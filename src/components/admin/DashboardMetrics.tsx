@@ -90,13 +90,13 @@ export function DashboardMetrics() {
           .gte('created_at', new Date().toISOString().split('T')[0]),
       ])
 
-      const totalRevenue = ordersResult.data?.reduce((sum, order) => sum + order.total, 0) || 0
-      const totalOrders = ordersResult.data?.length || 0
-      const totalProducts = productsResult.data?.length || 0
+      const totalRevenue = (ordersResult.data as Array<{ total: number }> | null)?.reduce((sum, order) => sum + order.total, 0) || 0
+      const totalOrders = (ordersResult.data as Array<{ total: number }> | null)?.length || 0
+      const totalProducts = (productsResult.data as Array<{ id: string; stock: number }> | null)?.length || 0
       const totalUsers = usersResult.count || 0
-      const lowStockProducts = lowStockResult.data?.length || 0
-      const pendingOrders = pendingOrdersResult.data?.length || 0
-      const todayRevenue = todayOrdersResult.data?.reduce((sum, order) => sum + order.total, 0) || 0
+      const lowStockProducts = (lowStockResult.data as Array<{ id: string }> | null)?.length || 0
+      const pendingOrders = (pendingOrdersResult.data as Array<{ id: string }> | null)?.length || 0
+      const todayRevenue = (todayOrdersResult.data as Array<{ total: number }> | null)?.reduce((sum, order) => sum + order.total, 0) || 0
       const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
       setMetrics({

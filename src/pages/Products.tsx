@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 import { ProductCard } from '@/components/features/ProductCard'
 import { ProductListItem } from '@/components/features/ProductListItem'
-import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { formatPrice } from '@/lib/utils'
-import type { Product, Category } from '@/types'
-import { X, Filter } from 'lucide-react'
+import { Input } from '@/components/ui/Input'
+import { supabase } from '@/lib/supabase'
+import type { Category, Product } from '@/types'
+import { Filter, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
 
 export function Products() {
   const [products, setProducts] = useState<Product[]>([])

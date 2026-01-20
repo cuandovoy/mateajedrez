@@ -1,18 +1,16 @@
-import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
-import { ShoppingCart, ArrowLeft } from 'lucide-react'
+import { ProductCard } from '@/components/features/ProductCard'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
-import { ProductCard } from '@/components/features/ProductCard'
+import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
 import { useCartStore } from '@/store/cartStore'
-import { useAuthStore } from '@/store/authStore'
 import type { Product, ProductWithCategory } from '@/types'
+import { ArrowLeft, ShoppingCart } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>()
-  const { user } = useAuthStore()
   const { addToCart } = useCartStore()
   const [product, setProduct] = useState<ProductWithCategory | null>(null)
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([])
@@ -34,7 +32,7 @@ export function ProductDetail() {
           *,
           category:categories(*)
         `)
-        .eq('id', id)
+        .eq('id', id as string)
         .eq('is_active', true)
         .single()
 
@@ -43,11 +41,11 @@ export function ProductDetail() {
       setProduct(data as ProductWithCategory)
 
       // Fetch related products
-      if (data?.category_id) {
+      if ((data as ProductWithCategory)?.category_id) {
         const { data: related, error: relatedError } = await supabase
           .from('products')
           .select('*')
-          .eq('category_id', data.category_id)
+          .eq('category_id', (data as ProductWithCategory).category_id)
           .eq('is_active', true)
           .neq('id', id)
           .limit(4)

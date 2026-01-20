@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ArrowLeft, Filter, X } from 'lucide-react'
 import type { Product, Category } from '@/types'
+import { PostgrestError } from '@supabase/supabase-js'
 
 export function CategoryProducts() {
   const { categorySlug } = useParams<{ categorySlug: string }>()
@@ -37,7 +38,7 @@ export function CategoryProducts() {
 
     try {
       // Fetch parent category by slug
-      const { data: categoryData, error: categoryError } = await supabase
+      const { data: categoryData = null, error: categoryError }: { data: Category | null, error: PostgrestError | null } = await supabase
         .from('categories')
         .select('*')
         .eq('slug', categorySlug)
@@ -50,20 +51,20 @@ export function CategoryProducts() {
         setParentCategory(categoryData)
 
         // Fetch subcategories
-        const { data: subcats, error: subcatsError } = await supabase
+        const { data: subcats, error: subcatsError }: { data: Category[] | null, error: PostgrestError | null } = await supabase
           .from('categories')
           .select('*')
-          .eq('parent_id', categoryData.id)
+          .eq('parent_id', categoryData?.id as string)
           .order('name')
 
         if (!subcatsError && subcats) {
           setSubcategories(subcats)
           // Por defecto, todas las subcategorías están seleccionadas
-          setSelectedSubcategories(subcats.map((cat) => cat.id))
+          setSelectedSubcategories(subcats?.map((cat) => cat.id as string) || [])
         }
 
         // Fetch products initially
-        await fetchProductsForCategory(categoryData.id, subcats || [])
+        await fetchProductsForCategory(categoryData?.id as string, subcats?.map((cat) => cat) || [])
       }
     } catch (error) {
       console.error('Error fetching category:', error)
@@ -77,7 +78,7 @@ export function CategoryProducts() {
       // Build category IDs array (parent + all subcategories)
       const allCategoryIds = [parentId]
       if (subcats.length > 0) {
-        allCategoryIds.push(...subcats.map((cat) => cat.id))
+        allCategoryIds.push(...subcats.map((cat) => cat.id as string))
       }
 
       let query = supabase
@@ -88,7 +89,7 @@ export function CategoryProducts() {
       // Filter by selected subcategories
       if (subcats.length === 0) {
         // Si no hay subcategorías, mostrar solo productos de la categoría padre
-        query = query.eq('category_id', parentId)
+        query = query.eq('category_id', parentId as string)
       } else if (
         selectedSubcategories.length === 0 ||
         selectedSubcategories.length === subcats.length
@@ -97,7 +98,7 @@ export function CategoryProducts() {
         query = query.in('category_id', allCategoryIds)
       } else {
         // Si hay algunas seleccionadas, filtrar solo por las seleccionadas
-        query = query.in('category_id', selectedSubcategories)
+        query = query.in('category_id', selectedSubcategories as string[])
       }
 
       if (priceRange.min) {
@@ -143,12 +144,12 @@ export function CategoryProducts() {
       setSelectedSubcategories([])
     } else {
       // Seleccionar todas
-      setSelectedSubcategories(subcategories.map((cat) => cat.id))
+      setSelectedSubcategories(subcategories.map((cat) => cat.id as string))
     }
   }
 
   const clearFilters = () => {
-    setSelectedSubcategories(subcategories.map((cat) => cat.id))
+    setSelectedSubcategories(subcategories.map((cat) => cat.id as string))
     setPriceRange({ min: '', max: '' })
     setSearchTerm('')
   }
@@ -190,9 +191,9 @@ export function CategoryProducts() {
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">{parentCategory.name}</h1>
-        {parentCategory.description && (
-          <p className="text-gray-600">{parentCategory.description}</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">{parentCategory?.name}</h1>
+        {parentCategory?.description && (
+          <p className="text-gray-600">{parentCategory?.description}</p>
         )}
         <div className="flex flex-col md:flex-row gap-4 mt-4">
           <Input
@@ -259,13 +260,13 @@ export function CategoryProducts() {
                     </label>
                     {subcategories.map((subcat) => (
                       <label
-                        key={subcat.id}
+                        key={subcat.id as string}
                         className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
                       >
                         <input
                           type="checkbox"
-                          checked={selectedSubcategories.includes(subcat.id)}
-                          onChange={() => handleSubcategoryToggle(subcat.id)}
+                          checked={selectedSubcategories.includes(subcat.id as string as string)}
+                          onChange={() => handleSubcategoryToggle(subcat.id as string)}
                           className="h-4 w-4 text-primary-200 focus:ring-primary-200 border-gray-300 rounded"
                         />
                         <span className="text-sm text-gray-700">{subcat.name}</span>
@@ -340,13 +341,13 @@ export function CategoryProducts() {
                       </label>
                       {subcategories.map((subcat) => (
                         <label
-                          key={subcat.id}
+                          key={subcat.id as string}
                           className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
                         >
                           <input
                             type="checkbox"
-                            checked={selectedSubcategories.includes(subcat.id)}
-                            onChange={() => handleSubcategoryToggle(subcat.id)}
+                            checked={selectedSubcategories.includes(subcat.id as string)}
+                            onChange={() => handleSubcategoryToggle(subcat.id as string)}
                             className="h-4 w-4 text-primary-200 focus:ring-primary-200 border-gray-300 rounded"
                           />
                           <span className="text-sm text-gray-700">{subcat.name}</span>

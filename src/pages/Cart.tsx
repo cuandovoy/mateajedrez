@@ -1,13 +1,12 @@
-import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Trash2, Plus, Minus, AlertTriangle } from 'lucide-react'
-import { useCartStore } from '@/store/cartStore'
-import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { formatPrice } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import { cn } from '@/lib/utils'
+import { cn, formatPrice } from '@/lib/utils'
+import { useAuthStore } from '@/store/authStore'
+import { useCartStore } from '@/store/cartStore'
+import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 function CartContent() {
   const navigate = useNavigate()
@@ -38,10 +37,10 @@ function CartContent() {
 
       const warnings: Record<string, { available: number; requested: number }> = {}
       items.forEach((item) => {
-        const product = products.find(p => p.id === item.product_id)
-        if (product && (product.stock < item.quantity || !product.is_active)) {
+        const product = products.find((p: { id: string; stock: number; is_active: boolean }) => p.id === item.product_id)
+        if (product && ((product as { stock: number }).stock < item.quantity || !(product as { is_active: boolean }).is_active)) {
           warnings[item.id] = {
-            available: product.stock,
+            available: (product as { stock: number }).stock,
             requested: item.quantity,
           }
         }

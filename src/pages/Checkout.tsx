@@ -191,13 +191,13 @@ export function Checkout() {
 
       // Update user profile with shipping info if user is logged in
       if (user) {
-        await supabase
-          .from('user_profiles')
+        await (supabase
+          .from('user_profiles') as any)
           .update({
             full_name: formData.fullName,
             phone: formData.phone,
-            address: shippingAddress as any,
-          } as any)
+            address: shippingAddress,
+          })
           .eq('user_id', user.id)
       }
 

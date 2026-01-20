@@ -85,12 +85,8 @@ export function AdminOrders() {
       let filteredData = data || []
       if (searchTerm) {
         filteredData = filteredData.filter((order) => {
-          const orderId = order.id.toLowerCase()
-          const shippingAddress = order.shipping_address as {
-            fullName?: string
-            phone?: string
-            address?: string
-          }
+          const orderId = (order as { id: string }).id.toLowerCase()
+          const shippingAddress = (order as { shipping_address: { fullName?: string; phone?: string; address?: string } }).shipping_address
           const searchLower = searchTerm.toLowerCase()
           return (
             orderId.includes(searchLower) ||

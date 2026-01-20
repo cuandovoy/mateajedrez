@@ -48,7 +48,7 @@ export function OrderConfirmation() {
             )
           )
         `)
-        .eq('id', id)
+        .eq('id', id as string)
         .single()
 
       if (error) throw error
@@ -131,14 +131,14 @@ export function OrderConfirmation() {
               <div className="border-t pt-4">
                 <p className="text-sm font-medium text-gray-700 mb-2">Dirección de Envío</p>
                 <div className="text-sm text-gray-600">
-                  <p>{order.shipping_address.fullName}</p>
-                  <p>{order.shipping_address.address}</p>
+                  <p>{(order.shipping_address as { fullName: string }).fullName}</p>
+                  <p>{(order.shipping_address as { address: string }).address}</p>
                   <p>
-                    {order.shipping_address.city}, {order.shipping_address.state}{' '}
-                    {order.shipping_address.zipCode}
+                    {(order.shipping_address as { city: string }).city}, {(order.shipping_address as { state: string }).state}{' '}
+                    {(order.shipping_address as { zipCode: string }).zipCode}
                   </p>
-                  <p>{order.shipping_address.country}</p>
-                  <p className="mt-2">Tel: {order.shipping_address.phone}</p>
+                  <p>{(order.shipping_address as { country: string }).country}</p>
+                  <p className="mt-2">Tel: {(order.shipping_address as { phone: string | number }).phone}</p>
                 </div>
               </div>
             )}

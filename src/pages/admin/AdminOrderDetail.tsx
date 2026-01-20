@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
-import { ArrowLeft, Package, MapPin, Phone, User, CreditCard, Calendar } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
+import { ArrowLeft, Calendar, CreditCard, MapPin, Package, Phone, User } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useParams } from 'react-router-dom'
 
 const getStatusLabel = (status: string): string => {
   const statusMap: Record<string, string> = {
@@ -40,7 +40,6 @@ interface OrderWithItems extends Order {
 
 export function AdminOrderDetail() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
@@ -49,6 +48,7 @@ export function AdminOrderDetail() {
     if (id) {
       fetchOrder()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const fetchOrder = async () => {
@@ -68,33 +68,36 @@ export function AdminOrderDetail() {
             )
           )
         `)
-        .eq('id', id)
+        .eq('id', id as string)
         .single()
 
       if (orderError) throw orderError
+      if (!orderData) return
+
+      const order = orderData as OrderWithItems
 
       // Fetch user profile if user_id exists
-      let userProfile = null
-      if (orderData.user_id) {
+      let userProfile: { full_name: string | null; email: string } | null = null
+      if (order.user_id) {
         const { data: profileData } = await supabase
           .from('user_profiles')
           .select('full_name')
-          .eq('user_id', orderData.user_id)
+          .eq('user_id', order.user_id)
           .single()
 
         if (profileData) {
           userProfile = {
-            full_name: profileData.full_name,
+            full_name: (profileData as { full_name: string }).full_name,
             email: 'N/A', // Email not available without admin functions
           }
         }
       }
 
       setOrder({
-        ...orderData,
-        order_items: orderData.order_items || [],
+        ...order,
+        order_items: order.order_items || [],
         user_profile: userProfile,
-      })
+      } as OrderWithItems)
     } catch (error) {
       console.error('Error fetching order:', error)
     } finally {
@@ -107,10 +110,10 @@ export function AdminOrderDetail() {
 
     setUpdating(true)
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', id)
+      const { error } = await (supabase
+        .from('orders') as any)
+        .update({ status: newStatus } as any)
+        .eq('id', id as string)
 
       if (error) throw error
 

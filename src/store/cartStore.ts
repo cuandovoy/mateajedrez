@@ -1,6 +1,7 @@
-import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import type { CartItemWithProduct, Product } from '@/types'
+import type { CartItem, CartItemWithProduct, Product } from '@/types'
+import { PostgrestError } from '@supabase/supabase-js'
+import { create } from 'zustand'
 import { useAuthStore } from './authStore'
 import { useToastStore } from './toastStore'
 
@@ -45,7 +46,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         if (error) throw error
 
         set({
-          items: (data || []).map((item: any) => ({
+          items: (data || []).map((item: CartItem & { product: Product }) => ({
             ...item,
             product: item.product,
           })) as CartItemWithProduct[],
@@ -78,7 +79,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         return
       }
 
-      const { data: products, error } = await supabase
+      const { data: products, error }: { data: Product[] | null, error: PostgrestError | null } = await supabase
         .from('products')
         .select('*')
         .in('id', productIds)
@@ -123,12 +124,8 @@ export const useCartStore = create<CartState>((set, get) => ({
       
       // Sync each item to database
       for (const localItem of localItems) {
-        const existingLocalItem = localItems.find(
-          li => li.product_id === localItem.product_id
-        )
-
         // Check if item exists in database
-        const { data: dbItem } = await supabase
+        const { data: dbItem }: { data: CartItem | null, error: PostgrestError | null } = await supabase
           .from('cart_items')
           .select('*')
           .eq('user_id', user.id)
@@ -137,14 +134,14 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         if (dbItem) {
           // Update quantity
-          await supabase
-            .from('cart_items')
-            .update({ quantity: dbItem.quantity + localItem.quantity })
-            .eq('id', dbItem.id)
+          await (supabase
+            .from('cart_items') as any)
+            .update({ quantity: (dbItem?.quantity || 0) + localItem.quantity })
+            .eq('id', dbItem?.id as string)
         } else {
           // Insert new item
-          await supabase
-            .from('cart_items')
+          await (supabase
+            .from('cart_items') as any)
             .insert({
               user_id: user.id,
               product_id: localItem.product_id,
@@ -168,7 +165,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     try {
       // First, check stock availability
-      const { data: product, error: productError } = await supabase
+      const { data: product, error: productError }: { data: Product | null, error: PostgrestError | null } = await supabase
         .from('products')
         .select('id, name, stock, is_active')
         .eq('id', productId)
@@ -176,7 +173,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
       if (productError) throw productError
 
-      if (!product.is_active) {
+      if (!product?.is_active) {
         useToastStore.getState().show('Este producto no está disponible', 'error')
         throw new Error('Product is not active')
       }
@@ -217,8 +214,8 @@ export const useCartStore = create<CartState>((set, get) => ({
 
       if (user) {
         // User is logged in - save to database
-        const { data, error } = await supabase
-          .from('cart_items')
+        const { data, error } = await (supabase
+          .from('cart_items') as any)
           .insert({
             user_id: user.id,
             product_id: productId,
@@ -233,9 +230,9 @@ export const useCartStore = create<CartState>((set, get) => ({
         if (error) throw error
 
         const newItem = {
-          ...data,
-          product: (data as any).product,
-        } as CartItemWithProduct
+          ...(data as CartItem),
+          product: (data as Product & { product: Product }).product,
+        } as CartItem & { product: Product }
 
         set({
           items: [
@@ -295,7 +292,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         // Show toast notification
         useToastStore.getState().show(
-          `${product.name} agregado al carrito`,
+          `${(product as Product).name} agregado al carrito`,
           'success'
         )
       }
@@ -320,8 +317,8 @@ export const useCartStore = create<CartState>((set, get) => ({
       
       if (user && !itemId.startsWith('local_')) {
         // Update in database
-        const { error } = await supabase
-          .from('cart_items')
+        const { error } = await (supabase
+          .from('cart_items') as any)
           .update({ quantity })
           .eq('id', itemId)
 
