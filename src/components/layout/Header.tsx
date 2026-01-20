@@ -66,11 +66,14 @@ export function Header() {
   return (
     <header className="bg-primary-200 shadow-sm border-primary-300 sticky top-0 z-30">
       <div className="container-custom">
-        <div className="flex items-center justify-between h-16 my-2">
-          <Link to="/" className="flex items-center space-x-3">
-            <img src="/logo.svg" alt="Flormaria Soria González" className="h-16 w-16" />
-          </Link>
+        <div className="flex items-center h-16 my-2">
+          <div className="flex-1">
+            <Link to="/" className="flex items-center space-x-3">
+              <img src="/logo.svg" alt="Flormaria Soria González" className="h-16 w-16" />
+            </Link>
+          </div>
 
+          <div className="flex-1 flex justify-center">
             <Dropdown
               options={categories.map((category) => ({
                 value: category.slug,
@@ -80,8 +83,9 @@ export function Header() {
               placeholder="Accesorios"
               onSelect={handleCategoryChange}
             />
-          <nav className="hidden lg:flex items-center space-x-4">
+          </div>
 
+          <div className="flex-1 flex justify-end items-center space-x-4">
             <Link to="/cart" className="relative">
               <Button variant="ghost" className="text-white hover:text-gray-700" size="sm">
                 <ShoppingCart className="h-5 w-5" />
@@ -93,36 +97,38 @@ export function Header() {
               </Button>
             </Link>
 
-            {user ? (
-              <>
-                {isAdmin && (
-                  <Link to="/admin">
+            <nav className="hidden lg:flex items-center space-x-4">
+              {user ? (
+                <>
+                  {isAdmin && (
+                    <Link to="/admin">
+                      <Button variant="ghost" className="text-white hover:text-gray-700" size="sm">
+                        <LayoutDashboard className="h-5 w-5 mr-2" />
+                        Panel Admin
+                      </Button>
+                    </Link>
+                  )}
+                  <div className="flex items-center space-x-2">
+                    <User className="h-5 w-5 text-gray-600" />
+                    <span className="text-sm text-gray-700">
+                      {user.email}
+                    </span>
+                  </div>
+                  <Button variant="ghost" className="text-white hover:text-gray-700" size="sm" onClick={handleSignOut}>
+                    <LogOut className="h-5 w-5" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Link to="/login">
                     <Button variant="ghost" className="text-white hover:text-gray-700" size="sm">
-                      <LayoutDashboard className="h-5 w-5 mr-2" />
-                      Panel Admin
+                      Iniciar Sesión
                     </Button>
                   </Link>
-                )}
-                <div className="flex items-center space-x-2">
-                  <User className="h-5 w-5 text-gray-600" />
-                  <span className="text-sm text-gray-700">
-                    {user.email}
-                  </span>
-                </div>
-                <Button variant="ghost" className="text-white hover:text-gray-700" size="sm" onClick={handleSignOut}>
-                  <LogOut className="h-5 w-5" />
-                </Button>
-              </>
-            ) : (
-              <>
-                <Link to="/login">
-                  <Button variant="ghost" className="text-white hover:text-gray-700" size="sm">
-                    Iniciar Sesión
-                  </Button>
-                </Link>
-              </>
-            )}
-          </nav>
+                </>
+              )}
+            </nav>
+          </div>
         </div>
       </div>
     </header>

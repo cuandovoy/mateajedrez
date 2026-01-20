@@ -89,21 +89,21 @@ export function Home() {
 
   return (
     <div className="bg-primary-50">
-      {/* Banner Section - Full Height */}
-      <div className="min-h-screen flex flex-col justify-center items-center py-12">
-        <div className="container-custom w-full">
-          <div className="flex justify-center mb-8">
+      {/* Banner Section - Responsive Height */}
+      <div className="min-h-[60vh] md:min-h-screen flex flex-col justify-center items-center py-8 md:py-12">
+        <div className="container-custom w-full px-4">
+          <div className="flex justify-center mb-6 md:mb-8">
             <div className="relative w-full max-w-6xl">
               <img
                 src="/banner1.png"
                 alt="Banner Flormaria Soria González"
-                className="w-full h-auto rounded-lg shadow-lg object-cover"
+                className="w-full h-auto rounded-lg shadow-lg object-cover max-h-[50vh] md:max-h-none"
               />
             </div>
           </div>
           <div className="flex justify-center">
             <Link to="/products">
-              <Button size="lg" className="px-8 py-3">
+              <Button size="lg" className="px-6 py-2.5 md:px-8 md:py-3 text-sm md:text-base">
                 Ver colección
               </Button>
             </Link>
@@ -153,14 +153,14 @@ export function Home() {
             {/* Vista Cards para móvil y tablet */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-6">
               {filteredProducts.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} noAddToCart={true} />
               ))}
             </div>
 
             {/* Vista Lista para desktop */}
             <div className="hidden lg:block space-y-4">
               {filteredProducts.map((product) => (
-                <ProductListItem key={product.id} product={product} />
+                <ProductListItem key={product.id} product={product} noAddToCart={true} />
               ))}
             </div>
           </>

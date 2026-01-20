@@ -60,18 +60,17 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
       <button
         type="button"
         className={cn(
-          'flex items-center justify-between w-full px-4 py-2 text-sm font-medium',
+          'flex items-center justify-between w-full px-5 py-2.5 text-base font-medium',
           'bg-transparent border border-transparent rounded-lg',
           'hover:bg-white/20 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50',
           'transition-all duration-200',
-          'min-w-[180px]',
-          'text-gray-800',
-          'text-lg'
+          'min-w-[220px]',
+          'text-gray-800'
         )}
       >
         <span className={cn(
           'truncate',
-          selectedOption ? 'text-gray-800 font-semibold' : 'text-white'
+          selectedOption ? 'text-gray-800 font-semibold text-xl' : 'text-white'
         )}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
@@ -79,7 +78,7 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
 
       {isOpen && (
         <div 
-          className="absolute z-20 left-1/2 transform -translate-x-1/2 mt-2 bg-white/95 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl overflow-hidden min-w-[180px]"
+          className="absolute z-20 left-1/2 transform -translate-x-1/2 mt-2 bg-white/95 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl overflow-hidden min-w-[220px]"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
@@ -95,7 +94,7 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
                   type="button"
                   onClick={() => handleSelect(option.value)}
                   className={cn(
-                    'w-full px-4 py-2.5 text-left text-sm transition-all duration-150',
+                    'w-full px-5 py-3 text-left text-base transition-all duration-150',
                     (() => {
                       const isAdminContext = typeof document !== 'undefined' && document.body.classList.contains('admin-theme')
                       return isAdminContext

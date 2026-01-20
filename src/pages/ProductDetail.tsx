@@ -133,7 +133,7 @@ export function ProductDetail() {
               </span>
             )}
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
-            <p className="text-2xl font-bold text-primary-200 mb-4">
+            <p className="text-2xl font-bold text-primary-500 mb-4">
               {formatPrice(selectedVariant?.price ?? product.price)}
             </p>
           </div>

@@ -8,9 +8,10 @@ import { useState } from 'react'
 
 interface ProductListItemProps {
   product: Product
+  noAddToCart?: boolean
 }
 
-export function ProductListItem({ product }: ProductListItemProps) {
+export function ProductListItem({ product, noAddToCart = false }: ProductListItemProps) {
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
 
@@ -65,15 +66,15 @@ export function ProductListItem({ product }: ProductListItemProps) {
             </div>
           </div>
           <div className="md:w-48 flex-shrink-0">
-            <Button
+            {!noAddToCart && <Button
               className="w-full"
               onClick={handleAddToCart}
               disabled={product.stock === 0 || isAdding}
               isLoading={isAdding}
             >
-              <ShoppingCart className="h-4 w-4 mr-2" />
+              {!noAddToCart && <ShoppingCart className="h-4 w-4 mr-2" />}
               Agregar al carrito
-            </Button>
+            </Button>}
           </div>
         </div>
       </div>
