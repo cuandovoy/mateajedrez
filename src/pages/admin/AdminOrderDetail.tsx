@@ -111,7 +111,7 @@ export function AdminOrderDetail() {
     setUpdating(true)
     try {
       const { error } = await (supabase
-        .from('orders'))
+        .from('orders') as any)
         .update({ status: newStatus })
         .eq('id', id as string)
 
