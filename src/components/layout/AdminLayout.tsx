@@ -46,6 +46,14 @@ export function AdminLayout() {
     { path: '/admin/users', label: 'Usuarios', icon: Users },
   ]
 
+  // Apply admin theme class to body when component mounts
+  useEffect(() => {
+    document.body.classList.add('admin-theme')
+    return () => {
+      document.body.classList.remove('admin-theme')
+    }
+  }, [])
+
   const isActive = (path: string) => {
     if (path === '/admin') {
       return location.pathname === '/admin'
@@ -56,7 +64,7 @@ export function AdminLayout() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>
       </div>
     )
   }
@@ -73,7 +81,7 @@ export function AdminLayout() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <Link to="/admin" className="flex items-center space-x-2">
-                <LayoutDashboard className="h-6 w-6 text-primary-600" />
+                <LayoutDashboard className="h-6 w-6 text-admin-600" />
                 <span className="text-xl font-bold text-gray-900">Admin Panel</span>
               </Link>
             </div>
@@ -110,7 +118,7 @@ export function AdminLayout() {
                       className={cn(
                         'flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors',
                         active
-                          ? 'bg-primary-50 text-primary-700 font-medium'
+                          ? 'bg-admin-50 text-admin-700 font-medium'
                           : 'text-gray-700 hover:bg-gray-100'
                       )}
                     >

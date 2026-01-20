@@ -20,7 +20,16 @@ const getStatusLabel = (status: string): string => {
 
 interface OrderWithItems extends Order {
   payment_method?: 'transfer' | 'mercadopago'
-  order_items: Array<OrderItem & { product: { name: string; image_url: string | null } }>
+  order_items: Array<OrderItem & { 
+    product: { name: string; image_url: string | null }
+    variant?: { 
+      id: string
+      name: string | null
+      sku: string
+      attributes: any
+      image_url: string | null
+    } | null
+  }>
 }
 
 export function OrderConfirmation() {
@@ -44,6 +53,13 @@ export function OrderConfirmation() {
             *,
             product:products (
               name,
+              image_url
+            ),
+            variant:product_variants (
+              id,
+              name,
+              sku,
+              attributes,
               image_url
             )
           )
@@ -151,26 +167,49 @@ export function OrderConfirmation() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {order.order_items?.map((item) => (
-                <div key={item.id} className="flex items-center space-x-4">
-                  {item.product.image_url && (
-                    <img
-                      src={item.product.image_url}
-                      alt={item.product.name}
-                      className="w-16 h-16 object-cover rounded"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <p className="font-medium">{item.product.name}</p>
-                    <p className="text-sm text-gray-600">
-                      Cantidad: {item.quantity} × {formatPrice(item.price)}
+              {order.order_items?.map((item) => {
+                const variant = item.variant
+                const displayImage = variant?.image_url || item.product.image_url
+                
+                return (
+                  <div key={item.id} className="flex items-center space-x-4">
+                    {displayImage && (
+                      <img
+                        src={displayImage}
+                        alt={item.product.name}
+                        className="w-16 h-16 object-cover rounded"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-medium">{item.product.name}</p>
+                      {variant && (
+                        <div className="mt-1 space-y-1">
+                          {variant.name && (
+                            <p className="text-sm font-medium text-gray-700">
+                              Variante: {variant.name}
+                            </p>
+                          )}
+                          {variant.attributes && typeof variant.attributes === 'object' && (
+                            <div className="flex flex-wrap gap-1">
+                              {Object.entries(variant.attributes as Record<string, string>).map(([key, value]) => (
+                                <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                                  {key}: {value}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-sm text-gray-600">
+                        Cantidad: {item.quantity} × {formatPrice(item.price)}
+                      </p>
+                    </div>
+                    <p className="font-semibold">
+                      {formatPrice(item.price * item.quantity)}
                     </p>
                   </div>
-                  <p className="font-semibold">
-                    {formatPrice(item.price * item.quantity)}
-                  </p>
-                </div>
-              ))}
+                )
+              })}
             </div>
             <div className="border-t mt-4 pt-4">
               <div className="flex justify-between text-lg font-bold">

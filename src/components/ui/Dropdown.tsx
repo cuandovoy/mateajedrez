@@ -65,7 +65,8 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
           'hover:bg-white/20 hover:border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50',
           'transition-all duration-200',
           'min-w-[180px]',
-          'text-gray-800'
+          'text-gray-800',
+          'text-lg'
         )}
       >
         <span className={cn(
@@ -95,8 +96,18 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
                   onClick={() => handleSelect(option.value)}
                   className={cn(
                     'w-full px-4 py-2.5 text-left text-sm transition-all duration-150',
-                    'hover:bg-primary-50 hover:text-primary-700 focus:bg-primary-50 focus:outline-none',
-                    value === option.value && 'bg-primary-100 text-primary-700 font-medium'
+                    (() => {
+                      const isAdminContext = typeof document !== 'undefined' && document.body.classList.contains('admin-theme')
+                      return isAdminContext
+                        ? 'hover:bg-admin-50 hover:text-admin-700 focus:bg-admin-50 focus:outline-none'
+                        : 'hover:bg-primary-50 hover:text-primary-700 focus:bg-primary-50 focus:outline-none'
+                    })(),
+                    (() => {
+                      const isAdminContext = typeof document !== 'undefined' && document.body.classList.contains('admin-theme')
+                      return value === option.value 
+                        ? (isAdminContext ? 'bg-admin-100 text-admin-700 font-medium' : 'bg-primary-100 text-primary-700 font-medium')
+                        : ''
+                    })()
                   )}
                 >
                   {option.label}

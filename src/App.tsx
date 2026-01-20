@@ -13,6 +13,7 @@ import { AdminDashboard } from '@/pages/admin/AdminDashboard'
 import { AdminProducts } from '@/pages/admin/AdminProducts'
 import { AdminOrders } from '@/pages/admin/AdminOrders'
 import { AdminOrderDetail } from '@/pages/admin/AdminOrderDetail'
+import { AdminUsers } from '@/pages/admin/AdminUsers'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
@@ -55,6 +56,7 @@ function App() {
           <Route path="/admin/categories" element={<AdminCategories />} />
           <Route path="/admin/orders" element={<AdminOrders />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
         </Route>
 
         {/* Ruta por defecto */}

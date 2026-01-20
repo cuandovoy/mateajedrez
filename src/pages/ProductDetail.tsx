@@ -1,4 +1,5 @@
 import { ProductCard } from '@/components/features/ProductCard'
+import { VariantSelector } from '@/components/features/VariantSelector'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
@@ -17,6 +18,8 @@ export function ProductDetail() {
   const [loading, setLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
   const [quantity, setQuantity] = useState(1)
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
+  const [selectedVariant, setSelectedVariant] = useState<any>(null)
 
   useEffect(() => {
     if (id) {
@@ -66,7 +69,7 @@ export function ProductDetail() {
 
     setIsAdding(true)
     try {
-      await addToCart(product.id, quantity)
+      await addToCart(product.id, quantity, selectedVariantId || undefined)
     } catch (error) {
       console.error('Error adding to cart:', error)
     } finally {
@@ -108,9 +111,9 @@ export function ProductDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         {/* Imagen del producto */}
         <div>
-          {product.image_url ? (
+          {(selectedVariant?.image_url || product.image_url) ? (
             <img
-              src={product.image_url}
+              src={selectedVariant?.image_url || product.image_url || ''}
               alt={product.name}
               className="w-full h-auto rounded-lg shadow-lg object-cover"
             />
@@ -131,7 +134,7 @@ export function ProductDetail() {
             )}
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
             <p className="text-2xl font-bold text-primary-200 mb-4">
-              {formatPrice(product.price)}
+              {formatPrice(selectedVariant?.price ?? product.price)}
             </p>
           </div>
 
@@ -146,16 +149,36 @@ export function ProductDetail() {
               <span className="text-sm font-medium text-gray-700">SKU: </span>
               <span className="text-sm text-gray-600">{product.sku}</span>
             </div>
-            <div>
-              <span className="text-sm font-medium text-gray-700">Stock: </span>
-              {product.stock > 0 ? (
-                <span className="text-sm text-green-600 font-medium">
-                  {product.stock} unidades disponibles
-                </span>
-              ) : (
-                <span className="text-sm text-red-600 font-medium">Sin stock</span>
-              )}
-            </div>
+          </div>
+
+          {/* Variant Selector - Solo permite seleccionar una variante a la vez */}
+          <div className="mb-6">
+            <VariantSelector
+              product={product}
+              selectedVariantId={selectedVariantId}
+              onVariantChange={(variantId) => {
+                setSelectedVariantId(variantId)
+                // Fetch variant details to get stock, price, and image
+                if (variantId) {
+                  supabase
+                    .from('product_variants')
+                    .select('*')
+                    .eq('id', variantId)
+                    .single()
+                    .then(({ data }) => {
+                      if (data) {
+                        setSelectedVariant(data)
+                        // Reset quantity to 1 when variant changes
+                        setQuantity(1)
+                      }
+                    })
+                } else {
+                  setSelectedVariant(null)
+                  // Reset quantity to 1 when variant is cleared
+                  setQuantity(1)
+                }
+              }}
+            />
           </div>
 
           <Card className="mb-6">
@@ -175,17 +198,25 @@ export function ProductDetail() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setQuantity(Math.min(product.stock, quantity + 1))}
-                    disabled={quantity >= product.stock}
+                    onClick={() => {
+                      const maxStock = selectedVariant?.stock ?? product.stock
+                      setQuantity(Math.min(maxStock, quantity + 1))
+                    }}
+                    disabled={quantity >= (selectedVariant?.stock ?? product.stock)}
                   >
                     +
                   </Button>
                 </div>
               </div>
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">
+                  Stock disponible: <span className="font-semibold">{selectedVariant?.stock ?? product.stock} {selectedVariant?.unit || product.unit || 'unidad'}</span>
+                </p>
+              </div>
               <Button
                 className="w-full"
                 onClick={handleAddToCart}
-                disabled={product.stock === 0 || isAdding}
+                disabled={(selectedVariant?.stock ?? product.stock) === 0 || isAdding}
                 isLoading={isAdding}
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />

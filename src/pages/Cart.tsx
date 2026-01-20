@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { cn, formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
+import { Product, ProductVariant } from '@/types'
+import { PostgrestError } from '@supabase/supabase-js'
 import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -27,24 +29,39 @@ function CartContent() {
 
   const validateStock = async () => {
     try {
-      const productIds = items.map(item => item.product_id)
-      const { data: products } = await supabase
-        .from('products')
-        .select('id, stock, is_active')
-        .in('id', productIds)
-
-      if (!products) return
-
       const warnings: Record<string, { available: number; requested: number }> = {}
-      items.forEach((item) => {
-        const product = products.find((p: { id: string; stock: number; is_active: boolean }) => p.id === item.product_id)
-        if (product && ((product as { stock: number }).stock < item.quantity || !(product as { is_active: boolean }).is_active)) {
-          warnings[item.id] = {
-            available: (product as { stock: number }).stock,
-            requested: item.quantity,
+      
+      for (const item of items) {
+        if (item.variant_id) {
+          // Validate variant stock
+          const { data: variant }: { data: ProductVariant | null, error: PostgrestError | null } = await supabase
+            .from('product_variants')
+            .select('id, stock, is_active')
+            .eq('id', item.variant_id)
+            .single()
+          
+          if (variant && (variant.stock < item.quantity || !variant.is_active)) {
+            warnings[item.id] = {
+              available: variant.stock,
+              requested: item.quantity,
+            }
+          }
+        } else {
+          // Validate product stock (backward compatibility)
+          const { data: product }: { data: Product | null, error: PostgrestError | null } = await supabase
+            .from('products')
+            .select('id, stock, is_active')
+            .eq('id', item.product_id)
+            .single()
+          
+          if (product && (product.stock < item.quantity || !product.is_active)) {
+            warnings[item.id] = {
+              available: product.stock,
+              requested: item.quantity,
+            }
           }
         }
-      })
+      }
 
       setStockWarnings(warnings)
     } catch (error) {
@@ -106,9 +123,9 @@ function CartContent() {
                     </div>
                   )}
                   <div className="flex items-center space-x-4">
-                    {item.product.image_url && (
+                    {(item.variant?.image_url || item.product.image_url) && (
                       <img
-                        src={item.product.image_url}
+                        src={item.variant?.image_url || item.product.image_url || ''}
                         alt={item.product.name}
                         className="w-24 h-24 object-cover rounded"
                       />
@@ -117,12 +134,30 @@ function CartContent() {
                       <h3 className="text-lg font-semibold text-gray-900">
                         {item.product.name}
                       </h3>
-                      <p className="text-primary-600 font-bold">
-                        {formatPrice(item.product.price)}
+                      {item.variant && (
+                        <div className="mt-1 space-y-1">
+                          {item.variant.name && (
+                            <p className="text-sm text-gray-600 font-medium">
+                              {item.variant.name}
+                            </p>
+                          )}
+                          {item.variant.attributes && typeof item.variant.attributes === 'object' && (
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(item.variant.attributes as Record<string, string>).map(([key, value]) => (
+                                <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                  {key}: {value}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-primary-600 font-bold mt-2">
+                        {formatPrice(item.variant?.price ?? item.product.price)}
                       </p>
-                      {item.product.stock > 0 && (
+                      {(item.variant?.stock ?? item.product.stock) > 0 && (
                         <p className="text-xs text-gray-500 mt-1">
-                          Stock disponible: {item.product.stock}
+                          Stock disponible: {item.variant?.stock ?? item.product.stock} {item.variant?.unit || item.product.unit || 'unidad'}
                         </p>
                       )}
                     </div>
@@ -141,14 +176,14 @@ function CartContent() {
                         variant="outline"
                         size="sm"
                         onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        disabled={item.quantity >= item.product.stock}
+                        disabled={item.quantity >= (item.variant?.stock ?? item.product.stock)}
                       >
                         <Plus className="h-4 w-4" />
                       </Button>
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-gray-900">
-                        {formatPrice(item.product.price * item.quantity)}
+                        {formatPrice((item.variant?.price ?? item.product.price) * item.quantity)}
                       </p>
                       <Button
                         variant="ghost"

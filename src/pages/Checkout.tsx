@@ -87,37 +87,62 @@ export function Checkout() {
     setLoading(true)
 
     try {
-      // Validate stock before creating order
-      const productIds = items.map(item => {
-        const cartItem = item as CartItemWithProduct & { product_id: string; quantity: number }
-        return cartItem.product_id
-      })
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('id, name, stock, is_active')
-        .in('id', productIds)
-
-      if (productsError) throw productsError
-
-      // Check stock availability for each item
+      // Validate stock before creating order (check variants if available, otherwise products)
       const stockIssues: string[] = []
-      items.forEach((item) => {
-        const cartItem = item as CartItemWithProduct & { product_id: string; quantity: number }
-        const product = (products as Array<{ id: string; name: string; stock: number; is_active: boolean }> | null)?.find(p => p.id === cartItem.product_id)
-        if (!product) {
-          stockIssues.push(`Producto "${item.product.name}" no encontrado`)
-          return
+      
+      for (const item of items) {
+        const cartItem = item as CartItemWithProduct & { product_id: string; quantity: number; variant_id?: string | null }
+        
+        if (cartItem.variant_id) {
+          // Validate variant stock
+          const { data: variant, error: variantError } = await (supabase
+            .from('product_variants') as any)
+            .select('id, name, stock, is_active, product:products(id, name, is_active)')
+            .eq('id', cartItem.variant_id)
+            .single()
+          
+          if (variantError || !variant) {
+            stockIssues.push(`Variante de "${item.product.name}" no encontrada`)
+            continue
+          }
+          
+          const product = variant.product
+          if (!product?.is_active || !variant.is_active) {
+            stockIssues.push(`Variante de "${item.product.name}" no está disponible`)
+            continue
+          }
+          
+          if (variant.stock < cartItem.quantity) {
+            stockIssues.push(
+              `Variante "${variant.name || item.product.name}": Stock disponible ${variant.stock}, solicitado ${cartItem.quantity}`
+            )
+          }
+        } else {
+          // Validate product stock (backward compatibility)
+          const { data: product, error: productError } = await supabase
+            .from('products')
+            .select('id, name, stock, is_active')
+            .eq('id', cartItem.product_id)
+            .single()
+          
+          if (productError || !product) {
+            stockIssues.push(`Producto "${item.product.name}" no encontrado`)
+            continue
+          }
+          
+          const productData = product as { id: string; name: string; stock: number; is_active: boolean }
+          if (!productData.is_active) {
+            stockIssues.push(`Producto "${item.product.name}" no está disponible`)
+            continue
+          }
+          
+          if (productData.stock < cartItem.quantity) {
+            stockIssues.push(
+              `Producto "${item.product.name}": Stock disponible ${productData.stock}, solicitado ${cartItem.quantity}`
+            )
+          }
         }
-        if (!product.is_active) {
-          stockIssues.push(`Producto "${item.product.name}" no está disponible`)
-          return
-        }
-        if (product.stock < cartItem.quantity) {
-          stockIssues.push(
-            `Producto "${item.product.name}": Stock disponible ${product.stock}, solicitado ${cartItem.quantity}`
-          )
-        }
-      })
+      }
 
       if (stockIssues.length > 0) {
         show(
@@ -157,14 +182,17 @@ export function Checkout() {
 
       if (orderError || !order) throw orderError || new Error('Failed to create order')
 
-      // Create order items
+      // Create order items (include variant_id if available)
       const orderItems = items.map((item) => {
-        const cartItem = item as CartItemWithProduct & { product_id: string; quantity: number }
+        const cartItem = item as CartItemWithProduct & { product_id: string; quantity: number; variant_id?: string | null }
+        // Use variant price if available, otherwise product price
+        const price = item.variant?.price ?? item.product.price
         return {
           order_id: (order as { id: string }).id,
           product_id: cartItem.product_id,
+          variant_id: cartItem.variant_id || null,
           quantity: cartItem.quantity,
-          price: item.product.price,
+          price,
         }
       })
 
@@ -189,8 +217,9 @@ export function Checkout() {
       // Clear cart
       await clearCart()
 
-      // Update user profile with shipping info if user is logged in
+      // Create or update user profile
       if (user) {
+        // Update existing profile for logged in user
         await (supabase
           .from('user_profiles') as any)
           .update({
@@ -199,6 +228,37 @@ export function Checkout() {
             address: shippingAddress,
           })
           .eq('user_id', user.id)
+      } else {
+        // Create guest profile (without authentication)
+        // Check if a profile with this phone already exists
+        const { data: existingProfile } = await (supabase
+          .from('user_profiles') as any)
+          .select('id')
+          .eq('phone', formData.phone)
+          .is('user_id', null)
+          .maybeSingle()
+
+        if (!existingProfile) {
+          // Create new guest profile
+          await (supabase
+            .from('user_profiles') as any)
+            .insert({
+              user_id: null, // Guest profile without authentication
+              full_name: formData.fullName,
+              phone: formData.phone,
+              address: shippingAddress,
+              role: 'user',
+            })
+        } else {
+          // Update existing guest profile
+          await (supabase
+            .from('user_profiles') as any)
+            .update({
+              full_name: formData.fullName,
+              address: shippingAddress,
+            })
+            .eq('id', existingProfile.id)
+        }
       }
 
       show('¡Orden creada exitosamente!', 'success')

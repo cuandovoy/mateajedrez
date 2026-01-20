@@ -192,7 +192,7 @@ function AdminCategoriesContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>
       </div>
     )
   }
@@ -310,105 +310,129 @@ function AdminCategoriesContent() {
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
-            <CardHeader>
-              <CardTitle>
-                {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
-              </CardTitle>
+          <Card className="w-full max-w-2xl relative">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-2xl">
+                  {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
+                </CardTitle>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsModalOpen(false)
+                    setEditingCategory(null)
+                    setImageFile(null)
+                    setImagePreview(null)
+                    reset()
+                  }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                <Input
-                  label="Nombre"
-                  {...register('name')}
-                  error={errors.name?.message}
-                />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Descripción
-                  </label>
-                  <textarea
-                    {...register('description')}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    rows={3}
+            <CardContent className="px-6 pb-6 max-h-[85vh] overflow-y-auto">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="md:col-span-2">
+                    <Input
+                      label="Nombre"
+                      {...register('name')}
+                      error={errors.name?.message}
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Descripción
+                    </label>
+                    <textarea
+                      {...register('description')}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      rows={3}
+                    />
+                  </div>
+                  <Input
+                    label="Slug"
+                    {...register('slug')}
+                    error={errors.slug?.message}
+                    placeholder="ej: electronica"
                   />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Categoría Padre (opcional)
+                    </label>
+                    <select
+                      {...register('parent_id')}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                    >
+                      <option value="">Sin categoría padre (categoría principal)</option>
+                      {getParentCategories()
+                        .filter((cat) => !editingCategory || cat.id !== editingCategory.id)
+                        .map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name}
+                          </option>
+                        ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Selecciona una categoría padre para crear una subcategoría
+                    </p>
+                  </div>
                 </div>
-                <Input
-                  label="Slug"
-                  {...register('slug')}
-                  error={errors.slug?.message}
-                  placeholder="ej: electronica"
-                />
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Categoría Padre (opcional)
-                  </label>
-                  <select
-                    {...register('parent_id')}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  >
-                    <option value="">Sin categoría padre (categoría principal)</option>
-                    {getParentCategories()
-                      .filter((cat) => !editingCategory || cat.id !== editingCategory.id)
-                      .map((cat) => (
-                        <option key={cat.id} value={cat.id}>
-                          {cat.name}
-                        </option>
-                      ))}
-                  </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Selecciona una categoría padre para crear una subcategoría
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                
+                <div className="border-t pt-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
                     Imagen de la Categoría
                   </label>
-                  {imagePreview && (
-                    <div className="relative mb-4">
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full h-48 object-cover rounded-lg border border-gray-300"
-                      />
-                      <button
-                        type="button"
-                        onClick={removeImage}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      {imagePreview && (
+                        <div className="relative mb-3">
+                          <img
+                            src={imagePreview}
+                            alt="Preview"
+                            className="w-full h-32 object-cover rounded-lg border border-gray-300"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeImage}
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+                      <label className="cursor-pointer block">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          onChange={handleImageChange}
+                          className="hidden"
+                        />
+                        <div className="flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                          <Upload className="h-4 w-4 mr-2" />
+                          <span className="text-sm text-gray-700">
+                            {imageFile ? 'Cambiar imagen' : 'Subir imagen'}
+                          </span>
+                        </div>
+                      </label>
                     </div>
-                  )}
-                  <div className="flex items-center space-x-4">
-                    <label className="flex-1 cursor-pointer">
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                        onChange={handleImageChange}
-                        className="hidden"
+                    <div>
+                      <p className="text-xs text-gray-500 mb-2">
+                        O ingresa una URL de imagen
+                      </p>
+                      <Input
+                        label="URL de Imagen (opcional)"
+                        type="url"
+                        {...register('image_url')}
+                        error={errors.image_url?.message}
+                        placeholder="https://ejemplo.com/imagen.jpg"
                       />
-                      <div className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                        <Upload className="h-5 w-5 mr-2" />
-                        <span className="text-sm text-gray-700">
-                          {imageFile ? 'Cambiar imagen' : 'Subir imagen'}
-                        </span>
-                      </div>
-                    </label>
+                    </div>
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
-                    O ingresa una URL de imagen
-                  </p>
-                  <Input
-                    label="URL de Imagen (opcional)"
-                    type="url"
-                    {...register('image_url')}
-                    error={errors.image_url?.message}
-                    className="mt-2"
-                    placeholder="https://ejemplo.com/imagen.jpg"
-                  />
                 </div>
-                <div className="flex space-x-4">
+                <div className="flex space-x-4 pt-2">
                   <Button type="submit" className="flex-1" isLoading={uploadingImage}>
                     {editingCategory ? 'Actualizar' : 'Crear'}
                   </Button>

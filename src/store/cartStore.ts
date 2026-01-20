@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { CartItem, CartItemWithProduct, Product } from '@/types'
+import type { CartItem, CartItemWithProduct, Product, ProductVariant } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
 import { create } from 'zustand'
 import { useAuthStore } from './authStore'
@@ -7,6 +7,7 @@ import { useToastStore } from './toastStore'
 
 interface LocalCartItem {
   product_id: string
+  variant_id?: string | null
   quantity: number
 }
 
@@ -14,7 +15,7 @@ interface CartState {
   items: CartItemWithProduct[]
   loading: boolean
   fetchCart: () => Promise<void>
-  addToCart: (productId: string, quantity?: number) => Promise<void>
+  addToCart: (productId: string, quantity?: number, variantId?: string) => Promise<void>
   updateQuantity: (itemId: string, quantity: number) => Promise<void>
   removeFromCart: (itemId: string) => Promise<void>
   clearCart: () => Promise<void>
@@ -34,21 +35,23 @@ export const useCartStore = create<CartState>((set, get) => ({
     set({ loading: true })
     try {
       if (user) {
-        // Fetch from database
+        // Fetch from database with variant information
         const { data, error } = await supabase
           .from('cart_items')
           .select(`
             *,
-            product:products(*)
+            product:products(*),
+            variant:product_variants(*)
           `)
           .eq('user_id', user.id)
 
         if (error) throw error
 
         set({
-          items: (data || []).map((item: CartItem & { product: Product }) => ({
+          items: (data || []).map((item: CartItem & { product: Product; variant?: ProductVariant | null }) => ({
             ...item,
             product: item.product,
+            variant: item.variant || null,
           })) as CartItemWithProduct[],
         })
       } else {
@@ -87,20 +90,38 @@ export const useCartStore = create<CartState>((set, get) => ({
 
       if (error) throw error
 
-      // Map local items with product data
+      // Fetch variants if any
+      const variantIds = localItems.filter(item => item.variant_id).map(item => item.variant_id as string)
+      let variants: ProductVariant[] = []
+      if (variantIds.length > 0) {
+        const { data: variantsData } = await supabase
+          .from('product_variants')
+          .select('*')
+          .in('id', variantIds)
+        
+        variants = (variantsData || []) as ProductVariant[]
+      }
+
+      // Map local items with product and variant data
       const items: CartItemWithProduct[] = localItems
         .map(localItem => {
           const product = products?.find(p => p.id === localItem.product_id)
           if (!product) return null
 
+          const variant = localItem.variant_id 
+            ? variants.find(v => v.id === localItem.variant_id)
+            : null
+
           return {
-            id: `local_${localItem.product_id}`,
+            id: `local_${localItem.product_id}_${localItem.variant_id || 'default'}`,
             user_id: '',
             product_id: localItem.product_id,
+            variant_id: localItem.variant_id || null,
             quantity: localItem.quantity,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             product: product as Product,
+            variant: variant || null,
           } as CartItemWithProduct
         })
         .filter((item): item is CartItemWithProduct => item !== null)
@@ -124,13 +145,20 @@ export const useCartStore = create<CartState>((set, get) => ({
       
       // Sync each item to database
       for (const localItem of localItems) {
-        // Check if item exists in database
-        const { data: dbItem }: { data: CartItem | null, error: PostgrestError | null } = await supabase
+        // Check if item exists in database (matching product_id and variant_id)
+        const query = supabase
           .from('cart_items')
           .select('*')
           .eq('user_id', user.id)
           .eq('product_id', localItem.product_id)
-          .maybeSingle()
+        
+        if (localItem.variant_id) {
+          query.eq('variant_id', localItem.variant_id)
+        } else {
+          query.is('variant_id', null)
+        }
+        
+        const { data: dbItem }: { data: CartItem | null, error: PostgrestError | null } = await query.maybeSingle()
 
         if (dbItem) {
           // Update quantity
@@ -145,6 +173,7 @@ export const useCartStore = create<CartState>((set, get) => ({
             .insert({
               user_id: user.id,
               product_id: localItem.product_id,
+              variant_id: localItem.variant_id || null,
               quantity: localItem.quantity,
             })
         }
@@ -160,42 +189,74 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  addToCart: async (productId: string, quantity = 1) => {
+  addToCart: async (productId: string, quantity = 1, variantId?: string) => {
     const { user } = useAuthStore.getState()
 
     try {
-      // First, check stock availability
-      const { data: product, error: productError }: { data: Product | null, error: PostgrestError | null } = await supabase
-        .from('products')
-        .select('id, name, stock, is_active')
-        .eq('id', productId)
-        .single()
+      // Check stock availability - use variant if provided, otherwise product
+      let availableStock = 0
+      let productName = ''
 
-      if (productError) throw productError
+      if (variantId) {
+        // Check variant stock
+        const { data: variant, error: variantError } = await (supabase
+          .from('product_variants') as any)
+          .select('id, name, stock, is_active, product:products(id, name, is_active)')
+          .eq('id', variantId)
+          .single()
 
-      if (!product?.is_active) {
-        useToastStore.getState().show('Este producto no está disponible', 'error')
-        throw new Error('Product is not active')
+        if (variantError) throw variantError
+
+        if (!variant) {
+          useToastStore.getState().show('Variante no encontrada', 'error')
+          throw new Error('Variant not found')
+        }
+
+        const product = (variant as any).product as Product
+        if (!product?.is_active || !variant.is_active) {
+          useToastStore.getState().show('Este producto no está disponible', 'error')
+          throw new Error('Product or variant is not active')
+        }
+
+        availableStock = variant.stock
+        productName = variant.name || product.name
+      } else {
+        // Check product stock (backward compatibility)
+        const { data: product, error: productError }: { data: Product | null, error: PostgrestError | null } = await supabase
+          .from('products')
+          .select('id, name, stock, is_active')
+          .eq('id', productId)
+          .single()
+
+        if (productError) throw productError
+
+        if (!product?.is_active) {
+          useToastStore.getState().show('Este producto no está disponible', 'error')
+          throw new Error('Product is not active')
+        }
+
+        availableStock = product.stock
+        productName = product.name
       }
 
-      // Check if item already exists in cart
+      // Check if item already exists in cart (matching product_id and variant_id)
       const existingItem = get().items.find(
-        (item) => item.product_id === productId
+        (item) => item.product_id === productId && item.variant_id === (variantId || null)
       )
 
       const totalQuantity = existingItem ? existingItem.quantity + quantity : quantity
 
-      if (product.stock < totalQuantity) {
-        const available = product.stock - (existingItem?.quantity || 0)
+      if (availableStock < totalQuantity) {
+        const available = availableStock - (existingItem?.quantity || 0)
         if (available <= 0) {
           useToastStore.getState().show(
-            `No hay stock disponible para "${product.name}"`,
+            `No hay stock disponible para "${productName}"`,
             'error'
           )
           throw new Error('Insufficient stock')
         } else {
           useToastStore.getState().show(
-            `Solo hay ${available} unidades disponibles de "${product.name}"`,
+            `Solo hay ${available} unidades disponibles de "${productName}"`,
             'error'
           )
           throw new Error('Insufficient stock')
@@ -219,11 +280,13 @@ export const useCartStore = create<CartState>((set, get) => ({
           .insert({
             user_id: user.id,
             product_id: productId,
+            variant_id: variantId || null,
             quantity,
           })
           .select(`
             *,
-            product:products(*)
+            product:products(*),
+            variant:product_variants(*)
           `)
           .single()
 
@@ -232,7 +295,8 @@ export const useCartStore = create<CartState>((set, get) => ({
         const newItem = {
           ...(data as CartItem),
           product: (data as Product & { product: Product }).product,
-        } as CartItem & { product: Product }
+          variant: (data as ProductVariant & { variant?: ProductVariant | null })?.variant || null,
+        } as CartItem & { product: Product; variant?: ProductVariant | null }
 
         set({
           items: [
@@ -257,16 +321,30 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         if (error) throw error
 
+        // Fetch variant if provided
+        let variant: ProductVariant | null = null
+        if (variantId) {
+          const { data: variantData } = await supabase
+            .from('product_variants')
+            .select('*')
+            .eq('id', variantId)
+            .single()
+          
+          variant = variantData as ProductVariant | null
+        }
+
         // Get current local cart
         const localCart = localStorage.getItem('local_cart')
         const localItems: LocalCartItem[] = localCart ? JSON.parse(localCart) : []
 
-        // Add or update item
-        const existingLocalItem = localItems.find(item => item.product_id === productId)
+        // Add or update item (matching product_id and variant_id)
+        const existingLocalItem = localItems.find(
+          item => item.product_id === productId && item.variant_id === (variantId || null)
+        )
         if (existingLocalItem) {
           existingLocalItem.quantity += quantity
         } else {
-          localItems.push({ product_id: productId, quantity })
+          localItems.push({ product_id: productId, variant_id: variantId || null, quantity })
         }
 
         // Save to localStorage
@@ -274,13 +352,15 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         // Update state
         const newItem: CartItemWithProduct = {
-          id: `local_${productId}`,
+          id: `local_${productId}_${variantId || 'default'}`,
           user_id: '',
           product_id: productId,
+          variant_id: variantId || null,
           quantity: existingLocalItem ? existingLocalItem.quantity : quantity,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
           product: product as Product,
+          variant: variant,
         }
 
         set({
@@ -406,7 +486,9 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   getTotal: () => {
     return get().items.reduce((total, item) => {
-      return total + item.product.price * item.quantity
+      // Use variant price if available, otherwise product price
+      const price = item.variant?.price ?? item.product.price
+      return total + price * item.quantity
     }, 0)
   },
 

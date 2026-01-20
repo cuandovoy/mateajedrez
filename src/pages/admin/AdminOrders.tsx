@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -36,16 +36,31 @@ type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancell
 const ITEMS_PER_PAGE = 10
 
 export function AdminOrders() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   
-  // Filters
+  // Filters - Initialize from URL params
+  const statusFromUrl = searchParams.get('status') as OrderStatus | null
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all')
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(
+    statusFromUrl && ['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(statusFromUrl)
+      ? statusFromUrl
+      : 'all'
+  )
   const [searchTerm, setSearchTerm] = useState('')
+
+  // Update URL when status filter changes
+  useEffect(() => {
+    if (statusFilter !== 'all') {
+      setSearchParams({ status: statusFilter })
+    } else {
+      setSearchParams({})
+    }
+  }, [statusFilter, setSearchParams])
 
   useEffect(() => {
     fetchOrders()
@@ -202,7 +217,7 @@ export function AdminOrders() {
                   setStatusFilter(e.target.value as OrderStatus | 'all')
                   setCurrentPage(1)
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-200"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
               >
                 <option value="all">Todos</option>
                 <option value="pending">Pendiente</option>
@@ -232,7 +247,7 @@ export function AdminOrders() {
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600"></div>
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center py-12">

@@ -31,7 +31,16 @@ const getStatusColor = (status: string): string => {
 
 interface OrderWithItems extends Order {
   payment_method?: 'transfer' | 'mercadopago'
-  order_items: Array<OrderItem & { product: { name: string; image_url: string | null; sku: string } }>
+  order_items: Array<OrderItem & { 
+    product: { name: string; image_url: string | null; sku: string }
+    variant?: { 
+      id: string
+      name: string | null
+      sku: string
+      attributes: any
+      image_url: string | null
+    } | null
+  }>
   user_profile?: {
     full_name: string | null
     email: string
@@ -54,7 +63,7 @@ export function AdminOrderDetail() {
   const fetchOrder = async () => {
     setLoading(true)
     try {
-      // Fetch order with items and products
+      // Fetch order with items, products, and variants
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
@@ -65,6 +74,13 @@ export function AdminOrderDetail() {
               name,
               image_url,
               sku
+            ),
+            variant:product_variants (
+              id,
+              name,
+              sku,
+              attributes,
+              image_url
             )
           )
         `)
@@ -129,7 +145,7 @@ export function AdminOrderDetail() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>
       </div>
     )
   }
@@ -210,7 +226,7 @@ export function AdminOrderDetail() {
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total</p>
-                  <p className="font-semibold text-lg text-primary-600">
+                  <p className="font-semibold text-lg text-admin-600">
                     {formatPrice(order.total)}
                   </p>
                 </div>
@@ -254,30 +270,54 @@ export function AdminOrderDetail() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.order_items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center space-x-4 border-b pb-4 last:border-b-0 last:pb-0"
-                  >
-                    {item.product.image_url && (
-                      <img
-                        src={item.product.image_url}
-                        alt={item.product.name}
-                        className="w-16 h-16 object-cover rounded"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900">{item.product.name}</p>
-                      <p className="text-sm text-gray-600">SKU: {item.product.sku}</p>
-                      <p className="text-sm text-gray-600">
-                        Cantidad: {item.quantity} × {formatPrice(item.price)}
+                {order.order_items.map((item) => {
+                  const variant = item.variant
+                  const displayImage = variant?.image_url || item.product.image_url
+                  const displaySku = variant?.sku || item.product.sku
+                  
+                  return (
+                    <div
+                      key={item.id}
+                      className="flex items-center space-x-4 border-b pb-4 last:border-b-0 last:pb-0"
+                    >
+                      {displayImage && (
+                        <img
+                          src={displayImage}
+                          alt={item.product.name}
+                          className="w-16 h-16 object-cover rounded"
+                        />
+                      )}
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">{item.product.name}</p>
+                        {variant && (
+                          <div className="mt-1 space-y-1">
+                            {variant.name && (
+                              <p className="text-sm font-medium text-gray-700">
+                                Variante: {variant.name}
+                              </p>
+                            )}
+                            {variant.attributes && typeof variant.attributes === 'object' && (
+                              <div className="flex flex-wrap gap-1">
+                                {Object.entries(variant.attributes as Record<string, string>).map(([key, value]) => (
+                                  <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                                    {key}: {value}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <p className="text-sm text-gray-600">SKU: {displaySku}</p>
+                        <p className="text-sm text-gray-600">
+                          Cantidad: {item.quantity} × {formatPrice(item.price)}
+                        </p>
+                      </div>
+                      <p className="font-semibold text-gray-900">
+                        {formatPrice(item.price * item.quantity)}
                       </p>
                     </div>
-                    <p className="font-semibold text-gray-900">
-                      {formatPrice(item.price * item.quantity)}
-                    </p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
               <div className="border-t mt-4 pt-4">
                 <div className="flex justify-between text-lg font-bold">

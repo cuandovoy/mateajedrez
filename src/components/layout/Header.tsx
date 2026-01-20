@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { ShoppingCart, User, LogOut } from 'lucide-react'
+import { ShoppingCart, User, LogOut, LayoutDashboard } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase'
 import type { Category } from '@/types'
 
 export function Header() {
-  const { user, signOut } = useAuthStore()
+  const { user, signOut, isAdmin } = useAuthStore()
   const { getItemCount, fetchCart } = useCartStore()
   const navigate = useNavigate()
   const [categories, setCategories] = useState<Category[]>([])
@@ -95,6 +95,14 @@ export function Header() {
 
             {user ? (
               <>
+                {isAdmin && (
+                  <Link to="/admin">
+                    <Button variant="ghost" className="text-white hover:text-gray-700" size="sm">
+                      <LayoutDashboard className="h-5 w-5 mr-2" />
+                      Panel Admin
+                    </Button>
+                  </Link>
+                )}
                 <div className="flex items-center space-x-2">
                   <User className="h-5 w-5 text-gray-600" />
                   <span className="text-sm text-gray-700">

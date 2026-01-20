@@ -23,8 +23,8 @@ export function AdminDashboard() {
           <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
             <CardContent className="p-6">
               <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-lg bg-primary-100 flex items-center justify-center">
-                  <Package className="h-6 w-6 text-primary-600" />
+                <div className="h-12 w-12 rounded-lg bg-admin-100 flex items-center justify-center">
+                  <Package className="h-6 w-6 text-admin-600" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Productos</h3>
@@ -39,8 +39,8 @@ export function AdminDashboard() {
           <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
             <CardContent className="p-6">
               <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-lg bg-primary-100 flex items-center justify-center">
-                  <Folder className="h-6 w-6 text-primary-600" />
+                <div className="h-12 w-12 rounded-lg bg-admin-100 flex items-center justify-center">
+                  <Folder className="h-6 w-6 text-admin-600" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Categorías</h3>
@@ -55,8 +55,8 @@ export function AdminDashboard() {
           <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
             <CardContent className="p-6">
               <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-lg bg-primary-100 flex items-center justify-center">
-                  <ShoppingCart className="h-6 w-6 text-primary-600" />
+                <div className="h-12 w-12 rounded-lg bg-admin-100 flex items-center justify-center">
+                  <ShoppingCart className="h-6 w-6 text-admin-600" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Órdenes</h3>
@@ -71,8 +71,8 @@ export function AdminDashboard() {
           <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
             <CardContent className="p-6">
               <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-lg bg-primary-100 flex items-center justify-center">
-                  <Users className="h-6 w-6 text-primary-600" />
+                <div className="h-12 w-12 rounded-lg bg-admin-100 flex items-center justify-center">
+                  <Users className="h-6 w-6 text-admin-600" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Usuarios</h3>

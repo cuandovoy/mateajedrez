@@ -10,6 +10,20 @@
     color: #111827;
     font-family: 'Poppins', sans-serif;
   }
+  
+  /* Variables CSS para colores admin - se aplican cuando el body tiene la clase 'admin-theme' */
+  body.admin-theme {
+    --admin-primary-50: #eff6ff;
+    --admin-primary-100: #dbeafe;
+    --admin-primary-200: #bfdbfe;
+    --admin-primary-300: #93c5fd;
+    --admin-primary-400: #60a5fa;
+    --admin-primary-500: #3b82f6;
+    --admin-primary-600: #2563eb;
+    --admin-primary-700: #1d4ed8;
+    --admin-primary-800: #1e40af;
+    --admin-primary-900: #1e3a8a;
+  }
 }
 
 @layer components {

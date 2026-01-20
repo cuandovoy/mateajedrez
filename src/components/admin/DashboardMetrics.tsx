@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent } from '@/components/ui/Card'
 import {
@@ -25,6 +26,7 @@ interface Metrics {
 }
 
 export function DashboardMetrics() {
+  const navigate = useNavigate()
   const [metrics, setMetrics] = useState<Metrics>({
     totalRevenue: 0,
     totalOrders: 0,
@@ -69,12 +71,8 @@ export function DashboardMetrics() {
           .from('user_profiles')
           .select('id', { count: 'exact', head: false }),
         
-        // Low stock products (less than 10)
-        supabase
-          .from('products')
-          .select('id')
-          .eq('is_active', true)
-          .lt('stock', 10),
+        // Low stock items using RPC function (variants and products without variants)
+        supabase.rpc('get_low_stock_items').select('id'),
         
         // Pending orders
         supabase
@@ -94,6 +92,7 @@ export function DashboardMetrics() {
       const totalOrders = (ordersResult.data as Array<{ total: number }> | null)?.length || 0
       const totalProducts = (productsResult.data as Array<{ id: string; stock: number }> | null)?.length || 0
       const totalUsers = usersResult.count || 0
+      // Count low stock items (variants and products without variants)
       const lowStockProducts = (lowStockResult.data as Array<{ id: string }> | null)?.length || 0
       const pendingOrders = (pendingOrdersResult.data as Array<{ id: string }> | null)?.length || 0
       const todayRevenue = (todayOrdersResult.data as Array<{ total: number }> | null)?.reduce((sum, order) => sum + order.total, 0) || 0
@@ -133,7 +132,18 @@ export function DashboardMetrics() {
     )
   }
 
-  const metricCards = [
+  interface MetricCard {
+    title: string
+    value: string
+    icon: React.ComponentType<{ className?: string }>
+    color: string
+    bgColor: string
+    description: string
+    onClick?: () => void
+    clickable?: boolean
+  }
+
+  const metricCards: MetricCard[] = [
     {
       title: 'Ingresos Totales',
       value: formatPrice(metrics.totalRevenue),
@@ -189,6 +199,8 @@ export function DashboardMetrics() {
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
       description: 'Requieren atención',
+      onClick: () => navigate('/admin/orders?status=pending'),
+      clickable: true,
     },
     {
       title: 'Productos Bajo Stock',
@@ -204,8 +216,15 @@ export function DashboardMetrics() {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
       {metricCards.map((metric, index) => {
         const Icon = metric.icon
+        const isClickable = metric.clickable
+        const handleClick = metric.onClick
+        
         return (
-          <Card key={index} className="hover:shadow-lg transition-shadow">
+          <Card 
+            key={index} 
+            className={`hover:shadow-lg transition-shadow ${isClickable ? 'cursor-pointer' : ''}`}
+            onClick={isClickable ? handleClick : undefined}
+          >
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className={`${metric.bgColor} p-3 rounded-lg`}>

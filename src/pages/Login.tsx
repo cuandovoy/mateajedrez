@@ -34,6 +34,27 @@ export function Login() {
     setError(null)
     try {
       await signIn(data.email, data.password)
+      
+      // Wait for profile to be loaded (signIn does fetchProfile, but we need to wait)
+      // Poll until profile is loaded or timeout after 2 seconds
+      let attempts = 0
+      const maxAttempts = 20
+      while (attempts < maxAttempts) {
+        const { isAdmin: userIsAdmin, profile } = useAuthStore.getState()
+        if (profile !== null) {
+          // Profile loaded, check if admin and redirect
+          if (userIsAdmin) {
+            navigate('/admin')
+          } else {
+            navigate('/')
+          }
+          return
+        }
+        await new Promise(resolve => setTimeout(resolve, 100))
+        attempts++
+      }
+      
+      // If profile didn't load, redirect to home (fallback)
       navigate('/')
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión')

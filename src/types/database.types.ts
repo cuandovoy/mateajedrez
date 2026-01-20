@@ -53,6 +53,9 @@ export interface Database {
           images: string[] | null
           sku: string
           is_active: boolean
+          unit: string | null
+          min_stock: number
+          low_stock_threshold: number
           created_at: string
           updated_at: string
         }
@@ -67,6 +70,9 @@ export interface Database {
           images?: string[] | null
           sku: string
           is_active?: boolean
+          unit?: string | null
+          min_stock?: number
+          low_stock_threshold?: number
           created_at?: string
           updated_at?: string
         }
@@ -81,6 +87,59 @@ export interface Database {
           images?: string[] | null
           sku?: string
           is_active?: boolean
+          unit?: string | null
+          min_stock?: number
+          low_stock_threshold?: number
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      product_variants: {
+        Row: {
+          id: string
+          product_id: string
+          sku: string
+          name: string | null
+          attributes: Json | null
+          price: number | null
+          stock: number
+          is_active: boolean
+          image_url: string | null
+          unit: string | null
+          min_stock: number
+          low_stock_threshold: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          sku: string
+          name?: string | null
+          attributes?: Json | null
+          price?: number | null
+          stock?: number
+          is_active?: boolean
+          image_url?: string | null
+          unit?: string | null
+          min_stock?: number
+          low_stock_threshold?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          sku?: string
+          name?: string | null
+          attributes?: Json | null
+          price?: number | null
+          stock?: number
+          is_active?: boolean
+          image_url?: string | null
+          unit?: string | null
+          min_stock?: number
+          low_stock_threshold?: number
           created_at?: string
           updated_at?: string
         }
@@ -90,6 +149,7 @@ export interface Database {
           id: string
           user_id: string
           product_id: string
+          variant_id: string | null
           quantity: number
           created_at: string
           updated_at: string
@@ -98,6 +158,7 @@ export interface Database {
           id?: string
           user_id: string
           product_id: string
+          variant_id?: string | null
           quantity: number
           created_at?: string
           updated_at?: string
@@ -106,6 +167,7 @@ export interface Database {
           id?: string
           user_id?: string
           product_id?: string
+          variant_id?: string | null
           quantity?: number
           created_at?: string
           updated_at?: string
@@ -145,6 +207,7 @@ export interface Database {
           id: string
           order_id: string
           product_id: string
+          variant_id: string | null
           quantity: number
           price: number
           created_at: string
@@ -153,6 +216,7 @@ export interface Database {
           id?: string
           order_id: string
           product_id: string
+          variant_id?: string | null
           quantity: number
           price: number
           created_at?: string
@@ -161,6 +225,7 @@ export interface Database {
           id?: string
           order_id?: string
           product_id?: string
+          variant_id?: string | null
           quantity?: number
           price?: number
           created_at?: string
@@ -215,6 +280,7 @@ export interface Database {
 // Type helpers
 export type Category = Database['public']['Tables']['categories']['Row']
 export type Product = Database['public']['Tables']['products']['Row']
+export type ProductVariant = Database['public']['Tables']['product_variants']['Row']
 export type CartItem = Database['public']['Tables']['cart_items']['Row']
 export type Order = Database['public']['Tables']['orders']['Row']
 export type OrderItem = Database['public']['Tables']['order_items']['Row']
@@ -222,12 +288,14 @@ export type UserProfile = Database['public']['Tables']['user_profiles']['Row']
 
 export type CategoryInsert = Database['public']['Tables']['categories']['Insert']
 export type ProductInsert = Database['public']['Tables']['products']['Insert']
+export type ProductVariantInsert = Database['public']['Tables']['product_variants']['Insert']
 export type CartItemInsert = Database['public']['Tables']['cart_items']['Insert']
 export type OrderInsert = Database['public']['Tables']['orders']['Insert']
 export type UserProfileInsert = Database['public']['Tables']['user_profiles']['Insert']
 
 export type CategoryUpdate = Database['public']['Tables']['categories']['Update']
 export type ProductUpdate = Database['public']['Tables']['products']['Update']
+export type ProductVariantUpdate = Database['public']['Tables']['product_variants']['Update']
 export type CartItemUpdate = Database['public']['Tables']['cart_items']['Update']
 export type OrderUpdate = Database['public']['Tables']['orders']['Update']
 export type UserProfileUpdate = Database['public']['Tables']['user_profiles']['Update']

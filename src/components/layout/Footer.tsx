@@ -77,7 +77,7 @@ export function Footer() {
             </p>
           </div>
         </div>
-        <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
+        <div className="border-t border-gray-300 mt-8 pt-8 text-center text-gray-400">
           <p className="text-white">&copy; {new Date().getFullYear()} Flormaria Soria González. Todos los derechos reservados.</p>
         </div>
       </div>

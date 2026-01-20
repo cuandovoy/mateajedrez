@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Edit, Trash2, Upload, X } from 'lucide-react'
+import { Plus, Edit, Trash2, Upload, X, Package } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { formatPrice } from '@/lib/utils'
 import { uploadProductImage, deleteImage } from '@/lib/storage'
+import { VariantManager } from '@/components/admin/VariantManager'
 import type { Product, Category, ProductInsert, ProductUpdate } from '@/types'
 
 const productSchema = z.object({
@@ -36,6 +37,7 @@ function AdminProductsContent() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [variantManagerProduct, setVariantManagerProduct] = useState<Product | null>(null)
 
   const {
     register,
@@ -206,7 +208,7 @@ function AdminProductsContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>
       </div>
     )
   }
@@ -242,32 +244,43 @@ function AdminProductsContent() {
                 {product.description || 'Sin descripción'}
               </p>
               <div className="flex justify-between items-center mb-4">
-                <span className="text-xl font-bold text-primary-600">
+                <span className="text-xl font-bold text-admin-600">
                   {formatPrice(product.price)}
                 </span>
                 <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                   Stock: {product.stock}
                 </span>
               </div>
-              <div className="flex space-x-2">
+              <div className="space-y-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => handleEdit(product)}
-                  className="flex-1"
+                  onClick={() => setVariantManagerProduct(product)}
+                  className="w-full"
                 >
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar
+                  <Package className="h-4 w-4 mr-2" />
+                  Gestionar Variantes
                 </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleDelete(product.id)}
-                  className="flex-1"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar
-                </Button>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleEdit(product)}
+                    className="flex-1"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleDelete(product.id)}
+                    className="flex-1"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -295,7 +308,7 @@ function AdminProductsContent() {
                   </label>
                   <textarea
                     {...register('description')}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
                     rows={3}
                   />
                 </div>
@@ -320,7 +333,7 @@ function AdminProductsContent() {
                   </label>
                   <select
                     {...register('category_id')}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
                   >
                     <option value="">Seleccionar categoría</option>
                     {categories.map((cat) => (
@@ -392,7 +405,7 @@ function AdminProductsContent() {
                   <input
                     type="checkbox"
                     {...register('is_active')}
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    className="h-4 w-4 text-admin-600 focus:ring-admin-500 border-gray-300 rounded"
                   />
                   <label className="ml-2 text-sm text-gray-700">
                     Producto activo
@@ -419,6 +432,13 @@ function AdminProductsContent() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {variantManagerProduct && (
+        <VariantManager
+          product={variantManagerProduct}
+          onClose={() => setVariantManagerProduct(null)}
+        />
       )}
     </div>
   )
