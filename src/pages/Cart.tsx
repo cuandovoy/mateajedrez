@@ -87,7 +87,7 @@ function CartContent() {
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-gray-600 text-lg mb-4">Tu carrito está vacío</p>
-            <Button onClick={() => navigate('/')}>
+            <Button onClick={() => navigate('/')} className='bg-primary-400 text-white'>
               Continuar Comprando
             </Button>
           </CardContent>

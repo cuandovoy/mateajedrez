@@ -21,7 +21,15 @@ export function Home() {
       try {
         const { data, error } = await supabase
           .from('products')
-          .select('*')
+          .select(`
+            *,
+            product_images (
+              id,
+              image_url,
+              display_order,
+              is_primary
+            )
+          `)
           .eq('is_active', true)
           .order('created_at', { ascending: false })
 

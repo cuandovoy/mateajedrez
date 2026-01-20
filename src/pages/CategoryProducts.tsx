@@ -83,7 +83,15 @@ export function CategoryProducts() {
 
       let query = supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          product_images (
+            id,
+            image_url,
+            display_order,
+            is_primary
+          )
+        `)
         .eq('is_active', true)
 
       // Filter by selected subcategories

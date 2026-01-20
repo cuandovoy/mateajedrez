@@ -26,7 +26,15 @@ export function Products() {
     try {
       let query = supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          product_images (
+            id,
+            image_url,
+            display_order,
+            is_primary
+          )
+        `)
         .eq('is_active', true)
 
       if (selectedCategory) {

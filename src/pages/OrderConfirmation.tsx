@@ -283,7 +283,7 @@ export function OrderConfirmation() {
 
         <div className="mt-8 flex justify-center space-x-4">
           <Link to="/">
-            <Button variant="outline">
+            <Button variant="outline" className='bg-primary-400 text-white'>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Continuar Comprando
             </Button>

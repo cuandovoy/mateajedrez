@@ -5,10 +5,22 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
 import { useCartStore } from '@/store/cartStore'
-import type { Product, ProductWithCategory } from '@/types'
-import { ArrowLeft, ShoppingCart } from 'lucide-react'
+import type { Product, ProductWithCategory, ProductImage } from '@/types'
+import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+
+// Helper function to validate image URLs
+function isValidImageUrl(url: string | null | undefined): boolean {
+  if (!url || typeof url !== 'string') return false
+  if (url.trim() === '') return false
+  try {
+    const urlObj = new URL(url)
+    return urlObj.protocol === 'http:' || urlObj.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>()
@@ -19,12 +31,17 @@ export function ProductDetail() {
   const [isAdding, setIsAdding] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
-  const [selectedVariant, setSelectedVariant] = useState<any>(null)
+  const [selectedVariant, setSelectedVariant] = useState<{ image_url?: string | null; price?: number | null; stock?: number; unit?: string | null } | null>(null)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [imageLoading, setImageLoading] = useState(true)
+  const [fadeIn, setFadeIn] = useState(false)
+
 
   useEffect(() => {
     if (id) {
       fetchProduct()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   const fetchProduct = async () => {
@@ -33,7 +50,13 @@ export function ProductDetail() {
         .from('products')
         .select(`
           *,
-          category:categories(*)
+          category:categories(*),
+          product_images (
+            id,
+            image_url,
+            display_order,
+            is_primary
+          )
         `)
         .eq('id', id as string)
         .eq('is_active', true)
@@ -41,13 +64,25 @@ export function ProductDetail() {
 
       if (error) throw error
 
-      setProduct(data as ProductWithCategory)
+      setProduct(data as ProductWithCategory & { product_images?: ProductImage[] })
+      setCurrentImageIndex(0) // Reset image index when product changes
+      setImageLoading(true)
+      setFadeIn(false)
 
       // Fetch related products
       if ((data as ProductWithCategory)?.category_id) {
         const { data: related, error: relatedError } = await supabase
           .from('products')
-          .select('*')
+          .select(`
+            *,
+            category:categories(*),
+            product_images (
+              id,
+              image_url,
+              display_order,
+              is_primary
+            )
+          `)
           .eq('category_id', (data as ProductWithCategory).category_id)
           .eq('is_active', true)
           .neq('id', id)
@@ -111,17 +146,165 @@ export function ProductDetail() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         {/* Imagen del producto */}
         <div>
-          {(selectedVariant?.image_url || product.image_url) ? (
-            <img
-              src={selectedVariant?.image_url || product.image_url || ''}
-              alt={product.name}
-              className="w-full h-auto rounded-lg shadow-lg object-cover"
-            />
-          ) : (
-            <div className="w-full h-96 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">
-              Sin imagen
-            </div>
-          )}
+          {(() => {
+            const productWithImages = product as Product & { product_images?: ProductImage[] }
+            
+            // Get all available image URLs in priority order
+            const imageUrls: string[] = []
+            
+            // 1. Variant image (if exists)
+            if (selectedVariant?.image_url && isValidImageUrl(selectedVariant.image_url)) {
+              imageUrls.push(selectedVariant.image_url)
+            }
+            
+            // 2. Product images (sorted by is_primary and display_order)
+            if (productWithImages.product_images && productWithImages.product_images.length > 0) {
+              const sorted = [...productWithImages.product_images]
+                .filter((img) => isValidImageUrl(img.image_url))
+                .sort((a, b) => {
+                  // Primary images first
+                  if (a.is_primary && !b.is_primary) return -1
+                  if (!a.is_primary && b.is_primary) return 1
+                  // Then by display_order
+                  return a.display_order - b.display_order
+                })
+              
+              sorted.forEach((img) => {
+                if (img.image_url && !imageUrls.includes(img.image_url)) {
+                  imageUrls.push(img.image_url)
+                }
+              })
+            }
+            
+            // 3. Legacy image_url (if exists and valid)
+            if (product.image_url && isValidImageUrl(product.image_url) && !imageUrls.includes(product.image_url)) {
+              imageUrls.push(product.image_url)
+            }
+            
+            // Get current image URL to try
+            const currentImageUrl = imageUrls[currentImageIndex]
+            const hasMultipleImages = imageUrls.length > 1
+            
+            const handlePreviousImage = () => {
+              setFadeIn(false)
+              setTimeout(() => {
+                setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : imageUrls.length - 1))
+                setImageLoading(true)
+              }, 150)
+            }
+            
+            const handleNextImage = () => {
+              setFadeIn(false)
+              setTimeout(() => {
+                setCurrentImageIndex((prev) => (prev < imageUrls.length - 1 ? prev + 1 : 0))
+                setImageLoading(true)
+              }, 150)
+            }
+            
+            const handleImageLoad = () => {
+              setImageLoading(false)
+              setFadeIn(true)
+            }
+            
+            if (!currentImageUrl) {
+              return (
+                <div className="w-full h-96 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">
+                  Sin imagen
+                </div>
+              )
+            }
+            
+            return (
+              <div className="relative">
+                <div className="relative w-full overflow-hidden rounded-lg shadow-lg">
+                  <div className="relative w-full" style={{ aspectRatio: '1 / 1', minHeight: '400px' }}>
+                    <img
+                      key={currentImageIndex}
+                      src={currentImageUrl}
+                      alt={product.name}
+                      className={`w-full h-full object-cover transition-opacity duration-300 ${
+                        fadeIn ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onLoad={handleImageLoad}
+                      onError={() => {
+                        console.error('Error loading image:', currentImageUrl)
+                        setImageLoading(false)
+                        // Try next image if available
+                        if (currentImageIndex < imageUrls.length - 1) {
+                          setCurrentImageIndex(currentImageIndex + 1)
+                        } else {
+                          // All images failed, show placeholder
+                          setCurrentImageIndex(-1)
+                        }
+                      }}
+                    />
+                    {imageLoading && (
+                      <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
+                        <div className="text-gray-400">Cargando...</div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Navigation buttons - only show if multiple images */}
+                  {hasMultipleImages && (
+                    <>
+                      <button
+                        onClick={handlePreviousImage}
+                        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 shadow-lg transition-all"
+                        aria-label="Imagen anterior"
+                      >
+                        <ChevronLeft className="h-6 w-6 text-gray-800" />
+                      </button>
+                      <button
+                        onClick={handleNextImage}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 shadow-lg transition-all"
+                        aria-label="Siguiente imagen"
+                      >
+                        <ChevronRight className="h-6 w-6 text-gray-800" />
+                      </button>
+                      
+                      {/* Image counter */}
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1 rounded-full text-sm">
+                        {currentImageIndex + 1} / {imageUrls.length}
+                      </div>
+                    </>
+                  )}
+                </div>
+                
+                {/* Thumbnail navigation - only show if multiple images */}
+                {hasMultipleImages && imageUrls.length > 1 && (
+                  <div className="flex gap-2 mt-4 overflow-x-auto pb-2">
+                    {imageUrls.map((url, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          if (index !== currentImageIndex) {
+                            setFadeIn(false)
+                            setTimeout(() => {
+                              setCurrentImageIndex(index)
+                              setImageLoading(true)
+                            }, 150)
+                          }
+                        }}
+                        className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
+                          index === currentImageIndex
+                            ? 'border-primary-500 ring-2 ring-primary-200 scale-105'
+                            : 'border-gray-300 hover:border-gray-400 hover:scale-105'
+                        }`}
+                        aria-label={`Ver imagen ${index + 1}`}
+                      >
+                        <img
+                          src={url}
+                          alt={`${product.name} - Imagen ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Información del producto */}
@@ -158,6 +341,9 @@ export function ProductDetail() {
               selectedVariantId={selectedVariantId}
               onVariantChange={(variantId) => {
                 setSelectedVariantId(variantId)
+                setCurrentImageIndex(0) // Reset image index when variant changes
+                setImageLoading(true)
+                setFadeIn(false)
                 // Fetch variant details to get stock, price, and image
                 if (variantId) {
                   supabase
