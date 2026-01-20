@@ -6,6 +6,18 @@ RUN apk add --no-cache yarn
 
 WORKDIR /app
 
+# Accept build arguments for environment variables
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+ARG VITE_APP_NAME
+ARG VITE_APP_URL
+
+# Set environment variables for the build process
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+ENV VITE_APP_NAME=$VITE_APP_NAME
+ENV VITE_APP_URL=$VITE_APP_URL
+
 # Copy package files first for better caching
 COPY package.json yarn.lock ./
 
