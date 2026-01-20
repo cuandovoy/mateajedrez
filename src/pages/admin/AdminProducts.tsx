@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Edit, Trash2, Upload, Package, ArrowUp, ArrowDown, Star } from 'lucide-react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
+import { Plus, Edit, Trash2, Upload, Package, ArrowUp, ArrowDown, Star, Grid3x3, List, X, Filter } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -10,6 +10,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { formatPrice } from '@/lib/utils'
 import { uploadProductImage, deleteImage } from '@/lib/storage'
 import { VariantManager } from '@/components/admin/VariantManager'
+import { ProductTable } from '@/components/admin/ProductTable'
+import {
+  CategoryFilter,
+  PriceRangeFilter,
+  SearchFilter,
+  StatusFilter,
+  StockFilter,
+} from '@/components/filters'
 import type { Product, Category, ProductInsert, ProductUpdate, ProductImage } from '@/types'
 
 const productSchema = z.object({
@@ -38,6 +46,20 @@ type ProductForm = z.infer<typeof productSchema>
 
 interface ProductWithImages extends Product {
   product_images?: ProductImage[]
+  category?: Category | null
+}
+
+type ViewMode = 'grid' | 'list'
+type StatusFilterValue = 'all' | 'active' | 'inactive'
+type StockFilterValue = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
+
+interface ProductFilters {
+  search: string
+  categoryId: string
+  priceMin: string
+  priceMax: string
+  status: StatusFilterValue
+  stock: StockFilterValue
 }
 
 function AdminProductsContent() {
@@ -49,6 +71,16 @@ function AdminProductsContent() {
   const [productImages, setProductImages] = useState<ProductImageItem[]>([])
   const [uploadingImage, setUploadingImage] = useState(false)
   const [variantManagerProduct, setVariantManagerProduct] = useState<Product | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [showFilters, setShowFilters] = useState(false)
+  const [filters, setFilters] = useState<ProductFilters>({
+    search: '',
+    categoryId: '',
+    priceMin: '',
+    priceMax: '',
+    status: 'all',
+    stock: 'all',
+  })
 
   const {
     register,
@@ -59,14 +91,10 @@ function AdminProductsContent() {
     resolver: zodResolver(productSchema),
   })
 
-  useEffect(() => {
-    fetchProducts()
-    fetchCategories()
-  }, [])
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true)
+      let query = supabase
         .from('products')
         .select(`
           *,
@@ -75,9 +103,41 @@ function AdminProductsContent() {
             image_url,
             display_order,
             is_primary
+          ),
+          category:categories (
+            id,
+            name
           )
         `)
-        .order('created_at', { ascending: false })
+
+      // Apply filters
+      if (filters.categoryId) {
+        query = query.eq('category_id', filters.categoryId)
+      }
+
+      if (filters.status !== 'all') {
+        query = query.eq('is_active', filters.status === 'active')
+      }
+
+      if (filters.priceMin) {
+        query = query.gte('price', parseFloat(filters.priceMin))
+      }
+
+      if (filters.priceMax) {
+        query = query.lte('price', parseFloat(filters.priceMax))
+      }
+
+      if (filters.stock !== 'all') {
+        if (filters.stock === 'out_of_stock') {
+          query = query.eq('stock', 0)
+        } else if (filters.stock === 'low_stock') {
+          query = query.lte('stock', 10) // Using default low stock threshold
+        } else if (filters.stock === 'in_stock') {
+          query = query.gt('stock', 0)
+        }
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) throw error
       setProducts((data || []) as ProductWithImages[])
@@ -86,7 +146,30 @@ function AdminProductsContent() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filters.categoryId, filters.status, filters.priceMin, filters.priceMax, filters.stock])
+
+  useEffect(() => {
+    fetchCategories()
+  }, [])
+
+  useEffect(() => {
+    fetchProducts()
+  }, [fetchProducts])
+
+  // Filter products by search term (client-side for better UX)
+  const filteredProducts = useMemo(() => {
+    if (!filters.search.trim()) {
+      return products
+    }
+
+    const searchLower = filters.search.toLowerCase()
+    return products.filter(
+      (product) =>
+        product.name.toLowerCase().includes(searchLower) ||
+        product.description?.toLowerCase().includes(searchLower) ||
+        product.sku.toLowerCase().includes(searchLower)
+    )
+  }, [products, filters.search])
 
   const fetchCategories = async () => {
     try {
@@ -466,6 +549,28 @@ function AdminProductsContent() {
     return product.image_url || null
   }
 
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      categoryId: '',
+      priceMin: '',
+      priceMax: '',
+      status: 'all',
+      stock: 'all',
+    })
+  }
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      filters.search !== '' ||
+      filters.categoryId !== '' ||
+      filters.priceMin !== '' ||
+      filters.priceMax !== '' ||
+      filters.status !== 'all' ||
+      filters.stock !== 'all'
+    )
+  }, [filters])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -481,75 +586,200 @@ function AdminProductsContent() {
           <h1 className="text-3xl font-bold text-gray-900">Productos</h1>
           <p className="text-gray-600 mt-2">Gestiona todos los productos de tu tienda</p>
         </div>
-        <Button onClick={handleNew}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Producto
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => setShowFilters(!showFilters)}
+            className="hidden md:flex"
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filtros
+            {hasActiveFilters && (
+              <span className="ml-2 bg-admin-600 text-white rounded-full px-2 py-0.5 text-xs">
+                {Object.values(filters).filter((v) => v !== '' && v !== 'all').length}
+              </span>
+            )}
+          </Button>
+          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 ${viewMode === 'grid' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              title="Vista de grilla"
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 ${viewMode === 'list' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              title="Vista de lista"
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+          <Button onClick={handleNew}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Producto
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {products.map((product) => {
-          const primaryImage = getPrimaryImage(product)
-          return (
-            <Card key={product.id}>
-              <CardContent className="p-6">
-                {primaryImage && (
-                  <img
-                    src={primaryImage}
-                    alt={product.name}
-                    className="w-full h-48 object-cover rounded mb-4"
-                  />
+      {/* Filters Panel */}
+      {showFilters && (
+        <Card className="mb-6">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle>Filtros</CardTitle>
+              <div className="flex items-center space-x-2">
+                {hasActiveFilters && (
+                  <Button variant="outline" size="sm" onClick={clearFilters}>
+                    <X className="h-4 w-4 mr-1" />
+                    Limpiar
+                  </Button>
                 )}
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {product.name}
-              </h3>
-              <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                {product.description || 'Sin descripción'}
-              </p>
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-xl font-bold text-admin-600">
-                  {formatPrice(product.price)}
-                </span>
-                <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  Stock: {product.stock}
-                </span>
-              </div>
-              <div className="space-y-2">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  onClick={() => setVariantManagerProduct(product)}
-                  className="w-full"
+                  onClick={() => setShowFilters(false)}
+                  className="md:hidden"
                 >
-                  <Package className="h-4 w-4 mr-2" />
-                  Gestionar Variantes
+                  <X className="h-4 w-4" />
                 </Button>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleEdit(product)}
-                    className="flex-1"
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Editar
-                  </Button>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => handleDelete(product.id)}
-                    className="flex-1"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Eliminar
-                  </Button>
-                </div>
               </div>
-            </CardContent>
-          </Card>
-          )
-        })}
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <SearchFilter
+                value={filters.search}
+                onChange={(value) => setFilters({ ...filters, search: value })}
+                placeholder="Buscar productos..."
+              />
+              <CategoryFilter
+                categories={categories}
+                selectedCategoryId={filters.categoryId}
+                onCategoryChange={(categoryId) =>
+                  setFilters({ ...filters, categoryId })
+                }
+              />
+              <StatusFilter
+                value={filters.status}
+                onChange={(value) => setFilters({ ...filters, status: value })}
+              />
+              <StockFilter
+                value={filters.stock}
+                onChange={(value) => setFilters({ ...filters, stock: value })}
+              />
+              <PriceRangeFilter
+                min={filters.priceMin}
+                max={filters.priceMax}
+                onMinChange={(min) => setFilters({ ...filters, priceMin: min })}
+                onMaxChange={(max) => setFilters({ ...filters, priceMax: max })}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Results count */}
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          Mostrando {filteredProducts.length} de {products.length} productos
+        </p>
       </div>
+
+      {/* Products Display */}
+      {viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProducts.map((product) => {
+            const primaryImage = getPrimaryImage(product)
+            return (
+              <Card key={product.id}>
+                <CardContent className="p-6">
+                  {primaryImage && (
+                    <img
+                      src={primaryImage}
+                      alt={product.name}
+                      className="w-full h-48 object-cover rounded mb-4"
+                    />
+                  )}
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {product.name}
+                  </h3>
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                    {product.description || 'Sin descripción'}
+                  </p>
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-xl font-bold text-admin-600">
+                      {formatPrice(product.price)}
+                    </span>
+                    <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      Stock: {product.stock}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setVariantManagerProduct(product)}
+                      className="w-full"
+                    >
+                      <Package className="h-4 w-4 mr-2" />
+                      Gestionar Variantes
+                    </Button>
+                    <div className="flex space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEdit(product)}
+                        className="flex-1"
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Editar
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => handleDelete(product.id)}
+                        className="flex-1"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Eliminar
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <ProductTable
+              products={filteredProducts}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onManageVariants={setVariantManagerProduct}
+              getPrimaryImage={getPrimaryImage}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {filteredProducts.length === 0 && !loading && (
+        <div className="text-center py-12">
+          <p className="text-gray-600 text-lg mb-4">
+            {hasActiveFilters
+              ? 'No se encontraron productos con los filtros seleccionados'
+              : 'No hay productos disponibles'}
+          </p>
+          {hasActiveFilters && (
+            <Button variant="outline" onClick={clearFilters}>
+              Limpiar filtros
+            </Button>
+          )}
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
