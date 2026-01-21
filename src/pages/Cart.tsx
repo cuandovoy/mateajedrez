@@ -123,99 +123,106 @@ function CartContent() {
                       </div>
                     </div>
                   )}
-                  <div className="flex items-center space-x-4">
-                    {(() => {
-                      // Get product image URL with priority: variant image > product images > legacy image_url
-                      const productWithImages = item.product as Product & { product_images?: ProductImage[] }
-                      const imageUrl = getProductImageUrl(
-                        productWithImages,
-                        item.variant?.image_url || null
-                      )
-                      
-                      return (
-                        <div className="flex-shrink-0 w-20 h-20 md:w-24 md:h-24 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-                          {imageUrl ? (
-                            <img
-                              src={imageUrl}
-                              alt={item.product.name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => {
-                                // Fallback to placeholder if image fails
-                                const target = e.target as HTMLImageElement
-                                target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e5e7eb" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%239ca3af" font-family="Arial" font-size="12"%3ESin imagen%3C/text%3E%3C/svg%3E'
-                              }}
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-xs text-center p-2">
-                              Sin imagen
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })()}
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {item.product.name}
-                      </h3>
-                      {item.variant && (
-                        <div className="mt-1 space-y-1">
-                          {item.variant.name && (
-                            <p className="text-sm text-gray-600 font-medium">
-                              {item.variant.name}
-                            </p>
-                          )}
-                          {item.variant.attributes && typeof item.variant.attributes === 'object' && (
-                            <div className="flex flex-wrap gap-2">
-                              {Object.entries(item.variant.attributes as Record<string, string>).map(([key, value]) => (
-                                <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                  {key}: {value}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      <p className="text-primary-600 font-bold mt-2">
-                        {formatPrice(item.variant?.price ?? item.product.price)}
-                      </p>
-                      {(item.variant?.stock ?? item.product.stock) > 0 && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          Stock disponible: {item.variant?.stock ?? item.product.stock} {item.variant?.unit || item.product.unit || 'unidad'}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                    {/* Image and Product Info */}
+                    <div className="flex items-start space-x-4 flex-1 min-w-0">
+                      {(() => {
+                        // Get product image URL with priority: variant image > product images > legacy image_url
+                        const productWithImages = item.product as Product & { product_images?: ProductImage[] }
+                        const imageUrl = getProductImageUrl(
+                          productWithImages,
+                          item.variant?.image_url || null
+                        )
+                        
+                        return (
+                          <div className="flex-shrink-0 w-20 h-20 md:w-24 md:h-24 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                            {imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={item.product.name}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  // Fallback to placeholder if image fails
+                                  const target = e.target as HTMLImageElement
+                                  target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e5e7eb" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%239ca3af" font-family="Arial" font-size="12"%3ESin imagen%3C/text%3E%3C/svg%3E'
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-xs text-center p-2">
+                                Sin imagen
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                          {item.product.name}
+                        </h3>
+                        {item.variant && (
+                          <div className="mt-1 space-y-1">
+                            {item.variant.name && (
+                              <p className="text-sm text-gray-600 font-medium">
+                                {item.variant.name}
+                              </p>
+                            )}
+                            {item.variant.attributes && typeof item.variant.attributes === 'object' && (
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(item.variant.attributes as Record<string, string>).map(([key, value]) => (
+                                  <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                    {key}: {value}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <p className="text-primary-600 font-bold mt-2 text-sm sm:text-base">
+                          {formatPrice(item.variant?.price ?? item.product.price)}
                         </p>
-                      )}
+                        {(item.variant?.stock ?? item.product.stock) > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Stock disponible: {item.variant?.stock ?? item.product.stock} {item.variant?.unit || item.product.unit || 'unidad'}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-12 text-center font-semibold">
-                        {item.quantity}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        disabled={item.quantity >= (item.variant?.stock ?? item.product.stock)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-gray-900">
-                        {formatPrice((item.variant?.price ?? item.product.price) * item.quantity)}
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeFromCart(item.id)}
-                        className="mt-2 text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+
+                    {/* Quantity Controls and Actions */}
+                    <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6">
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-12 text-center font-semibold">
+                          {item.quantity}
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          disabled={item.quantity >= (item.variant?.stock ?? item.product.stock)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-col items-end sm:items-end gap-2">
+                        <p className="text-base sm:text-lg font-bold text-gray-900">
+                          {formatPrice((item.variant?.price ?? item.product.price) * item.quantity)}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFromCart(item.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

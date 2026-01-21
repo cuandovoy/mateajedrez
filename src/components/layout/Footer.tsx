@@ -77,8 +77,21 @@ export function Footer() {
             </p>
           </div>
         </div>
-        <div className="border-t border-gray-300 mt-8 pt-8 text-center text-gray-400">
-          <p className="text-white">&copy; {new Date().getFullYear()} Flormaria Soria González. Todos los derechos reservados.</p>
+        <div className="border-t border-gray-300 mt-8 pt-8 text-center">
+          <p className="text-white mb-2">
+            &copy; {new Date().getFullYear()} Flormaria Soria González. Todos los derechos reservados.
+          </p>
+          <p className="text-gray-700 text-sm">
+            Creado por{' '}
+            <a
+              href="https://ciceridev.vercel.app/home"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-white hover:text-primary-100 transition-colors underline"
+            >
+              Lucas Ciceri
+            </a>
+          </p>
         </div>
       </div>
     </footer>
