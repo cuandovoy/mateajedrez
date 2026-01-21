@@ -6,7 +6,10 @@ export type {
   OrderItem, Product, ProductInsert,
   ProductUpdate, ProductVariant, ProductVariantInsert,
   ProductVariantUpdate, ProductImage, ProductImageInsert,
-  ProductImageUpdate, UserProfile
+  ProductImageUpdate, ProductBarcode, ProductBarcodeInsert,
+  ProductBarcodeUpdate, Supplier, SupplierInsert, SupplierUpdate,
+  ProductSupplier, ProductSupplierInsert, ProductSupplierUpdate,
+  UserProfile
 } from './database.types'
 
 export interface CartItemWithProduct extends CartItem {

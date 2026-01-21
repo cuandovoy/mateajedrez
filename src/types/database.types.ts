@@ -173,6 +173,135 @@ export interface Database {
           updated_at?: string
         }
       }
+      product_barcodes: {
+        Row: {
+          id: string
+          product_id: string | null
+          variant_id: string | null
+          barcode: string
+          barcode_type: 'EAN13' | 'EAN8' | 'UPC' | 'CODE128' | 'CODE39' | 'INTERNAL' | 'SUPPLIER' | 'OTHER'
+          is_primary: boolean
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id?: string | null
+          variant_id?: string | null
+          barcode: string
+          barcode_type?: 'EAN13' | 'EAN8' | 'UPC' | 'CODE128' | 'CODE39' | 'INTERNAL' | 'SUPPLIER' | 'OTHER'
+          is_primary?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string | null
+          variant_id?: string | null
+          barcode?: string
+          barcode_type?: 'EAN13' | 'EAN8' | 'UPC' | 'CODE128' | 'CODE39' | 'INTERNAL' | 'SUPPLIER' | 'OTHER'
+          is_primary?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      suppliers: {
+        Row: {
+          id: string
+          name: string
+          contact_name: string | null
+          email: string | null
+          phone: string | null
+          address: string | null
+          city: string | null
+          country: string | null
+          postal_code: string | null
+          tax_id: string | null
+          website: string | null
+          notes: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          contact_name?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          city?: string | null
+          country?: string | null
+          postal_code?: string | null
+          tax_id?: string | null
+          website?: string | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          contact_name?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          city?: string | null
+          country?: string | null
+          postal_code?: string | null
+          tax_id?: string | null
+          website?: string | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      product_suppliers: {
+        Row: {
+          id: string
+          product_id: string
+          supplier_id: string
+          supplier_sku: string | null
+          supplier_price: number | null
+          lead_time_days: number | null
+          min_order_quantity: number
+          is_primary: boolean
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          product_id: string
+          supplier_id: string
+          supplier_sku?: string | null
+          supplier_price?: number | null
+          lead_time_days?: number | null
+          min_order_quantity?: number
+          is_primary?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          product_id?: string
+          supplier_id?: string
+          supplier_sku?: string | null
+          supplier_price?: number | null
+          lead_time_days?: number | null
+          min_order_quantity?: number
+          is_primary?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
       cart_items: {
         Row: {
           id: string
@@ -302,6 +431,7 @@ export interface Database {
     Enums: {
       order_status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
       user_role: 'user' | 'admin'
+      barcode_type: 'EAN13' | 'EAN8' | 'UPC' | 'CODE128' | 'CODE39' | 'INTERNAL' | 'SUPPLIER' | 'OTHER'
     }
   }
 }
@@ -311,6 +441,9 @@ export type Category = Database['public']['Tables']['categories']['Row']
 export type Product = Database['public']['Tables']['products']['Row']
 export type ProductVariant = Database['public']['Tables']['product_variants']['Row']
 export type ProductImage = Database['public']['Tables']['product_images']['Row']
+export type ProductBarcode = Database['public']['Tables']['product_barcodes']['Row']
+export type Supplier = Database['public']['Tables']['suppliers']['Row']
+export type ProductSupplier = Database['public']['Tables']['product_suppliers']['Row']
 export type CartItem = Database['public']['Tables']['cart_items']['Row']
 export type Order = Database['public']['Tables']['orders']['Row']
 export type OrderItem = Database['public']['Tables']['order_items']['Row']
@@ -320,6 +453,9 @@ export type CategoryInsert = Database['public']['Tables']['categories']['Insert'
 export type ProductInsert = Database['public']['Tables']['products']['Insert']
 export type ProductVariantInsert = Database['public']['Tables']['product_variants']['Insert']
 export type ProductImageInsert = Database['public']['Tables']['product_images']['Insert']
+export type ProductBarcodeInsert = Database['public']['Tables']['product_barcodes']['Insert']
+export type SupplierInsert = Database['public']['Tables']['suppliers']['Insert']
+export type ProductSupplierInsert = Database['public']['Tables']['product_suppliers']['Insert']
 export type CartItemInsert = Database['public']['Tables']['cart_items']['Insert']
 export type OrderInsert = Database['public']['Tables']['orders']['Insert']
 export type UserProfileInsert = Database['public']['Tables']['user_profiles']['Insert']
@@ -328,6 +464,9 @@ export type CategoryUpdate = Database['public']['Tables']['categories']['Update'
 export type ProductUpdate = Database['public']['Tables']['products']['Update']
 export type ProductVariantUpdate = Database['public']['Tables']['product_variants']['Update']
 export type ProductImageUpdate = Database['public']['Tables']['product_images']['Update']
+export type ProductBarcodeUpdate = Database['public']['Tables']['product_barcodes']['Update']
+export type SupplierUpdate = Database['public']['Tables']['suppliers']['Update']
+export type ProductSupplierUpdate = Database['public']['Tables']['product_suppliers']['Update']
 export type CartItemUpdate = Database['public']['Tables']['cart_items']['Update']
 export type OrderUpdate = Database['public']['Tables']['orders']['Update']
 export type UserProfileUpdate = Database['public']['Tables']['user_profiles']['Update']

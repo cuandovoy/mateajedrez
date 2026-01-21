@@ -14,6 +14,7 @@ export function CategoryProducts() {
   const { categorySlug } = useParams<{ categorySlug: string }>()
   const [products, setProducts] = useState<Product[]>([])
   const [parentCategory, setParentCategory] = useState<Category | null>(null)
+  const [currentCategory, setCurrentCategory] = useState<Category | null>(null) // The category being viewed (could be parent or subcategory)
   const [subcategories, setSubcategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -25,46 +26,83 @@ export function CategoryProducts() {
     if (categorySlug) {
       fetchCategoryAndProducts()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categorySlug])
 
   useEffect(() => {
     if (parentCategory || selectedSubcategories.length > 0 || priceRange.min || priceRange.max) {
       fetchProducts()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentCategory, selectedSubcategories, priceRange.min, priceRange.max])
 
   const fetchCategoryAndProducts = async () => {
     if (!categorySlug) return
 
     try {
-      // Fetch parent category by slug
+      // First, try to find a category with this slug (could be parent or subcategory)
       const { data: categoryData = null, error: categoryError }: { data: Category | null, error: PostgrestError | null } = await supabase
         .from('categories')
         .select('*')
         .eq('slug', categorySlug)
-        .is('parent_id', null)
         .single()
 
       if (categoryError) throw categoryError
 
       if (categoryData) {
-        setParentCategory(categoryData)
+        let parentCategory: Category
+        let selectedSubcategoryId: string | null = null
 
-        // Fetch subcategories
+        // Check if it's a parent category or a subcategory
+        if (categoryData.parent_id) {
+          // It's a subcategory - fetch the parent category
+          const { data: parentData, error: parentError } = await supabase
+            .from('categories')
+            .select('*')
+            .eq('id', categoryData.parent_id)
+            .single()
+
+          if (parentError) throw parentError
+          if (!parentData) {
+            throw new Error('Parent category not found')
+          }
+
+          parentCategory = parentData
+          selectedSubcategoryId = categoryData.id as string
+          setCurrentCategory(categoryData) // Set the subcategory as current
+        } else {
+          // It's a parent category
+          parentCategory = categoryData
+          setCurrentCategory(categoryData) // Set the parent as current
+        }
+
+        setParentCategory(parentCategory)
+
+        // Fetch all subcategories of the parent
         const { data: subcats, error: subcatsError }: { data: Category[] | null, error: PostgrestError | null } = await supabase
           .from('categories')
           .select('*')
-          .eq('parent_id', categoryData?.id as string)
+          .eq('parent_id', parentCategory.id as string)
           .order('name')
 
-        if (!subcatsError && subcats) {
+        if (!subcatsError && subcats && subcats.length > 0) {
           setSubcategories(subcats)
-          // Por defecto, todas las subcategorías están seleccionadas
-          setSelectedSubcategories(subcats?.map((cat) => cat.id as string) || [])
+          
+          // If we navigated to a specific subcategory, select only that one
+          // Otherwise, select all subcategories by default
+          if (selectedSubcategoryId) {
+            setSelectedSubcategories([selectedSubcategoryId])
+          } else {
+            setSelectedSubcategories(subcats.map((cat) => cat.id as string))
+          }
+        } else {
+          // No subcategories, clear selection
+          setSubcategories([])
+          setSelectedSubcategories([])
         }
 
         // Fetch products initially
-        await fetchProductsForCategory(categoryData?.id as string, subcats?.map((cat) => cat) || [])
+        await fetchProductsForCategory(parentCategory.id as string, subcats || [])
       }
     } catch (error) {
       console.error('Error fetching category:', error)
@@ -199,9 +237,18 @@ export function CategoryProducts() {
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">{parentCategory?.name}</h1>
-        {parentCategory?.description && (
-          <p className="text-gray-600">{parentCategory?.description}</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          {currentCategory?.name || parentCategory?.name}
+        </h1>
+        {(currentCategory?.description || parentCategory?.description) && (
+          <p className="text-gray-600">
+            {currentCategory?.description || parentCategory?.description}
+          </p>
+        )}
+        {currentCategory?.parent_id && parentCategory && (
+          <p className="text-sm text-gray-500 mt-1">
+            Categoría: {parentCategory.name}
+          </p>
         )}
         <div className="flex flex-col md:flex-row gap-4 mt-4">
           <Input

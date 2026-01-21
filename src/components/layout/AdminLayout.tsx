@@ -8,7 +8,8 @@ import {
   ShoppingCart, 
   Users,
   LogOut,
-  Store
+  Store,
+  Truck
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
@@ -42,6 +43,7 @@ export function AdminLayout() {
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/products', label: 'Productos', icon: Package },
     { path: '/admin/categories', label: 'Categorías', icon: Folder },
+    { path: '/admin/suppliers', label: 'Proveedores', icon: Truck },
     { path: '/admin/orders', label: 'Órdenes', icon: ShoppingCart },
     { path: '/admin/users', label: 'Usuarios', icon: Users },
   ]

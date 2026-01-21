@@ -1,5 +1,5 @@
-import { Edit, Trash2, Package, Image as ImageIcon } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { Edit, Trash2, Package, Image as ImageIcon, ScanLine, Truck } from 'lucide-react'
+import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { formatPrice } from '@/lib/utils'
 import type { Product, ProductImage, Category } from '@/types'
 
@@ -13,6 +13,8 @@ interface ProductTableProps {
   onEdit: (product: Product) => void
   onDelete: (id: string) => void
   onManageVariants: (product: Product) => void
+  onManageBarcodes?: (product: Product) => void
+  onManageSuppliers?: (product: Product) => void
   getPrimaryImage: (product: ProductWithCategory) => string | null
 }
 
@@ -21,6 +23,8 @@ export function ProductTable({
   onEdit,
   onDelete,
   onManageVariants,
+  onManageBarcodes,
+  onManageSuppliers,
   getPrimaryImage,
 }: ProductTableProps) {
   if (products.length === 0) {
@@ -128,31 +132,45 @@ export function ProductTable({
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onManageVariants(product)}
-                      title="Gestionar variantes"
-                    >
-                      <Package className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => onEdit(product)}
-                      title="Editar"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => onDelete(product.id)}
-                      title="Eliminar"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div className="flex items-center justify-end">
+                    <ActionsMenu
+                      actions={[
+                        {
+                          label: 'Gestionar variantes',
+                          icon: <Package className="h-4 w-4" />,
+                          onClick: () => onManageVariants(product),
+                        },
+                        ...(onManageBarcodes
+                          ? [
+                              {
+                                label: 'Código de barras',
+                                icon: <ScanLine className="h-4 w-4" />,
+                                onClick: () => onManageBarcodes(product),
+                              },
+                            ]
+                          : []),
+                        ...(onManageSuppliers
+                          ? [
+                              {
+                                label: 'Proveedores',
+                                icon: <Truck className="h-4 w-4" />,
+                                onClick: () => onManageSuppliers(product),
+                              },
+                            ]
+                          : []),
+                        {
+                          label: 'Editar',
+                          icon: <Edit className="h-4 w-4" />,
+                          onClick: () => onEdit(product),
+                        },
+                        {
+                          label: 'Eliminar',
+                          icon: <Trash2 className="h-4 w-4" />,
+                          onClick: () => onDelete(product.id),
+                          variant: 'danger',
+                        },
+                      ]}
+                    />
                   </div>
                 </td>
               </tr>

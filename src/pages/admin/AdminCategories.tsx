@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Plus, Edit, Trash2, Upload, X } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { Plus, Edit, Trash2, Upload, X, Grid3x3, List, Filter } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -8,7 +8,12 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { uploadCategoryImage, deleteImage } from '@/lib/storage'
+import { CategoryTable } from '@/components/admin/CategoryTable'
+import { ActionsMenu } from '@/components/ui/ActionsMenu'
+import { SearchFilter } from '@/components/filters'
 import type { Category, CategoryInsert, CategoryUpdate } from '@/types'
+
+type ViewMode = 'grid' | 'list'
 
 const categorySchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -31,6 +36,8 @@ function AdminCategoriesContent() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [search, setSearch] = useState('')
 
   const {
     register,
@@ -68,6 +75,21 @@ function AdminCategoriesContent() {
   const getSubcategories = (parentId: string) => {
     return categories.filter((cat) => cat.parent_id === parentId)
   }
+
+  // Filter categories by search term
+  const filteredCategories = useMemo(() => {
+    if (!search.trim()) {
+      return categories
+    }
+
+    const searchLower = search.toLowerCase()
+    return categories.filter(
+      (category) =>
+        category.name.toLowerCase().includes(searchLower) ||
+        category.slug.toLowerCase().includes(searchLower) ||
+        category.description?.toLowerCase().includes(searchLower)
+    )
+  }, [categories, search])
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -204,116 +226,198 @@ function AdminCategoriesContent() {
           <h1 className="text-3xl font-bold text-gray-900">Categorías</h1>
           <p className="text-gray-600 mt-2">Organiza tus productos en categorías y subcategorías</p>
         </div>
-        <Button onClick={handleNew}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva Categoría
-        </Button>
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 ${viewMode === 'list' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              title="Vista de lista"
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 ${viewMode === 'grid' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              title="Vista de grilla"
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </button>
+          </div>
+          <Button onClick={handleNew}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva Categoría
+          </Button>
+        </div>
       </div>
 
-      <div className="space-y-6">
-        {getParentCategories().map((parentCategory) => (
-          <div key={parentCategory.id}>
-            <Card>
-              <CardContent className="p-6">
-                <div className="flex items-start space-x-4">
-                  {parentCategory.image_url && (
-                    <img
-                      src={parentCategory.image_url}
-                      alt={parentCategory.name}
-                      className="w-32 h-32 object-cover rounded"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {parentCategory.name}
-                      </h3>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(parentCategory)}
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Editar
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => handleDelete(parentCategory.id)}
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Eliminar
-                        </Button>
-                      </div>
-                    </div>
-                    <p className="text-gray-600 text-sm mb-2">
-                      {parentCategory.description || 'Sin descripción'}
-                    </p>
-                    <p className="text-xs text-gray-500 mb-4">Slug: {parentCategory.slug}</p>
-                    
-                    {getSubcategories(parentCategory.id).length > 0 && (
-                      <div className="mt-4 pl-4 border-l-2 border-gray-200">
-                        <p className="text-sm font-medium text-gray-700 mb-2">Subcategorías:</p>
-                        <div className="space-y-2">
-                          {getSubcategories(parentCategory.id).map((subcategory) => (
-                            <Card key={subcategory.id} className="bg-gray-50">
-                              <CardContent className="p-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="flex items-center space-x-3">
-                                    {subcategory.image_url && (
-                                      <img
-                                        src={subcategory.image_url}
-                                        alt={subcategory.name}
-                                        className="w-16 h-16 object-cover rounded"
-                                      />
-                                    )}
-                                    <div>
-                                      <h4 className="text-sm font-semibold text-gray-900">
-                                        {subcategory.name}
-                                      </h4>
-                                      <p className="text-xs text-gray-500">
-                                        {subcategory.description || 'Sin descripción'}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="flex space-x-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleEdit(subcategory)}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="danger"
-                                      size="sm"
-                                      onClick={() => handleDelete(subcategory.id)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
+      {/* Filters Panel */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Filter className="h-5 w-5" />
+            <span>Filtros</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <SearchFilter
+              value={search}
+              onChange={setSearch}
+              placeholder="Buscar categorías..."
+            />
+          </div>
+          {search && (
+            <div className="mt-4">
+              <Button variant="outline" onClick={() => setSearch('')}>
+                Limpiar Filtros
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Results count */}
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          Mostrando {filteredCategories.length} de {categories.length} categorías
+        </p>
+      </div>
+
+      {/* Categories Display */}
+      {viewMode === 'grid' ? (
+        <div className="space-y-6">
+          {getParentCategories()
+            .filter((cat) => filteredCategories.includes(cat))
+            .map((parentCategory) => {
+              const subcategories = getSubcategories(parentCategory.id).filter((sub) =>
+                filteredCategories.includes(sub)
+              )
+              return (
+                <div key={parentCategory.id}>
+                  <Card>
+                    <CardContent className="p-6">
+                      <div className="flex items-start space-x-4">
+                        {parentCategory.image_url && (
+                          <img
+                            src={parentCategory.image_url}
+                            alt={parentCategory.name}
+                            className="w-32 h-32 object-cover rounded"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-2">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {parentCategory.name}
+                            </h3>
+                            <ActionsMenu
+                              actions={[
+                                {
+                                  label: 'Editar',
+                                  icon: <Edit className="h-4 w-4" />,
+                                  onClick: () => handleEdit(parentCategory),
+                                },
+                                {
+                                  label: 'Eliminar',
+                                  icon: <Trash2 className="h-4 w-4" />,
+                                  onClick: () => handleDelete(parentCategory.id),
+                                  variant: 'danger',
+                                },
+                              ]}
+                            />
+                          </div>
+                          <p className="text-gray-600 text-sm mb-2">
+                            {parentCategory.description || 'Sin descripción'}
+                          </p>
+                          <p className="text-xs text-gray-500 mb-4">Slug: {parentCategory.slug}</p>
+                          
+                          {subcategories.length > 0 && (
+                            <div className="mt-4 pl-4 border-l-2 border-gray-200">
+                              <p className="text-sm font-medium text-gray-700 mb-2">Subcategorías:</p>
+                              <div className="space-y-2">
+                                {subcategories.map((subcategory) => (
+                                  <Card key={subcategory.id} className="bg-gray-50">
+                                    <CardContent className="p-4">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-3">
+                                          {subcategory.image_url && (
+                                            <img
+                                              src={subcategory.image_url}
+                                              alt={subcategory.name}
+                                              className="w-16 h-16 object-cover rounded"
+                                            />
+                                          )}
+                                          <div>
+                                            <h4 className="text-sm font-semibold text-gray-900">
+                                              {subcategory.name}
+                                            </h4>
+                                            <p className="text-xs text-gray-500">
+                                              {subcategory.description || 'Sin descripción'}
+                                            </p>
+                                          </div>
+                                        </div>
+                                        <ActionsMenu
+                                          actions={[
+                                            {
+                                              label: 'Editar',
+                                              icon: <Edit className="h-4 w-4" />,
+                                              onClick: () => handleEdit(subcategory),
+                                            },
+                                            {
+                                              label: 'Eliminar',
+                                              icon: <Trash2 className="h-4 w-4" />,
+                                              onClick: () => handleDelete(subcategory.id),
+                                              variant: 'danger',
+                                            },
+                                          ]}
+                                        />
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    )}
-                  </div>
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        ))}
-      </div>
+              )
+            })}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <CategoryTable
+              categories={filteredCategories}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {filteredCategories.length === 0 && !loading && (
+        <div className="text-center py-12">
+          <p className="text-gray-600 text-lg mb-4">
+            {search
+              ? 'No se encontraron categorías con el término de búsqueda'
+              : 'No hay categorías disponibles'}
+          </p>
+          {search && (
+            <Button variant="outline" onClick={() => setSearch('')}>
+              Limpiar búsqueda
+            </Button>
+          )}
+        </div>
+      )}
 
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-2xl relative">
-            <CardHeader className="pb-4">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            <CardHeader className="flex-shrink-0 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-2xl">
+                <CardTitle>
                   {editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}
                 </CardTitle>
                 <button
@@ -325,116 +429,138 @@ function AdminCategoriesContent() {
                     setImagePreview(null)
                     reset()
                   }}
-                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 rounded-full hover:bg-gray-100"
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
                   aria-label="Cerrar"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
             </CardHeader>
-            <CardContent className="px-6 pb-6 max-h-[85vh] overflow-y-auto">
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="md:col-span-2">
+            <CardContent className="flex-1 overflow-y-auto px-6 py-6">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                {/* Información Básica */}
+                <div className="space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                    Información Básica
+                  </h3>
+                  <div className="space-y-4">
                     <Input
                       label="Nombre"
                       {...register('name')}
                       error={errors.name?.message}
+                      placeholder="Ej: Electrónica"
                     />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Descripción
-                    </label>
-                    <textarea
-                      {...register('description')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                      rows={3}
-                    />
-                  </div>
-                  <Input
-                    label="Slug"
-                    {...register('slug')}
-                    error={errors.slug?.message}
-                    placeholder="ej: electronica"
-                  />
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Categoría Padre (opcional)
-                    </label>
-                    <select
-                      {...register('parent_id')}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                    >
-                      <option value="">Sin categoría padre (categoría principal)</option>
-                      {getParentCategories()
-                        .filter((cat) => !editingCategory || cat.id !== editingCategory.id)
-                        .map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </option>
-                        ))}
-                    </select>
-                    <p className="mt-1 text-xs text-gray-500">
-                      Selecciona una categoría padre para crear una subcategoría
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="border-t pt-5">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Imagen de la Categoría
-                  </label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      {imagePreview && (
-                        <div className="relative mb-3">
-                          <img
-                            src={imagePreview}
-                            alt="Preview"
-                            className="w-full h-32 object-cover rounded-lg border border-gray-300"
-                          />
-                          <button
-                            type="button"
-                            onClick={removeImage}
-                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      )}
-                      <label className="cursor-pointer block">
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/jpg,image/png,image/webp"
-                          onChange={handleImageChange}
-                          className="hidden"
-                        />
-                        <div className="flex items-center justify-center px-4 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                          <Upload className="h-4 w-4 mr-2" />
-                          <span className="text-sm text-gray-700">
-                            {imageFile ? 'Cambiar imagen' : 'Subir imagen'}
-                          </span>
-                        </div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Descripción
                       </label>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 mb-2">
-                        O ingresa una URL de imagen
-                      </p>
-                      <Input
-                        label="URL de Imagen (opcional)"
-                        type="url"
-                        {...register('image_url')}
-                        error={errors.image_url?.message}
-                        placeholder="https://ejemplo.com/imagen.jpg"
+                      <textarea
+                        {...register('description')}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 resize-none"
+                        rows={3}
+                        placeholder="Descripción de la categoría (opcional)"
                       />
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Input
+                        label="Slug"
+                        {...register('slug')}
+                        error={errors.slug?.message}
+                        placeholder="ej: electronica"
+                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Categoría Padre
+                        </label>
+                        <select
+                          {...register('parent_id')}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 bg-white"
+                        >
+                          <option value="">Sin categoría padre (principal)</option>
+                          {getParentCategories()
+                            .filter((cat) => !editingCategory || cat.id !== editingCategory.id)
+                            .map((cat) => (
+                              <option key={cat.id} value={cat.id}>
+                                {cat.name}
+                              </option>
+                            ))}
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Opcional: Selecciona una categoría padre para crear una subcategoría
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-                <div className="flex space-x-4 pt-2">
+
+                {/* Imagen */}
+                <div className="border-t border-gray-200 pt-6 space-y-4">
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+                    Imagen de la Categoría
+                  </h3>
+                  <div className="space-y-4">
+                    {imagePreview && (
+                      <div className="relative inline-block">
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-48 h-48 object-cover rounded-lg border-2 border-gray-300"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeImage}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-lg"
+                          aria-label="Eliminar imagen"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Subir Imagen
+                        </label>
+                        <label className="cursor-pointer block">
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/jpg,image/png,image/webp"
+                            onChange={handleImageChange}
+                            className="hidden"
+                          />
+                          <div className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-admin-500 hover:bg-admin-50 transition-colors">
+                            <Upload className="h-5 w-5 mr-2 text-gray-400" />
+                            <span className="text-sm text-gray-700 font-medium">
+                              {imageFile ? 'Cambiar imagen' : 'Seleccionar archivo'}
+                            </span>
+                          </div>
+                        </label>
+                        <p className="mt-2 text-xs text-gray-500">
+                          Formatos: JPG, PNG, WEBP. Máximo 5MB
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          O usar URL
+                        </label>
+                        <Input
+                          type="url"
+                          {...register('image_url')}
+                          error={errors.image_url?.message}
+                          placeholder="https://ejemplo.com/imagen.jpg"
+                        />
+                        <p className="mt-2 text-xs text-gray-500">
+                          Ingresa una URL de imagen externa
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex space-x-4 pt-4 border-t border-gray-200">
                   <Button type="submit" className="flex-1" isLoading={uploadingImage}>
-                    {editingCategory ? 'Actualizar' : 'Crear'}
+                    {editingCategory ? 'Actualizar Categoría' : 'Crear Categoría'}
                   </Button>
                   <Button
                     type="button"
@@ -442,6 +568,8 @@ function AdminCategoriesContent() {
                     onClick={() => {
                       setIsModalOpen(false)
                       setEditingCategory(null)
+                      setImageFile(null)
+                      setImagePreview(null)
                       reset()
                     }}
                     className="flex-1"

@@ -1,24 +1,28 @@
-import { useEffect, useState, useMemo, useCallback } from 'react'
-import { Plus, Edit, Trash2, Upload, Package, ArrowUp, ArrowDown, Star, Grid3x3, List, X, Filter } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { formatPrice } from '@/lib/utils'
-import { uploadProductImage, deleteImage } from '@/lib/storage'
-import { VariantManager } from '@/components/admin/VariantManager'
+import { BarcodeManager } from '@/components/admin/BarcodeManager'
+import { ProductSupplierManager } from '@/components/admin/ProductSupplierManager'
 import { ProductTable } from '@/components/admin/ProductTable'
+import { VariantManager } from '@/components/admin/VariantManager'
 import {
   CategoryFilter,
   PriceRangeFilter,
   SearchFilter,
   StatusFilter,
   StockFilter,
+  SupplierFilter,
 } from '@/components/filters'
-import type { Product, Category, ProductInsert, ProductUpdate, ProductImage } from '@/types'
+import { ActionsMenu } from '@/components/ui/ActionsMenu'
+import { Button } from '@/components/ui/Button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
+import { deleteImage, uploadProductImage } from '@/lib/storage'
+import { supabase } from '@/lib/supabase'
+import { formatPrice } from '@/lib/utils'
+import type { Category, Product, ProductImage, ProductInsert, ProductUpdate, Supplier } from '@/types'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { ArrowDown, ArrowUp, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
 
 const productSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -56,6 +60,7 @@ type StockFilterValue = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
 interface ProductFilters {
   search: string
   categoryId: string
+  supplierId: string
   priceMin: string
   priceMax: string
   status: StatusFilterValue
@@ -65,17 +70,21 @@ interface ProductFilters {
 function AdminProductsContent() {
   const [products, setProducts] = useState<ProductWithImages[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithImages | null>(null)
   const [productImages, setProductImages] = useState<ProductImageItem[]>([])
   const [uploadingImage, setUploadingImage] = useState(false)
   const [variantManagerProduct, setVariantManagerProduct] = useState<Product | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>('grid')
-  const [showFilters, setShowFilters] = useState(false)
+  const [barcodeManagerProduct, setBarcodeManagerProduct] = useState<Product | null>(null)
+  const [barcodeManagerVariant, setBarcodeManagerVariant] = useState<{ productId: string; variantId: string } | null>(null)
+  const [supplierManagerProduct, setSupplierManagerProduct] = useState<Product | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [filters, setFilters] = useState<ProductFilters>({
     search: '',
     categoryId: '',
+    supplierId: '',
     priceMin: '',
     priceMax: '',
     status: 'all',
@@ -94,6 +103,26 @@ function AdminProductsContent() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
+      
+      // If filtering by supplier, we need to get product IDs first
+      let productIds: string[] | null = null
+      if (filters.supplierId) {
+        const { data: productSuppliersData, error: supplierError } = await supabase
+          .from('product_suppliers')
+          .select('product_id')
+          .eq('supplier_id', filters.supplierId)
+        
+        if (supplierError) throw supplierError
+        productIds = productSuppliersData?.map((ps: { product_id: string }) => ps.product_id) || []
+        
+        // If no products found for this supplier, return empty array
+        if (productIds.length === 0) {
+          setProducts([])
+          setLoading(false)
+          return
+        }
+      }
+      
       let query = supabase
         .from('products')
         .select(`
@@ -113,6 +142,10 @@ function AdminProductsContent() {
       // Apply filters
       if (filters.categoryId) {
         query = query.eq('category_id', filters.categoryId)
+      }
+
+      if (filters.supplierId && productIds) {
+        query = query.in('id', productIds)
       }
 
       if (filters.status !== 'all') {
@@ -146,10 +179,11 @@ function AdminProductsContent() {
     } finally {
       setLoading(false)
     }
-  }, [filters.categoryId, filters.status, filters.priceMin, filters.priceMax, filters.stock])
+  }, [filters.categoryId, filters.supplierId, filters.status, filters.priceMin, filters.priceMax, filters.stock])
 
   useEffect(() => {
     fetchCategories()
+    fetchSuppliers()
   }, [])
 
   useEffect(() => {
@@ -182,6 +216,21 @@ function AdminProductsContent() {
       setCategories(data || [])
     } catch (error) {
       console.error('Error fetching categories:', error)
+    }
+  }
+
+  const fetchSuppliers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .eq('is_active', true)
+        .order('name')
+
+      if (error) throw error
+      setSuppliers(data || [])
+    } catch (error) {
+      console.error('Error fetching suppliers:', error)
     }
   }
 
@@ -553,6 +602,7 @@ function AdminProductsContent() {
     setFilters({
       search: '',
       categoryId: '',
+      supplierId: '',
       priceMin: '',
       priceMax: '',
       status: 'all',
@@ -564,6 +614,7 @@ function AdminProductsContent() {
     return (
       filters.search !== '' ||
       filters.categoryId !== '' ||
+      filters.supplierId !== '' ||
       filters.priceMin !== '' ||
       filters.priceMax !== '' ||
       filters.status !== 'all' ||
@@ -587,33 +638,20 @@ function AdminProductsContent() {
           <p className="text-gray-600 mt-2">Gestiona todos los productos de tu tienda</p>
         </div>
         <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowFilters(!showFilters)}
-            className="hidden md:flex"
-          >
-            <Filter className="h-4 w-4 mr-2" />
-            Filtros
-            {hasActiveFilters && (
-              <span className="ml-2 bg-admin-600 text-white rounded-full px-2 py-0.5 text-xs">
-                {Object.values(filters).filter((v) => v !== '' && v !== 'all').length}
-              </span>
-            )}
-          </Button>
           <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 ${viewMode === 'grid' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-              title="Vista de grilla"
-            >
-              <Grid3x3 className="h-4 w-4" />
-            </button>
             <button
               onClick={() => setViewMode('list')}
               className={`p-2 ${viewMode === 'list' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
               title="Vista de lista"
             >
               <List className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 ${viewMode === 'grid' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              title="Vista de grilla"
+            >
+              <Grid3x3 className="h-4 w-4" />
             </button>
           </div>
           <Button onClick={handleNew}>
@@ -624,61 +662,58 @@ function AdminProductsContent() {
       </div>
 
       {/* Filters Panel */}
-      {showFilters && (
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Filtros</CardTitle>
-              <div className="flex items-center space-x-2">
-                {hasActiveFilters && (
-                  <Button variant="outline" size="sm" onClick={clearFilters}>
-                    <X className="h-4 w-4 mr-1" />
-                    Limpiar
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFilters(false)}
-                  className="md:hidden"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Filter className="h-5 w-5" />
+            <span>Filtros</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <SearchFilter
+              value={filters.search}
+              onChange={(value) => setFilters({ ...filters, search: value })}
+              placeholder="Buscar productos..."
+            />
+            <CategoryFilter
+              categories={categories}
+              selectedCategoryId={filters.categoryId}
+              onCategoryChange={(categoryId) =>
+                setFilters({ ...filters, categoryId })
+              }
+            />
+            <SupplierFilter
+              suppliers={suppliers}
+              selectedSupplierId={filters.supplierId}
+              onSupplierChange={(supplierId) =>
+                setFilters({ ...filters, supplierId })
+              }
+            />
+            <StatusFilter
+              value={filters.status}
+              onChange={(value) => setFilters({ ...filters, status: value })}
+            />
+            <StockFilter
+              value={filters.stock}
+              onChange={(value) => setFilters({ ...filters, stock: value })}
+            />
+            <PriceRangeFilter
+              min={filters.priceMin}
+              max={filters.priceMax}
+              onMinChange={(min) => setFilters({ ...filters, priceMin: min })}
+              onMaxChange={(max) => setFilters({ ...filters, priceMax: max })}
+            />
+          </div>
+          {hasActiveFilters && (
+            <div className="mt-4">
+              <Button variant="outline" onClick={clearFilters}>
+                Limpiar Filtros
+              </Button>
             </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <SearchFilter
-                value={filters.search}
-                onChange={(value) => setFilters({ ...filters, search: value })}
-                placeholder="Buscar productos..."
-              />
-              <CategoryFilter
-                categories={categories}
-                selectedCategoryId={filters.categoryId}
-                onCategoryChange={(categoryId) =>
-                  setFilters({ ...filters, categoryId })
-                }
-              />
-              <StatusFilter
-                value={filters.status}
-                onChange={(value) => setFilters({ ...filters, status: value })}
-              />
-              <StockFilter
-                value={filters.stock}
-                onChange={(value) => setFilters({ ...filters, stock: value })}
-              />
-              <PriceRangeFilter
-                min={filters.priceMin}
-                max={filters.priceMax}
-                onMinChange={(min) => setFilters({ ...filters, priceMin: min })}
-                onMaxChange={(max) => setFilters({ ...filters, priceMax: max })}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Results count */}
       <div className="mb-4 flex items-center justify-between">
@@ -693,8 +728,41 @@ function AdminProductsContent() {
           {filteredProducts.map((product) => {
             const primaryImage = getPrimaryImage(product)
             return (
-              <Card key={product.id}>
+              <Card key={product.id} className="relative">
                 <CardContent className="p-6">
+                  {/* Actions Menu */}
+                  <div className="absolute top-4 right-4">
+                    <ActionsMenu
+                      actions={[
+                        {
+                          label: 'Gestionar variantes',
+                          icon: <Package className="h-4 w-4" />,
+                          onClick: () => setVariantManagerProduct(product),
+                        },
+                        {
+                          label: 'Código de barras',
+                          icon: <ScanLine className="h-4 w-4" />,
+                          onClick: () => setBarcodeManagerProduct(product),
+                        },
+                        {
+                          label: 'Proveedores',
+                          icon: <Truck className="h-4 w-4" />,
+                          onClick: () => setSupplierManagerProduct(product),
+                        },
+                        {
+                          label: 'Editar',
+                          icon: <Edit className="h-4 w-4" />,
+                          onClick: () => handleEdit(product),
+                        },
+                        {
+                          label: 'Eliminar',
+                          icon: <Trash2 className="h-4 w-4" />,
+                          onClick: () => handleDelete(product.id),
+                          variant: 'danger',
+                        },
+                      ]}
+                    />
+                  </div>
                   {primaryImage && (
                     <img
                       src={primaryImage}
@@ -702,13 +770,13 @@ function AdminProductsContent() {
                       className="w-full h-48 object-cover rounded mb-4"
                     />
                   )}
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2 pr-8">
                     {product.name}
                   </h3>
                   <p className="text-gray-600 text-sm mb-4 line-clamp-2">
                     {product.description || 'Sin descripción'}
                   </p>
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="flex justify-between items-center mb-2">
                     <span className="text-xl font-bold text-admin-600">
                       {formatPrice(product.price)}
                     </span>
@@ -716,36 +784,14 @@ function AdminProductsContent() {
                       Stock: {product.stock}
                     </span>
                   </div>
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setVariantManagerProduct(product)}
-                      className="w-full"
-                    >
-                      <Package className="h-4 w-4 mr-2" />
-                      Gestionar Variantes
-                    </Button>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(product)}
-                        className="flex-1"
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleDelete(product.id)}
-                        className="flex-1"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Eliminar
-                      </Button>
-                    </div>
+                  <div className="flex items-center space-x-2 text-xs text-gray-500">
+                    <span>SKU: {product.sku}</span>
+                    {product.category && (
+                      <>
+                        <span>•</span>
+                        <span>{product.category.name}</span>
+                      </>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -760,6 +806,8 @@ function AdminProductsContent() {
               onEdit={handleEdit}
               onDelete={handleDelete}
               onManageVariants={setVariantManagerProduct}
+              onManageBarcodes={setBarcodeManagerProduct}
+              onManageSuppliers={setSupplierManagerProduct}
               getPrimaryImage={getPrimaryImage}
             />
           </CardContent>
@@ -842,11 +890,29 @@ function AdminProductsContent() {
                     </p>
                   )}
                 </div>
-                <Input
-                  label="SKU"
-                  {...register('sku')}
-                  error={errors.sku?.message}
-                />
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                      SKU
+                    </label>
+                    {editingProduct && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setBarcodeManagerProduct(editingProduct)}
+                        className="text-xs"
+                      >
+                        <Package className="h-3 w-3 mr-1" />
+                        Códigos de Barras
+                      </Button>
+                    )}
+                  </div>
+                  <Input
+                    {...register('sku')}
+                    error={errors.sku?.message}
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Imágenes del Producto
@@ -1012,6 +1078,28 @@ function AdminProductsContent() {
         <VariantManager
           product={variantManagerProduct}
           onClose={() => setVariantManagerProduct(null)}
+        />
+      )}
+
+      {barcodeManagerProduct && (
+        <BarcodeManager
+          productId={barcodeManagerProduct.id}
+          onClose={() => setBarcodeManagerProduct(null)}
+        />
+      )}
+
+      {barcodeManagerVariant && (
+        <BarcodeManager
+          productId={barcodeManagerVariant.productId}
+          variantId={barcodeManagerVariant.variantId}
+          onClose={() => setBarcodeManagerVariant(null)}
+        />
+      )}
+
+      {supplierManagerProduct && (
+        <ProductSupplierManager
+          productId={supplierManagerProduct.id}
+          onClose={() => setSupplierManagerProduct(null)}
         />
       )}
     </div>
