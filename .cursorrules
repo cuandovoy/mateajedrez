@@ -1,0 +1,216 @@
+# Cursor Rules - E-commerce Supabase Project
+
+## Stack Tecnológico
+- **Frontend**: React 18 + TypeScript + Vite
+- **Styling**: Tailwind CSS (SOLO Tailwind, NO CSS personalizado)
+- **Backend**: Supabase (PostgreSQL + Auth + RLS + Storage)
+- **State Management**: Zustand
+- **Forms**: React Hook Form + Zod
+- **Routing**: React Router v6
+
+## Principios Generales
+
+### 1. TypeScript
+- **SIEMPRE** usar tipos explícitos, evitar `any` cuando sea posible
+- Usar tipos de Supabase desde `@/types/database.types.ts`
+- Preferir `type` sobre `interface` para tipos simples
+- Usar `as const` para literales cuando sea apropiado
+- Tipos temporales deben marcarse con `// TODO: Remove after regenerating types`
+
+### 2. React
+- Usar componentes funcionales con hooks
+- Preferir `useCallback` y `useMemo` para optimizaciones cuando sea necesario
+- Evitar re-renders innecesarios
+- Usar `React.memo` solo cuando sea realmente necesario
+- Mantener componentes pequeños y enfocados en una responsabilidad
+
+### 3. Estilos (Tailwind CSS)
+- **NUNCA** crear archivos CSS personalizados
+- **SOLO** usar clases de Tailwind CSS
+- Usar utilidades de Tailwind para responsive: `sm:`, `md:`, `lg:`, `xl:`
+- Agregar clases personalizadas en `tailwind.config.js` si es necesario
+- Usar `cn()` utility para combinar clases condicionalmente
+- Preferir clases de utilidad sobre componentes de estilo personalizados
+
+### 4. Estructura de Archivos
+```
+src/
+  components/
+    admin/          # Componentes específicos de admin
+    features/       # Componentes de features (ProductCard, etc.)
+    filters/        # Componentes de filtros reutilizables
+    layout/         # Componentes de layout (Header, Footer, etc.)
+    ui/             # Componentes UI base reutilizables
+  lib/              # Utilidades y helpers
+  pages/            # Páginas/views
+    admin/          # Páginas de administración
+  store/            # Zustand stores
+  types/            # TypeScript types
+```
+
+### 5. Naming Conventions
+- **Componentes**: PascalCase (`ProductCard.tsx`)
+- **Hooks**: camelCase con prefijo `use` (`useAuthStore`)
+- **Utilidades**: camelCase (`formatPrice`, `getProductImageUrl`)
+- **Constantes**: UPPER_SNAKE_CASE (`MAX_QUANTITY`)
+- **Tipos/Interfaces**: PascalCase (`Product`, `OrderInsert`)
+
+### 6. Supabase
+- **SIEMPRE** usar tipos generados desde `database.types.ts`
+- Usar RLS (Row Level Security) para todas las tablas
+- Validar datos en el cliente antes de enviar a Supabase
+- Manejar errores de Supabase apropiadamente
+- Usar transacciones cuando sea necesario (RPC functions)
+- Preferir queries específicas sobre `select('*')`
+
+### 7. Formularios
+- Usar `react-hook-form` con `zod` para validación
+- Crear schemas de validación reutilizables
+- Mostrar errores de validación de forma clara
+- Deshabilitar botones de submit durante el loading
+- Resetear formularios después de submit exitoso
+
+### 8. Estado Global (Zustand)
+- Crear stores por dominio (authStore, cartStore, toastStore)
+- Mantener stores simples y enfocados
+- Usar selectores cuando sea necesario para evitar re-renders
+- No mezclar lógica de negocio compleja en stores
+
+### 9. Manejo de Errores
+- **SIEMPRE** manejar errores en async operations
+- Mostrar mensajes de error amigables al usuario
+- Usar toast notifications para feedback
+- Loggear errores en consola para debugging
+- No exponer detalles técnicos de errores al usuario
+
+### 10. Performance
+- Lazy load de componentes pesados cuando sea posible
+- Usar `React.lazy()` y `Suspense` para code splitting
+- Optimizar imágenes (lazy loading, sizes apropiados)
+- Evitar re-renders innecesarios
+- Usar `useMemo` y `useCallback` cuando sea apropiado
+
+### 11. Accesibilidad
+- Usar elementos semánticos HTML apropiados
+- Agregar `aria-label` cuando sea necesario
+- Asegurar contraste de colores adecuado
+- Hacer formularios accesibles (labels, errores)
+- Soporte para navegación por teclado
+
+### 12. Seguridad
+- **NUNCA** exponer secrets en el código
+- Validar datos en cliente Y servidor
+- Usar RLS policies apropiadas
+- Sanitizar inputs del usuario
+- Usar HTTPS siempre
+
+### 13. Código Limpio
+- Funciones pequeñas y con una sola responsabilidad
+- Nombres descriptivos y claros
+- Evitar código duplicado (DRY)
+- Comentar código complejo, no código obvio
+- Mantener archivos pequeños (< 500 líneas cuando sea posible)
+
+### 14. Testing (Futuro)
+- Escribir tests para lógica crítica
+- Tests de componentes para UI importante
+- Tests de integración para flujos completos
+
+### 15. Git
+- Commits descriptivos y atómicos
+- Usar conventional commits cuando sea posible
+- No committear archivos de configuración local (.env)
+- Mantener `.gitignore` actualizado
+
+## Patrones Específicos del Proyecto
+
+### Componentes Admin
+- Usar `AdminLayout` para todas las páginas de admin
+- Mantener consistencia en estilos y estructura
+- Usar `ActionsMenu` para acciones en tablas
+- Implementar filtros reutilizables desde `@/components/filters`
+
+### Componentes UI Base
+- Componentes en `@/components/ui` deben ser reutilizables
+- Props bien tipadas con TypeScript
+- Variantes usando props (ej: `variant="primary"`)
+- Soporte para `className` para extensibilidad
+
+### Páginas
+- Una página = un archivo
+- Usar componentes reutilizables
+- Mantener lógica de negocio en hooks o stores
+- Separar presentación de lógica
+
+### Migraciones SQL
+- Numerar migraciones secuencialmente: `001_`, `002_`, etc.
+- Incluir comentarios descriptivos
+- Probar migraciones antes de commitear
+- Incluir rollback cuando sea posible
+- Documentar cambios importantes
+
+### Tipos TypeScript
+- Regenerar tipos después de migraciones SQL
+- Usar tipos de Supabase cuando estén disponibles
+- Crear tipos temporales solo cuando sea necesario
+- Eliminar tipos temporales después de regenerar
+
+## Anti-Patrones a Evitar
+
+❌ **NO hacer:**
+- Usar `any` sin justificación
+- Crear CSS personalizado fuera de Tailwind
+- Mezclar lógica de negocio en componentes
+- Ignorar errores de TypeScript
+- Hardcodear valores mágicos
+- Duplicar código
+- Componentes demasiado grandes
+- Props drilling excesivo
+- Mutar estado directamente
+- Olvidar manejar estados de loading/error
+
+✅ **SÍ hacer:**
+- Usar tipos estrictos
+- Componentes pequeños y reutilizables
+- Separar concerns (presentación vs lógica)
+- Manejar todos los estados (loading, error, success)
+- Validar datos
+- Usar constantes para valores repetidos
+- Extraer lógica compleja a funciones/hooks
+- Usar context o stores para estado compartido
+- Inmutabilidad en estado
+
+## Comandos Útiles
+
+```bash
+# Generar tipos de TypeScript desde Supabase
+yarn generate-types
+
+# Desarrollo
+yarn dev
+
+# Build
+yarn build
+
+# Linting
+yarn lint
+
+# Type checking
+yarn type-check
+```
+
+## Notas Adicionales
+
+- Este proyecto usa Supabase en VPS con Docker (no Supabase Cloud)
+- La URL de Supabase es personalizada (no *.supabase.co)
+- Para generar tipos, usar el script `generate-types.js` o manualmente desde migraciones
+- Mantener consistencia con el código existente
+- Seguir los patrones establecidos en el proyecto
+
+## Prioridades
+
+1. **Seguridad**: RLS, validación, sanitización
+2. **Type Safety**: TypeScript estricto
+3. **UX**: Feedback claro, loading states, manejo de errores
+4. **Performance**: Optimizaciones cuando sea necesario
+5. **Mantenibilidad**: Código limpio y bien organizado

@@ -613,10 +613,138 @@ export type CartItem = Database['public']['Tables']['cart_items']['Row']
 export type Order = Database['public']['Tables']['orders']['Row']
 export type OrderItem = Database['public']['Tables']['order_items']['Row']
 export type UserProfile = Database['public']['Tables']['user_profiles']['Row']
-export type Branch = Database['public']['Tables']['branches']['Row']
-export type BranchInventory = Database['public']['Tables']['branch_inventory']['Row']
-export type CashSession = Database['public']['Tables']['cash_sessions']['Row']
-export type OrderPayment = Database['public']['Tables']['order_payments']['Row']
+
+// Temporary Branch types (will be generated from Supabase after migration)
+// TODO: Remove these after regenerating types from Supabase
+export type Branch = {
+  id: string
+  name: string
+  code: string | null
+  address: string | null
+  city: string | null
+  country: string | null
+  postal_code: string | null
+  phone: string | null
+  email: string | null
+  is_active: boolean
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type BranchInsert = {
+  id?: string
+  name: string
+  code?: string | null
+  address?: string | null
+  city?: string | null
+  country?: string | null
+  postal_code?: string | null
+  phone?: string | null
+  email?: string | null
+  is_active?: boolean
+  notes?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type BranchUpdate = {
+  id?: string
+  name?: string
+  code?: string | null
+  address?: string | null
+  city?: string | null
+  country?: string | null
+  postal_code?: string | null
+  phone?: string | null
+  email?: string | null
+  is_active?: boolean
+  notes?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+// Temporary CashSession types (will be generated from Supabase after migration)
+// TODO: Remove these after regenerating types from Supabase
+export type CashSession = {
+  id: string
+  branch_id: string
+  opening_amount: number
+  expected_amount: number | null
+  closing_amount: number | null
+  difference: number | null
+  opened_by: string | null
+  closed_by: string | null
+  opened_at: string
+  closed_at: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type CashSessionInsert = {
+  id?: string
+  branch_id: string
+  opening_amount: number
+  expected_amount?: number | null
+  closing_amount?: number | null
+  difference?: number | null
+  opened_by?: string | null
+  closed_by?: string | null
+  opened_at?: string
+  closed_at?: string | null
+  notes?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+export type CashSessionUpdate = {
+  id?: string
+  branch_id?: string
+  opening_amount?: number
+  expected_amount?: number | null
+  closing_amount?: number | null
+  difference?: number | null
+  opened_by?: string | null
+  closed_by?: string | null
+  opened_at?: string
+  closed_at?: string | null
+  notes?: string | null
+  created_at?: string
+  updated_at?: string
+}
+
+// Temporary OrderPayment types (will be generated from Supabase after migration)
+// TODO: Remove these after regenerating types from Supabase
+export type OrderPayment = {
+  id: string
+  order_id: string
+  payment_method: 'transfer' | 'mercadopago' | 'cash'
+  amount: number
+  cash_session_id: string | null
+  notes: string | null
+  created_at: string
+}
+
+export type OrderPaymentInsert = {
+  id?: string
+  order_id: string
+  payment_method: 'transfer' | 'mercadopago' | 'cash'
+  amount: number
+  cash_session_id?: string | null
+  notes?: string | null
+  created_at?: string
+}
+
+export type OrderPaymentUpdate = {
+  id?: string
+  order_id?: string
+  payment_method?: 'transfer' | 'mercadopago' | 'cash'
+  amount?: number
+  cash_session_id?: string | null
+  notes?: string | null
+  created_at?: string
+}
 
 export type CategoryInsert = Database['public']['Tables']['categories']['Insert']
 export type ProductInsert = Database['public']['Tables']['products']['Insert']
@@ -628,10 +756,6 @@ export type ProductSupplierInsert = Database['public']['Tables']['product_suppli
 export type CartItemInsert = Database['public']['Tables']['cart_items']['Insert']
 export type OrderInsert = Database['public']['Tables']['orders']['Insert']
 export type UserProfileInsert = Database['public']['Tables']['user_profiles']['Insert']
-export type BranchInsert = Database['public']['Tables']['branches']['Insert']
-export type BranchInventoryInsert = Database['public']['Tables']['branch_inventory']['Insert']
-export type CashSessionInsert = Database['public']['Tables']['cash_sessions']['Insert']
-export type OrderPaymentInsert = Database['public']['Tables']['order_payments']['Insert']
 
 export type CategoryUpdate = Database['public']['Tables']['categories']['Update']
 export type ProductUpdate = Database['public']['Tables']['products']['Update']
@@ -643,7 +767,3 @@ export type ProductSupplierUpdate = Database['public']['Tables']['product_suppli
 export type CartItemUpdate = Database['public']['Tables']['cart_items']['Update']
 export type OrderUpdate = Database['public']['Tables']['orders']['Update']
 export type UserProfileUpdate = Database['public']['Tables']['user_profiles']['Update']
-export type BranchUpdate = Database['public']['Tables']['branches']['Update']
-export type BranchInventoryUpdate = Database['public']['Tables']['branch_inventory']['Update']
-export type CashSessionUpdate = Database['public']['Tables']['cash_sessions']['Update']
-export type OrderPaymentUpdate = Database['public']['Tables']['order_payments']['Update']

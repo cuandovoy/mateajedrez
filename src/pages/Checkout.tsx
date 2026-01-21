@@ -1,15 +1,16 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useCartStore } from '@/store/cartStore'
-import { useAuthStore } from '@/store/authStore'
-import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
+import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
-import { ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { useAuthStore } from '@/store/authStore'
+import { useCartStore } from '@/store/cartStore'
 import { useToastStore } from '@/store/toastStore'
-import type { CartItemWithProduct } from '@/types'
+import type { Branch, CartItemWithProduct, ProductVariant } from '@/types'
+import { BranchInventory } from '@/types/database.types'
+import { ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 interface ShippingForm {
   fullName: string
@@ -21,7 +22,7 @@ interface ShippingForm {
   country: string
 }
 
-type PaymentMethod = 'transfer' | 'mercadopago'
+type PaymentMethod = 'transfer' | 'mercadopago' | 'cash'
 
 export function Checkout() {
   const navigate = useNavigate()
@@ -30,6 +31,7 @@ export function Checkout() {
   const { show } = useToastStore()
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transfer')
+  const [mainBranchId, setMainBranchId] = useState<string | null>(null)
   const [formData, setFormData] = useState<ShippingForm>({
     fullName: '',
     phone: '',
@@ -40,6 +42,40 @@ export function Checkout() {
     country: 'Argentina',
   })
   const [errors, setErrors] = useState<Partial<ShippingForm>>({})
+
+  // Fetch main branch on mount
+  useEffect(() => {
+    const fetchMainBranch = async () => {
+      try {
+        const { data, error }: { data: Branch | null, error: Error | null } = await supabase
+          .from('branches')
+          .select('id')
+          .eq('code', 'MAIN')
+          .eq('is_active', true)
+          .single()
+
+        if (error) throw error
+        if (data) {
+          setMainBranchId(data.id)
+        }
+      } catch (error) {
+        console.error('Error fetching main branch:', error)
+        // Fallback: try to get first active branch
+        const { data }: { data: Branch | null, error: Error | null } = await supabase
+          .from('branches')
+          .select('id')
+          .eq('is_active', true)
+          .limit(1)
+          .single()
+
+        if (data) {
+          setMainBranchId(data.id)
+        }
+      }
+    }
+
+    fetchMainBranch()
+  }, [])
 
   const validateForm = (): boolean => {
     const newErrors: Partial<ShippingForm> = {}
@@ -87,59 +123,110 @@ export function Checkout() {
     setLoading(true)
 
     try {
-      // Validate stock before creating order (check variants if available, otherwise products)
+      // Ensure we have a branch_id
+      if (!mainBranchId) {
+        show('Error: No se pudo determinar la sucursal. Por favor, contacta al administrador.', 'error')
+        setLoading(false)
+        return
+      }
+
+      // Validate stock from branch_inventory before creating order
       const stockIssues: string[] = []
       
       for (const item of items) {
         const cartItem = item as CartItemWithProduct & { product_id: string; quantity: number; variant_id?: string | null }
         
         if (cartItem.variant_id) {
-          // Validate variant stock
-          const { data: variant, error: variantError } = await (supabase
-            .from('product_variants') as any)
-            .select('id, name, stock, is_active, product:products(id, name, is_active)')
-            .eq('id', cartItem.variant_id)
+          // Validate variant stock from branch_inventory
+          const { data: inventory, error: inventoryError }: { data: BranchInventory | null, error: Error | null } = await supabase
+            .from('branch_inventory')
+            .select('stock, variant_id, product_variants(id, name, is_active, product:products(id, name, is_active))')
+            .eq('branch_id', mainBranchId)
+            .eq('variant_id', cartItem.variant_id)
             .single()
           
-          if (variantError || !variant) {
-            stockIssues.push(`Variante de "${item.product.name}" no encontrada`)
+          if (inventoryError || !inventory) {
+            stockIssues.push(`Inventario no encontrado para "${item.product.name}"`)
             continue
           }
+
+          const variant = (inventory as any).product_variants
+          const product = variant?.product
           
-          const product = variant.product
-          if (!product?.is_active || !variant.is_active) {
+          if (!product?.is_active || !variant?.is_active) {
             stockIssues.push(`Variante de "${item.product.name}" no está disponible`)
             continue
           }
           
-          if (variant.stock < cartItem.quantity) {
+          if (inventory.stock < cartItem.quantity) {
             stockIssues.push(
-              `Variante "${variant.name || item.product.name}": Stock disponible ${variant.stock}, solicitado ${cartItem.quantity}`
+              `Variante "${variant.name || item.product.name}": Stock disponible ${inventory.stock}, solicitado ${cartItem.quantity}`
             )
           }
         } else {
-          // Validate product stock (backward compatibility)
-          const { data: product, error: productError } = await supabase
-            .from('products')
-            .select('id, name, stock, is_active')
-            .eq('id', cartItem.product_id)
+          // For products without variants, check if there's a default variant
+          // First, try to find default variant
+          const { data: defaultVariant }: { data: ProductVariant | null, error: Error | null } = await supabase
+            .from('product_variants')
+            .select('id')
+            .eq('product_id', cartItem.product_id)
+            .like('sku', '%-DEFAULT')
+            .eq('is_active', true)
+            .limit(1)
             .single()
-          
-          if (productError || !product) {
-            stockIssues.push(`Producto "${item.product.name}" no encontrado`)
-            continue
-          }
-          
-          const productData = product as { id: string; name: string; stock: number; is_active: boolean }
-          if (!productData.is_active) {
-            stockIssues.push(`Producto "${item.product.name}" no está disponible`)
-            continue
-          }
-          
-          if (productData.stock < cartItem.quantity) {
-            stockIssues.push(
-              `Producto "${item.product.name}": Stock disponible ${productData.stock}, solicitado ${cartItem.quantity}`
-            )
+
+          if (defaultVariant) {
+            // Check inventory for default variant
+            const { data: inventory, error: inventoryError }: { data: BranchInventory | null, error: Error | null } = await supabase
+              .from('branch_inventory')
+              .select('stock, variant_id, product_variants(id, name, is_active, product:products(id, name, is_active))')
+              .eq('branch_id', mainBranchId)
+              .eq('variant_id', defaultVariant.id)
+              .single()
+
+            if (inventoryError || !inventory) {
+              stockIssues.push(`Inventario no encontrado para "${item.product.name}"`)
+              continue
+            }
+
+            const variant = (inventory as any).product_variants
+            const product = variant?.product
+
+            if (!product?.is_active || !variant?.is_active) {
+              stockIssues.push(`Producto "${item.product.name}" no está disponible`)
+              continue
+            }
+
+            if (inventory.stock < cartItem.quantity) {
+              stockIssues.push(
+                `Producto "${item.product.name}": Stock disponible ${inventory.stock}, solicitado ${cartItem.quantity}`
+              )
+            }
+          } else {
+            // Fallback: check product-level inventory (edge case)
+            const { data: inventory, error: inventoryError }: { data: BranchInventory | null, error: Error | null } = await supabase
+              .from('branch_inventory')
+              .select('stock, product_id, products(id, name, is_active)')
+              .eq('branch_id', mainBranchId)
+              .eq('product_id', cartItem.product_id)
+              .single()
+
+            if (inventoryError || !inventory) {
+              stockIssues.push(`Inventario no encontrado para "${item.product.name}"`)
+              continue
+            }
+
+            const product = (inventory as any).products
+            if (!product?.is_active) {
+              stockIssues.push(`Producto "${item.product.name}" no está disponible`)
+              continue
+            }
+
+            if (inventory.stock < cartItem.quantity) {
+              stockIssues.push(
+                `Producto "${item.product.name}": Stock disponible ${inventory.stock}, solicitado ${cartItem.quantity}`
+              )
+            }
           }
         }
       }
@@ -166,12 +253,14 @@ export function Checkout() {
       }
 
       // Create order - user_id can be null for guest orders
+      // branch_id is required for multi-branch support
       const orderData = {
         user_id: user?.id || null,
         total,
         status: 'pending' as const,
         shipping_address: shippingAddress,
         payment_method: paymentMethod,
+        branch_id: mainBranchId, // Assign to main branch
       } as any
 
       const { data: order, error: orderError } = await supabase
@@ -202,7 +291,7 @@ export function Checkout() {
 
       if (itemsError) {
         // Check if it's a stock error
-        if (itemsError.message?.includes('Insufficient stock')) {
+        if (itemsError.message?.includes('Insufficient stock') || itemsError.message?.includes('Inventory entry not found')) {
           show(
             'Algunos productos ya no tienen stock disponible. Por favor, actualiza tu carrito.',
             'error'
@@ -212,6 +301,22 @@ export function Checkout() {
           return
         }
         throw itemsError
+      }
+
+      // Create order_payment record
+      // This links the payment to the order and optionally to a cash session
+      const { error: paymentError } = await supabase
+        .from('order_payments')
+        .insert({
+          order_id: (order as { id: string }).id,
+          payment_method: paymentMethod,
+          amount: total,
+          cash_session_id: null, // Will be set later if cash payment and session exists
+        } as any)
+
+      if (paymentError) {
+        console.error('Error creating order payment:', paymentError)
+        // Don't fail the order if payment record fails, but log it
       }
 
       // Clear cart
@@ -505,6 +610,21 @@ export function Checkout() {
                         <p className="font-medium text-gray-900">Mercado Pago</p>
                         <p className="text-sm text-gray-600">
                           Próximamente disponible
+                        </p>
+                      </div>
+                    </label>
+                    <label className="flex items-center space-x-3 p-4 border-2 border-gray-200 rounded-lg cursor-not-allowed opacity-50">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="cash"
+                        disabled
+                        className="w-4 h-4 text-primary-200 focus:ring-primary-200"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900">Efectivo</p>
+                        <p className="text-sm text-gray-600">
+                          Disponible solo en tienda física
                         </p>
                       </div>
                     </label>

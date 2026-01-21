@@ -19,14 +19,14 @@ const getStatusLabel = (status: string): string => {
 }
 
 interface OrderWithItems extends Order {
-  payment_method?: 'transfer' | 'mercadopago'
+  payment_method: 'transfer' | 'mercadopago' | 'cash'
   order_items: Array<OrderItem & { 
     product: { name: string; image_url: string | null }
     variant?: { 
       id: string
       name: string | null
       sku: string
-      attributes: any
+      attributes: Record<string, string>
       image_url: string | null
     } | null
   }>

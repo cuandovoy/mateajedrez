@@ -4,8 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { cn, formatPrice, getProductImageUrl } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
-import { Product, ProductVariant, ProductImage } from '@/types'
-import { PostgrestError } from '@supabase/supabase-js'
+import { Branch, Product, ProductImage } from '@/types'
+import { BranchInventory, ProductVariant } from '@/types/database.types'
 import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -15,50 +15,125 @@ function CartContent() {
   const { items, loading, fetchCart, updateQuantity, removeFromCart, getTotal } = useCartStore()
   const { user } = useAuthStore()
   const [stockWarnings, setStockWarnings] = useState<Record<string, { available: number; requested: number }>>({})
+  const [mainBranchId, setMainBranchId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchCart()
   }, [user, fetchCart])
 
+  // Fetch main branch on mount
   useEffect(() => {
-    // Validate stock when items change
-    if (items.length > 0) {
+    const fetchMainBranch = async () => {
+      try {
+        const { data, error }: { data: Branch | null, error: Error | null } = await supabase
+          .from('branches')
+          .select('id')
+          .eq('code', 'MAIN')
+          .eq('is_active', true)
+          .single()
+
+        if (error) throw error
+        if (data) {
+          setMainBranchId(data.id)
+        }
+      } catch (error) {
+        console.error('Error fetching main branch:', error)
+        // Fallback: try to get first active branch
+        const { data }: { data: {id: string} | null, error: Error | null } = await supabase
+          .from('branches')
+          .select('id')
+          .eq('is_active', true)
+          .limit(1)
+          .single()
+
+        if (data) {
+          setMainBranchId(data.id)
+        }
+      }
+    }
+
+    fetchMainBranch()
+  }, [])
+
+  useEffect(() => {
+    // Validate stock when items change and branch is loaded
+    if (items.length > 0 && mainBranchId) {
       validateStock()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items])
+  }, [items, mainBranchId])
 
   const validateStock = async () => {
+    if (!mainBranchId) return
+
     try {
       const warnings: Record<string, { available: number; requested: number }> = {}
       
       for (const item of items) {
         if (item.variant_id) {
-          // Validate variant stock
-          const { data: variant }: { data: ProductVariant | null, error: PostgrestError | null } = await supabase
-            .from('product_variants')
-            .select('id, stock, is_active')
-            .eq('id', item.variant_id)
+          // Validate variant stock from branch_inventory
+          const { data: inventory, error: inventoryError }: { data: BranchInventory | null, error: Error | null } = await supabase
+            .from('branch_inventory')
+            .select('stock, variant_id, product_variants(id, is_active)')
+            .eq('branch_id', mainBranchId)
+            .eq('variant_id', item.variant_id)
             .single()
           
-          if (variant && (variant.stock < item.quantity || !variant.is_active)) {
-            warnings[item.id] = {
-              available: variant.stock,
-              requested: item.quantity,
+          if (!inventoryError && inventory) {
+            const variant = (inventory as any).product_variants
+            if (inventory.stock < item.quantity || !variant?.is_active) {
+              warnings[item.id] = {
+                available: inventory.stock,
+                requested: item.quantity,
+              }
             }
           }
         } else {
-          // Validate product stock (backward compatibility)
-          const { data: product }: { data: Product | null, error: PostgrestError | null } = await supabase
-            .from('products')
-            .select('id, stock, is_active')
-            .eq('id', item.product_id)
+          // For products without variants, try to find default variant
+          const { data: defaultVariant }: { data: ProductVariant | null, error: Error | null } = await supabase
+            .from('product_variants')
+            .select('id')
+            .eq('product_id', item.product_id)
+            .like('sku', '%-DEFAULT')
+            .eq('is_active', true)
+            .limit(1)
             .single()
-          
-          if (product && (product.stock < item.quantity || !product.is_active)) {
-            warnings[item.id] = {
-              available: product.stock,
-              requested: item.quantity,
+
+          if (defaultVariant) {
+            // Check inventory for default variant
+            const { data: inventory, error: inventoryError }: { data: BranchInventory | null, error: Error | null } = await supabase
+              .from('branch_inventory')
+              .select('stock, variant_id, product_variants(id, is_active)')
+              .eq('branch_id', mainBranchId)
+              .eq('variant_id', defaultVariant.id)
+              .single()
+
+            if (!inventoryError && inventory) {
+              const variant = (inventory as any).product_variants
+              if (inventory.stock < item.quantity || !variant?.is_active) {
+                warnings[item.id] = {
+                  available: inventory.stock,
+                  requested: item.quantity,
+                }
+              }
+            }
+          } else {
+            // Fallback: check product-level inventory (edge case)
+            const { data: inventory, error: inventoryError }: { data: BranchInventory | null, error: Error | null } = await supabase
+              .from('branch_inventory')
+              .select('stock, product_id, products(id, is_active)')
+              .eq('branch_id', mainBranchId)
+              .eq('product_id', item.product_id)
+              .single()
+
+            if (!inventoryError && inventory) {
+              const product = (inventory as any).products
+              if (inventory.stock < item.quantity || !product?.is_active) {
+                warnings[item.id] = {
+                  available: inventory.stock,
+                  requested: item.quantity,
+                }
+              }
             }
           }
         }

@@ -1,17 +1,12 @@
-import { useEffect, useState, useMemo } from 'react'
-import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
+import type { Branch, Order, OrderItem, Product } from '@/types'
 import {
-  DollarSign,
-  ShoppingCart,
-  TrendingUp,
-  Package,
-  Calendar,
-  BarChart3,
-  ArrowUpRight,
-  ArrowDownRight,
+  ArrowUpRight, BarChart3, Building2, Calendar, DollarSign, Package, ShoppingCart,
+  TrendingUp
 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 
 interface SalesMetrics {
   totalRevenue: number
@@ -48,6 +43,8 @@ interface DailySales {
 
 export function AdminSales() {
   const [loading, setLoading] = useState(true)
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('') // Empty = all branches
   const [metrics, setMetrics] = useState<SalesMetrics>({
     totalRevenue: 0,
     totalOrders: 0,
@@ -65,10 +62,30 @@ export function AdminSales() {
   const [orderStatusCounts, setOrderStatusCounts] = useState<OrderStatusCount[]>([])
   const [dailySales, setDailySales] = useState<DailySales[]>([])
   const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('30d')
+  const [salesByBranch, setSalesByBranch] = useState<Array<{ branch_id: string; branch_name: string; revenue: number; orders: number }>>([])
+
+  useEffect(() => {
+    fetchBranches()
+  }, [])
 
   useEffect(() => {
     fetchSalesData()
-  }, [selectedPeriod])
+  }, [selectedPeriod, selectedBranchId])
+
+  const fetchBranches = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name')
+
+      if (error) throw error
+      setBranches((data || []) as Branch[])
+    } catch (error) {
+      console.error('Error fetching branches:', error)
+    }
+  }
 
   const fetchSalesData = async () => {
     try {
@@ -84,14 +101,21 @@ export function AdminSales() {
       yearAgo.setFullYear(yearAgo.getFullYear() - 1)
 
       // Fetch all orders with statuses that count as sales
-      const { data: allOrders, error: ordersError } = await supabase
+      // Filter by branch if selected
+      let ordersQuery = supabase
         .from('orders')
-        .select('id, total, status, created_at')
+        .select('id, total, status, created_at, branch_id')
         .in('status', ['delivered', 'shipped', 'processing', 'pending'])
+
+      if (selectedBranchId) {
+        ordersQuery = ordersQuery.eq('branch_id', selectedBranchId)
+      }
+
+      const { data: allOrders, error: ordersError } = await ordersQuery
 
       if (ordersError) throw ordersError
 
-      const orders = allOrders || []
+      const orders = allOrders as Order[]
 
       // Calculate metrics
       const completedOrders = orders.filter((o) =>
@@ -137,7 +161,7 @@ export function AdminSales() {
       })
 
       // Fetch top products
-      const { data: orderItems, error: itemsError } = await supabase
+      const { data: orderItems, error: itemsError }: { data: OrderItem[] | null, error: Error | null } = await supabase
         .from('order_items')
         .select('product_id, quantity, price, order_id')
         .in(
@@ -149,7 +173,7 @@ export function AdminSales() {
 
       // Get product names
       const productIds = [...new Set((orderItems || []).map((item) => item.product_id))]
-      const { data: products, error: productsError } = await supabase
+      const { data: products, error: productsError }: { data: Product[] | null, error: Error | null } = await supabase
         .from('products')
         .select('id, name')
         .in('id', productIds)
@@ -240,6 +264,36 @@ export function AdminSales() {
       }
 
       setDailySales(dailySalesData)
+
+      // Calculate sales by branch (if no branch filter is selected)
+      if (!selectedBranchId) {
+        const branchSalesMap = new Map<string, { revenue: number; orders: number }>()
+        
+        completedOrders.forEach((order) => {
+          const branchId = (order as Order).branch_id
+          if (branchId) {
+            const current = branchSalesMap.get(branchId) || { revenue: 0, orders: 0 }
+            branchSalesMap.set(branchId, {
+              revenue: current.revenue + order.total,
+              orders: current.orders + 1,
+            })
+          }
+        })
+
+        const branchSalesData = Array.from(branchSalesMap.entries()).map(([branch_id, stats]) => {
+          const branch = branches.find((b) => b.id === branch_id)
+          return {
+            branch_id,
+            branch_name: branch?.name || 'Sucursal desconocida',
+            revenue: stats.revenue,
+            orders: stats.orders,
+          }
+        })
+
+        setSalesByBranch(branchSalesData)
+      } else {
+        setSalesByBranch([])
+      }
     } catch (error) {
       console.error('Error fetching sales data:', error)
     } finally {
@@ -271,11 +325,40 @@ export function AdminSales() {
     )
   }
 
+  const selectedBranch = branches.find((b) => b.id === selectedBranchId)
+
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Reportes de Ventas</h1>
-        <p className="text-gray-600 mt-2">Análisis detallado de tus ventas y rendimiento</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Reportes de Ventas</h1>
+            <p className="text-gray-600 mt-2">Análisis detallado de tus ventas y rendimiento</p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Sucursal</label>
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 min-w-[200px]"
+              >
+                <option value="">Todas las sucursales</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name} {branch.code && `(${branch.code})`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+        {selectedBranch && (
+          <div className="mt-4 flex items-center space-x-2 text-sm text-gray-600">
+            <Building2 className="h-4 w-4" />
+            <span>Mostrando datos de: <strong>{selectedBranch.name}</strong></span>
+          </div>
+        )}
       </div>
 
       {/* Métricas principales */}
@@ -352,6 +435,42 @@ export function AdminSales() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Sales by Branch Summary (if no branch selected) */}
+      {!selectedBranchId && salesByBranch.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Ventas por Sucursal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {salesByBranch
+                .sort((a, b) => b.revenue - a.revenue)
+                .map((branchSale) => {
+                  const branch = branches.find((b) => b.id === branchSale.branch_id)
+                  return (
+                    <div
+                      key={branchSale.branch_id}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Building2 className="h-5 w-5 text-admin-600" />
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{branchSale.branch_name}</p>
+                          <p className="text-xs text-gray-500">{branch?.code || 'Sin código'}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-gray-900">{formatPrice(branchSale.revenue)}</p>
+                        <p className="text-xs text-gray-500">{branchSale.orders} órdenes</p>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Ventas por período */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
