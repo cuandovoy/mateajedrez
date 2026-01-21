@@ -9,7 +9,8 @@ import {
   Users,
   LogOut,
   Store,
-  Truck
+  Truck,
+  BarChart3
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
@@ -45,6 +46,7 @@ export function AdminLayout() {
     { path: '/admin/categories', label: 'Categorías', icon: Folder },
     { path: '/admin/suppliers', label: 'Proveedores', icon: Truck },
     { path: '/admin/orders', label: 'Órdenes', icon: ShoppingCart },
+    { path: '/admin/reports/sales', label: 'Reportes → Ventas', icon: BarChart3 },
     { path: '/admin/users', label: 'Usuarios', icon: Users },
   ]
 
