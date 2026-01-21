@@ -1,8 +1,8 @@
-import { Outlet } from 'react-router-dom'
-import { Header } from './Header'
-import { Footer } from './Footer'
-import { ToastContainer } from './ToastContainer'
 import { MessageCircle } from 'lucide-react'
+import { Outlet } from 'react-router-dom'
+import { Footer } from './Footer'
+import { Header } from './Header'
+import { ToastContainer } from './ToastContainer'
 
 export function ShopLayout() {
   const whatsappNumber = '59898257909'
@@ -11,6 +11,17 @@ export function ShopLayout() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Promotional Banner */}
+      <div className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-2.5 md:py-3 shadow-md">
+        <div className="container-custom">
+          <div className="flex items-center justify-center gap-2 md:gap-3">
+            <p className="text-xs md:text-sm font-semibold text-center">
+              🚚 Envío gratis en pedidos mayores a $2000 UY!
+            </p>
+          </div>
+        </div>
+      </div>
+      
       <Header />
       <main className="flex-grow bg-primary-50">
         <Outlet />

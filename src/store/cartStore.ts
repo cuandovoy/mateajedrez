@@ -35,12 +35,20 @@ export const useCartStore = create<CartState>((set, get) => ({
     set({ loading: true })
     try {
       if (user) {
-        // Fetch from database with variant information
+        // Fetch from database with variant information and product images
         const { data, error } = await supabase
           .from('cart_items')
           .select(`
             *,
-            product:products(*),
+            product:products(
+              *,
+              product_images (
+                id,
+                image_url,
+                display_order,
+                is_primary
+              )
+            ),
             variant:product_variants(*)
           `)
           .eq('user_id', user.id)
@@ -75,18 +83,26 @@ export const useCartStore = create<CartState>((set, get) => ({
 
       const localItems: LocalCartItem[] = JSON.parse(localCart)
       
-      // Fetch product details for all items
-      const productIds = localItems.map(item => item.product_id)
-      if (productIds.length === 0) {
-        set({ items: [] })
-        return
-      }
+        // Fetch product details for all items
+        const productIds = localItems.map(item => item.product_id)
+        if (productIds.length === 0) {
+          set({ items: [] })
+          return
+        }
 
-      const { data: products, error }: { data: Product[] | null, error: PostgrestError | null } = await supabase
-        .from('products')
-        .select('*')
-        .in('id', productIds)
-        .eq('is_active', true)
+        const { data: products, error }: { data: (Product & { product_images?: any[] })[] | null, error: PostgrestError | null } = await supabase
+          .from('products')
+          .select(`
+          *,
+          product_images (
+            id,
+            image_url,
+            display_order,
+            is_primary
+          )
+        `)
+          .in('id', productIds)
+          .eq('is_active', true)
 
       if (error) throw error
 
@@ -285,7 +301,15 @@ export const useCartStore = create<CartState>((set, get) => ({
           })
           .select(`
             *,
-            product:products(*),
+            product:products(
+              *,
+              product_images (
+                id,
+                image_url,
+                display_order,
+                is_primary
+              )
+            ),
             variant:product_variants(*)
           `)
           .single()
@@ -314,7 +338,15 @@ export const useCartStore = create<CartState>((set, get) => ({
         // User is not logged in - save to localStorage
         const { data: product, error } = await supabase
           .from('products')
-          .select('*')
+          .select(`
+            *,
+            product_images (
+              id,
+              image_url,
+              display_order,
+              is_primary
+            )
+          `)
           .eq('id', productId)
           .eq('is_active', true)
           .single()

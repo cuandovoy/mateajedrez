@@ -27,7 +27,7 @@ export function ProductCard({ product, noAddToCart = false }: ProductCardProps) 
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-console.log("product",product);
+
   const handleAddToCart = async () => {
     setIsAdding(true)
     try {
@@ -69,15 +69,15 @@ console.log("product",product);
   const currentImageUrl = imageUrls[currentImageIndex]
 
   return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow flex flex-col h-full">
-      <Link to={`/products/${product.id}`} className="block">
-        <div className="w-full bg-gray-200" style={{ aspectRatio: '16/9', minHeight: '192px' }}>
+    <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:border-primary-300 transition-all duration-300 flex flex-col h-full group">
+      <Link to={`/products/${product.id}`} className="block overflow-hidden">
+        <div className="w-full bg-gray-200 relative" style={{ aspectRatio: '16/9', minHeight: '192px' }}>
           {currentImageUrl ? (
             <img
               key={currentImageIndex}
               src={currentImageUrl}
               alt={product.name}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
               style={{ aspectRatio: '16/9' }}
               onError={() => {
                 console.error('Error loading product image:', currentImageUrl)
@@ -97,8 +97,8 @@ console.log("product",product);
         </div>
       </Link>
       <div className="p-4 flex flex-col flex-grow">
-        <Link to={`/products/${product.id}`}>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-primary-200 transition-colors">
+        <Link to={`/products/${product.id}`} className="group/link">
+          <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover/link:text-primary-600 transition-colors duration-300">
             {product.name}
           </h3>
         </Link>
@@ -106,25 +106,25 @@ console.log("product",product);
           {product.description || 'Sin descripción'}
         </p>
         <div className="flex items-center justify-between mb-4">
-          <span className="text-2xl font-bold text-primary-600">
+          <span className="text-2xl font-bold text-primary-600 group-hover:text-primary-700 transition-colors">
             {formatPrice(product.price)}
           </span>
           <div className="flex items-center space-x-2">
             {product.stock > 0 ? (
-              <span className="text-sm text-green-600">En stock</span>
+              <span className="text-sm text-green-600 font-medium">En stock</span>
             ) : (
-              <span className="text-sm text-red-600">Sin stock</span>
+              <span className="text-sm text-red-600 font-medium">Sin stock</span>
             )}
           </div>
         </div>
         {!noAddToCart && (
           <Button
-            className="w-full bg-primary-400 text-white mt-auto"
+            className="w-full bg-primary-300 text-white mt-auto hover:bg-primary-400 hover:shadow-md transition-all duration-300 font-semibold"
             onClick={handleAddToCart}
             disabled={product.stock === 0 || isAdding}
             isLoading={isAdding}
           >
-            <ShoppingCart className="h-4 w-4 mr-2 text-white bg-primary-400" />
+            <ShoppingCart className="h-4 w-4 mr-2" />
             Agregar al carrito
           </Button>
         )}

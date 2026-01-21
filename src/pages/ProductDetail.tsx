@@ -7,7 +7,7 @@ import { formatPrice } from '@/lib/utils'
 import { useCartStore } from '@/store/cartStore'
 import type { Product, ProductWithCategory, ProductImage } from '@/types'
 import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 // Helper function to validate image URLs
@@ -35,6 +35,7 @@ export function ProductDetail() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [imageLoading, setImageLoading] = useState(true)
   const [fadeIn, setFadeIn] = useState(false)
+  const productRef = useRef<HTMLDivElement>(null)
 
 
   useEffect(() => {
@@ -43,6 +44,16 @@ export function ProductDetail() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  // Scroll to product when page loads
+  useEffect(() => {
+    if (!loading && product && productRef.current) {
+      // Small delay to ensure DOM is fully rendered
+      setTimeout(() => {
+        productRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 100)
+    }
+  }, [loading, product])
 
   const fetchProduct = async () => {
     try {
@@ -143,7 +154,7 @@ export function ProductDetail() {
         </Button>
       </Link>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+      <div ref={productRef} className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         {/* Imagen del producto */}
         <div>
           {(() => {

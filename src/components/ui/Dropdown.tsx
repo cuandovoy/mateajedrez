@@ -1,6 +1,6 @@
 import { cn } from '@/lib/utils'
 import { useEffect, useRef, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 
 interface DropdownOption {
   value: string
@@ -14,13 +14,20 @@ interface DropdownProps {
   placeholder?: string
   onSelect: (value: string) => void
   className?: string
-  darkBackground?: boolean // For header context with dark background
+  darkBackground?: boolean
 }
 
-export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect, className, darkBackground = false }: DropdownProps) {
+export function Dropdown({ 
+  options, 
+  value, 
+  placeholder = 'Seleccionar', 
+  onSelect, 
+  className, 
+  darkBackground = false 
+}: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [hoveredOption, setHoveredOption] = useState<string | null>(null)
-  const [clickedOption, setClickedOption] = useState<string | null>(null)
+  const [expandedOptions, setExpandedOptions] = useState<Set<string>>(new Set())
   const dropdownRef = useRef<HTMLDivElement>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -29,7 +36,7 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false)
         setHoveredOption(null)
-        setClickedOption(null)
+        setExpandedOptions(new Set())
       }
     }
 
@@ -51,28 +58,35 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
     onSelect(optionValue)
     setIsOpen(false)
     setHoveredOption(null)
-    setClickedOption(null)
+    setExpandedOptions(new Set())
   }
 
   const handleToggle = () => {
     setIsOpen(!isOpen)
     if (!isOpen) {
       setHoveredOption(null)
-      setClickedOption(null)
+      setExpandedOptions(new Set())
     }
   }
 
-  const handleOptionClick = (optionValue: string, hasSubcategories: boolean) => {
-    if (hasSubcategories) {
-      // Toggle submenu on click (for mobile)
-      setClickedOption(clickedOption === optionValue ? null : optionValue)
+  const handleOptionClick = (optionValue: string, hasSubcategories: boolean, event: React.MouseEvent) => {
+    // On mobile, toggle expansion on click
+    if (hasSubcategories && window.innerWidth < 1024) {
+      event.stopPropagation()
+      const newExpanded = new Set(expandedOptions)
+      if (newExpanded.has(optionValue)) {
+        newExpanded.delete(optionValue)
+      } else {
+        newExpanded.add(optionValue)
+      }
+      setExpandedOptions(newExpanded)
     } else {
+      // On desktop or if no subcategories, select directly
       handleSelect(optionValue)
     }
   }
 
   const handleMouseEnter = () => {
-    // Cancelar cualquier timeout pendiente
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
@@ -81,12 +95,27 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
   }
 
   const handleMouseLeave = () => {
-    // Agregar un delay antes de cerrar para permitir movimiento entre botón y menú
     timeoutRef.current = setTimeout(() => {
       setIsOpen(false)
       setHoveredOption(null)
     }, 200)
   }
+
+  const handleOptionMouseEnter = (optionValue: string) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+    setHoveredOption(optionValue)
+  }
+
+  const handleOptionMouseLeave = () => {
+    timeoutRef.current = setTimeout(() => {
+      setHoveredOption(null)
+    }, 150)
+  }
+
+  const isAdminContext = typeof document !== 'undefined' && document.body.classList.contains('admin-theme')
 
   return (
     <div
@@ -95,6 +124,7 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
+      {/* Trigger Button */}
       <button
         type="button"
         onClick={handleToggle}
@@ -114,12 +144,22 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
         )}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
+        <ChevronDown 
+          className={cn(
+            'h-4 w-4 transition-transform duration-200 ml-2',
+            isOpen && 'transform rotate-180',
+            darkBackground ? 'text-white' : 'text-gray-600'
+          )} 
+        />
       </button>
 
+      {/* Dropdown Menu */}
       <div
         className={cn(
-          'absolute z-20 left-1/2 transform -translate-x-1/2 mt-2 bg-white/95 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl overflow-hidden min-w-[220px]',
-          'transition-all duration-300 ease-out',
+          'absolute z-50 left-1/2 transform -translate-x-1/2 mt-2',
+          'bg-white rounded-lg shadow-2xl border border-gray-200',
+          'transition-all duration-200 ease-out',
+          'min-w-[240px] max-w-[320px]',
           isOpen
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 -translate-y-2 pointer-events-none'
@@ -127,101 +167,105 @@ export function Dropdown({ options, value, placeholder = 'Seleccionar', onSelect
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <div className="max-h-60 overflow-y-auto relative">
+        <div className="max-h-[70vh] overflow-y-auto py-2">
           {options.length === 0 ? (
-            <div className="px-4 py-2 text-sm text-gray-500 text-center">
+            <div className="px-4 py-3 text-sm text-gray-500 text-center">
               No hay opciones disponibles
             </div>
           ) : (
-            <div className="flex relative">
-              {/* Main categories */}
-              <div className="flex-1">
-                {options.map((option) => {
-                  const hasSubcategories = option.subcategories && option.subcategories.length > 0 || false
-                  const isHovered = hoveredOption === option.value
-                  const isClicked = clickedOption === option.value
-                  const showSubmenu = hasSubcategories && (isHovered || isClicked)
-                  
-                  return (
-                    <div
-                      key={option.value}
-                      className="relative"
-                      onMouseEnter={() => hasSubcategories && setHoveredOption(option.value)}
-                      onMouseLeave={() => setHoveredOption(null)}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => handleOptionClick(option.value, hasSubcategories)}
-                        className={cn(
-                          'w-full px-5 py-3 text-left text-base transition-all duration-150 flex items-center justify-between',
-                          (() => {
-                            const isAdminContext = typeof document !== 'undefined' && document.body.classList.contains('admin-theme')
-                            return isAdminContext
-                              ? 'hover:bg-admin-50 hover:text-admin-700 focus:bg-admin-50 focus:outline-none'
-                              : 'hover:bg-primary-50 hover:text-primary-700 focus:bg-primary-50 focus:outline-none'
-                          })(),
-                          (() => {
-                            const isAdminContext = typeof document !== 'undefined' && document.body.classList.contains('admin-theme')
-                            return value === option.value 
-                              ? (isAdminContext ? 'bg-admin-100 text-admin-700 font-medium' : 'bg-primary-100 text-primary-700 font-medium')
-                              : ''
-                          })()
-                        )}
-                      >
-                        <span>{option.label}</span>
-                        {hasSubcategories && (
-                          <ChevronRight className={cn(
-                            'h-4 w-4 ml-2 flex-shrink-0 transition-transform duration-200',
-                            (isHovered || isClicked) && 'transform rotate-90'
-                          )} />
-                        )}
-                      </button>
-                      
-                      {/* Subcategories submenu */}
-                      {showSubmenu && (
-                        <div
-                          className={cn(
-                            'absolute bg-white/95 backdrop-blur-sm border border-white/20 rounded-lg shadow-xl min-w-[200px] z-[100]',
-                            'transition-all duration-200 ease-out',
-                            'opacity-100 translate-x-0',
-                            // On desktop, show to the right
-                            'lg:left-full lg:top-0 lg:ml-1',
-                            // On mobile, show below with full width to avoid overlap
-                            'max-lg:left-0 max-lg:top-full max-lg:ml-0 max-lg:mt-1 max-lg:w-full'
-                          )}
-                          onMouseEnter={() => setHoveredOption(option.value)}
-                          onMouseLeave={() => setHoveredOption(null)}
-                        >
-                          {option.subcategories!.map((subcategory) => (
-                            <button
-                              key={subcategory.value}
-                              type="button"
-                              onClick={() => handleSelect(subcategory.value)}
-                              className={cn(
-                                'w-full px-5 py-3 text-left text-sm transition-all duration-150',
-                                (() => {
-                                  const isAdminContext = typeof document !== 'undefined' && document.body.classList.contains('admin-theme')
-                                  return isAdminContext
-                                    ? 'hover:bg-admin-50 hover:text-admin-700 focus:bg-admin-50 focus:outline-none'
-                                    : 'hover:bg-primary-50 hover:text-primary-700 focus:bg-primary-50 focus:outline-none'
-                                })(),
-                                (() => {
-                                  const isAdminContext = typeof document !== 'undefined' && document.body.classList.contains('admin-theme')
-                                  return value === subcategory.value 
-                                    ? (isAdminContext ? 'bg-admin-100 text-admin-700 font-medium' : 'bg-primary-100 text-primary-700 font-medium')
-                                    : ''
-                                })()
-                              )}
-                            >
-                              {subcategory.label}
-                            </button>
-                          ))}
-                        </div>
+            <div className="space-y-1">
+              {options.map((option) => {
+                const hasSubcategories = option.subcategories && option.subcategories.length > 0
+                const isHovered = hoveredOption === option.value
+                const isExpanded = expandedOptions.has(option.value)
+                const showSubmenu = hasSubcategories && (isHovered || isExpanded)
+                const isSelected = value === option.value
+
+                return (
+                  <div
+                    key={option.value}
+                    className="relative"
+                    onMouseEnter={() => handleOptionMouseEnter(option.value)}
+                    onMouseLeave={handleOptionMouseLeave}
+                  >
+                    {/* Main Category Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleOptionClick(option.value, hasSubcategories || false, e)}
+                      className={cn(
+                        'w-full px-4 py-3 text-left transition-all duration-150',
+                        'flex items-center justify-between group',
+                        isSelected
+                          ? isAdminContext 
+                            ? 'bg-admin-100 text-admin-700 font-medium' 
+                            : 'bg-primary-100 text-primary-700 font-medium'
+                          : isAdminContext
+                            ? 'hover:bg-admin-50 hover:text-admin-700'
+                            : 'hover:bg-primary-50 hover:text-primary-700',
+                        'focus:outline-none focus:ring-2 focus:ring-inset',
+                        isAdminContext ? 'focus:ring-admin-500' : 'focus:ring-primary-500'
                       )}
-                    </div>
-                  )
-                })}
-              </div>
+                    >
+                      <span className="flex-1 text-base">{option.label}</span>
+                      {hasSubcategories && (
+                        <ChevronDown 
+                          className={cn(
+                            'h-4 w-4 transition-transform duration-200 ml-2 flex-shrink-0',
+                            showSubmenu && 'transform rotate-180',
+                            isSelected 
+                              ? isAdminContext ? 'text-admin-600' : 'text-primary-600'
+                              : 'text-gray-400 group-hover:text-gray-600'
+                          )} 
+                        />
+                      )}
+                    </button>
+
+                    {/* Subcategories - Desktop: Show below on hover, Mobile: Show below on click */}
+                    {showSubmenu && option.subcategories && (
+                      <div
+                        className={cn(
+                          'bg-gray-50 border-t border-gray-200',
+                          'transition-all duration-200 ease-out',
+                          'lg:absolute lg:left-0 lg:right-0 lg:top-full lg:mt-1 lg:bg-white lg:rounded-lg lg:shadow-lg lg:border lg:border-gray-200 lg:z-10',
+                          'max-lg:relative max-lg:mt-0'
+                        )}
+                        onMouseEnter={() => handleOptionMouseEnter(option.value)}
+                        onMouseLeave={handleOptionMouseLeave}
+                      >
+                        <div className="py-1">
+                          {option.subcategories.map((subcategory) => {
+                            const isSubSelected = value === subcategory.value
+                            return (
+                              <button
+                                key={subcategory.value}
+                                type="button"
+                                onClick={() => handleSelect(subcategory.value)}
+                                className={cn(
+                                  'w-full px-6 py-2.5 text-left text-sm transition-all duration-150',
+                                  'flex items-center',
+                                  isSubSelected
+                                    ? isAdminContext 
+                                      ? 'bg-admin-100 text-admin-700 font-medium' 
+                                      : 'bg-primary-100 text-primary-700 font-medium'
+                                    : isAdminContext
+                                      ? 'hover:bg-admin-50 hover:text-admin-700'
+                                      : 'hover:bg-primary-50 hover:text-primary-700',
+                                  'focus:outline-none'
+                                )}
+                              >
+                                <span className="flex items-center">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mr-3"></span>
+                                  {subcategory.label}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

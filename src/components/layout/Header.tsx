@@ -104,7 +104,7 @@ export function Header() {
   }
 
   return (
-    <header className="bg-primary-200 shadow-sm border-primary-300 sticky top-0 z-30">
+    <header className="bg-primary-200 border-primary-300 sticky top-0 z-30">
       <div className="container-custom">
         {/* Desktop Layout */}
         <div className="hidden lg:flex items-center h-16 my-2">
@@ -127,7 +127,7 @@ export function Header() {
           <div className="flex-1 flex justify-end items-center space-x-4">
             <Link to="/cart" className="relative">
               <Button variant="ghost" className="text-white hover:text-gray-700" size="sm">
-                <ShoppingCart className="h-5 w-5" />
+                <ShoppingCart className="h-6 w-6" />
                 {getItemCount() > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                     {getItemCount()}
@@ -142,7 +142,7 @@ export function Header() {
               ) : (
                 <>
                   <Link to="/login">
-                    <Button variant="ghost" className="text-white hover:text-gray-700" size="sm">
+                    <Button variant="ghost" className="text-white hover:text-gray-700" size="md">
                       Iniciar Sesión
                     </Button>
                   </Link>

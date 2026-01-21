@@ -8,7 +8,7 @@ interface CategoryCardProps {
 export function CategoryCard({ category }: CategoryCardProps) {
   return (
     <Link to={`/${category.slug}`}>
-      <div className="group relative bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 hover:scale-105">
+      <div className="group relative bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:border-primary-300 transition-all duration-300 hover:scale-105">
         <div className="aspect-w-16 aspect-h-9 bg-gray-200 overflow-hidden">
           {category.image_url ? (
             <img
@@ -23,7 +23,7 @@ export function CategoryCard({ category }: CategoryCardProps) {
           )}
         </div>
         <div className="p-4">
-          <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-primary-200 transition-colors">
+          <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors duration-300">
             {category.name}
           </h3>
           {category.description && (

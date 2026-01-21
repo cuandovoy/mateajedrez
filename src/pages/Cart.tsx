@@ -1,10 +1,10 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
-import { cn, formatPrice } from '@/lib/utils'
+import { cn, formatPrice, getProductImageUrl } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
-import { Product, ProductVariant } from '@/types'
+import { Product, ProductVariant, ProductImage } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
 import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -25,6 +25,7 @@ function CartContent() {
     if (items.length > 0) {
       validateStock()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items])
 
   const validateStock = async () => {
@@ -123,13 +124,35 @@ function CartContent() {
                     </div>
                   )}
                   <div className="flex items-center space-x-4">
-                    {(item.variant?.image_url || item.product.image_url) && (
-                      <img
-                        src={item.variant?.image_url || item.product.image_url || ''}
-                        alt={item.product.name}
-                        className="w-24 h-24 object-cover rounded"
-                      />
-                    )}
+                    {(() => {
+                      // Get product image URL with priority: variant image > product images > legacy image_url
+                      const productWithImages = item.product as Product & { product_images?: ProductImage[] }
+                      const imageUrl = getProductImageUrl(
+                        productWithImages,
+                        item.variant?.image_url || null
+                      )
+                      
+                      return (
+                        <div className="flex-shrink-0 w-20 h-20 md:w-24 md:h-24 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={item.product.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                // Fallback to placeholder if image fails
+                                const target = e.target as HTMLImageElement
+                                target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23e5e7eb" width="100" height="100"/%3E%3Ctext x="50%25" y="50%25" text-anchor="middle" dy=".3em" fill="%239ca3af" font-family="Arial" font-size="12"%3ESin imagen%3C/text%3E%3C/svg%3E'
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-xs text-center p-2">
+                              Sin imagen
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                     <div className="flex-1">
                       <h3 className="text-lg font-semibold text-gray-900">
                         {item.product.name}
