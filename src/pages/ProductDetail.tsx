@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
+import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
 import type { Product, ProductWithCategory, ProductImage } from '@/types'
 import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -35,6 +36,8 @@ export function ProductDetail() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [imageLoading, setImageLoading] = useState(true)
   const [fadeIn, setFadeIn] = useState(false)
+  const [productStock, setProductStock] = useState<number | null>(null)
+  const [variantStock, setVariantStock] = useState<number | null>(null)
   const productRef = useRef<HTMLDivElement>(null)
 
 
@@ -79,6 +82,17 @@ export function ProductDetail() {
       setCurrentImageIndex(0) // Reset image index when product changes
       setImageLoading(true)
       setFadeIn(false)
+      
+      // Fetch product stock from branch_inventory
+      if (data) {
+        const productData = data as ProductWithCategory & { product_images?: ProductImage[] }
+        getProductStock(productData.id as string)
+          .then((stock) => setProductStock(stock))
+          .catch((error) => {
+            console.error('Error fetching product stock:', error)
+            setProductStock(0)
+          })
+      }
 
       // Fetch related products
       if ((data as ProductWithCategory)?.category_id) {
@@ -355,7 +369,7 @@ export function ProductDetail() {
                 setCurrentImageIndex(0) // Reset image index when variant changes
                 setImageLoading(true)
                 setFadeIn(false)
-                // Fetch variant details to get stock, price, and image
+                // Fetch variant details to get price and image
                 if (variantId) {
                   supabase
                     .from('product_variants')
@@ -367,10 +381,19 @@ export function ProductDetail() {
                         setSelectedVariant(data)
                         // Reset quantity to 1 when variant changes
                         setQuantity(1)
+                        
+                        // Fetch variant stock from branch_inventory
+                        getProductStock(product.id, variantId)
+                          .then((stock) => setVariantStock(stock))
+                          .catch((error) => {
+                            console.error('Error fetching variant stock:', error)
+                            setVariantStock(0)
+                          })
                       }
                     })
                 } else {
                   setSelectedVariant(null)
+                  setVariantStock(null)
                   // Reset quantity to 1 when variant is cleared
                   setQuantity(1)
                 }
@@ -396,10 +419,10 @@ export function ProductDetail() {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const maxStock = selectedVariant?.stock ?? product.stock
-                      setQuantity(Math.min(maxStock, quantity + 1))
+                      const currentStock = selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)
+                      setQuantity(Math.min(currentStock, quantity + 1))
                     }}
-                    disabled={quantity >= (selectedVariant?.stock ?? product.stock)}
+                    disabled={quantity >= (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0))}
                   >
                     +
                   </Button>
@@ -407,13 +430,22 @@ export function ProductDetail() {
               </div>
               <div className="mb-4">
                 <p className="text-sm text-gray-600">
-                  Stock disponible: <span className="font-semibold">{selectedVariant?.stock ?? product.stock} {selectedVariant?.unit || product.unit || 'unidad'}</span>
+                  Stock disponible: <span className="font-semibold">
+                    {selectedVariantId 
+                      ? (variantStock !== null ? variantStock : 'Cargando...')
+                      : (productStock !== null ? productStock : 'Cargando...')
+                    } {selectedVariant?.unit || product.unit || 'unidad'}
+                  </span>
                 </p>
               </div>
               <Button
                 className="w-full"
                 onClick={handleAddToCart}
-                disabled={(selectedVariant?.stock ?? product.stock) === 0 || isAdding}
+                disabled={
+                  (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)) === 0 || 
+                  isAdding ||
+                  (selectedVariantId ? variantStock === null : productStock === null)
+                }
                 isLoading={isAdding}
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />

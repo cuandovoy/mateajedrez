@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
+import { getProductStock } from '@/lib/stock'
 import type { ProductVariant, Product } from '@/types'
 import { cn } from '@/lib/utils'
 import { PostgrestError } from '@supabase/supabase-js'
@@ -16,6 +17,8 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
   const [loading, setLoading] = useState(true)
   const [attributes, setAttributes] = useState<Record<string, string[]>>({})
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({})
+  const [variantStocks, setVariantStocks] = useState<Record<string, number>>({}) // variant.id -> stock
+  const [productStock, setProductStock] = useState<number | null>(null)
 
   useEffect(() => {
     fetchVariants()
@@ -45,13 +48,13 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
 
   useEffect(() => {
     // Auto-select first available variant if none selected
-    if (!selectedVariantId && variants.length > 0) {
-      const firstAvailable = variants.find((v) => v.is_active && v.stock > 0)
+    if (!selectedVariantId && variants.length > 0 && Object.keys(variantStocks).length > 0) {
+      const firstAvailable = variants.find((v) => v.is_active && (variantStocks[v.id] ?? 0) > 0)
       if (firstAvailable) {
         onVariantChange(firstAvailable.id)
       }
     }
-  }, [variants, selectedVariantId, onVariantChange])
+  }, [variants, selectedVariantId, onVariantChange, variantStocks])
 
   const fetchVariants = async () => {
     setLoading(true)
@@ -65,6 +68,34 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
 
       if (error) throw error
       setVariants(data || [])
+      
+      // Fetch stock for all variants from branch_inventory
+      if (data && data.length > 0) {
+        const stockPromises = data.map(async (variant) => {
+          try {
+            const stock = await getProductStock(product.id, variant.id)
+            return { variantId: variant.id, stock }
+          } catch (error) {
+            console.error('Error fetching stock for variant:', variant.id, error)
+            return { variantId: variant.id, stock: 0 }
+          }
+        })
+        
+        const stockResults = await Promise.all(stockPromises)
+        const stockMap: Record<string, number> = {}
+        stockResults.forEach(({ variantId, stock }) => {
+          stockMap[variantId] = stock
+        })
+        setVariantStocks(stockMap)
+      }
+      
+      // Fetch product stock (for products without variants)
+      getProductStock(product.id)
+        .then((stock) => setProductStock(stock))
+        .catch((error) => {
+          console.error('Error fetching product stock:', error)
+          setProductStock(0)
+        })
       
       // If only one variant, auto-select it
       if (data && data.length === 1) {
@@ -110,7 +141,9 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
 
   const selectedVariant = variants.find((v) => v.id === selectedVariantId)
   const displayPrice = selectedVariant?.price ?? product.price
-  const displayStock = selectedVariant?.stock ?? product.stock
+  const displayStock = selectedVariantId 
+    ? (variantStocks[selectedVariantId] ?? null)
+    : (productStock ?? null)
   const displayImage = selectedVariant?.image_url ?? product.image_url
 
   if (loading) {
@@ -142,7 +175,8 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
                 const attrs = v.attributes as Record<string, string>
                 return attrs[key] === value
               })
-              const isAvailable = variantWithThisValue?.is_active && (variantWithThisValue?.stock || 0) > 0
+              const variantStock = variantWithThisValue ? (variantStocks[variantWithThisValue.id] ?? 0) : 0
+              const isAvailable = variantWithThisValue?.is_active && variantStock > 0
 
               return (
                 <button
@@ -180,10 +214,10 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
             <span
               className={cn(
                 'text-sm font-semibold',
-                displayStock > 0 ? 'text-green-600' : 'text-red-600'
+                displayStock !== null && displayStock > 0 ? 'text-green-600' : 'text-red-600'
               )}
             >
-              {displayStock} {selectedVariant.unit || product.unit || 'unidad'}
+              {displayStock !== null ? displayStock : 'Cargando...'} {selectedVariant.unit || product.unit || 'unidad'}
             </span>
           </div>
           {selectedVariant.name && (

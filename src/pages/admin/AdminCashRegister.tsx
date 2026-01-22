@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { CashSessionTable } from '@/components/admin/CashSessionTable'
+import { CashSessionPayments } from '@/components/admin/CashSessionPayments'
+import { ManualSaleForm } from '@/components/admin/ManualSaleForm'
 import { SearchFilter } from '@/components/filters'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import {
@@ -22,6 +24,8 @@ import {
   Calendar,
   TrendingUp,
   TrendingDown,
+  Receipt,
+  ShoppingCart,
 } from 'lucide-react'
 import { formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -55,6 +59,9 @@ function AdminCashRegisterContent() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [search, setSearch] = useState('')
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>('')
+  const [viewingPaymentsSessionId, setViewingPaymentsSessionId] = useState<string | null>(null)
+  const [isManualSaleOpen, setIsManualSaleOpen] = useState(false)
+  const [selectedBranchForSale, setSelectedBranchForSale] = useState<string>('')
 
   const {
     register: registerOpen,
@@ -98,13 +105,47 @@ function AdminCashRegisterContent() {
   const fetchSessions = async () => {
     try {
       setLoading(true)
+      // Fetch sessions and calculate expected_amount
       const { data, error } = await supabase
         .from('cash_sessions')
         .select('*')
         .order('opened_at', { ascending: false })
 
       if (error) throw error
-      setSessions((data || []) as CashSession[])
+
+      const sessionsData = (data || []) as CashSession[]
+
+      // Calculate expected_amount for each session
+      // expected_amount = opening_amount + sum of cash payments linked to this session
+      const sessionsWithExpected = await Promise.all(
+        sessionsData.map(async (session) => {
+          try {
+            // Get sum of cash payments for this session
+            const { data: paymentsData } = await supabase
+              .from('order_payments')
+              .select('amount')
+              .eq('cash_session_id', session.id)
+              .eq('payment_method', 'cash')
+
+            const cashPaymentsTotal = (paymentsData || []).reduce(
+              (sum: number, p: { amount: number }) => sum + p.amount,
+              0
+            )
+
+            const expectedAmount = (session.opening_amount || 0) + cashPaymentsTotal
+
+            return {
+              ...session,
+              expected_amount: expectedAmount,
+            } as CashSession
+          } catch (error) {
+            console.error('Error calculating expected amount:', error)
+            return session
+          }
+        })
+      )
+
+      setSessions(sessionsWithExpected)
     } catch (error) {
       console.error('Error fetching cash sessions:', error)
     } finally {
@@ -296,6 +337,29 @@ function AdminCashRegisterContent() {
               <Grid3x3 className="h-4 w-4" />
             </button>
           </div>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (branches.length === 0) {
+                alert('No hay sucursales disponibles')
+                return
+              }
+              if (branches.length === 1) {
+                setSelectedBranchForSale(branches[0].id)
+                setIsManualSaleOpen(true)
+              } else {
+                // Show simple selection - use first branch with open session, or first branch
+                const branchWithOpenSession = branches.find((b) =>
+                  openSessions.some((s) => s.branch_id === b.id)
+                )
+                setSelectedBranchForSale(branchWithOpenSession?.id || branches[0].id)
+                setIsManualSaleOpen(true)
+              }
+            }}
+          >
+            <ShoppingCart className="h-4 w-4 mr-2" />
+            Nueva Venta
+          </Button>
           <Button onClick={handleNew}>
             <Plus className="h-4 w-4 mr-2" />
             Abrir Caja
@@ -440,6 +504,7 @@ function AdminCashRegisterContent() {
               branches={branches}
               onEdit={handleCloseSession}
               onDelete={handleDelete}
+              onViewPayments={setViewingPaymentsSessionId}
             />
           </CardContent>
         </Card>
@@ -456,6 +521,11 @@ function AdminCashRegisterContent() {
                   <div className="absolute top-4 right-4">
                     <ActionsMenu
                       actions={[
+                        {
+                          label: 'Ver Ventas',
+                          icon: <Receipt className="h-4 w-4" />,
+                          onClick: () => setViewingPaymentsSessionId(session.id),
+                        },
                         {
                           label: isOpen ? 'Cerrar Sesión' : 'Ver Detalles',
                           icon: <Edit className="h-4 w-4" />,
@@ -722,6 +792,34 @@ function AdminCashRegisterContent() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Cash Session Payments Modal */}
+      {viewingPaymentsSessionId && (
+        <CashSessionPayments
+          sessionId={viewingPaymentsSessionId}
+          onClose={() => setViewingPaymentsSessionId(null)}
+        />
+      )}
+
+      {/* Manual Sale Form Modal */}
+      {isManualSaleOpen && selectedBranchForSale && (
+        <ManualSaleForm
+          branchId={selectedBranchForSale}
+          openCashSession={openSessions.find((s) => s.branch_id === selectedBranchForSale) || null}
+          openCashSessions={openSessions}
+          branches={branches}
+          onClose={() => {
+            setIsManualSaleOpen(false)
+            setSelectedBranchForSale('')
+          }}
+          onSaleCreated={() => {
+            fetchSessions()
+          }}
+          onBranchChange={(newBranchId) => {
+            setSelectedBranchForSale(newBranchId)
+          }}
+        />
       )}
     </div>
   )

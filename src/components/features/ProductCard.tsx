@@ -3,8 +3,9 @@ import { ShoppingCart } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
 import { formatPrice } from '@/lib/utils'
+import { getProductStock } from '@/lib/stock'
 import type { Product, ProductImage } from '@/types'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface ProductCardProps {
   product: Product & { product_images?: ProductImage[] }
@@ -27,6 +28,7 @@ export function ProductCard({ product, noAddToCart = false }: ProductCardProps) 
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [stock, setStock] = useState<number | null>(null) // null = loading, number = loaded
 
   const handleAddToCart = async () => {
     setIsAdding(true)
@@ -67,6 +69,29 @@ export function ProductCard({ product, noAddToCart = false }: ProductCardProps) 
   }
 
   const currentImageUrl = imageUrls[currentImageIndex]
+
+  // Fetch stock from branch_inventory
+  useEffect(() => {
+    let cancelled = false
+    getProductStock(product.id)
+      .then((stockValue) => {
+        if (!cancelled) {
+          setStock(stockValue)
+        }
+      })
+      .catch((error) => {
+        console.error('Error fetching stock for product:', product.id, error)
+        if (!cancelled) {
+          setStock(0) // Default to 0 on error
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [product.id])
+
+  const hasStock = stock !== null ? stock > 0 : false
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:border-primary-300 transition-all duration-300 flex flex-col h-full group">
@@ -110,7 +135,9 @@ export function ProductCard({ product, noAddToCart = false }: ProductCardProps) 
             {formatPrice(product.price)}
           </span>
           <div className="flex items-center space-x-2">
-            {product.stock > 0 ? (
+            {stock === null ? (
+              <span className="text-sm text-gray-400 font-medium">Cargando...</span>
+            ) : hasStock ? (
               <span className="text-sm text-green-600 font-medium">En stock</span>
             ) : (
               <span className="text-sm text-red-600 font-medium">Sin stock</span>
@@ -121,7 +148,7 @@ export function ProductCard({ product, noAddToCart = false }: ProductCardProps) 
           <Button
             className="w-full bg-primary-300 text-white mt-auto hover:bg-primary-400 hover:shadow-md transition-all duration-300 font-semibold"
             onClick={handleAddToCart}
-            disabled={product.stock === 0 || isAdding}
+            disabled={!hasStock || isAdding}
             isLoading={isAdding}
           >
             <ShoppingCart className="h-4 w-4 mr-2" />

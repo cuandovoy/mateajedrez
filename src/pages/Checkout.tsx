@@ -6,7 +6,7 @@ import { formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { useToastStore } from '@/store/toastStore'
-import type { Branch, CartItemWithProduct, ProductVariant } from '@/types'
+import type { Branch, CartItemWithProduct } from '@/types'
 import { BranchInventory } from '@/types/database.types'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -39,7 +39,7 @@ export function Checkout() {
     city: '',
     state: '',
     zipCode: '',
-    country: 'Argentina',
+    country: 'Uruguay',
   })
   const [errors, setErrors] = useState<Partial<ShippingForm>>({})
 
@@ -164,55 +164,33 @@ export function Checkout() {
             )
           }
         } else {
-          // For products without variants, check if there's a default variant
-          // First, try to find default variant
-          const { data: defaultVariant }: { data: ProductVariant | null, error: Error | null } = await supabase
+          // Product without variant_id - check if product has variants
+          // First, check if product has any variants
+          const { data: hasVariants } = await supabase
             .from('product_variants')
             .select('id')
             .eq('product_id', cartItem.product_id)
-            .like('sku', '%-DEFAULT')
             .eq('is_active', true)
             .limit(1)
-            .single()
+            .maybeSingle()
 
-          if (defaultVariant) {
-            // Check inventory for default variant
-            const { data: inventory, error: inventoryError }: { data: BranchInventory | null, error: Error | null } = await supabase
-              .from('branch_inventory')
-              .select('stock, variant_id, product_variants(id, name, is_active, product:products(id, name, is_active))')
-              .eq('branch_id', mainBranchId)
-              .eq('variant_id', defaultVariant.id)
-              .single()
-
-            if (inventoryError || !inventory) {
-              stockIssues.push(`Inventario no encontrado para "${item.product.name}"`)
-              continue
-            }
-
-            const variant = (inventory as any).product_variants
-            const product = variant?.product
-
-            if (!product?.is_active || !variant?.is_active) {
-              stockIssues.push(`Producto "${item.product.name}" no está disponible`)
-              continue
-            }
-
-            if (inventory.stock < cartItem.quantity) {
-              stockIssues.push(
-                `Producto "${item.product.name}": Stock disponible ${inventory.stock}, solicitado ${cartItem.quantity}`
-              )
-            }
+          if (hasVariants) {
+            // Product has variants but none was selected - this shouldn't happen in normal flow
+            // But we'll check product-level inventory as fallback
+            stockIssues.push(`El producto "${item.product.name}" tiene variantes. Por favor, selecciona una variante específica.`)
+            continue
           } else {
-            // Fallback: check product-level inventory (edge case)
+            // Product without variants - use product-level inventory
             const { data: inventory, error: inventoryError }: { data: BranchInventory | null, error: Error | null } = await supabase
               .from('branch_inventory')
               .select('stock, product_id, products(id, name, is_active)')
               .eq('branch_id', mainBranchId)
               .eq('product_id', cartItem.product_id)
-              .single()
+              .is('variant_id', null)
+              .maybeSingle()
 
             if (inventoryError || !inventory) {
-              stockIssues.push(`Inventario no encontrado para "${item.product.name}"`)
+              stockIssues.push(`Inventario no encontrado para "${item.product.name}". Por favor, asegúrate de que el inventario esté configurado.`)
               continue
             }
 
@@ -304,19 +282,63 @@ export function Checkout() {
       }
 
       // Create order_payment record
-      // This links the payment to the order and optionally to a cash session
+      // If payment is cash, link it to the open cash session for this branch
+      let cashSessionId: string | null = null
+      if (paymentMethod === 'cash' && mainBranchId) {
+        // Find open cash session for this branch
+        const { data: openSession } = await supabase
+          .from('cash_sessions')
+          .select('id')
+          .eq('branch_id', mainBranchId)
+          .is('closed_at', null)
+          .single()
+
+        if (openSession) {
+          cashSessionId = (openSession as { id: string }).id
+        }
+      }
+
       const { error: paymentError } = await supabase
         .from('order_payments')
         .insert({
           order_id: (order as { id: string }).id,
           payment_method: paymentMethod,
           amount: total,
-          cash_session_id: null, // Will be set later if cash payment and session exists
+          cash_session_id: cashSessionId,
         } as any)
 
       if (paymentError) {
         console.error('Error creating order payment:', paymentError)
         // Don't fail the order if payment record fails, but log it
+      } else if (cashSessionId) {
+        // Update expected_amount for the cash session
+        // Calculate: opening_amount + sum of cash payments
+        const { data: sessionData } = await supabase
+          .from('cash_sessions')
+          .select('opening_amount')
+          .eq('id', cashSessionId)
+          .single()
+
+        const { data: paymentsData } = await supabase
+          .from('order_payments')
+          .select('amount')
+          .eq('cash_session_id', cashSessionId)
+          .eq('payment_method', 'cash')
+
+        if (sessionData) {
+          const session = sessionData as { opening_amount: number }
+          const payments = (paymentsData || []) as Array<{ amount: number }>
+          const cashPaymentsTotal = payments.reduce(
+            (sum, p) => sum + p.amount,
+            0
+          )
+          const newExpectedAmount = (session.opening_amount || 0) + cashPaymentsTotal
+
+          await supabase
+            .from('cash_sessions')
+            .update({ expected_amount: newExpectedAmount } as never)
+            .eq('id', cashSessionId)
+        }
       }
 
       // Clear cart

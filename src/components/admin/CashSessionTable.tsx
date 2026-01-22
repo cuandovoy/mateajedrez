@@ -1,6 +1,6 @@
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { formatPrice } from '@/lib/utils'
-import { Building2, DollarSign, Edit, Trash2 } from 'lucide-react'
+import { Building2, DollarSign, Edit, Trash2, Receipt } from 'lucide-react'
 import type { CashSession } from '@/types'
 
 interface CashSessionTableProps {
@@ -8,6 +8,7 @@ interface CashSessionTableProps {
   branches: Array<{ id: string; name: string }>
   onEdit: (session: CashSession) => void
   onDelete: (id: string) => void
+  onViewPayments?: (sessionId: string) => void
 }
 
 export function CashSessionTable({
@@ -15,6 +16,7 @@ export function CashSessionTable({
   branches,
   onEdit,
   onDelete,
+  onViewPayments,
 }: CashSessionTableProps) {
   if (sessions.length === 0) {
     return (
@@ -157,6 +159,15 @@ export function CashSessionTable({
                   <div className="flex items-center justify-end">
                     <ActionsMenu
                       actions={[
+                        ...(onViewPayments
+                          ? [
+                              {
+                                label: 'Ver Ventas',
+                                icon: <Receipt className="h-4 w-4" />,
+                                onClick: () => onViewPayments(session.id),
+                              },
+                            ]
+                          : []),
                         {
                           label: isOpen ? 'Cerrar Sesión' : 'Ver Detalles',
                           icon: <Edit className="h-4 w-4" />,

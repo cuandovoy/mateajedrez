@@ -11,7 +11,10 @@ export type {
   ProductSupplier, ProductSupplierInsert, ProductSupplierUpdate,
   UserProfile, Branch, BranchInsert, BranchUpdate,
   CashSession, CashSessionInsert, CashSessionUpdate,
-  OrderPayment, OrderPaymentInsert, OrderPaymentUpdate
+  OrderPayment, OrderPaymentInsert, OrderPaymentUpdate,
+  AuditLog, AuditLogInsert, AuditLogUpdate,
+  InventoryMovement, InventoryMovementInsert, InventoryMovementUpdate,
+  InventoryTransfer, InventoryTransferInsert, InventoryTransferUpdate
 } from './database.types'
 
 export interface CartItemWithProduct extends CartItem {

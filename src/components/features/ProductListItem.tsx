@@ -3,8 +3,9 @@ import { ShoppingCart } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
 import { formatPrice } from '@/lib/utils'
+import { getProductStock } from '@/lib/stock'
 import type { Product, ProductImage } from '@/types'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface ProductListItemProps {
   product: Product & { product_images?: ProductImage[] }
@@ -27,6 +28,7 @@ export function ProductListItem({ product, noAddToCart = false }: ProductListIte
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  const [stock, setStock] = useState<number | null>(null)
 
   const handleAddToCart = async () => {
     setIsAdding(true)
@@ -67,6 +69,29 @@ export function ProductListItem({ product, noAddToCart = false }: ProductListIte
   }
 
   const currentImageUrl = imageUrls[currentImageIndex]
+
+  // Fetch stock from branch_inventory
+  useEffect(() => {
+    let cancelled = false
+    getProductStock(product.id)
+      .then((stockValue) => {
+        if (!cancelled) {
+          setStock(stockValue)
+        }
+      })
+      .catch((error) => {
+        console.error('Error fetching stock for product:', product.id, error)
+        if (!cancelled) {
+          setStock(0)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [product.id])
+
+  const hasStock = stock !== null ? stock > 0 : false
 
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
@@ -110,7 +135,9 @@ export function ProductListItem({ product, noAddToCart = false }: ProductListIte
               <span className="text-2xl font-bold text-primary-600">
                 {formatPrice(product.price)}
               </span>
-              {product.stock > 0 ? (
+              {stock === null ? (
+                <span className="text-sm text-gray-400 font-medium">Cargando...</span>
+              ) : hasStock ? (
                 <span className="text-sm text-green-600 font-medium">En stock</span>
               ) : (
                 <span className="text-sm text-red-600 font-medium">Sin stock</span>
@@ -121,7 +148,7 @@ export function ProductListItem({ product, noAddToCart = false }: ProductListIte
             {!noAddToCart && <Button
               className="w-full bg-primary-400 text-white"
               onClick={handleAddToCart}
-              disabled={product.stock === 0 || isAdding}
+              disabled={!hasStock || isAdding}
               isLoading={isAdding}
             >
               {!noAddToCart && <ShoppingCart className="h-4 w-4 mr-2" />}

@@ -241,11 +241,11 @@ export function OrderConfirmation() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Tipo de Cuenta:</span>
-                    <span className="font-semibold text-gray-900">Ahorro</span>
+                    <span className="font-semibold text-gray-900">Caja de ahorro</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Número de Cuenta:</span>
-                    <span className="font-semibold text-gray-900">0000000000000000000000</span>
+                    <span className="font-semibold text-gray-900">001913212-00001</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Titular:</span>

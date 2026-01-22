@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { cn, formatPrice, getProductImageUrl } from '@/lib/utils'
+import { getProductStock } from '@/lib/stock'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { Branch, Product, ProductImage } from '@/types'
@@ -16,6 +17,7 @@ function CartContent() {
   const { user } = useAuthStore()
   const [stockWarnings, setStockWarnings] = useState<Record<string, { available: number; requested: number }>>({})
   const [mainBranchId, setMainBranchId] = useState<string | null>(null)
+  const [itemStocks, setItemStocks] = useState<Record<string, number>>({}) // item.id -> stock
 
   useEffect(() => {
     fetchCart()
@@ -80,7 +82,7 @@ function CartContent() {
             .single()
           
           if (!inventoryError && inventory) {
-            const variant = (inventory as any).product_variants
+            const variant = (inventory as BranchInventory & { product_variants?: { id: string; is_active: boolean } | null }).product_variants
             if (inventory.stock < item.quantity || !variant?.is_active) {
               warnings[item.id] = {
                 available: inventory.stock,
@@ -109,7 +111,7 @@ function CartContent() {
               .single()
 
             if (!inventoryError && inventory) {
-              const variant = (inventory as any).product_variants
+              const variant = (inventory as BranchInventory & { product_variants?: { id: string; is_active: boolean } | null }).product_variants
               if (inventory.stock < item.quantity || !variant?.is_active) {
                 warnings[item.id] = {
                   available: inventory.stock,
@@ -127,7 +129,7 @@ function CartContent() {
               .single()
 
             if (!inventoryError && inventory) {
-              const product = (inventory as any).products
+              const product = (inventory as BranchInventory & { products?: { id: string; is_active: boolean } | null }).products
               if (inventory.stock < item.quantity || !product?.is_active) {
                 warnings[item.id] = {
                   available: inventory.stock,
@@ -140,6 +142,19 @@ function CartContent() {
       }
 
       setStockWarnings(warnings)
+      
+      // Also fetch and store actual stock for display
+      const stockMap: Record<string, number> = {}
+      for (const item of items) {
+        try {
+          const stock = await getProductStock(item.product_id, item.variant_id || null, mainBranchId)
+          stockMap[item.id] = stock
+        } catch (error) {
+          console.error('Error fetching stock for cart item:', item.id, error)
+          stockMap[item.id] = 0
+        }
+      }
+      setItemStocks(stockMap)
     } catch (error) {
       console.error('Error validating stock:', error)
     }
@@ -255,9 +270,9 @@ function CartContent() {
                         <p className="text-primary-600 font-bold mt-2 text-sm sm:text-base">
                           {formatPrice(item.variant?.price ?? item.product.price)}
                         </p>
-                        {(item.variant?.stock ?? item.product.stock) > 0 && (
+                        {itemStocks[item.id] !== undefined && itemStocks[item.id] > 0 && (
                           <p className="text-xs text-gray-500 mt-1">
-                            Stock disponible: {item.variant?.stock ?? item.product.stock} {item.variant?.unit || item.product.unit || 'unidad'}
+                            Stock disponible: {itemStocks[item.id]} {item.variant?.unit || item.product.unit || 'unidad'}
                           </p>
                         )}
                       </div>
@@ -280,7 +295,7 @@ function CartContent() {
                           variant="outline"
                           size="sm"
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                          disabled={item.quantity >= (item.variant?.stock ?? item.product.stock)}
+                          disabled={item.quantity >= (itemStocks[item.id] ?? 0)}
                         >
                           <Plus className="h-4 w-4" />
                         </Button>

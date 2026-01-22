@@ -70,7 +70,7 @@ export function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-4">Contacto</h3>
             <p className="text-white">
-              Email: flormaria.soria@gmail.com
+              Email: flormaria.sogo@gmail.com
             </p>
             <p className="text-white">
               Teléfono: +598 98 257 909

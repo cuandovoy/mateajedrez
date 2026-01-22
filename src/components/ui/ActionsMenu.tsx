@@ -16,12 +16,16 @@ interface ActionsMenuProps {
 
 export function ActionsMenu({ actions, className }: ActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuContentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false)
+        setMenuPosition(null)
       }
     }
 
@@ -34,19 +38,60 @@ export function ActionsMenu({ actions, className }: ActionsMenuProps) {
     }
   }, [isOpen])
 
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const buttonRect = buttonRef.current.getBoundingClientRect()
+      const menuWidth = 192 // w-48 = 12rem = 192px
+      const spacing = 4 // mt-1 = 4px
+
+      // Calcular posición desde la esquina superior derecha del botón
+      let left = buttonRect.right - menuWidth
+      let top = buttonRect.bottom + spacing
+
+      // Ajustar si se sale por la izquierda
+      if (left < 0) {
+        left = buttonRect.left
+      }
+
+      // Verificar si hay espacio abajo, si no, mostrar arriba
+      const spaceBelow = window.innerHeight - buttonRect.bottom
+      const estimatedMenuHeight = actions.length * 40 + 8 // altura estimada por item + padding
+      
+      if (spaceBelow < estimatedMenuHeight && buttonRect.top > estimatedMenuHeight) {
+        // Mostrar arriba del botón
+        top = buttonRect.top - estimatedMenuHeight - spacing
+      }
+
+      // Asegurar que no se salga por arriba
+      if (top < 0) {
+        top = spacing
+      }
+
+      // Con position: fixed, las coordenadas son relativas al viewport (no necesitamos scrollY/scrollX)
+      setMenuPosition({
+        top: top,
+        left: left,
+      })
+    }
+  }, [isOpen, actions.length])
+
   const handleActionClick = (action: ActionItem) => {
     action.onClick()
     setIsOpen(false)
+    setMenuPosition(null)
+  }
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    setIsOpen(!isOpen)
   }
 
   return (
     <div ref={menuRef} className={cn('relative', className)}>
       <button
+        ref={buttonRef}
         type="button"
-        onClick={(e) => {
-          e.stopPropagation()
-          setIsOpen(!isOpen)
-        }}
+        onClick={handleToggle}
         className="p-1 rounded-md hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-admin-500"
         aria-label="Acciones"
       >
@@ -57,11 +102,25 @@ export function ActionsMenu({ actions, className }: ActionsMenuProps) {
         <>
           {/* Backdrop */}
           <div
-            className="fixed inset-0 z-10"
-            onClick={() => setIsOpen(false)}
+            className="fixed inset-0 z-40"
+            onClick={() => {
+              setIsOpen(false)
+              setMenuPosition(null)
+            }}
           />
-          {/* Menu */}
-          <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-20">
+          {/* Menu - Using fixed positioning to avoid overflow issues */}
+          <div
+            ref={menuContentRef}
+            className="fixed w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50"
+            style={
+              menuPosition
+                ? {
+                    top: `${menuPosition.top}px`,
+                    left: `${menuPosition.left}px`,
+                  }
+                : { display: 'none' }
+            }
+          >
             <div className="py-1">
               {actions.map((action, index) => (
                 <button

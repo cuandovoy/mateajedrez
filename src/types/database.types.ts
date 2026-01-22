@@ -585,6 +585,138 @@ export interface Database {
           created_at?: string
         }
       }
+      audit_logs: {
+        Row: {
+          id: string
+          table_name: string
+          record_id: string | null
+          action: string
+          user_id: string | null
+          old_data: Json | null
+          new_data: Json | null
+          changed_fields: string[] | null
+          ip_address: string | null
+          user_agent: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          table_name: string
+          record_id?: string | null
+          action: string
+          user_id?: string | null
+          old_data?: Json | null
+          new_data?: Json | null
+          changed_fields?: string[] | null
+          ip_address?: string | null
+          user_agent?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          table_name?: string
+          record_id?: string | null
+          action?: string
+          user_id?: string | null
+          old_data?: Json | null
+          new_data?: Json | null
+          changed_fields?: string[] | null
+          ip_address?: string | null
+          user_agent?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+      }
+      inventory_movements: {
+        Row: {
+          id: string
+          branch_inventory_id: string
+          movement_type: string
+          quantity: number
+          previous_stock: number
+          new_stock: number
+          reference_id: string | null
+          reference_type: string | null
+          notes: string | null
+          created_by: string | null
+          supplier_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          branch_inventory_id: string
+          movement_type: string
+          quantity: number
+          previous_stock: number
+          new_stock: number
+          reference_id?: string | null
+          reference_type?: string | null
+          notes?: string | null
+          created_by?: string | null
+          supplier_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          branch_inventory_id?: string
+          movement_type?: string
+          quantity?: number
+          previous_stock?: number
+          new_stock?: number
+          reference_id?: string | null
+          reference_type?: string | null
+          notes?: string | null
+          created_by?: string | null
+          supplier_id?: string | null
+          created_at?: string
+        }
+      }
+      inventory_transfers: {
+        Row: {
+          id: string
+          from_branch_id: string
+          to_branch_id: string
+          product_id: string | null
+          variant_id: string | null
+          quantity: number
+          status: string
+          notes: string | null
+          created_by: string | null
+          completed_by: string | null
+          created_at: string
+          completed_at: string | null
+        }
+        Insert: {
+          id?: string
+          from_branch_id: string
+          to_branch_id: string
+          product_id?: string | null
+          variant_id?: string | null
+          quantity: number
+          status?: string
+          notes?: string | null
+          created_by?: string | null
+          completed_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+        Update: {
+          id?: string
+          from_branch_id?: string
+          to_branch_id?: string
+          product_id?: string | null
+          variant_id?: string | null
+          quantity?: number
+          status?: string
+          notes?: string | null
+          created_by?: string | null
+          completed_by?: string | null
+          created_at?: string
+          completed_at?: string | null
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -617,6 +749,9 @@ export type Branch = Database['public']['Tables']['branches']['Row']
 export type BranchInventory = Database['public']['Tables']['branch_inventory']['Row']
 export type CashSession = Database['public']['Tables']['cash_sessions']['Row']
 export type OrderPayment = Database['public']['Tables']['order_payments']['Row']
+export type AuditLog = Database['public']['Tables']['audit_logs']['Row']
+export type InventoryMovement = Database['public']['Tables']['inventory_movements']['Row']
+export type InventoryTransfer = Database['public']['Tables']['inventory_transfers']['Row']
 
 export type CategoryInsert = Database['public']['Tables']['categories']['Insert']
 export type ProductInsert = Database['public']['Tables']['products']['Insert']
@@ -632,6 +767,9 @@ export type BranchInsert = Database['public']['Tables']['branches']['Insert']
 export type BranchInventoryInsert = Database['public']['Tables']['branch_inventory']['Insert']
 export type CashSessionInsert = Database['public']['Tables']['cash_sessions']['Insert']
 export type OrderPaymentInsert = Database['public']['Tables']['order_payments']['Insert']
+export type AuditLogInsert = Database['public']['Tables']['audit_logs']['Insert']
+export type InventoryMovementInsert = Database['public']['Tables']['inventory_movements']['Insert']
+export type InventoryTransferInsert = Database['public']['Tables']['inventory_transfers']['Insert']
 
 export type CategoryUpdate = Database['public']['Tables']['categories']['Update']
 export type ProductUpdate = Database['public']['Tables']['products']['Update']
@@ -647,3 +785,6 @@ export type BranchUpdate = Database['public']['Tables']['branches']['Update']
 export type BranchInventoryUpdate = Database['public']['Tables']['branch_inventory']['Update']
 export type CashSessionUpdate = Database['public']['Tables']['cash_sessions']['Update']
 export type OrderPaymentUpdate = Database['public']['Tables']['order_payments']['Update']
+export type AuditLogUpdate = Database['public']['Tables']['audit_logs']['Update']
+export type InventoryMovementUpdate = Database['public']['Tables']['inventory_movements']['Update']
+export type InventoryTransferUpdate = Database['public']['Tables']['inventory_transfers']['Update']
