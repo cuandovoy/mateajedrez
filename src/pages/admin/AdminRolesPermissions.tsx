@@ -1,19 +1,17 @@
 // src/pages/admin/AdminRolesPermissions.tsx
 // Admin page to manage roles and permissions
 
-import { AdminLayout } from '@/components/layout/AdminLayout'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
-import type { Database } from '@/types/database.types'
+import type { Database, RolePermission } from '@/types/database.types'
 import { Loader, Save } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 type Role = Database['public']['Tables']['roles']['Row']
 type Permission = Database['public']['Tables']['permissions']['Row']
-type RolePermission = Database['public']['Tables']['roles_permissions']['Row']
 
 interface RoleWithPermissions extends Role {
   permissions: Permission[]
@@ -45,7 +43,7 @@ export function AdminRolesPermissions() {
       if (rolesError) throw rolesError
 
       // Fetch permissions
-      const { data: permissionsData, error: permissionsError } = await supabase
+      const { data: permissionsData, error: permissionsError }: { data: Permission[] | null, error: Error | null } = await supabase
         .from('permissions')
         .select('*')
         .order('category, key')
@@ -55,17 +53,17 @@ export function AdminRolesPermissions() {
       setPermissions(permissionsData || [])
 
       // Fetch role permissions and merge
-      const { data: rolePermissionsData, error: rpError } = await supabase
+      const { data: rolePermissionsData, error: rpError }: { data: RolePermission[] | null, error: Error | null } = await supabase
         .from('roles_permissions')
         .select('*')
 
       if (rpError) throw rpError
 
-      const rolesWithPerms = (rolesData || []).map((role) => ({
+      const rolesWithPerms = (rolesData || []).map((role: Role) => ({
         ...role,
         permissions: (rolePermissionsData || [])
           .filter((rp) => rp.role_id === role.id)
-          .map((rp) => permissionsData?.find((p) => p.id === rp.permission_id))
+          .map((rp) => permissionsData?.find((p: Permission) => p.id === rp.permission_id) as Permission)
           .filter(Boolean) as Permission[],
       }))
 
@@ -114,7 +112,7 @@ export function AdminRolesPermissions() {
         const newRolePermissions = Array.from(selectedPermissions).map((permId) => ({
           role_id: selectedRole.id,
           permission_id: permId,
-        }))
+        } as never))
 
         // Use upsert with onConflict on (role_id, permission_id) to avoid duplicate key errors
         const { error: insertError } = await supabase
@@ -136,11 +134,9 @@ export function AdminRolesPermissions() {
 
   if (loading) {
     return (
-      <AdminLayout>
         <div className="flex items-center justify-center h-96">
           <Loader className="h-8 w-8 animate-spin" />
         </div>
-      </AdminLayout>
     )
   }
 

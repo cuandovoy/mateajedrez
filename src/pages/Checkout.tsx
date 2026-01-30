@@ -246,7 +246,7 @@ export function Checkout() {
       let customer: Customer | null = null
       
       // Check if customer exists by phone
-      const { data: existingCustomer } = await supabase
+      const { data: existingCustomer }: { data: Customer | null, error: Error | null } = await supabase
         .from('customers')
         .select('*')
         .eq('phone', formData.phone)
@@ -263,7 +263,7 @@ export function Checkout() {
               email: user.email || existingCustomer.email,
               full_name: formData.fullName,
               address: shippingAddress,
-            })
+            } as never)
             .eq('id', existingCustomer.id)
             .select()
             .single()
@@ -283,7 +283,7 @@ export function Checkout() {
             phone: formData.phone,
             address: shippingAddress,
             is_active: true,
-          })
+          } as never)
           .select()
           .single()
 

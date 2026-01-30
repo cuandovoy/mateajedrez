@@ -1,9 +1,9 @@
 // src/components/features/PermissionGate.tsx
 // Component to conditionally render based on permissions
 
-import type { ReactNode } from 'react'
 import { usePermission } from '@/hooks/usePermission'
 import type { Permission } from '@/lib/permissions'
+import type { ReactNode } from 'react'
 
 interface PermissionGateProps {
   /**
@@ -46,7 +46,7 @@ export function PermissionGate({
   fallback = null,
   require = 'any',
 }: PermissionGateProps) {
-  const { can, canAny, canAll } = usePermission()
+  const { canAny, canAll } = usePermission()
 
   const permissions = Array.isArray(permission) ? permission : [permission]
   const hasAccess = require === 'any' ? canAny(permissions) : canAll(permissions)

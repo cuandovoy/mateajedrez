@@ -69,7 +69,7 @@ export function TabsList({ children, className }: TabsListProps) {
   )
 }
 
-export function TabsTrigger({ value, children, className }: TabsTriggerProps) {
+export function TabsTrigger({ value, children }: TabsTriggerProps) {
   const { value: selectedValue, onChange } = useTabs()
   const isSelected = selectedValue === value
 

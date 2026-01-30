@@ -80,7 +80,7 @@ export function AdminCustomers() {
             phone: formData.phone,
             address: formData.address,
             notes: formData.notes || null,
-          })
+          } as never)
           .eq('id', editingId)
 
         if (error) throw error
@@ -96,7 +96,7 @@ export function AdminCustomers() {
             address: formData.address,
             notes: formData.notes || null,
             is_active: true,
-          })
+          } as never)
 
         if (error) throw error
         show('Cliente creado correctamente', 'success')
