@@ -21,6 +21,9 @@ import { AdminCashRegister } from '@/pages/admin/AdminCashRegister'
 import { AdminAuditLogs } from '@/pages/admin/AdminAuditLogs'
 import { AdminInventory } from '@/pages/admin/AdminInventory'
 import { AdminTransfers } from '@/pages/admin/AdminTransfers'
+import { AdminRolesPermissions } from '@/pages/admin/AdminRolesPermissions'
+import { AdminCustomers } from '@/pages/admin/AdminCustomers'
+import { ProtectedRoute } from '@/components/features/ProtectedRoute'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
@@ -64,6 +67,7 @@ function App() {
           <Route path="/admin/suppliers" element={<AdminSuppliers />} />
           <Route path="/admin/orders" element={<AdminOrders />} />
           <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
+          <Route path="/admin/customers" element={<AdminCustomers />} />
           <Route path="/admin/reports/sales" element={<AdminSales />} />
           <Route path="/admin/reports/audit-logs" element={<AdminAuditLogs />} />
           <Route path="/admin/branches" element={<AdminBranches />} />
@@ -71,6 +75,10 @@ function App() {
           <Route path="/admin/transfers" element={<AdminTransfers />} />
           <Route path="/admin/cash-register" element={<AdminCashRegister />} />
           <Route path="/admin/users" element={<AdminUsers />} />
+          <Route
+            path="/admin/roles-permissions"
+            element={<AdminRolesPermissions />}
+          />
         </Route>
 
         {/* Ruta por defecto */}

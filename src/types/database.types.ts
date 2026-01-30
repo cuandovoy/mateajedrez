@@ -335,6 +335,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string | null
+          customer_id: string | null
           total: number
           status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
           shipping_address: Json
@@ -346,6 +347,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id?: string | null
+          customer_id?: string | null
           total: number
           status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
           shipping_address: Json
@@ -357,6 +359,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string | null
+          customer_id?: string | null
           total?: number
           status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
           shipping_address?: Json
@@ -425,6 +428,141 @@ export interface Database {
           address?: Json | null
           created_at?: string
           updated_at?: string
+        }
+      }
+      ,
+      roles: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          is_system: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          is_system?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          is_system?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      ,
+      permissions: {
+        Row: {
+          id: string
+          key: string
+          name: string
+          description: string | null
+          category: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          key: string
+          name: string
+          description?: string | null
+          category?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          key?: string
+          name?: string
+          description?: string | null
+          category?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      ,
+      roles_permissions: {
+        Row: {
+          id: string
+          role_id: string
+          permission_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          role_id: string
+          permission_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          role_id?: string
+          permission_id?: string
+          created_at?: string
+        }
+      }
+      ,
+      user_permissions: {
+        Row: {
+          id: string
+          user_profile_id: string
+          permission_id: string
+          expires_at: string | null
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_profile_id: string
+          permission_id: string
+          expires_at?: string | null
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_profile_id?: string
+          permission_id?: string
+          expires_at?: string | null
+          created_at?: string
+          created_by?: string | null
+        }
+      }
+      ,
+      rbac_audit_log: {
+        Row: {
+          id: string
+          action: string
+          admin_user_id: string | null
+          target_role_id: string | null
+          target_user_profile_id: string | null
+          details: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          action: string
+          admin_user_id?: string | null
+          target_role_id?: string | null
+          target_user_profile_id?: string | null
+          details?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          action?: string
+          admin_user_id?: string | null
+          target_role_id?: string | null
+          target_user_profile_id?: string | null
+          details?: Json | null
+          created_at?: string
         }
       }
       branches: {
@@ -717,6 +855,44 @@ export interface Database {
           completed_at?: string | null
         }
       }
+      customers: {
+        Row: {
+          id: string
+          user_id: string | null
+          email: string | null
+          full_name: string
+          phone: string
+          address: Json | null
+          notes: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id?: string | null
+          email?: string | null
+          full_name: string
+          phone: string
+          address?: Json | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string | null
+          email?: string | null
+          full_name?: string
+          phone?: string
+          address?: Json | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -726,7 +902,7 @@ export interface Database {
     }
     Enums: {
       order_status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
-      user_role: 'user' | 'admin'
+      user_role: 'user' | 'admin' | 'manager' | 'viewer'
       barcode_type: 'EAN13' | 'EAN8' | 'UPC' | 'CODE128' | 'CODE39' | 'INTERNAL' | 'SUPPLIER' | 'OTHER'
       payment_method: 'transfer' | 'mercadopago' | 'cash'
     }
@@ -752,6 +928,7 @@ export type OrderPayment = Database['public']['Tables']['order_payments']['Row']
 export type AuditLog = Database['public']['Tables']['audit_logs']['Row']
 export type InventoryMovement = Database['public']['Tables']['inventory_movements']['Row']
 export type InventoryTransfer = Database['public']['Tables']['inventory_transfers']['Row']
+export type Customer = Database['public']['Tables']['customers']['Row']
 
 export type CategoryInsert = Database['public']['Tables']['categories']['Insert']
 export type ProductInsert = Database['public']['Tables']['products']['Insert']
@@ -770,6 +947,7 @@ export type OrderPaymentInsert = Database['public']['Tables']['order_payments'][
 export type AuditLogInsert = Database['public']['Tables']['audit_logs']['Insert']
 export type InventoryMovementInsert = Database['public']['Tables']['inventory_movements']['Insert']
 export type InventoryTransferInsert = Database['public']['Tables']['inventory_transfers']['Insert']
+export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
 
 export type CategoryUpdate = Database['public']['Tables']['categories']['Update']
 export type ProductUpdate = Database['public']['Tables']['products']['Update']
@@ -788,3 +966,22 @@ export type OrderPaymentUpdate = Database['public']['Tables']['order_payments'][
 export type AuditLogUpdate = Database['public']['Tables']['audit_logs']['Update']
 export type InventoryMovementUpdate = Database['public']['Tables']['inventory_movements']['Update']
 export type InventoryTransferUpdate = Database['public']['Tables']['inventory_transfers']['Update']
+export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
+
+export type Role = Database['public']['Tables']['roles']['Row']
+export type Permission = Database['public']['Tables']['permissions']['Row']
+export type RolePermission = Database['public']['Tables']['roles_permissions']['Row']
+export type UserPermission = Database['public']['Tables']['user_permissions']['Row']
+export type RbacAuditLog = Database['public']['Tables']['rbac_audit_log']['Row']
+
+export type RoleInsert = Database['public']['Tables']['roles']['Insert']
+export type PermissionInsert = Database['public']['Tables']['permissions']['Insert']
+export type RolePermissionInsert = Database['public']['Tables']['roles_permissions']['Insert']
+export type UserPermissionInsert = Database['public']['Tables']['user_permissions']['Insert']
+export type RbacAuditLogInsert = Database['public']['Tables']['rbac_audit_log']['Insert']
+
+export type RoleUpdate = Database['public']['Tables']['roles']['Update']
+export type PermissionUpdate = Database['public']['Tables']['permissions']['Update']
+export type RolePermissionUpdate = Database['public']['Tables']['roles_permissions']['Update']
+export type UserPermissionUpdate = Database['public']['Tables']['user_permissions']['Update']
+export type RbacAuditLogUpdate = Database['public']['Tables']['rbac_audit_log']['Update']

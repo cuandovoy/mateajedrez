@@ -103,7 +103,7 @@ function AdminProductsContent() {
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true)
-      
+
       // If filtering by supplier, we need to get product IDs first
       let productIds: string[] | null = null
       if (filters.supplierId) {
@@ -111,10 +111,10 @@ function AdminProductsContent() {
           .from('product_suppliers')
           .select('product_id')
           .eq('supplier_id', filters.supplierId)
-        
+
         if (supplierError) throw supplierError
         productIds = productSuppliersData?.map((ps: { product_id: string }) => ps.product_id) || []
-        
+
         // If no products found for this supplier, return empty array
         if (productIds.length === 0) {
           setProducts([])
@@ -122,7 +122,7 @@ function AdminProductsContent() {
           return
         }
       }
-      
+
       let query = supabase
         .from('products')
         .select(`
@@ -281,17 +281,17 @@ function AdminProductsContent() {
   const removeImage = (index: number) => {
     const image = productImages[index]
     const newImages = productImages.filter((_, i) => i !== index)
-    
+
     // If we removed the primary image, make the first one primary
     if (image.is_primary && newImages.length > 0) {
       newImages[0].is_primary = true
     }
-    
+
     // Reorder display_order
     newImages.forEach((img, i) => {
       img.display_order = i
     })
-    
+
     setProductImages(newImages)
   }
 
@@ -313,13 +313,13 @@ function AdminProductsContent() {
 
     const newImages = [...productImages]
     const newIndex = direction === 'up' ? index - 1 : index + 1
-    ;[newImages[index], newImages[newIndex]] = [newImages[newIndex], newImages[index]]
-    
+      ;[newImages[index], newImages[newIndex]] = [newImages[newIndex], newImages[index]]
+
     // Update display_order
     newImages.forEach((img, i) => {
       img.display_order = i
     })
-    
+
     setProductImages(newImages)
   }
 
@@ -390,7 +390,7 @@ function AdminProductsContent() {
           const currentImageIds = new Set(
             productImages.filter((img) => img.id).map((img) => img.id!)
           )
-          
+
           const imagesToDelete = editingProduct.product_images.filter(
             (img) => !currentImageIds.has(img.id)
           )
@@ -426,12 +426,12 @@ function AdminProductsContent() {
           // Update existing images that changed (order, primary status, or were replaced)
           const imagesToUpdate = imagesToSave.filter((img) => {
             if (!img.id) return false // New images don't have ID
-            
+
             const existingImage = editingProduct.product_images?.find(
               (ei) => ei.id === img.id
             )
             if (!existingImage) return false
-            
+
             // Check if anything changed
             return (
               existingImage.display_order !== img.display_order ||
@@ -442,7 +442,7 @@ function AdminProductsContent() {
 
           for (const imageToUpdate of imagesToUpdate) {
             if (!imageToUpdate.id) continue // Skip if no ID
-            
+
             const { error: updateError } = await supabase
               .from('product_images')
               // @ts-expect-error - Supabase types need to be regenerated after migration
@@ -539,7 +539,7 @@ function AdminProductsContent() {
 
   const handleEdit = (product: ProductWithImages) => {
     setEditingProduct(product)
-    
+
     // Load existing images
     const existingImages: ProductImageItem[] = (product.product_images || [])
       .sort((a, b) => a.display_order - b.display_order)
@@ -549,9 +549,9 @@ function AdminProductsContent() {
         display_order: img.display_order,
         is_primary: img.is_primary,
       }))
-    
+
     setProductImages(existingImages)
-    
+
     reset({
       name: product.name,
       description: product.description || '',
@@ -632,33 +632,32 @@ function AdminProductsContent() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Productos</h1>
-          <p className="text-gray-600 mt-2">Gestiona todos los productos de tu tienda</p>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Productos</h1>
+        <p className="text-gray-600 mt-2">Gestiona todos los productos de tu tienda</p>
+      </div>
+
+      <div className="mb-8 flex items-center justify-between gap-4">
+        <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`p-2 ${viewMode === 'list' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+            title="Vista de lista"
+          >
+            <List className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`p-2 ${viewMode === 'grid' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+            title="Vista de grilla"
+          >
+            <Grid3x3 className="h-4 w-4" />
+          </button>
         </div>
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 ${viewMode === 'list' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-              title="Vista de lista"
-            >
-              <List className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 ${viewMode === 'grid' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-              title="Vista de grilla"
-            >
-              <Grid3x3 className="h-4 w-4" />
-            </button>
-          </div>
-          <Button onClick={handleNew}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Producto
-          </Button>
-        </div>
+        <Button onClick={handleNew}>
+          <Plus className="h-4 w-4 mr-2" />
+          Nuevo Producto
+        </Button>
       </div>
 
       {/* Filters Panel */}
@@ -670,7 +669,7 @@ function AdminProductsContent() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <SearchFilter
               value={filters.search}
               onChange={(value) => setFilters({ ...filters, search: value })}
@@ -917,7 +916,7 @@ function AdminProductsContent() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Imágenes del Producto
                   </label>
-                  
+
                   {/* Existing Images */}
                   {productImages.length > 0 && (
                     <div className="space-y-3 mb-4">

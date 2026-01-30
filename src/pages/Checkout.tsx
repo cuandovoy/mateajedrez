@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch, CartItemWithProduct } from '@/types'
-import { BranchInventory } from '@/types/database.types'
+import { BranchInventory, Customer } from '@/types/database.types'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -234,12 +234,68 @@ export function Checkout() {
       // branch_id is required for multi-branch support
       const orderData = {
         user_id: user?.id || null,
+        customer_id: null, // Will be set after creating customer
         total,
         status: 'pending' as const,
         shipping_address: shippingAddress,
         payment_method: paymentMethod,
         branch_id: mainBranchId, // Assign to main branch
       } as any
+
+      // Create or get customer
+      let customer: Customer | null = null
+      
+      // Check if customer exists by phone
+      const { data: existingCustomer } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('phone', formData.phone)
+        .maybeSingle()
+
+      if (existingCustomer) {
+        customer = existingCustomer
+        // Update customer info if they have a new user_id
+        if (user?.id && !existingCustomer.user_id) {
+          const { data: updatedCustomer } = await supabase
+            .from('customers')
+            .update({
+              user_id: user.id,
+              email: user.email || existingCustomer.email,
+              full_name: formData.fullName,
+              address: shippingAddress,
+            })
+            .eq('id', existingCustomer.id)
+            .select()
+            .single()
+          
+          if (updatedCustomer) {
+            customer = updatedCustomer
+          }
+        }
+      } else {
+        // Create new customer
+        const { data: newCustomer, error: customerError } = await supabase
+          .from('customers')
+          .insert({
+            user_id: user?.id || null,
+            email: user?.email || null,
+            full_name: formData.fullName,
+            phone: formData.phone,
+            address: shippingAddress,
+            is_active: true,
+          })
+          .select()
+          .single()
+
+        if (customerError || !newCustomer) {
+          throw customerError || new Error('Failed to create customer')
+        }
+        
+        customer = newCustomer
+      }
+
+      // Update orderData with customer_id
+      orderData.customer_id = customer.id
 
       const { data: order, error: orderError } = await supabase
         .from('orders')
@@ -343,50 +399,6 @@ export function Checkout() {
 
       // Clear cart
       await clearCart()
-
-      // Create or update user profile
-      if (user) {
-        // Update existing profile for logged in user
-        await (supabase
-          .from('user_profiles') as any)
-          .update({
-            full_name: formData.fullName,
-            phone: formData.phone,
-            address: shippingAddress,
-          })
-          .eq('user_id', user.id)
-      } else {
-        // Create guest profile (without authentication)
-        // Check if a profile with this phone already exists
-        const { data: existingProfile } = await (supabase
-          .from('user_profiles') as any)
-          .select('id')
-          .eq('phone', formData.phone)
-          .is('user_id', null)
-          .maybeSingle()
-
-        if (!existingProfile) {
-          // Create new guest profile
-          await (supabase
-            .from('user_profiles') as any)
-            .insert({
-              user_id: null, // Guest profile without authentication
-              full_name: formData.fullName,
-              phone: formData.phone,
-              address: shippingAddress,
-              role: 'user',
-            })
-        } else {
-          // Update existing guest profile
-          await (supabase
-            .from('user_profiles') as any)
-            .update({
-              full_name: formData.fullName,
-              address: shippingAddress,
-            })
-            .eq('id', existingProfile.id)
-        }
-      }
 
       show('¡Orden creada exitosamente!', 'success')
       
