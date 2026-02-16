@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.2",
-    "@supabase/supabase-js": "^2.39.0",
+    "@supabase/supabase-js": "2.78.0",
     "clsx": "^2.1.0",
     "date-fns": "^3.0.6",
     "jsbarcode": "^3.12.3",
