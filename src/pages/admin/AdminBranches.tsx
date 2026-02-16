@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { BranchTable } from '@/components/admin/BranchTable'
 import { SearchFilter } from '@/components/filters'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
+import { useOrganization } from '@/hooks/useOrganization'
 import {
   Building2,
   Edit,
@@ -22,7 +23,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import type { Branch, BranchInsert, BranchUpdate } from '@/types'
+import type { Branch, BranchInsert } from '@/types'
 
 type ViewMode = 'grid' | 'list'
 
@@ -42,6 +43,7 @@ const branchSchema = z.object({
 type BranchForm = z.infer<typeof branchSchema>
 
 function AdminBranchesContent() {
+  const { organizationId } = useOrganization()
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -63,15 +65,17 @@ function AdminBranchesContent() {
   })
 
   useEffect(() => {
-    fetchBranches()
-  }, [])
+    if (organizationId) fetchBranches()
+  }, [organizationId])
 
   const fetchBranches = async () => {
+    if (!organizationId) return
     try {
       setLoading(true)
       const { data, error } = await supabase
         .from('branches')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('name')
 
       if (error) throw error
@@ -103,7 +107,7 @@ function AdminBranchesContent() {
 
   const onSubmit = async (data: BranchForm) => {
     try {
-      const branchData: BranchInsert | BranchUpdate = {
+      const baseData = {
         ...data,
         code: data.code || null,
         email: data.email || null,
@@ -118,11 +122,12 @@ function AdminBranchesContent() {
         const { error } = await supabase
           .from('branches')
           // @ts-expect-error - Supabase types need to be regenerated after migration
-          .update(branchData)
+          .update(baseData)
           .eq('id', editingBranch.id)
 
         if (error) throw error
       } else {
+        const branchData: BranchInsert = { ...baseData, organization_id: organizationId! }
         const { error } = await supabase
           .from('branches')
           // @ts-expect-error - Supabase types need to be regenerated after migration
@@ -202,7 +207,7 @@ function AdminBranchesContent() {
     setIsModalOpen(true)
   }
 
-  if (loading) {
+  if (!organizationId || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>

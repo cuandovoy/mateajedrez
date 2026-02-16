@@ -1,3 +1,4 @@
+import { useOrganizationStore } from '@/store/organizationStore'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -10,8 +11,13 @@ import { ArrowLeft, Filter, X } from 'lucide-react'
 import type { Product, Category } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
 
+const DEFAULT_STORE_SLUG = 'default'
+
 export function CategoryProducts() {
   const { categorySlug } = useParams<{ categorySlug: string }>()
+  const currentOrg = useOrganizationStore((s) => s.currentOrganization)
+  const fetchOrgBySlug = useOrganizationStore((s) => s.fetchOrgBySlug)
+  const [orgId, setOrgId] = useState<string | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [parentCategory, setParentCategory] = useState<Category | null>(null)
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null) // The category being viewed (could be parent or subcategory)
@@ -23,11 +29,21 @@ export function CategoryProducts() {
   const [showFilters, setShowFilters] = useState(false)
 
   useEffect(() => {
-    if (categorySlug) {
+    const loadOrg = async () => {
+      const id = currentOrg?.id ?? (await fetchOrgBySlug(DEFAULT_STORE_SLUG))?.id
+      setOrgId(id ?? null)
+    }
+    loadOrg()
+  }, [currentOrg?.id, fetchOrgBySlug])
+
+  useEffect(() => {
+    if (categorySlug && orgId) {
       fetchCategoryAndProducts()
+    } else if (categorySlug && !orgId) {
+      setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categorySlug])
+  }, [categorySlug, orgId])
 
   useEffect(() => {
     if (parentCategory || selectedSubcategories.length > 0 || priceRange.min || priceRange.max) {
@@ -37,13 +53,14 @@ export function CategoryProducts() {
   }, [parentCategory, selectedSubcategories, priceRange.min, priceRange.max])
 
   const fetchCategoryAndProducts = async () => {
-    if (!categorySlug) return
+    if (!categorySlug || !orgId) return
 
     try {
-      // First, try to find a category with this slug (could be parent or subcategory)
+      // Find category by slug within this org (slug is unique per org)
       const { data: categoryData = null, error: categoryError }: { data: Category | null, error: PostgrestError | null } = await supabase
         .from('categories')
         .select('*')
+        .eq('organization_id', orgId)
         .eq('slug', categorySlug)
         .single()
 
@@ -101,8 +118,8 @@ export function CategoryProducts() {
           setSelectedSubcategories([])
         }
 
-        // Fetch products initially
-        await fetchProductsForCategory(parentCategory.id as string, subcats || [])
+        // Fetch products initially (pass org from category)
+        await fetchProductsForCategory(parentCategory.id as string, subcats || [], categoryData.organization_id)
       }
     } catch (error) {
       console.error('Error fetching category:', error)
@@ -111,7 +128,7 @@ export function CategoryProducts() {
     }
   }
 
-  const fetchProductsForCategory = async (parentId: string, subcats: Category[]) => {
+  const fetchProductsForCategory = async (parentId: string, subcats: Category[], organizationId?: string) => {
     try {
       // Build category IDs array (parent + all subcategories)
       const allCategoryIds = [parentId]
@@ -131,6 +148,10 @@ export function CategoryProducts() {
           )
         `)
         .eq('is_active', true)
+
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId)
+      }
 
       // Filter by selected subcategories
       if (subcats.length === 0) {
@@ -166,7 +187,7 @@ export function CategoryProducts() {
 
   const fetchProducts = async () => {
     if (!parentCategory) return
-    await fetchProductsForCategory(parentCategory.id, subcategories)
+    await fetchProductsForCategory(parentCategory.id, subcategories, parentCategory.organization_id)
   }
 
   const filteredProducts = products.filter((product) =>

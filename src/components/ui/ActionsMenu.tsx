@@ -92,7 +92,7 @@ export function ActionsMenu({ actions, className }: ActionsMenuProps) {
         ref={buttonRef}
         type="button"
         onClick={handleToggle}
-        className="p-1 rounded-md hover:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-admin-500"
+        className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-md hover:bg-gray-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-admin-500"
         aria-label="Acciones"
       >
         <MoreVertical className="h-5 w-5 text-gray-600" />

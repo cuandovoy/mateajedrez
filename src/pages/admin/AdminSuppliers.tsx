@@ -12,6 +12,7 @@ import {
 } from '@/lib/uruguay-validators'
 import type { Supplier, SupplierInsert, SupplierUpdate } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useOrganization } from '@/hooks/useOrganization'
 import { Building2, Edit, Filter, Globe, Grid3x3, List, Mail, MapPin, Phone, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -74,6 +75,7 @@ const supplierSchema = z.object({
 type SupplierForm = z.infer<typeof supplierSchema>
 
 function AdminSuppliersContent() {
+  const { organizationId } = useOrganization()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -91,15 +93,17 @@ function AdminSuppliersContent() {
   })
 
   useEffect(() => {
-    fetchSuppliers()
-  }, [])
+    if (organizationId) fetchSuppliers()
+  }, [organizationId])
 
   const fetchSuppliers = async () => {
+    if (!organizationId) return
     try {
       setLoading(true)
       const { data, error } = await supabase
         .from('suppliers')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('name')
 
       if (error) throw error
@@ -139,7 +143,7 @@ function AdminSuppliersContent() {
         ? data.tax_id.replace(/[\s.\-]/g, '')
         : null
 
-      const supplierData: SupplierInsert | SupplierUpdate = {
+      const baseData = {
         ...data,
         email: data.email || null,
         website: data.website || null,
@@ -148,6 +152,7 @@ function AdminSuppliersContent() {
       }
 
       if (editingSupplier) {
+        const supplierData: SupplierUpdate = { ...baseData }
         const { error } = await supabase
           .from('suppliers')
           // @ts-expect-error - Supabase types need to be regenerated after migration
@@ -156,6 +161,7 @@ function AdminSuppliersContent() {
 
         if (error) throw error
       } else {
+        const supplierData: SupplierInsert = { ...baseData, organization_id: organizationId! }
         const { error } = await supabase
           .from('suppliers')
           // @ts-expect-error - Supabase types need to be regenerated after migration
@@ -242,7 +248,7 @@ function AdminSuppliersContent() {
     setIsModalOpen(true)
   }
 
-  if (loading) {
+  if (!organizationId || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>

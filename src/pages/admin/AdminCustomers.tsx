@@ -2,6 +2,7 @@ import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { useOrganization } from '@/hooks/useOrganization'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
 import type { Customer } from '@/types/database.types'
@@ -23,6 +24,7 @@ interface CustomerForm {
 }
 
 export function AdminCustomers() {
+  const { organizationId } = useOrganization()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -44,15 +46,17 @@ export function AdminCustomers() {
   const { show } = useToastStore()
 
   useEffect(() => {
-    fetchCustomers()
-  }, [])
+    if (organizationId) fetchCustomers()
+  }, [organizationId])
 
   const fetchCustomers = async () => {
+    if (!organizationId) return
     try {
       setLoading(true)
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -90,6 +94,7 @@ export function AdminCustomers() {
         const { error } = await supabase
           .from('customers')
           .insert({
+            organization_id: organizationId,
             full_name: formData.full_name,
             email: formData.email || null,
             phone: formData.phone,

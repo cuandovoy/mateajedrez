@@ -52,7 +52,6 @@ export function ProtectedRoute({
 
   // Check permissions (new system)
   if (requiredPermissions) {
-    debugger
     const perms = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions]
     const hasAccess = requireAll ? canAll(perms) : canAny(perms)
     

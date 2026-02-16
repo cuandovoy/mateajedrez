@@ -6,6 +6,7 @@ import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { useOrganization } from '@/hooks/useOrganization'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch } from '@/types'
@@ -32,13 +33,30 @@ interface InventoryItem {
   variant_id: string | null
   product_name: string
   variant_name: string | null
+  sku: string | null
+  thumbnail_url: string | null
   stock: number
   min_stock: number
   low_stock_threshold: number
   is_low_stock: boolean
 }
 
+type ProductImageRef = {
+  image_url: string
+  is_primary: boolean
+  display_order: number
+}
+
+const getPrimaryImageUrl = (images: ProductImageRef[] | null | undefined): string | null => {
+  if (!images || images.length === 0) return null
+  const primary = images.find((img) => img.is_primary)
+  if (primary?.image_url) return primary.image_url
+  const ordered = [...images].sort((a, b) => a.display_order - b.display_order)
+  return ordered[0]?.image_url || null
+}
+
 export function AdminInventory() {
+  const { organizationId } = useOrganization()
   const { show } = useToastStore()
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
@@ -53,25 +71,30 @@ export function AdminInventory() {
   const [adjustmentModalItem, setAdjustmentModalItem] = useState<InventoryItem | null>(null)
   const [transferModalItem, setTransferModalItem] = useState<InventoryItem | null>(null)
   const [movementsModalItem, setMovementsModalItem] = useState<InventoryItem | null>(null)
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
 
   useEffect(() => {
-    fetchBranches()
-    fetchProducts()
-    fetchInventory()
-    checkMissingProducts()
-  }, [])
-
-  useEffect(() => {
-    if (selectedBranch) {
+    if (organizationId) {
+      fetchBranches()
+      fetchProducts()
+      fetchInventory()
       checkMissingProducts()
     }
-  }, [selectedBranch])
+  }, [organizationId])
+
+  useEffect(() => {
+    if (selectedBranch && organizationId) {
+      checkMissingProducts()
+    }
+  }, [selectedBranch, organizationId])
 
   const fetchBranches = async () => {
+    if (!organizationId) return
     try {
       const { data, error } = await supabase
         .from('branches')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name')
 
@@ -87,10 +110,12 @@ export function AdminInventory() {
   }
 
   const fetchProducts = async () => {
+    if (!organizationId) return
     try {
       const { error } = await supabase
         .from('products')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name')
 
@@ -101,6 +126,7 @@ export function AdminInventory() {
   }
 
   const fetchInventory = async () => {
+    if (!organizationId) return
     try {
       setLoading(true)
       const { data, error } = await supabase
@@ -114,17 +140,44 @@ export function AdminInventory() {
           min_stock,
           low_stock_threshold,
           branches!inner(id, name),
-          products(id, name),
-          product_variants(id, name, product_id, products!inner(id, name))
+          products(
+            id,
+            name,
+            sku,
+            image_url,
+            product_images (
+              image_url,
+              is_primary,
+              display_order
+            )
+          ),
+          product_variants(
+            id,
+            name,
+            sku,
+            image_url,
+            product_id,
+            products!inner(
+              id,
+              name,
+              sku,
+              image_url,
+              product_images (
+                image_url,
+                is_primary,
+                display_order
+              )
+            )
+          )
         `)
         .order('stock', { ascending: true })
 
       if (error) throw error
-
       const inventoryItems: InventoryItem[] = (data || []).map((item: any) => {
         const branch = item.branches
         const product = item.product_id ? item.products : (item.product_variants?.products || null)
         const variant = item.variant_id ? item.product_variants : null
+        const productPrimaryImage = getPrimaryImageUrl(product?.product_images as ProductImageRef[] | undefined)
 
         return {
           id: item.id,
@@ -134,6 +187,8 @@ export function AdminInventory() {
           variant_id: item.variant_id,
           product_name: product?.name || variant?.name || 'N/A',
           variant_name: variant?.name || null,
+          sku: variant?.sku || product?.sku || null,
+          thumbnail_url: variant?.image_url || productPrimaryImage || product?.image_url || null,
           stock: item.stock,
           min_stock: item.min_stock,
           low_stock_threshold: item.low_stock_threshold,
@@ -184,29 +239,39 @@ export function AdminInventory() {
 
   const checkMissingProducts = async () => {
     try {
-      // Count products/variants that should have inventory but don't
       const branchId = selectedBranch || branches[0]?.id
-      if (!branchId) return
+      if (!branchId || !organizationId) return
 
-      // Count active products without inventory entries
+      // Count active products without inventory entries (org-scoped)
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('id')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
 
       if (productsError) throw productsError
 
-      // Count active variants without inventory entries
-      const { data: variantsData, error: variantsError } = await supabase
-        .from('product_variants')
+      // Count active variants without inventory entries (via products of org)
+      const { data: productsForVariants } = await supabase
+        .from('products')
         .select('id')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
-
-      if (variantsError) throw variantsError
+      const ids = (productsForVariants || []).map((p: { id: string }) => p.id)
+      let variantsData: { id: string }[] = []
+      if (ids.length > 0) {
+        const { data: vData, error: vErr } = await supabase
+          .from('product_variants')
+          .select('id')
+          .in('product_id', ids)
+          .eq('is_active', true)
+        if (vErr) throw vErr
+        variantsData = vData || []
+      }
 
       // Check which ones don't have inventory entries
-      const productIds = (productsData || []).map((p: any) => p.id)
-      const variantIds = (variantsData || []).map((v: any) => v.id)
+      const prodIds = (productsData || []).map((p: { id: string }) => p.id)
+      const variantIds = variantsData.map((v) => v.id)
 
       const { data: existingInventory } = await supabase
         .from('branch_inventory')
@@ -215,16 +280,16 @@ export function AdminInventory() {
 
       const existingProductIds = new Set(
         (existingInventory || [])
-          .filter((inv: any) => inv.product_id)
-          .map((inv: any) => inv.product_id)
+          .filter((inv: { product_id?: string }) => inv.product_id)
+          .map((inv: { product_id: string }) => inv.product_id)
       )
       const existingVariantIds = new Set(
         (existingInventory || [])
-          .filter((inv: any) => inv.variant_id)
-          .map((inv: any) => inv.variant_id)
+          .filter((inv: { variant_id?: string }) => inv.variant_id)
+          .map((inv: { variant_id: string }) => inv.variant_id)
       )
 
-      const missingProducts = productIds.filter((id: string) => !existingProductIds.has(id))
+      const missingProducts = prodIds.filter((id: string) => !existingProductIds.has(id))
       const missingVariants = variantIds.filter((id: string) => !existingVariantIds.has(id))
 
       setMissingProductsCount(missingProducts.length + missingVariants.length)
@@ -430,11 +495,39 @@ export function AdminInventory() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{item.product_name}</p>
-                          {item.variant_name && (
-                            <p className="text-xs text-gray-500">Variante: {item.variant_name}</p>
-                          )}
+                        <div className="flex items-center space-x-3">
+                          <div className="h-10 w-10 rounded-md border border-gray-200 bg-gray-100 overflow-hidden shrink-0">
+                            {item.thumbnail_url ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPreviewImage({
+                                    url: item.thumbnail_url as string,
+                                    name: item.product_name,
+                                  })
+                                }
+                                className="h-full w-full block"
+                              >
+                                <img
+                                  src={item.thumbnail_url}
+                                  alt={item.product_name}
+                                  className="h-full w-full object-cover hover:scale-105 transition-transform"
+                                  loading="lazy"
+                                />
+                              </button>
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center text-gray-400">
+                                <Package className="h-4 w-4" />
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{item.product_name}</p>
+                            {item.variant_name && (
+                              <p className="text-xs text-gray-500">Variante: {item.variant_name}</p>
+                            )}
+                            <p className="text-xs text-gray-500">SKU: {item.sku || 'N/A'}</p>
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center">
@@ -615,6 +708,37 @@ export function AdminInventory() {
           variantName={movementsModalItem.variant_name}
           onClose={() => setMovementsModalItem(null)}
         />
+      )}
+
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-4xl w-full bg-white rounded-lg overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <p className="text-sm font-medium text-gray-900 truncate">{previewImage.name}</p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPreviewImage(null)}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="bg-gray-50 max-h-[80vh] overflow-auto">
+              <img
+                src={previewImage.url}
+                alt={previewImage.name}
+                className="w-full h-auto object-contain"
+              />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

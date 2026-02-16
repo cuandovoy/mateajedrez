@@ -147,7 +147,7 @@ export function VariantForm({ product, variant, onClose }: VariantFormProps) {
           if (variant?.image_url) {
             await deleteImage(variant.image_url, 'product-images')
           }
-          imageUrl = await uploadProductImage(imageFile, `variant-${Date.now()}`)
+          imageUrl = await uploadProductImage(imageFile, `variant-${Date.now()}`, product.organization_id ?? undefined)
         } catch (error) {
           console.error('Error uploading image:', error)
           show('Error al subir la imagen', 'error')

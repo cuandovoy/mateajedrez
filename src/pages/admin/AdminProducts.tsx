@@ -13,15 +13,17 @@ import {
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Skeleton, SkeletonTable } from '@/components/ui/Skeleton'
 import { Input } from '@/components/ui/Input'
 import { deleteImage, uploadProductImage } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
-import type { Category, Product, ProductImage, ProductInsert, ProductUpdate, Supplier } from '@/types'
+import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowDown, ArrowUp, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { useOrganization } from '@/hooks/useOrganization'
 import { z } from 'zod'
 
 const productSchema = z.object({
@@ -68,9 +70,11 @@ interface ProductFilters {
 }
 
 function AdminProductsContent() {
+  const { organizationId } = useOrganization()
   const [products, setProducts] = useState<ProductWithImages[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithImages | null>(null)
@@ -80,6 +84,7 @@ function AdminProductsContent() {
   const [barcodeManagerProduct, setBarcodeManagerProduct] = useState<Product | null>(null)
   const [barcodeManagerVariant, setBarcodeManagerVariant] = useState<{ productId: string; variantId: string } | null>(null)
   const [supplierManagerProduct, setSupplierManagerProduct] = useState<Product | null>(null)
+  const [initialBranchId, setInitialBranchId] = useState<string>('')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [filters, setFilters] = useState<ProductFilters>({
     search: '',
@@ -101,6 +106,7 @@ function AdminProductsContent() {
   })
 
   const fetchProducts = useCallback(async () => {
+    if (!organizationId) return
     try {
       setLoading(true)
 
@@ -138,6 +144,7 @@ function AdminProductsContent() {
             name
           )
         `)
+        .eq('organization_id', organizationId)
 
       // Apply filters
       if (filters.categoryId) {
@@ -179,12 +186,15 @@ function AdminProductsContent() {
     } finally {
       setLoading(false)
     }
-  }, [filters.categoryId, filters.supplierId, filters.status, filters.priceMin, filters.priceMax, filters.stock])
+  }, [organizationId, filters.categoryId, filters.supplierId, filters.status, filters.priceMin, filters.priceMax, filters.stock])
 
   useEffect(() => {
-    fetchCategories()
-    fetchSuppliers()
-  }, [])
+    if (organizationId) {
+      fetchCategories()
+      fetchSuppliers()
+      fetchBranches()
+    }
+  }, [organizationId])
 
   useEffect(() => {
     fetchProducts()
@@ -206,10 +216,12 @@ function AdminProductsContent() {
   }, [products, filters.search])
 
   const fetchCategories = async () => {
+    if (!organizationId) return
     try {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('name')
 
       if (error) throw error
@@ -220,10 +232,12 @@ function AdminProductsContent() {
   }
 
   const fetchSuppliers = async () => {
+    if (!organizationId) return
     try {
       const { data, error } = await supabase
         .from('suppliers')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name')
 
@@ -231,6 +245,23 @@ function AdminProductsContent() {
       setSuppliers(data || [])
     } catch (error) {
       console.error('Error fetching suppliers:', error)
+    }
+  }
+
+  const fetchBranches = async () => {
+    if (!organizationId) return
+    try {
+      const { data, error } = await supabase
+        .from('branches')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('name')
+
+      if (error) throw error
+      setBranches((data || []) as Branch[])
+    } catch (error) {
+      console.error('Error fetching branches:', error)
     }
   }
 
@@ -324,12 +355,27 @@ function AdminProductsContent() {
   }
 
   const onSubmit = async (data: ProductForm) => {
+    if (!organizationId) return
+
+    // When creating with stock > 0, branch is required for inventory
+    if (!editingProduct && data.stock > 0) {
+      if (branches.length === 0) {
+        alert('No hay sucursales disponibles. Crea una sucursal primero o deja el stock en 0.')
+        return
+      }
+      if (!initialBranchId) {
+        alert('Si indicas stock inicial, debes seleccionar la sucursal donde se cargará el inventario.')
+        return
+      }
+    }
+
     try {
       setUploadingImage(true)
 
       const productData: ProductInsert | ProductUpdate = {
         ...data,
         image_url: null, // We'll use product_images table instead
+        ...(editingProduct ? {} : { organization_id: organizationId }),
       }
 
       let productId: string
@@ -357,6 +403,47 @@ function AdminProductsContent() {
         if (error) throw error
         // @ts-expect-error - Supabase types need to be regenerated after migration
         productId = newProduct.id
+
+        // Load initial stock into branch_inventory when creating with stock + branch
+        if (data.stock > 0 && initialBranchId) {
+          const { data: branchInventory, error: biError } = await supabase
+            .from('branch_inventory')
+            .select('id, stock')
+            .eq('branch_id', initialBranchId)
+            .eq('product_id', productId)
+            .is('variant_id', null)
+            .single()
+
+          const bi = branchInventory as { id: string; stock: number } | null
+          if (!biError && bi?.id) {
+            const previousStock = bi.stock ?? 0
+            const newStock = previousStock + data.stock
+
+            const { error: updateError } = await supabase
+              .from('branch_inventory')
+              // @ts-expect-error - Supabase types may need regeneration
+              .update({ stock: newStock })
+              .eq('id', bi.id)
+
+            if (!updateError) {
+              await supabase
+                .from('inventory_movements')
+                // @ts-expect-error - Supabase types may need regeneration
+                .insert({
+                  branch_inventory_id: bi.id,
+                  movement_type: 'receipt',
+                  quantity: data.stock,
+                  previous_stock: previousStock,
+                  new_stock: newStock,
+                  reference_type: 'receipt',
+                  notes: 'Stock inicial al crear producto',
+                })
+            } else {
+              console.error('Error loading initial inventory:', updateError)
+              alert('Producto creado pero no se pudo cargar el stock inicial. Ajusta el inventario manualmente.')
+            }
+          }
+        }
       }
 
       // Handle product images
@@ -374,7 +461,7 @@ function AdminProductsContent() {
 
           // Upload file if it exists (new image)
           if (image.file) {
-            imageUrl = await uploadProductImage(image.file, productId)
+            imageUrl = await uploadProductImage(image.file, productId, organizationId ?? undefined)
           }
 
           imagesToSave.push({
@@ -584,6 +671,7 @@ function AdminProductsContent() {
   const handleNew = () => {
     setEditingProduct(null)
     setProductImages([])
+    setInitialBranchId('')
     reset()
     setIsModalOpen(true)
   }
@@ -624,8 +712,20 @@ function AdminProductsContent() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>
+      <div>
+        <div className="mb-8">
+          <Skeleton className="h-9 w-48 mb-2" />
+          <Skeleton className="h-5 w-72" />
+        </div>
+        <div className="mb-8 flex gap-4">
+          <Skeleton className="h-10 flex-1 max-w-md" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <SkeletonTable rows={6} />
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -868,6 +968,29 @@ function AdminProductsContent() {
                     error={errors.stock?.message}
                   />
                 </div>
+                {!editingProduct && branches.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Sucursal para stock inicial
+                    </label>
+                    <select
+                      value={initialBranchId}
+                      onChange={(e) => setInitialBranchId(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                    >
+                      <option value="">Ninguna (sin cargar inventario)</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name} {branch.code && `(${branch.code})`}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Si indicas stock, selecciona la sucursal donde se cargará. El inventario se
+                      actualizará automáticamente.
+                    </p>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Categoría
@@ -1060,6 +1183,7 @@ function AdminProductsContent() {
                       setIsModalOpen(false)
                       setEditingProduct(null)
                       setProductImages([])
+                      setInitialBranchId('')
                       reset()
                     }}
                     className="flex-1"

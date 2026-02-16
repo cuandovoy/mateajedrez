@@ -81,7 +81,7 @@ export function Footer() {
           <p className="text-white mb-2">
             &copy; {new Date().getFullYear()} Flormaria Soria González. Todos los derechos reservados.
           </p>
-          <p className="text-gray-700 text-sm">
+          <p className="text-gray-400 text-sm">
             Creado por{' '}
             <a
               href="https://ciceridev.vercel.app/home"

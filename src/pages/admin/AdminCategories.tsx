@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useOrganization } from '@/hooks/useOrganization'
 import { Plus, Edit, Trash2, Upload, X, Grid3x3, List, Filter } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useForm } from 'react-hook-form'
@@ -29,6 +30,7 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp
 type CategoryForm = z.infer<typeof categorySchema>
 
 function AdminCategoriesContent() {
+  const { organizationId } = useOrganization()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -49,14 +51,16 @@ function AdminCategoriesContent() {
   })
 
   useEffect(() => {
-    fetchCategories()
-  }, [])
+    if (organizationId) fetchCategories()
+  }, [organizationId])
 
   const fetchCategories = async () => {
+    if (!organizationId) return
     try {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('name')
 
       if (error) throw error
@@ -119,19 +123,21 @@ function AdminCategoriesContent() {
   }
 
   const onSubmit = async (data: CategoryForm) => {
+    if (!organizationId) return
     try {
       setUploadingImage(true)
       let imageUrl = data.image_url || null
 
       // Upload image if a new file was selected
       if (imageFile) {
-        imageUrl = await uploadCategoryImage(imageFile, editingCategory?.id)
+        imageUrl = await uploadCategoryImage(imageFile, editingCategory?.id, organizationId ?? undefined)
       }
 
       const categoryData: CategoryInsert | CategoryUpdate = {
         ...data,
         image_url: imageUrl,
         parent_id: data.parent_id || null,
+        ...(editingCategory ? {} : { organization_id: organizationId }),
       }
 
       if (editingCategory) {

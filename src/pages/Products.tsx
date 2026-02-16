@@ -4,11 +4,16 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
+import { useOrganizationStore } from '@/store/organizationStore'
 import type { Category, Product } from '@/types'
 import { Filter, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
+const DEFAULT_STORE_SLUG = 'default'
+
 export function Products() {
+  const currentOrg = useOrganizationStore((s) => s.currentOrganization)
+  const fetchOrgBySlug = useOrganizationStore((s) => s.fetchOrgBySlug)
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -16,13 +21,29 @@ export function Products() {
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
   const [showFilters, setShowFilters] = useState(false)
+  const [orgId, setOrgId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchProducts()
-    fetchCategories()
-  }, [])
+    const loadOrg = async () => {
+      const id = currentOrg?.id ?? (await fetchOrgBySlug(DEFAULT_STORE_SLUG))?.id
+      setOrgId(id ?? null)
+    }
+    loadOrg()
+  }, [currentOrg?.id, fetchOrgBySlug])
+
+  useEffect(() => {
+    if (orgId) {
+      fetchProducts()
+      fetchCategories()
+    }
+  }, [orgId])
+
+  useEffect(() => {
+    if (orgId) fetchProducts()
+  }, [orgId, selectedCategory, priceRange.min, priceRange.max])
 
   const fetchProducts = async () => {
+    if (!orgId) return
     try {
       let query = supabase
         .from('products')
@@ -35,6 +56,7 @@ export function Products() {
             is_primary
           )
         `)
+        .eq('organization_id', orgId)
         .eq('is_active', true)
 
       if (selectedCategory) {
@@ -61,10 +83,12 @@ export function Products() {
   }
 
   const fetchCategories = async () => {
+    if (!orgId) return
     try {
       const { data, error } = await supabase
         .from('categories')
         .select('*')
+        .eq('organization_id', orgId)
         .is('parent_id', null)
         .order('name')
 
@@ -74,10 +98,6 @@ export function Products() {
       console.error('Error fetching categories:', error)
     }
   }
-
-  useEffect(() => {
-    fetchProducts()
-  }, [selectedCategory, priceRange.min, priceRange.max])
 
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

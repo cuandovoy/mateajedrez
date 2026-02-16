@@ -9,21 +9,21 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', isLoading, disabled, children, ...props }, ref) => {
-    const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none'
+    const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none'
     
     // Check if we're in admin context (body has admin-theme class)
     const isAdminContext = typeof document !== 'undefined' && document.body.classList.contains('admin-theme')
     
     const variants = {
       primary: isAdminContext 
-        ? 'bg-admin-500 text-white hover:bg-admin-600 focus:ring-admin-500'
-        : 'bg-primary-200 text-white hover:bg-primary-300 focus:ring-primary-200',
-      secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500',
+        ? 'bg-admin-500 text-white hover:bg-admin-600 focus-visible:ring-admin-500'
+        : 'bg-primary-200 text-white hover:bg-primary-300 focus-visible:ring-primary-200',
+      secondary: 'bg-gray-600 text-white hover:bg-gray-700 focus-visible:ring-gray-500',
       outline: isAdminContext
-        ? 'border-2 border-admin-500 text-admin-600 hover:bg-admin-50 focus:ring-admin-500'
-        : 'border-2 border-primary-200 text-primary-200 hover:bg-primary-50 focus:ring-primary-200',
-      ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
-      danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+        ? 'border-2 border-admin-500 text-admin-600 hover:bg-admin-50 focus-visible:ring-admin-500'
+        : 'border-2 border-primary-200 text-primary-200 hover:bg-primary-50 focus-visible:ring-primary-200',
+      ghost: 'text-gray-700 hover:bg-gray-100 focus-visible:ring-gray-500',
+      danger: 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500',
     }
 
     const sizes = {

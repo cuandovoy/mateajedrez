@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
+import { useOrganizationStore } from '@/store/organizationStore'
 import { formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { CashSession, Product } from '@/types'
@@ -95,9 +96,11 @@ export function ManualSaleForm({
     }
   }, [currentCashSession, setValue])
 
+  const organizationId = useOrganizationStore((s) => s.currentOrganization?.id)
+
   useEffect(() => {
-    fetchProducts()
-  }, [])
+    if (organizationId) fetchProducts()
+  }, [organizationId])
 
   // Close search results when clicking outside
   useEffect(() => {
@@ -119,10 +122,12 @@ export function ManualSaleForm({
   }, [])
 
   const fetchProducts = async () => {
+    if (!organizationId) return
     try {
       const { data, error } = await supabase
         .from('products')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name')
 
@@ -160,11 +165,11 @@ export function ManualSaleForm({
           .select('stock')
           .eq('branch_id', targetBranchId)
           .eq('variant_id', variantId)
-          .single()
+          .maybeSingle()
 
         return (data as { stock: number } | null)?.stock || 0
       } else {
-        // Try to find default variant first
+        // Try to find default variant first (maybeSingle: 0 rows = null, 1 row = data)
         const { data: defaultVariant } = await supabase
           .from('product_variants')
           .select('id')
@@ -172,7 +177,7 @@ export function ManualSaleForm({
           .like('sku', '%-DEFAULT')
           .eq('is_active', true)
           .limit(1)
-          .single()
+          .maybeSingle()
 
         if (defaultVariant && (defaultVariant as { id: string }).id) {
           const { data } = await supabase
@@ -180,7 +185,7 @@ export function ManualSaleForm({
             .select('stock')
             .eq('branch_id', targetBranchId)
             .eq('variant_id', (defaultVariant as { id: string }).id)
-            .single()
+            .maybeSingle()
 
           return (data as { stock: number } | null)?.stock || 0
         } else {
@@ -190,7 +195,7 @@ export function ManualSaleForm({
             .select('stock')
             .eq('branch_id', targetBranchId)
             .eq('product_id', productId)
-            .single()
+            .maybeSingle()
 
           return (data as { stock: number } | null)?.stock || 0
         }
@@ -205,19 +210,20 @@ export function ManualSaleForm({
     const availableStock = await getAvailableStock(product.id)
     const price = product.price
 
+    if (availableStock === 0) {
+      show('Este producto tiene 0 stock. Se agregó igual. Podrás registrar la venta.', 'info')
+    }
+
     // Check if product already exists in sale lines
     const existingIndex = saleLines.findIndex(
       (line) => line.type === 'product' && line.product_id === product.id && !line.variant_id
     )
 
     if (existingIndex >= 0) {
-      // Update quantity
+      // Update quantity (allow even if exceeds stock - user can register sale anyway)
       const newLines = [...saleLines]
       newLines[existingIndex].quantity += 1
-      if (newLines[existingIndex].available_stock !== undefined && newLines[existingIndex].quantity > newLines[existingIndex].available_stock!) {
-        show('No hay suficiente stock disponible', 'error')
-        return
-      }
+      newLines[existingIndex].available_stock = availableStock
       setSaleLines(newLines)
     } else {
       // Add new line
@@ -288,8 +294,7 @@ export function ManualSaleForm({
 
     const line = saleLines.find((l) => l.id === id)
     if (line && line.available_stock !== undefined && newQuantity > line.available_stock) {
-      show('No hay suficiente stock disponible', 'error')
-      return
+      show('Stock insuficiente. Puedes registrar la venta igual.', 'info')
     }
 
     setSaleLines(
@@ -348,23 +353,40 @@ export function ManualSaleForm({
     try {
       const total = saleLines.reduce((sum, line) => sum + line.price * line.quantity, 0)
 
-      // Validate stock for product lines
+      // Check if any product has insufficient stock - alert but allow
+      const insufficientLines: { name: string; available: number; requested: number }[] = []
       for (const line of saleLines) {
         if (line.type === 'product' && line.product_id) {
           const availableStock = await getAvailableStock(line.product_id, line.variant_id)
           if (availableStock < line.quantity) {
-            show(
-              `No hay suficiente stock para "${line.product_name}". Disponible: ${availableStock}, Solicitado: ${line.quantity}`,
-              'error'
-            )
-            setLoading(false)
-            return
+            insufficientLines.push({
+              name: line.product_name,
+              available: availableStock,
+              requested: line.quantity,
+            })
           }
         }
       }
+      if (insufficientLines.length > 0) {
+        const msg = insufficientLines
+          .map((l) => `"${l.name}": disponible ${l.available}, solicitado ${l.requested}`)
+          .join('. ')
+        const proceed = window.confirm(
+          `Stock insuficiente:\n${msg}\n\n¿Registrar la venta igual? (El inventario quedará en negativo)`
+        )
+        if (!proceed) {
+          setLoading(false)
+          return
+        }
+      }
 
-      // Create order
+      // Create order (organization_id from current org)
+      const { useOrganizationStore } = await import('@/store/organizationStore')
+      const organizationId = useOrganizationStore.getState().currentOrganization?.id
+      if (!organizationId) throw new Error('No hay organización seleccionada')
+
       const orderData: OrderInsert = {
+        organization_id: organizationId,
         user_id: null,
         total,
         status: 'pending',
@@ -654,8 +676,16 @@ export function ManualSaleForm({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {saleLines.map((line) => (
-                          <tr key={line.id} className="hover:bg-gray-50">
+                        {saleLines.map((line) => {
+                          const hasNoStock =
+                            line.type === 'product' &&
+                            line.available_stock !== undefined &&
+                            (line.available_stock === 0 || line.quantity > line.available_stock)
+                          return (
+                          <tr
+                            key={line.id}
+                            className={hasNoStock ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-400' : 'hover:bg-gray-50'}
+                          >
                             <td className="px-2 sm:px-3 py-2">
                               <div>
                                 <p className="font-medium text-gray-900 text-xs sm:text-sm">{line.product_name}</p>
@@ -663,7 +693,15 @@ export function ManualSaleForm({
                                   <p className="text-xs text-gray-500">Variante: {line.variant_name}</p>
                                 )}
                                 {line.type === 'product' && line.available_stock !== undefined && (
-                                  <p className="text-xs text-gray-400">Stock: {line.available_stock}</p>
+                                  <p
+                                    className={
+                                      line.available_stock === 0 || line.quantity > line.available_stock
+                                        ? 'text-xs font-medium text-red-600'
+                                        : 'text-xs text-gray-400'
+                                    }
+                                  >
+                                    Stock: {line.available_stock}
+                                  </p>
                                 )}
                               </div>
                             </td>
@@ -685,10 +723,6 @@ export function ManualSaleForm({
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleUpdateQuantity(line.id, line.quantity + 1)}
-                                  disabled={
-                                    line.available_stock !== undefined &&
-                                    line.quantity >= line.available_stock
-                                  }
                                   className="h-6 w-6 p-0"
                                 >
                                   <Plus className="h-3 w-3" />
@@ -750,7 +784,8 @@ export function ManualSaleForm({
                               </Button>
                             </td>
                           </tr>
-                        ))}
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>

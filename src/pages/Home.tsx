@@ -1,3 +1,4 @@
+import { useOrganizationStore } from '@/store/organizationStore'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -7,17 +8,27 @@ import type { Product, Category } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { ArrowRight } from 'lucide-react'
 
+const DEFAULT_STORE_SLUG = 'default'
+
 export function Home() {
+  const currentOrg = useOrganizationStore((s) => s.currentOrganization)
+  const fetchOrgBySlug = useOrganizationStore((s) => s.fetchOrgBySlug)
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let isMounted = true
+    const isMounted = { current: true }
 
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
-        const { data, error } = await supabase
+        const orgId = currentOrg?.id ?? (await fetchOrgBySlug(DEFAULT_STORE_SLUG))?.id
+        if (!orgId) {
+          setLoading(false)
+          return
+        }
+
+        const { data: productsData, error: productsError } = await supabase
           .from('products')
           .select(`
             *,
@@ -28,57 +39,39 @@ export function Home() {
               is_primary
             )
           `)
+          .eq('organization_id', orgId)
           .eq('is_active', true)
           .order('created_at', { ascending: false })
 
-        if (error) throw error
+        if (productsError) throw productsError
 
-        if (isMounted) {
-          setProducts(data || [])
-        }
-      } catch (error) {
-        // Ignore abort errors - they're expected in development mode with StrictMode
-        if ((error instanceof Error && error.name !== 'AbortError') || !(error instanceof Error)) {
-          if (isMounted) {
-            console.error('Error fetching products:', error)
-          }
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false)
-        }
-      }
-    }
-
-    const fetchCategories = async () => {
-      try {
-        const { data, error } = await supabase
+        const { data: categoriesData, error: categoriesError } = await supabase
           .from('categories')
           .select('*')
+          .eq('organization_id', orgId)
           .is('parent_id', null)
           .order('name')
 
-        if (error) throw error
-        if (isMounted) {
-          setCategories(data || [])
+        if (categoriesError) throw categoriesError
+
+        if (isMounted.current) {
+          setProducts(productsData || [])
+          setCategories(categoriesData || [])
         }
       } catch (error) {
-        // Ignore abort errors - they're expected in development mode with StrictMode
         if ((error instanceof Error && error.name !== 'AbortError') || !(error instanceof Error)) {
-          if (isMounted) {
-            console.error('Error fetching categories:', error)
-          }
+          console.error('Error fetching store data:', error)
         }
+      } finally {
+        if (isMounted.current) setLoading(false)
       }
     }
 
-    // Fetch both in parallel
-    Promise.all([fetchProducts(), fetchCategories()])
-
+    fetchData()
     return () => {
-      isMounted = false
+      isMounted.current = false
     }
-  }, [])
+  }, [currentOrg?.id, fetchOrgBySlug])
 
 
   if (loading) {

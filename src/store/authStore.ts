@@ -7,7 +7,10 @@ interface AuthState {
   user: User | null
   profile: UserProfile | null
   loading: boolean
+  /** Platform admin or org admin - puede gestionar miembros y organizaciones */
   isAdmin: boolean
+  /** Admin o manager en alguna org - puede acceder al panel admin */
+  canAccessAdminPanel: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, fullName?: string) => Promise<void>
   signOut: () => Promise<void>
@@ -21,6 +24,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   profile: null,
   loading: true,
   isAdmin: false,
+  canAccessAdminPanel: false,
 
   setLoading: (loading: boolean) => {
     set({ loading })
@@ -50,6 +54,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user: session?.user ?? null })
 
       if (session?.user) {
+        const { useOrganizationStore } = await import('./organizationStore')
+        await useOrganizationStore.getState().fetchOrganizations()
         await get().fetchProfile()
         // Sync local cart to database when user logs in
         const { useCartStore } = await import('./cartStore')
@@ -64,7 +70,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
         if (error.message === 'Auth initialization timeout') {
           console.warn('Auth initialization timed out, continuing without session')
-          set({ user: null, profile: null, isAdmin: false })
+          set({ user: null, profile: null, isAdmin: false, canAccessAdminPanel: false })
           return
         }
         console.error('Error initializing auth:', error)
@@ -91,9 +97,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (data) {
         const profile = data as UserProfile
+        const { useOrganizationStore } = await import('./organizationStore')
+        const orgs = useOrganizationStore.getState().organizations
+        const isAdminInOrg = orgs.some((o) => o.member?.role === 'admin')
+        const isManagerInOrg = orgs.some((o) => o.member?.role === 'manager')
         set({
           profile,
-          isAdmin: profile.role === 'admin',
+          isAdmin: profile.role === 'admin' || isAdminInOrg,
+          canAccessAdminPanel: profile.role === 'admin' || isAdminInOrg || isManagerInOrg,
         })
       }
     } catch (error) {
@@ -114,20 +125,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ user: data.user })
       
-      // Fetch profile and sync cart in parallel to speed up
-      // Use Promise.allSettled to ensure we don't block on failures
-      await Promise.allSettled([
-        get().fetchProfile(),
-        (async () => {
-          try {
-            const { useCartStore } = await import('./cartStore')
-            await useCartStore.getState().syncLocalCart()
-          } catch (err) {
-            console.error('Error syncing cart:', err)
-            // Don't throw - cart sync failure shouldn't block login
-          }
-        })(),
-      ])
+      const { useOrganizationStore } = await import('./organizationStore')
+      await useOrganizationStore.getState().fetchOrganizations()
+      await get().fetchProfile()
+      try {
+        const { useCartStore } = await import('./cartStore')
+        await useCartStore.getState().syncLocalCart()
+      } catch (err) {
+        console.error('Error syncing cart:', err)
+      }
     } catch (error) {
       console.error('Error signing in:', error)
       throw error
@@ -173,7 +179,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { error } = await supabase.auth.signOut()
       if (error) throw error
 
-      set({ user: null, profile: null, isAdmin: false })
+      set({ user: null, profile: null, isAdmin: false, canAccessAdminPanel: false })
+      const { useOrganizationStore } = await import('./organizationStore')
+      useOrganizationStore.getState().clear()
     } catch (error) {
       console.error('Error signing out:', error)
       throw error
@@ -223,7 +231,7 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
           console.error('Error in auth state change operations:', err)
         })
       } else {
-        useAuthStore.setState({ profile: null, isAdmin: false })
+        useAuthStore.setState({ profile: null, isAdmin: false, canAccessAdminPanel: false })
       }
     }
   } catch (error) {

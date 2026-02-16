@@ -154,7 +154,7 @@ export function AdminOrderDetail() {
     return (
       <div className="text-center py-12">
         <p className="text-gray-600 text-lg mb-4">Orden no encontrada</p>
-        <Link to="/admin/orders">
+        <Link to="/orders">
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a Órdenes
@@ -178,7 +178,7 @@ export function AdminOrderDetail() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <Link to="/admin/orders">
+          <Link to="/orders">
             <Button variant="outline" className="mb-4">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Volver a Órdenes

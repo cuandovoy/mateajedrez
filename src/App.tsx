@@ -1,13 +1,5 @@
 import { AdminLayout } from '@/components/layout/AdminLayout'
-import { ShopLayout } from '@/components/layout/ShopLayout'
-import { Cart } from '@/pages/Cart'
-import { CategoryProducts } from '@/pages/CategoryProducts'
-import { Checkout } from '@/pages/Checkout'
-import { Home } from '@/pages/Home'
 import { Login } from '@/pages/Login'
-import { OrderConfirmation } from '@/pages/OrderConfirmation'
-import { ProductDetail } from '@/pages/ProductDetail'
-import { Products } from '@/pages/Products'
 import { AdminAuditLogs } from '@/pages/admin/AdminAuditLogs'
 import { AdminBranches } from '@/pages/admin/AdminBranches'
 import { AdminCashRegister } from '@/pages/admin/AdminCashRegister'
@@ -22,6 +14,7 @@ import { AdminRolesPermissions } from '@/pages/admin/AdminRolesPermissions'
 import { AdminSales } from '@/pages/admin/AdminSales'
 import { AdminSuppliers } from '@/pages/admin/AdminSuppliers'
 import { AdminTransfers } from '@/pages/admin/AdminTransfers'
+import { AdminOrganizations } from '@/pages/admin/AdminOrganizations'
 import { AdminUsers } from '@/pages/admin/AdminUsers'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
@@ -45,39 +38,27 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rutas de la tienda (ShopLayout) */}
-        <Route element={<ShopLayout />}>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          {/* <Route path="/register" element={<Register />} /> */}
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/products/:id" element={<ProductDetail />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/orders/:id" element={<OrderConfirmation />} />
-          <Route path="/:categorySlug" element={<CategoryProducts />} />
-        </Route>
+        {/* Login (sin auth) */}
+        <Route path="/login" element={<Login />} />
 
-        {/* Rutas de administración (AdminLayout) */}
+        {/* Panel Admin en ruta raíz */}
         <Route element={<AdminLayout />}>
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/products" element={<AdminProducts />} />
-          <Route path="/admin/categories" element={<AdminCategories />} />
-          <Route path="/admin/suppliers" element={<AdminSuppliers />} />
-          <Route path="/admin/orders" element={<AdminOrders />} />
-          <Route path="/admin/orders/:id" element={<AdminOrderDetail />} />
-          <Route path="/admin/customers" element={<AdminCustomers />} />
-          <Route path="/admin/reports/sales" element={<AdminSales />} />
-          <Route path="/admin/reports/audit-logs" element={<AdminAuditLogs />} />
-          <Route path="/admin/branches" element={<AdminBranches />} />
-          <Route path="/admin/inventory" element={<AdminInventory />} />
-          <Route path="/admin/transfers" element={<AdminTransfers />} />
-          <Route path="/admin/cash-register" element={<AdminCashRegister />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-          <Route
-            path="/admin/roles-permissions"
-            element={<AdminRolesPermissions />}
-          />
+          <Route path="/" element={<AdminDashboard />} />
+          <Route path="/products" element={<AdminProducts />} />
+          <Route path="/categories" element={<AdminCategories />} />
+          <Route path="/suppliers" element={<AdminSuppliers />} />
+          <Route path="/orders" element={<AdminOrders />} />
+          <Route path="/orders/:id" element={<AdminOrderDetail />} />
+          <Route path="/customers" element={<AdminCustomers />} />
+          <Route path="/reports/sales" element={<AdminSales />} />
+          <Route path="/reports/audit-logs" element={<AdminAuditLogs />} />
+          <Route path="/branches" element={<AdminBranches />} />
+          <Route path="/inventory" element={<AdminInventory />} />
+          <Route path="/transfers" element={<AdminTransfers />} />
+          <Route path="/cash-register" element={<AdminCashRegister />} />
+          <Route path="/organizations" element={<AdminOrganizations />} />
+          <Route path="/users" element={<AdminUsers />} />
+          <Route path="/roles-permissions" element={<AdminRolesPermissions />} />
         </Route>
 
         {/* Ruta por defecto */}

@@ -1,6 +1,7 @@
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
+import { EmptyState } from '@/components/ui/EmptyState'
 import type { Category } from '@/types'
-import { Edit, Image as ImageIcon, Trash2 } from 'lucide-react'
+import { Edit, Image as ImageIcon, Trash2, Folder } from 'lucide-react'
 
 interface CategoryTableProps {
   categories: Category[]
@@ -28,9 +29,11 @@ export function CategoryTable({
 
   if (categories.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        No se encontraron categorías
-      </div>
+      <EmptyState
+        icon={Folder}
+        title="No se encontraron categorías"
+        description="Crea tu primera categoría para organizar los productos."
+      />
     )
   }
 

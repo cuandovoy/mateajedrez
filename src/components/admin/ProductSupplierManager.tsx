@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
 import type { ProductSupplier, ProductSupplierInsert, Supplier } from '@/types'
-import { Plus, Star, Trash2, X } from 'lucide-react'
+import { Package, Plus, Star, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 interface ProductSupplierManagerProps {
   productId: string
@@ -23,6 +24,7 @@ interface SupplierItem {
 }
 
 export function ProductSupplierManager({ productId, onClose }: ProductSupplierManagerProps) {
+  const navigate = useNavigate()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [productSuppliers, setProductSuppliers] = useState<SupplierItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,6 +37,10 @@ export function ProductSupplierManager({ productId, onClose }: ProductSupplierMa
     min_order_quantity: '1',
     notes: '',
   })
+
+  const availableSuppliers = suppliers.filter(
+    (s) => !productSuppliers.some((ps) => ps.supplier_id === s.id),
+  )
 
   useEffect(() => {
     fetchData()
@@ -203,8 +209,33 @@ export function ProductSupplierManager({ productId, onClose }: ProductSupplierMa
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Empty state: no suppliers in the system */}
+          {suppliers.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <div className="rounded-full bg-gray-100 p-4 mb-4">
+                <Package className="h-12 w-12 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                No hay proveedores cargados
+              </h3>
+              <p className="text-gray-600 mb-6 max-w-sm">
+                Para asociar proveedores a este producto, primero debes crear proveedores en el
+                sistema. Los proveedores se gestionan en la sección de administración.
+              </p>
+              <Button
+                type="button"
+                onClick={() => {
+                  onClose()
+                  navigate('/suppliers')
+                }}
+              >
+                Ir a Proveedores
+              </Button>
+            </div>
+          )}
+
           {/* Existing Suppliers */}
-          {productSuppliers.length > 0 && (
+          {productSuppliers.length > 0 && suppliers.length > 0 && (
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">
                 Proveedores Asociados
@@ -281,101 +312,131 @@ export function ProductSupplierManager({ productId, onClose }: ProductSupplierMa
             </div>
           )}
 
-          {/* Add New Supplier */}
-          <div className="space-y-3 border-t pt-4">
-            <label className="block text-sm font-medium text-gray-700">
-              Agregar Proveedor
-            </label>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Proveedor *
-                </label>
-                <select
-                  value={newSupplier.supplier_id}
-                  onChange={(e) =>
-                    setNewSupplier({ ...newSupplier, supplier_id: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                >
-                  <option value="">Seleccionar proveedor</option>
-                  {suppliers
-                    .filter((s) => !productSuppliers.some((ps) => ps.supplier_id === s.id))
-                    .map((supplier) => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input
-                  type="text"
-                  label="SKU del Proveedor"
-                  placeholder="SKU del proveedor"
-                  value={newSupplier.supplier_sku}
-                  onChange={(e) =>
-                    setNewSupplier({ ...newSupplier, supplier_sku: e.target.value })
-                  }
-                />
-                <Input
-                  type="number"
-                  step="0.01"
-                  label="Precio del Proveedor"
-                  placeholder="0.00"
-                  value={newSupplier.supplier_price}
-                  onChange={(e) =>
-                    setNewSupplier({ ...newSupplier, supplier_price: e.target.value })
-                  }
-                />
-                <Input
-                  type="number"
-                  label="Tiempo de Entrega (días)"
-                  placeholder="Ej: 7"
-                  value={newSupplier.lead_time_days}
-                  onChange={(e) =>
-                    setNewSupplier({ ...newSupplier, lead_time_days: e.target.value })
-                  }
-                />
-                <Input
-                  type="number"
-                  label="Cantidad Mínima de Pedido"
-                  placeholder="1"
-                  value={newSupplier.min_order_quantity}
-                  onChange={(e) =>
-                    setNewSupplier({ ...newSupplier, min_order_quantity: e.target.value })
-                  }
-                />
-              </div>
-              <div>
-                <Input
-                  type="text"
-                  label="Notas (opcional)"
-                  placeholder="Información adicional sobre este proveedor"
-                  value={newSupplier.notes}
-                  onChange={(e) => setNewSupplier({ ...newSupplier, notes: e.target.value })}
-                />
-              </div>
-              <Button
-                type="button"
-                onClick={handleAddSupplier}
-                variant="outline"
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Agregar Proveedor
-              </Button>
+          {/* Add New Supplier - only when there are suppliers in the system */}
+          {suppliers.length > 0 && (
+            <div className="space-y-3 border-t pt-4">
+              {productSuppliers.length === 0 && (
+                <p className="text-sm text-gray-600">
+                  Este producto aún no tiene proveedores asociados. Selecciona uno y completa los
+                  datos para agregarlo.
+                </p>
+              )}
+              {availableSuppliers.length === 0 && productSuppliers.length > 0 && (
+                <p className="text-sm text-amber-700 bg-amber-50 px-3 py-2 rounded-lg">
+                  Todos los proveedores ya están asociados a este producto.
+                </p>
+              )}
+              {availableSuppliers.length > 0 && (
+                <>
+                  <label className="block text-sm font-medium text-gray-700">
+                    Agregar Proveedor
+                  </label>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Proveedor *
+                      </label>
+                      <select
+                        value={newSupplier.supplier_id}
+                        onChange={(e) =>
+                          setNewSupplier({ ...newSupplier, supplier_id: e.target.value })
+                        }
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      >
+                        <option value="">Seleccionar proveedor</option>
+                        {availableSuppliers.map((supplier) => (
+                          <option key={supplier.id} value={supplier.id}>
+                            {supplier.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <Input
+                        type="text"
+                        label="SKU del Proveedor"
+                        placeholder="SKU del proveedor"
+                        value={newSupplier.supplier_sku}
+                        onChange={(e) =>
+                          setNewSupplier({ ...newSupplier, supplier_sku: e.target.value })
+                        }
+                      />
+                      <Input
+                        type="number"
+                        step="0.01"
+                        label="Precio del Proveedor"
+                        placeholder="0.00"
+                        value={newSupplier.supplier_price}
+                        onChange={(e) =>
+                          setNewSupplier({ ...newSupplier, supplier_price: e.target.value })
+                        }
+                      />
+                      <Input
+                        type="number"
+                        label="Tiempo de Entrega (días)"
+                        placeholder="Ej: 7"
+                        value={newSupplier.lead_time_days}
+                        onChange={(e) =>
+                          setNewSupplier({ ...newSupplier, lead_time_days: e.target.value })
+                        }
+                      />
+                      <Input
+                        type="number"
+                        label="Cantidad Mínima de Pedido"
+                        placeholder="1"
+                        value={newSupplier.min_order_quantity}
+                        onChange={(e) =>
+                          setNewSupplier({ ...newSupplier, min_order_quantity: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Input
+                        type="text"
+                        label="Notas (opcional)"
+                        placeholder="Información adicional sobre este proveedor"
+                        value={newSupplier.notes}
+                        onChange={(e) =>
+                          setNewSupplier({ ...newSupplier, notes: e.target.value })
+                        }
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleAddSupplier}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Proveedor
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
-          </div>
+          )}
 
           {/* Actions */}
           <div className="flex space-x-4 pt-4 border-t">
-            <Button type="button" onClick={handleSave} className="flex-1" isLoading={saving}>
-              Guardar
-            </Button>
-            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
-              Cancelar
-            </Button>
+            {suppliers.length > 0 ? (
+              <>
+                <Button
+                  type="button"
+                  onClick={handleSave}
+                  className="flex-1"
+                  isLoading={saving}
+                >
+                  Guardar
+                </Button>
+                <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+                  Cancelar
+                </Button>
+              </>
+            ) : (
+              <Button type="button" onClick={onClose} className="w-full">
+                Cerrar
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

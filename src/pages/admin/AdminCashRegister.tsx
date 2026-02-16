@@ -27,6 +27,7 @@ import {
   Receipt,
   ShoppingCart,
 } from 'lucide-react'
+import { useOrganization } from '@/hooks/useOrganization'
 import { formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import type { CashSession, CashSessionInsert, CashSessionUpdate, Branch } from '@/types'
@@ -49,6 +50,7 @@ const closeSessionSchema = z.object({
 type CloseSessionForm = z.infer<typeof closeSessionSchema>
 
 function AdminCashRegisterContent() {
+  const { organizationId } = useOrganization()
   const { user } = useAuthStore()
   const [sessions, setSessions] = useState<CashSession[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
@@ -83,15 +85,19 @@ function AdminCashRegisterContent() {
   })
 
   useEffect(() => {
-    fetchBranches()
-    fetchSessions()
-  }, [])
+    if (organizationId) {
+      fetchBranches()
+      fetchSessions()
+    }
+  }, [organizationId])
 
   const fetchBranches = async () => {
+    if (!organizationId) return
     try {
       const { data, error } = await supabase
         .from('branches')
         .select('id, name, code')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name')
 

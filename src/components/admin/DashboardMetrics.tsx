@@ -199,7 +199,7 @@ export function DashboardMetrics() {
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
       description: 'Requieren atención',
-      onClick: () => navigate('/admin/orders?status=pending'),
+      onClick: () => navigate('/orders?status=pending'),
       clickable: true,
     },
     {

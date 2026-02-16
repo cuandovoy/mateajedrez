@@ -9,9 +9,80 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      organizations: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          logo_url: string | null
+          primary_color: string | null
+          settings: Json
+          subscription_tier: string
+          subscription_status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          logo_url?: string | null
+          primary_color?: string | null
+          settings?: Json
+          subscription_tier?: string
+          subscription_status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          slug?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          settings?: Json
+          subscription_tier?: string
+          subscription_status?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      organization_members: {
+        Row: {
+          id: string
+          organization_id: string
+          user_id: string
+          role: string
+          invited_by: string | null
+          joined_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          user_id: string
+          role?: string
+          invited_by?: string | null
+          joined_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          user_id?: string
+          role?: string
+          invited_by?: string | null
+          joined_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
       categories: {
         Row: {
           id: string
+          organization_id: string
           name: string
           description: string | null
           slug: string
@@ -22,6 +93,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          organization_id: string
           name: string
           description?: string | null
           slug: string
@@ -32,6 +104,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          organization_id?: string
           name?: string
           description?: string | null
           slug?: string
@@ -44,6 +117,7 @@ export interface Database {
       products: {
         Row: {
           id: string
+          organization_id: string
           name: string
           description: string | null
           price: number
@@ -61,6 +135,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          organization_id: string
           name: string
           description?: string | null
           price: number
@@ -78,6 +153,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          organization_id?: string
           name?: string
           description?: string | null
           price?: number
@@ -211,6 +287,7 @@ export interface Database {
       suppliers: {
         Row: {
           id: string
+          organization_id: string
           name: string
           contact_name: string | null
           email: string | null
@@ -228,6 +305,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          organization_id: string
           name: string
           contact_name?: string | null
           email?: string | null
@@ -245,6 +323,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          organization_id?: string
           name?: string
           contact_name?: string | null
           email?: string | null
@@ -305,6 +384,7 @@ export interface Database {
       cart_items: {
         Row: {
           id: string
+          organization_id: string
           user_id: string
           product_id: string
           variant_id: string | null
@@ -314,6 +394,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          organization_id: string
           user_id: string
           product_id: string
           variant_id?: string | null
@@ -323,6 +404,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          organization_id?: string
           user_id?: string
           product_id?: string
           variant_id?: string | null
@@ -334,6 +416,7 @@ export interface Database {
       orders: {
         Row: {
           id: string
+          organization_id: string
           user_id: string | null
           customer_id: string | null
           total: number
@@ -346,6 +429,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          organization_id: string
           user_id?: string | null
           customer_id?: string | null
           total: number
@@ -358,6 +442,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          organization_id?: string
           user_id?: string | null
           customer_id?: string | null
           total?: number
@@ -402,7 +487,7 @@ export interface Database {
         Row: {
           id: string
           user_id: string | null
-          role: 'user' | 'admin'
+          role: 'user' | 'admin' | 'manager' | 'viewer'
           full_name: string | null
           phone: string | null
           address: Json | null
@@ -412,7 +497,7 @@ export interface Database {
         Insert: {
           id?: string
           user_id?: string | null
-          role?: 'user' | 'admin'
+          role?: 'user' | 'admin' | 'manager' | 'viewer'
           full_name?: string | null
           phone?: string | null
           address?: Json | null
@@ -422,7 +507,7 @@ export interface Database {
         Update: {
           id?: string
           user_id?: string | null
-          role?: 'user' | 'admin'
+          role?: 'user' | 'admin' | 'manager' | 'viewer'
           full_name?: string | null
           phone?: string | null
           address?: Json | null
@@ -568,6 +653,7 @@ export interface Database {
       branches: {
         Row: {
           id: string
+          organization_id: string
           name: string
           code: string | null
           address: string | null
@@ -583,6 +669,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          organization_id: string
           name: string
           code?: string | null
           address?: string | null
@@ -598,6 +685,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          organization_id?: string
           name?: string
           code?: string | null
           address?: string | null
@@ -726,6 +814,7 @@ export interface Database {
       audit_logs: {
         Row: {
           id: string
+          organization_id: string | null
           table_name: string
           record_id: string | null
           action: string
@@ -740,6 +829,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          organization_id?: string | null
           table_name: string
           record_id?: string | null
           action: string
@@ -754,6 +844,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          organization_id?: string | null
           table_name?: string
           record_id?: string | null
           action?: string
@@ -858,6 +949,7 @@ export interface Database {
       customers: {
         Row: {
           id: string
+          organization_id: string
           user_id: string | null
           email: string | null
           full_name: string
@@ -870,6 +962,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          organization_id: string
           user_id?: string | null
           email?: string | null
           full_name: string
@@ -882,6 +975,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          organization_id?: string
           user_id?: string | null
           email?: string | null
           full_name?: string
@@ -910,6 +1004,8 @@ export interface Database {
 }
 
 // Type helpers
+export type Organization = Database['public']['Tables']['organizations']['Row']
+export type OrganizationMember = Database['public']['Tables']['organization_members']['Row']
 export type Category = Database['public']['Tables']['categories']['Row']
 export type Product = Database['public']['Tables']['products']['Row']
 export type ProductVariant = Database['public']['Tables']['product_variants']['Row']
@@ -930,6 +1026,8 @@ export type InventoryMovement = Database['public']['Tables']['inventory_movement
 export type InventoryTransfer = Database['public']['Tables']['inventory_transfers']['Row']
 export type Customer = Database['public']['Tables']['customers']['Row']
 
+export type OrganizationInsert = Database['public']['Tables']['organizations']['Insert']
+export type OrganizationMemberInsert = Database['public']['Tables']['organization_members']['Insert']
 export type CategoryInsert = Database['public']['Tables']['categories']['Insert']
 export type ProductInsert = Database['public']['Tables']['products']['Insert']
 export type ProductVariantInsert = Database['public']['Tables']['product_variants']['Insert']

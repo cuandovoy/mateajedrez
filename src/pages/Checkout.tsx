@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
+import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch, CartItemWithProduct } from '@/types'
 import { BranchInventory, Customer } from '@/types/database.types'
@@ -28,6 +29,9 @@ export function Checkout() {
   const navigate = useNavigate()
   const { items, getTotal, clearCart } = useCartStore()
   const { user } = useAuthStore()
+  const orgFromStore = useOrganizationStore((s) => s.currentOrganization?.id)
+  const orgFromCart = items[0] && 'product' in items[0] ? (items[0] as CartItemWithProduct).product?.organization_id : null
+  const organizationId = orgFromStore ?? orgFromCart
   const { show } = useToastStore()
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transfer')
@@ -43,27 +47,29 @@ export function Checkout() {
   })
   const [errors, setErrors] = useState<Partial<ShippingForm>>({})
 
-  // Fetch main branch on mount
+  // Fetch main branch on mount (filter by org when available)
   useEffect(() => {
     const fetchMainBranch = async () => {
+      if (!organizationId) return
       try {
-        const { data, error }: { data: Branch | null, error: Error | null } = await supabase
+        const { data: mainData, error }: { data: Branch | null, error: Error | null } = await supabase
           .from('branches')
           .select('id')
+          .eq('organization_id', organizationId)
           .eq('code', 'MAIN')
           .eq('is_active', true)
           .single()
 
-        if (error) throw error
-        if (data) {
-          setMainBranchId(data.id)
+        if (!error && mainData) {
+          setMainBranchId(mainData.id)
+          return
         }
-      } catch (error) {
-        console.error('Error fetching main branch:', error)
-        // Fallback: try to get first active branch
-        const { data }: { data: Branch | null, error: Error | null } = await supabase
+
+        // Fallback: first active branch of org
+        const { data }: { data: Branch | null } = await supabase
           .from('branches')
           .select('id')
+          .eq('organization_id', organizationId)
           .eq('is_active', true)
           .limit(1)
           .single()
@@ -71,11 +77,13 @@ export function Checkout() {
         if (data) {
           setMainBranchId(data.id)
         }
+      } catch (error) {
+        console.error('Error fetching main branch:', error)
       }
     }
 
     fetchMainBranch()
-  }, [])
+  }, [organizationId])
 
   const validateForm = (): boolean => {
     const newErrors: Partial<ShippingForm> = {}
@@ -230,9 +238,16 @@ export function Checkout() {
         country: formData.country,
       }
 
+      if (!organizationId) {
+        show('No se pudo determinar la organización. Por favor, inicia sesión o recarga la página.', 'error')
+        setLoading(false)
+        return
+      }
+
       // Create order - user_id can be null for guest orders
       // branch_id is required for multi-branch support
       const orderData = {
+        organization_id: organizationId,
         user_id: user?.id || null,
         customer_id: null, // Will be set after creating customer
         total,
@@ -242,13 +257,14 @@ export function Checkout() {
         branch_id: mainBranchId, // Assign to main branch
       } as any
 
-      // Create or get customer
+      // Create or get customer (scoped by org)
       let customer: Customer | null = null
       
-      // Check if customer exists by phone
+      // Check if customer exists by phone within this org
       const { data: existingCustomer }: { data: Customer | null, error: Error | null } = await supabase
         .from('customers')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('phone', formData.phone)
         .maybeSingle()
 
@@ -277,6 +293,7 @@ export function Checkout() {
         const { data: newCustomer, error: customerError } = await supabase
           .from('customers')
           .insert({
+            organization_id: organizationId,
             user_id: user?.id || null,
             email: user?.email || null,
             full_name: formData.fullName,

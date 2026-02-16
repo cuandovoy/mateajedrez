@@ -30,4 +30,19 @@
   .container-custom {
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
+
+  /* Spacing consistente: usar p-4, p-6, gap-4, gap-6 */
+  .spacing-section {
+    @apply p-4 md:p-6;
+  }
+}
+
+/* 7.1 Focus visible para accesibilidad */
+@layer utilities {
+  .focus-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500;
+  }
+  .focus-ring-admin {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-admin-500;
+  }
 }

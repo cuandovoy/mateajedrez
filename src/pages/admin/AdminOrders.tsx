@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { useOrganization } from '@/hooks/useOrganization'
 import { formatPrice } from '@/lib/utils'
 import { Search, Calendar, Filter, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
 import type { Order } from '@/types'
@@ -36,6 +37,7 @@ type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancell
 const ITEMS_PER_PAGE = 10
 
 export function AdminOrders() {
+  const { organizationId } = useOrganization()
   const [searchParams, setSearchParams] = useSearchParams()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -63,15 +65,17 @@ export function AdminOrders() {
   }, [statusFilter, setSearchParams])
 
   useEffect(() => {
-    fetchOrders()
-  }, [currentPage, startDate, endDate, statusFilter, searchTerm])
+    if (organizationId) fetchOrders()
+  }, [organizationId, currentPage, startDate, endDate, statusFilter, searchTerm])
 
   const fetchOrders = async () => {
+    if (!organizationId) return
     setLoading(true)
     try {
       let query = supabase
         .from('orders')
         .select('*', { count: 'exact' })
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
 
       // Apply date filters
@@ -311,7 +315,7 @@ export function AdminOrders() {
                             {formatPrice(order.total)}
                           </td>
                           <td className="py-3 px-4">
-                            <Link to={`/admin/orders/${order.id}`}>
+                            <Link to={`/orders/${order.id}`}>
                               <Button variant="outline" size="sm">
                                 <Eye className="h-4 w-4 mr-1" />
                                 Ver

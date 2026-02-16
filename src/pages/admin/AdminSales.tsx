@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { formatPrice } from '@/lib/utils'
 import type { Branch, Order, OrderItem, Product } from '@/types'
+import { useOrganization } from '@/hooks/useOrganization'
 import {
   ArrowUpRight, BarChart3, Building2, Calendar, DollarSign, Package, ShoppingCart,
   TrendingUp
@@ -42,6 +43,7 @@ interface DailySales {
 }
 
 export function AdminSales() {
+  const { organizationId } = useOrganization()
   const [loading, setLoading] = useState(true)
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState<string>('') // Empty = all branches
@@ -65,18 +67,20 @@ export function AdminSales() {
   const [salesByBranch, setSalesByBranch] = useState<Array<{ branch_id: string; branch_name: string; revenue: number; orders: number }>>([])
 
   useEffect(() => {
-    fetchBranches()
-  }, [])
+    if (organizationId) fetchBranches()
+  }, [organizationId])
 
   useEffect(() => {
-    fetchSalesData()
-  }, [selectedPeriod, selectedBranchId])
+    if (organizationId) fetchSalesData()
+  }, [organizationId, selectedPeriod, selectedBranchId])
 
   const fetchBranches = async () => {
+    if (!organizationId) return
     try {
       const { data, error } = await supabase
         .from('branches')
         .select('id, name, code')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name')
 
@@ -88,6 +92,7 @@ export function AdminSales() {
   }
 
   const fetchSalesData = async () => {
+    if (!organizationId) return
     try {
       setLoading(true)
 
@@ -101,10 +106,11 @@ export function AdminSales() {
       yearAgo.setFullYear(yearAgo.getFullYear() - 1)
 
       // Fetch all orders with statuses that count as sales
-      // Filter by branch if selected
+      // Filter by organization and branch if selected
       let ordersQuery = supabase
         .from('orders')
         .select('id, total, status, created_at, branch_id')
+        .eq('organization_id', organizationId)
         .in('status', ['delivered', 'shipped', 'processing', 'pending'])
 
       if (selectedBranchId) {

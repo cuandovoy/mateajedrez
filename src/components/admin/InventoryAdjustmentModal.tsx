@@ -36,7 +36,7 @@ export function InventoryAdjustmentModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const stock = parseInt(newStock)
+    const stock = parseInt(newStock, 10)
     if (isNaN(stock) || stock < 0) {
       show('El stock debe ser un número mayor o igual a 0', 'error')
       return
@@ -50,15 +50,29 @@ export function InventoryAdjustmentModal({
     setLoading(true)
 
     try {
-      // Type assertion needed because PostgREST types may not be updated after migration 028
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.rpc as any)('adjust_inventory', {
-        p_branch_inventory_id: inventoryItem.id,
-        p_new_stock: stock,
-        p_notes: notes || null,
-      })
+      const previousStock = inventoryItem.current_stock
+      const quantityChange = stock - previousStock
 
-      if (error) throw error
+      const { error: updateError } = await supabase
+        .from('branch_inventory')
+        // @ts-expect-error - Supabase types may need regeneration
+        .update({ stock })
+        .eq('id', inventoryItem.id)
+
+      if (updateError) throw updateError
+
+      await supabase
+        .from('inventory_movements')
+        // @ts-expect-error - Supabase types may need regeneration
+        .insert({
+          branch_inventory_id: inventoryItem.id,
+          movement_type: 'adjustment',
+          quantity: quantityChange,
+          previous_stock: previousStock,
+          new_stock: stock,
+          reference_type: 'manual',
+          notes: notes || null,
+        })
 
       show(
         `Ajuste realizado: ${difference > 0 ? '+' : ''}${difference} unidades (${inventoryItem.current_stock} → ${stock})`,

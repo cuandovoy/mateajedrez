@@ -2,6 +2,7 @@ import { InputHTMLAttributes, forwardRef } from 'react'
 import { cn } from '@/lib/utils'
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  /** Label visible para el input. Recomendado para accesibilidad. */
   label?: string
   error?: string
 }
@@ -23,9 +24,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           id={inputId}
+          aria-label={label || props['aria-label'] || (typeof props.placeholder === 'string' ? props.placeholder : undefined)}
           className={cn(
-            'w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors',
-            error && 'border-red-500 focus:ring-red-500',
+            'w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent transition-colors',
+            error && 'border-red-500 focus-visible:ring-red-500',
             className
           )}
           {...props}
