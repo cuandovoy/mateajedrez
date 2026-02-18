@@ -66,8 +66,12 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
     fetchPayments()
   }, [fetchPayments])
 
-  const totalCash = payments.reduce((sum, p) => sum + p.amount, 0)
-  const paymentCount = payments.length
+  const validPayments = payments.filter((p) => p.order?.status !== 'cancelled')
+  const cancelledPayments = payments.filter((p) => p.order?.status === 'cancelled')
+
+  const totalValidCash = validPayments.reduce((sum, p) => sum + p.amount, 0)
+  const totalCancelledCash = cancelledPayments.reduce((sum, p) => sum + p.amount, 0)
+  const paymentCount = validPayments.length
 
   if (loading) {
     return (
@@ -93,13 +97,14 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
         </CardHeader>
         <CardContent className="flex-1 overflow-y-auto px-6 py-6">
           {/* Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Total en Efectivo</p>
-                    <p className="text-2xl font-bold text-gray-900">{formatPrice(totalCash)}</p>
+                    <p className="text-sm text-gray-600 mb-1">Ventas Válidas</p>
+                    <p className="text-2xl font-bold text-gray-900">{formatPrice(totalValidCash)}</p>
+                    <p className="text-xs text-gray-500 mt-1">Lo que debería estar en caja</p>
                   </div>
                   <div className="bg-green-50 p-3 rounded-lg">
                     <DollarSign className="h-6 w-6 text-green-600" />
@@ -111,7 +116,27 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Número de Ventas</p>
+                    <p className="text-sm text-gray-600 mb-1">Devoluciones</p>
+                    <p className="text-2xl font-bold text-red-600">{formatPrice(totalCancelledCash)}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {cancelledPayments.length === 0
+                        ? 'Sin devoluciones'
+                        : cancelledPayments.length === 1
+                        ? '1 orden cancelada'
+                        : `${cancelledPayments.length} órdenes canceladas`}
+                    </p>
+                  </div>
+                  <div className="bg-red-50 p-3 rounded-lg">
+                    <Receipt className="h-6 w-6 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Ventas (cantidad)</p>
                     <p className="text-2xl font-bold text-gray-900">{paymentCount}</p>
                   </div>
                   <div className="bg-blue-50 p-3 rounded-lg">
@@ -126,7 +151,7 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Ticket Promedio</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {paymentCount > 0 ? formatPrice(totalCash / paymentCount) : formatPrice(0)}
+                      {paymentCount > 0 ? formatPrice(totalValidCash / paymentCount) : formatPrice(0)}
                     </p>
                   </div>
                   <div className="bg-purple-50 p-3 rounded-lg">
@@ -145,6 +170,9 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
           ) : (
             <div className="space-y-3">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Lista de Ventas</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Las órdenes canceladas (devoluciones) no suman al monto esperado en caja.
+              </p>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -164,8 +192,13 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {payments.map((payment) => (
-                      <tr key={payment.id} className="hover:bg-gray-50">
+                    {[...validPayments, ...cancelledPayments].map((payment) => {
+                      const isCancelled = payment.order?.status === 'cancelled'
+                      return (
+                      <tr
+                        key={payment.id}
+                        className={isCancelled ? 'bg-red-50/50 hover:bg-red-50/70' : 'hover:bg-gray-50'}
+                      >
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex items-center text-sm text-gray-900">
                             <Calendar className="h-4 w-4 mr-2 text-gray-400" />
@@ -230,12 +263,15 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                           )}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-right">
-                          <div className="text-sm font-semibold text-gray-900">
+                          <div className={`text-sm font-semibold ${isCancelled ? 'text-red-600 line-through' : 'text-gray-900'}`}>
                             {formatPrice(payment.amount)}
+                            {isCancelled && (
+                              <span className="ml-1 text-xs font-normal text-red-500">(devolución)</span>
+                            )}
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>

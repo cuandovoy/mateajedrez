@@ -1,25 +1,25 @@
 {
-  "name": "Flormaria Soria González - Accesorios y Joyería",
-  "short_name": "Flormaria",
-  "description": "Descubre nuestra exclusiva colección de accesorios y joyería artesanal. Envío gratis en pedidos mayores a $2000 UY.",
+  "name": "Axios - Panel de Administración",
+  "short_name": "Axios",
+  "description": "Panel de administración para gestión de e-commerce",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#ffffff",
+  "background_color": "#000000",
+  "theme_color": "#E53935",
   "orientation": "portrait-primary",
   "scope": "/",
-  "lang": "es-UY",
+  "lang": "es",
   "icons": [
     {
-      "src": "/logo.svg",
-      "type": "image/svg+xml",
-      "sizes": "any",
+      "src": "/logo3.png",
+      "type": "image/png",
+      "sizes": "192x192",
       "purpose": "any"
     },
     {
-      "src": "/logo.svg",
-      "type": "image/svg+xml",
-      "sizes": "any",
+      "src": "/logo3.png",
+      "type": "image/png",
+      "sizes": "512x512",
       "purpose": "maskable"
     }
   ]

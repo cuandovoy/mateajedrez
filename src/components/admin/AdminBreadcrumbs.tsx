@@ -45,8 +45,8 @@ export function AdminBreadcrumbs() {
   if (breadcrumbs.length === 0) return null
 
   return (
-    <nav aria-label="Breadcrumb" className="mb-4">
-      <ol className="flex items-center gap-1 text-sm text-gray-600 flex-wrap">
+    <nav aria-label="Breadcrumb" className="mb-3">
+      <ol className="flex items-center gap-1 text-xs text-gray-500 flex-wrap">
         <li>
           <Link to="/" className="hover:text-admin-600 transition-colors">
             Admin
@@ -56,7 +56,7 @@ export function AdminBreadcrumbs() {
           <li key={crumb.path} className="flex items-center gap-1">
             <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />
             {i === breadcrumbs.length - 1 ? (
-              <span className="font-medium text-gray-900">{crumb.label}</span>
+              <span className="font-medium text-gray-700">{crumb.label}</span>
             ) : (
               <Link to={crumb.path} className="hover:text-admin-600 transition-colors">
                 {crumb.label}

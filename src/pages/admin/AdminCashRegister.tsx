@@ -121,24 +121,35 @@ function AdminCashRegisterContent() {
 
       const sessionsData = (data || []) as CashSession[]
 
-      // Calculate expected_amount for each session
-      // expected_amount = opening_amount + sum of cash payments linked to this session
+      // expected_amount = apertura + ventas efectivo (excluyendo órdenes canceladas/devoluciones)
       const sessionsWithExpected = await Promise.all(
         sessionsData.map(async (session) => {
           try {
-            // Get sum of cash payments for this session
             const { data: paymentsData } = await supabase
               .from('order_payments')
-              .select('amount')
+              .select('amount, order_id')
               .eq('cash_session_id', session.id)
               .eq('payment_method', 'cash')
 
-            const cashPaymentsTotal = (paymentsData || []).reduce(
-              (sum: number, p: { amount: number }) => sum + p.amount,
-              0
-            )
+            const payments = paymentsData || []
+            const orderIds = [...new Set(payments.map((p: { order_id: string }) => p.order_id))]
 
-            const expectedAmount = (session.opening_amount || 0) + cashPaymentsTotal
+            let validPaymentsTotal = 0
+            if (orderIds.length > 0) {
+              const { data: ordersData } = await supabase
+                .from('orders')
+                .select('id, status')
+                .in('id', orderIds)
+
+              const validOrderIds = new Set(
+                (ordersData || []).filter((o: { status: string }) => o.status !== 'cancelled').map((o: { id: string }) => o.id)
+              )
+              validPaymentsTotal = payments
+                .filter((p: { order_id: string }) => validOrderIds.has(p.order_id))
+                .reduce((sum: number, p: { amount: number }) => sum + p.amount, 0)
+            }
+
+            const expectedAmount = (session.opening_amount || 0) + validPaymentsTotal
 
             return {
               ...session,
@@ -387,7 +398,7 @@ function AdminCashRegisterContent() {
               </div>
             </div>
             <div className="mt-4">
-              <p className="text-xs text-gray-500">Total en caja abierta</p>
+              <p className="text-xs text-gray-500">Suma de aperturas de sesiones abiertas</p>
               <p className="text-lg font-semibold text-blue-600">{formatPrice(totals.openTotal)}</p>
             </div>
           </CardContent>
@@ -754,6 +765,9 @@ function AdminCashRegisterContent() {
                           </span>
                         </div>
                       )}
+                      <p className="text-xs text-gray-500 pt-1 border-t border-gray-200">
+                        Esperado = Apertura + ventas en efectivo (sin contar órdenes canceladas/devoluciones)
+                      </p>
                     </div>
                     <Input
                       label="Monto de Cierre (Efectivo Contado) *"

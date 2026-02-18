@@ -7,7 +7,6 @@ import { useAuthStore } from '@/store/authStore'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent } from '@/components/ui/Card'
-import { LayoutDashboard } from 'lucide-react'
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -73,12 +72,10 @@ export function Login() {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="px-4 md:px-8 py-4">
           <div className="flex items-center space-x-3">
-            <div className="p-2 bg-admin-600 rounded-lg">
-              <LayoutDashboard className="h-5 w-5 text-white" />
-            </div>
+            <img src="/logo3.png" alt="Axios" className="h-10 w-10 object-contain" />
             <div>
-              <span className="text-lg md:text-xl font-bold text-gray-900 block">Panel Admin</span>
-              <span className="text-xs text-gray-500 hidden sm:block">Gestión de E-commerce</span>
+              <span className="text-lg md:text-xl font-bold text-gray-900 block">Axios</span>
+              <span className="text-xs text-gray-500 hidden sm:block">Panel de administración</span>
             </div>
           </div>
         </div>

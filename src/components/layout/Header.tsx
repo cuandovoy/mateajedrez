@@ -218,7 +218,7 @@ export function Header() {
                       <Link to="/admin" onClick={() => setIsMobileMenuOpen(false)}>
                         <Button variant="ghost" className="w-full text-white hover:text-gray-700 justify-start" size="sm">
                           <LayoutDashboard className="h-5 w-5 mr-2" />
-                          Panel Admin
+                          Panel de control
                         </Button>
                       </Link>
                     )}
@@ -349,7 +349,7 @@ function UserMenu({ user, isAdmin, onSignOut }: UserMenuProps) {
                   className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 transition-colors flex items-center space-x-2"
                 >
                   <LayoutDashboard className="h-4 w-4" />
-                  <span>Panel Administrador</span>
+                  <span>Panel de control</span>
                 </button>
               </Link>
             )}

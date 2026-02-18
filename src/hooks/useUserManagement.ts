@@ -73,6 +73,12 @@ export function useUserManagement() {
       throw new Error('No se pudo crear el usuario en auth')
     }
 
+    // identities vacío = usuario ya existía (Supabase no crea uno nuevo)
+    const identities = (createdUser as { identities?: unknown[] }).identities ?? []
+    if (identities.length === 0) {
+      throw new Error('Ya existe un usuario con este email.')
+    }
+
     let profileAvailable = false
     for (let i = 0; i < 6; i++) {
       const { data, error } = await supabase
