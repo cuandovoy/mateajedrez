@@ -3,6 +3,7 @@ import { Plus, Edit, Trash2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { ProductVariant, Product } from '@/types'
@@ -15,6 +16,7 @@ interface VariantManagerProps {
 
 export function VariantManager({ product, onClose }: VariantManagerProps) {
   const { show } = useToastStore()
+  const settings = useOrgSettings()
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [loading, setLoading] = useState(true)
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -148,7 +150,7 @@ export function VariantManager({ product, onClose }: VariantManagerProps) {
                             {getAttributesDisplay(variant.attributes)}
                           </td>
                           <td className="py-3 px-4">
-                            {variant.price ? formatPrice(variant.price) : formatPrice(product.price)}
+                            {variant.price ? formatPrice(variant.price, settings) : formatPrice(product.price, settings)}
                           </td>
                           <td className="py-3 px-4">
                             <span className={variant.stock <= (variant.low_stock_threshold || 10) ? 'text-red-600 font-semibold' : 'text-gray-900'}>

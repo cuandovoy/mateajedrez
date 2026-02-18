@@ -162,6 +162,7 @@ export function AdminLayout() {
   if (!user || !canAccessAdminPanel) {
     return null
   }
+console.log(currentOrganization);
 
   return (
     <div className="min-h-screen bg-gray-50">

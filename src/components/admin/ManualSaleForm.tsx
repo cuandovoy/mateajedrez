@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { formatPrice } from '@/lib/utils'
@@ -39,7 +41,7 @@ interface SaleLine {
 const manualSaleSchema = z.object({
   customer_name: z.string().optional(),
   customer_phone: z.string().optional(),
-  payment_method: z.enum(['cash', 'transfer', 'mercadopago']),
+  payment_method: z.string().min(1, 'Selecciona un método de pago'),
   notes: z.string().optional(),
 })
 
@@ -47,7 +49,7 @@ type ManualSaleForm = z.infer<typeof manualSaleSchema>
 
 export function ManualSaleForm({
   branchId: initialBranchId,
-  openCashSession: initialOpenCashSession,
+  openCashSession: _initialOpenCashSession,
   openCashSessions,
   branches,
   onClose,
@@ -55,6 +57,9 @@ export function ManualSaleForm({
   onBranchChange,
 }: ManualSaleFormProps) {
   const { show } = useToastStore()
+  const settings = useOrgSettings()
+  const organizationId = useOrganizationStore((s) => s.currentOrganization?.id)
+  const { methods: paymentMethods } = useOrgPaymentMethods(organizationId)
   const [branchId, setBranchId] = useState(initialBranchId)
   const [products, setProducts] = useState<Product[]>([])
   const [searchTerm, setSearchTerm] = useState('')
@@ -76,6 +81,14 @@ export function ManualSaleForm({
     setBranchId(initialBranchId)
   }, [initialBranchId])
 
+  const defaultPaymentMethod = (() => {
+    const cashMethod = paymentMethods.find((m) => m.requires_cash_session && m.key === 'cash')
+    const firstNonCash = paymentMethods.find((m) => !m.requires_cash_session)
+    if (currentCashSession && cashMethod) return 'cash'
+    if (firstNonCash) return firstNonCash.key
+    return paymentMethods[0]?.key ?? ''
+  })()
+
   const {
     register,
     handleSubmit,
@@ -85,18 +98,22 @@ export function ManualSaleForm({
   } = useForm<ManualSaleForm>({
     resolver: zodResolver(manualSaleSchema),
     defaultValues: {
-      payment_method: initialOpenCashSession ? 'cash' : 'transfer',
+      payment_method: defaultPaymentMethod,
     },
   })
 
-  // Update payment method default when cash session changes
+  // Update payment method default when cash session or payment methods change
   useEffect(() => {
-    if (currentCashSession) {
+    const cashMethod = paymentMethods.find((m) => m.requires_cash_session && m.key === 'cash')
+    const firstNonCash = paymentMethods.find((m) => !m.requires_cash_session)
+    if (currentCashSession && cashMethod) {
       setValue('payment_method', 'cash')
+    } else if (firstNonCash) {
+      setValue('payment_method', firstNonCash.key)
+    } else if (paymentMethods[0]) {
+      setValue('payment_method', paymentMethods[0].key)
     }
-  }, [currentCashSession, setValue])
-
-  const organizationId = useOrganizationStore((s) => s.currentOrganization?.id)
+  }, [currentCashSession, paymentMethods, setValue])
 
   useEffect(() => {
     if (organizationId) fetchProducts()
@@ -343,7 +360,8 @@ export function ManualSaleForm({
       return
     }
 
-    if (data.payment_method === 'cash' && !currentCashSession) {
+    const selectedMethod = paymentMethods.find((m) => m.key === data.payment_method)
+    if (selectedMethod?.requires_cash_session && !currentCashSession) {
       show('No hay una sesión de caja abierta para esta sucursal', 'error')
       return
     }
@@ -371,6 +389,11 @@ export function ManualSaleForm({
         const msg = insufficientLines
           .map((l) => `"${l.name}": disponible ${l.available}, solicitado ${l.requested}`)
           .join('. ')
+        if (!settings.allow_negative_stock) {
+          show(`Stock insuficiente: ${msg}. No se permite vender con stock negativo.`, 'error')
+          setLoading(false)
+          return
+        }
         const proceed = window.confirm(
           `Stock insuficiente:\n${msg}\n\n¿Registrar la venta igual? (El inventario quedará en negativo)`
         )
@@ -438,7 +461,8 @@ export function ManualSaleForm({
       }
 
       // Create order_payment
-      const cashSessionId = data.payment_method === 'cash' && currentCashSession ? currentCashSession.id : null
+      const methodRequiresCash = paymentMethods.find((m) => m.key === data.payment_method)?.requires_cash_session
+      const cashSessionId = methodRequiresCash && currentCashSession ? currentCashSession.id : null
 
       const paymentData: OrderPaymentInsert = {
         order_id: (order as { id: string }).id,
@@ -453,18 +477,26 @@ export function ManualSaleForm({
       if (paymentError) {
         console.error('Error creating order payment:', paymentError)
       } else if (cashSessionId) {
-        // Update expected_amount for the cash session
+        // Update expected_amount for the cash session (sum all payments with requires_cash_session)
+        const cashMethodKeys = paymentMethods.filter((m) => m.requires_cash_session).map((m) => m.key)
         const { data: sessionData } = await supabase
           .from('cash_sessions')
           .select('opening_amount')
           .eq('id', cashSessionId)
           .single()
 
-        const { data: paymentsData } = await supabase
-          .from('order_payments')
-          .select('amount')
-          .eq('cash_session_id', cashSessionId)
-          .eq('payment_method', 'cash')
+        const { data: paymentsData } =
+          cashMethodKeys.length > 0
+            ? await supabase
+                .from('order_payments')
+                .select('amount')
+                .eq('cash_session_id', cashSessionId)
+                .in('payment_method', cashMethodKeys)
+            : await supabase
+                .from('order_payments')
+                .select('amount')
+                .eq('cash_session_id', cashSessionId)
+                .eq('payment_method', data.payment_method)
 
         if (sessionData && (sessionData as { opening_amount: number }).opening_amount !== undefined) {
           const cashPaymentsTotal = (paymentsData || []).reduce((sum: number, p: { amount: number }) => sum + p.amount, 0)
@@ -589,7 +621,7 @@ export function ManualSaleForm({
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="font-medium text-gray-900 text-sm">{product.name}</p>
-                            <p className="text-xs text-gray-600">{formatPrice(product.price)}</p>
+                            <p className="text-xs text-gray-600">{formatPrice(product.price, settings)}</p>
                           </div>
                           <Plus className="h-4 w-4 text-admin-600 flex-shrink-0" />
                         </div>
@@ -755,7 +787,7 @@ export function ManualSaleForm({
                                 </div>
                               ) : (
                                 <div className="flex items-center justify-end space-x-1">
-                                  <span className="font-medium text-xs sm:text-sm">{formatPrice(line.price)}</span>
+                                  <span className="font-medium text-xs sm:text-sm">{formatPrice(line.price, settings)}</span>
                                   <button
                                     type="button"
                                     onClick={() => handleStartEditPrice(line.id)}
@@ -769,7 +801,7 @@ export function ManualSaleForm({
                             </td>
                             <td className="px-2 sm:px-3 py-2 text-right">
                               <span className="font-semibold text-gray-900 text-xs sm:text-sm">
-                                {formatPrice(line.price * line.quantity)}
+                                {formatPrice(line.price * line.quantity, settings)}
                               </span>
                             </td>
                             <td className="px-2 sm:px-3 py-2 text-center">
@@ -802,7 +834,7 @@ export function ManualSaleForm({
             <div className="flex-shrink-0 border-t pt-3 space-y-3">
               <div className="flex items-center justify-between text-lg sm:text-xl font-bold text-gray-900">
                 <span>Total:</span>
-                <span className="text-xl sm:text-2xl text-admin-600">{formatPrice(total)}</span>
+                <span className="text-xl sm:text-2xl text-admin-600">{formatPrice(total, settings)}</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -814,11 +846,16 @@ export function ManualSaleForm({
                     {...register('payment_method')}
                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
                   >
-                    <option value="cash" disabled={!currentCashSession}>
-                      Efectivo {!currentCashSession && '(Requiere sesión de caja abierta)'}
-                    </option>
-                    <option value="transfer">Transferencia Bancaria</option>
-                    <option value="mercadopago">Mercado Pago</option>
+                    {paymentMethods.map((m) => (
+                      <option
+                        key={m.id}
+                        value={m.key}
+                        disabled={m.requires_cash_session && !currentCashSession}
+                      >
+                        {m.name}
+                        {m.requires_cash_session && !currentCashSession && ' (Requiere sesión de caja abierta)'}
+                      </option>
+                    ))}
                   </select>
                   {errors.payment_method && (
                     <p className="text-xs text-red-500 mt-1">{errors.payment_method.message}</p>

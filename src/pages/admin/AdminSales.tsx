@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
-import { formatPrice } from '@/lib/utils'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { formatPrice, formatDateShort } from '@/lib/utils'
 import type { Branch, Order, OrderItem, Product } from '@/types'
 import { useOrganization } from '@/hooks/useOrganization'
 import {
@@ -44,6 +45,7 @@ interface DailySales {
 
 export function AdminSales() {
   const { organizationId } = useOrganization()
+  const settings = useOrgSettings()
   const [loading, setLoading] = useState(true)
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState<string>('') // Empty = all branches
@@ -377,7 +379,7 @@ export function AdminSales() {
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500">Ingresos Totales</p>
-                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.totalRevenue)}</p>
+                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.totalRevenue, settings)}</p>
               </div>
             </div>
             <div className="flex items-center text-sm text-gray-600">
@@ -395,7 +397,7 @@ export function AdminSales() {
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500">Ticket Promedio</p>
-                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.averageOrderValue)}</p>
+                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.averageOrderValue, settings)}</p>
               </div>
             </div>
             <div className="flex items-center text-sm text-gray-600">
@@ -413,7 +415,7 @@ export function AdminSales() {
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500">Este Mes</p>
-                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.monthRevenue)}</p>
+                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.monthRevenue, settings)}</p>
               </div>
             </div>
             <div className="flex items-center text-sm text-gray-600">
@@ -431,7 +433,7 @@ export function AdminSales() {
               </div>
               <div className="text-right">
                 <p className="text-xs text-gray-500">Hoy</p>
-                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.todayRevenue)}</p>
+                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.todayRevenue, settings)}</p>
               </div>
             </div>
             <div className="flex items-center text-sm text-gray-600">
@@ -467,7 +469,7 @@ export function AdminSales() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-bold text-gray-900">{formatPrice(branchSale.revenue)}</p>
+                        <p className="text-lg font-bold text-gray-900">{formatPrice(branchSale.revenue, settings)}</p>
                         <p className="text-xs text-gray-500">{branchSale.orders} órdenes</p>
                       </div>
                     </div>
@@ -491,7 +493,7 @@ export function AdminSales() {
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Hoy</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.todayRevenue)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.todayRevenue, settings)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-500">{metrics.todayOrders} órdenes</p>
@@ -500,7 +502,7 @@ export function AdminSales() {
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Esta Semana</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.weekRevenue)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.weekRevenue, settings)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-500">{metrics.weekOrders} órdenes</p>
@@ -509,7 +511,7 @@ export function AdminSales() {
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Este Mes</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.monthRevenue)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.monthRevenue, settings)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-500">{metrics.monthOrders} órdenes</p>
@@ -518,7 +520,7 @@ export function AdminSales() {
               <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Este Año</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.yearRevenue)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.yearRevenue, settings)}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-500">{metrics.yearOrders} órdenes</p>
@@ -547,7 +549,7 @@ export function AdminSales() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium text-gray-900">{status.count} órdenes</p>
-                    <p className="text-xs text-gray-500">{formatPrice(status.revenue)}</p>
+                    <p className="text-xs text-gray-500">{formatPrice(status.revenue, settings)}</p>
                   </div>
                 </div>
               ))}
@@ -599,8 +601,7 @@ export function AdminSales() {
           <div className="h-64 flex items-end justify-between space-x-1">
             {dailySales.map((day, index) => {
               const height = maxRevenue > 0 ? (day.revenue / maxRevenue) * 100 : 0
-              const date = new Date(day.date)
-              const dayLabel = date.toLocaleDateString('es-UY', { day: 'numeric', month: 'short' })
+              const dayLabel = formatDateShort(day.date, settings)
               return (
                 <div
                   key={index}
@@ -610,7 +611,7 @@ export function AdminSales() {
                   <div
                     className="w-full bg-admin-600 rounded-t transition-all hover:bg-admin-700 cursor-pointer"
                     style={{ height: `${height}%`, minHeight: height > 0 ? '4px' : '0' }}
-                    title={`${dayLabel}: ${formatPrice(day.revenue)} - ${day.orders} órdenes`}
+                    title={`${dayLabel}: ${formatPrice(day.revenue, settings)} - ${day.orders} órdenes`}
                   />
                   {index % Math.ceil(dailySales.length / 7) === 0 && (
                     <span className="text-xs text-gray-500 mt-2 transform -rotate-45 origin-left whitespace-nowrap">
@@ -661,7 +662,7 @@ export function AdminSales() {
                         {product.total_quantity} unidades
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                        {formatPrice(product.total_revenue)}
+                        {formatPrice(product.total_revenue, settings)}
                       </td>
                     </tr>
                   ))}

@@ -17,6 +17,7 @@ import { Skeleton, SkeletonTable } from '@/components/ui/Skeleton'
 import { Input } from '@/components/ui/Input'
 import { deleteImage, uploadProductImage } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice } from '@/lib/utils'
 import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -71,6 +72,7 @@ interface ProductFilters {
 
 function AdminProductsContent() {
   const { organizationId } = useOrganization()
+  const settings = useOrgSettings()
   const [products, setProducts] = useState<ProductWithImages[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -877,7 +879,7 @@ function AdminProductsContent() {
                   </p>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xl font-bold text-admin-600">
-                      {formatPrice(product.price)}
+                      {formatPrice(product.price, settings)}
                     </span>
                     <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                       Stock: {product.stock}

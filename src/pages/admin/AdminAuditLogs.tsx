@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { formatDateTime } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import {
   ChevronLeft,
@@ -43,6 +45,7 @@ const TABLE_NAMES = [
 const ACTIONS = ['INSERT', 'UPDATE', 'DELETE'] as const
 
 export function AdminAuditLogs() {
+  const settings = useOrgSettings()
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
@@ -296,7 +299,7 @@ export function AdminAuditLogs() {
                     {logs.map((log) => (
                       <tr key={log.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm text-gray-900">
-                          {new Date(log.created_at).toLocaleString('es-UY')}
+                          {formatDateTime(log.created_at, settings)}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-900">
                           <span className="inline-flex items-center space-x-1">

@@ -50,7 +50,7 @@ export const useOrganizationStore = create<OrganizationState>()(
               id,
               role,
               organization_id,
-              organizations(id, name, slug, logo_url, primary_color, subscription_tier, subscription_status)
+              organizations(id, name, slug, logo_url, primary_color, settings, subscription_tier, subscription_status)
             `)
             .eq('user_id', user.id)
 
@@ -91,9 +91,21 @@ export const useOrganizationStore = create<OrganizationState>()(
         try {
           const { data, error } = await supabase.rpc('get_org_by_slug' as never, { p_slug: slug } as never)
           if (error || !data) return null
-          const row = (Array.isArray(data) ? data[0] : data) as { id: string; name: string; slug: string } | undefined
+          const row = (Array.isArray(data) ? data[0] : data) as {
+            id: string
+            name: string
+            slug: string
+            logo_url?: string | null
+            primary_color?: string | null
+            settings?: Record<string, unknown> | null
+          } | undefined
           if (!row?.id) return null
-          return { ...row, settings: {}, subscription_tier: 'free', subscription_status: 'active' } as Organization
+          return {
+            ...row,
+            settings: row.settings ?? {},
+            subscription_tier: 'free',
+            subscription_status: 'active',
+          } as Organization
         } catch {
           return null
         }

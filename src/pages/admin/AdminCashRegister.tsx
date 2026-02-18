@@ -28,7 +28,8 @@ import {
   ShoppingCart,
 } from 'lucide-react'
 import { useOrganization } from '@/hooks/useOrganization'
-import { formatPrice } from '@/lib/utils'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import type { CashSession, CashSessionInsert, CashSessionUpdate, Branch } from '@/types'
 
@@ -52,6 +53,7 @@ type CloseSessionForm = z.infer<typeof closeSessionSchema>
 function AdminCashRegisterContent() {
   const { organizationId } = useOrganization()
   const { user } = useAuthStore()
+  const settings = useOrgSettings()
   const [sessions, setSessions] = useState<CashSession[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
@@ -399,7 +401,7 @@ function AdminCashRegisterContent() {
             </div>
             <div className="mt-4">
               <p className="text-xs text-gray-500">Suma de aperturas de sesiones abiertas</p>
-              <p className="text-lg font-semibold text-blue-600">{formatPrice(totals.openTotal)}</p>
+              <p className="text-lg font-semibold text-blue-600">{formatPrice(totals.openTotal, settings)}</p>
             </div>
           </CardContent>
         </Card>
@@ -417,7 +419,7 @@ function AdminCashRegisterContent() {
             </div>
             <div className="mt-4">
               <p className="text-xs text-gray-500">Total cerrado</p>
-              <p className="text-lg font-semibold text-gray-700">{formatPrice(totals.closedTotal)}</p>
+              <p className="text-lg font-semibold text-gray-700">{formatPrice(totals.closedTotal, settings)}</p>
             </div>
           </CardContent>
         </Card>
@@ -437,7 +439,7 @@ function AdminCashRegisterContent() {
                   ) : (
                     <TrendingDown className="h-6 w-6 inline mr-1" />
                   )}
-                  {formatPrice(Math.abs(totals.differenceTotal))}
+                  {formatPrice(Math.abs(totals.differenceTotal), settings)}
                 </p>
               </div>
               <div
@@ -567,22 +569,22 @@ function AdminCashRegisterContent() {
                     <div className="space-y-2 text-sm">
                       <div className="flex items-center text-gray-600">
                         <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                        {new Date(session.opened_at).toLocaleDateString('es-UY')}
+                        {formatDateShort(session.opened_at, settings)}
                       </div>
                       <div className="flex items-center text-gray-600">
                         <DollarSign className="h-4 w-4 mr-2 text-gray-400" />
-                        Apertura: {formatPrice(session.opening_amount)}
+                        Apertura: {formatPrice(session.opening_amount, settings)}
                       </div>
                       {session.closed_at && (
                         <>
                           {session.expected_amount !== null && (
                             <div className="text-xs text-gray-500">
-                              Esperado: {formatPrice(session.expected_amount)}
+                              Esperado: {formatPrice(session.expected_amount, settings)}
                             </div>
                           )}
                           {session.closing_amount !== null && (
                             <div className="text-sm font-medium text-gray-700">
-                              Cierre: {formatPrice(session.closing_amount)}
+                              Cierre: {formatPrice(session.closing_amount, settings)}
                             </div>
                           )}
                           {difference !== 0 && (
@@ -592,7 +594,7 @@ function AdminCashRegisterContent() {
                               }`}
                             >
                               Diferencia: {difference > 0 ? '+' : ''}
-                              {formatPrice(difference)}
+                              {formatPrice(difference, settings)}
                             </div>
                           )}
                         </>
@@ -755,13 +757,13 @@ function AdminCashRegisterContent() {
                     <div className="p-4 bg-gray-50 rounded-lg space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-600">Monto de Apertura:</span>
-                        <span className="font-semibold">{formatPrice(editingSession.opening_amount)}</span>
+                        <span className="font-semibold">{formatPrice(editingSession.opening_amount, settings)}</span>
                       </div>
                       {editingSession.expected_amount !== null && (
                         <div className="flex justify-between text-sm">
                           <span className="text-gray-600">Monto Esperado:</span>
                           <span className="font-semibold text-blue-600">
-                            {formatPrice(editingSession.expected_amount)}
+                            {formatPrice(editingSession.expected_amount, settings)}
                           </span>
                         </div>
                       )}

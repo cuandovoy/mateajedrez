@@ -5,7 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
-import { formatPrice } from '@/lib/utils'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { formatDateShort, formatPrice } from '@/lib/utils'
 import { Search, Calendar, Filter, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
 import type { Order } from '@/types'
 import { cn } from '@/lib/utils'
@@ -38,6 +39,7 @@ const ITEMS_PER_PAGE = 10
 
 export function AdminOrders() {
   const { organizationId } = useOrganization()
+  const settings = useOrgSettings()
   const [searchParams, setSearchParams] = useSearchParams()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
@@ -295,11 +297,7 @@ export function AdminOrders() {
                             </div>
                           </td>
                           <td className="py-3 px-4 text-sm text-gray-600">
-                            {new Date(order.created_at).toLocaleDateString('es-ES', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            })}
+                            {formatDateShort(order.created_at, settings)}
                           </td>
                           <td className="py-3 px-4">
                             <span
@@ -312,7 +310,7 @@ export function AdminOrders() {
                             </span>
                           </td>
                           <td className="py-3 px-4 font-semibold text-gray-900">
-                            {formatPrice(order.total)}
+                            {formatPrice(order.total, settings)}
                           </td>
                           <td className="py-3 px-4">
                             <Link to={`/orders/${order.id}`}>

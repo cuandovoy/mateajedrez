@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { supabase } from '@/lib/supabase'
-import { formatPrice } from '@/lib/utils'
+import { formatDateShort, formatPrice, formatTime } from '@/lib/utils'
 import type { Order, OrderPayment } from '@/types'
 import { Calendar, DollarSign, Receipt, ShoppingCart, X } from 'lucide-react'
 import { useEffect, useState, useCallback } from 'react'
@@ -16,6 +17,7 @@ interface PaymentWithOrder extends OrderPayment {
 }
 
 export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsProps) {
+  const settings = useOrgSettings()
   const [payments, setPayments] = useState<PaymentWithOrder[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -103,7 +105,7 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Ventas Válidas</p>
-                    <p className="text-2xl font-bold text-gray-900">{formatPrice(totalValidCash)}</p>
+                    <p className="text-2xl font-bold text-gray-900">{formatPrice(totalValidCash, settings)}</p>
                     <p className="text-xs text-gray-500 mt-1">Lo que debería estar en caja</p>
                   </div>
                   <div className="bg-green-50 p-3 rounded-lg">
@@ -117,7 +119,7 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Devoluciones</p>
-                    <p className="text-2xl font-bold text-red-600">{formatPrice(totalCancelledCash)}</p>
+                    <p className="text-2xl font-bold text-red-600">{formatPrice(totalCancelledCash, settings)}</p>
                     <p className="text-xs text-gray-500 mt-1">
                       {cancelledPayments.length === 0
                         ? 'Sin devoluciones'
@@ -151,7 +153,7 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                   <div>
                     <p className="text-sm text-gray-600 mb-1">Ticket Promedio</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {paymentCount > 0 ? formatPrice(totalValidCash / paymentCount) : formatPrice(0)}
+                      {paymentCount > 0 ? formatPrice(totalValidCash / paymentCount, settings) : formatPrice(0, settings)}
                     </p>
                   </div>
                   <div className="bg-purple-50 p-3 rounded-lg">
@@ -203,19 +205,8 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                           <div className="flex items-center text-sm text-gray-900">
                             <Calendar className="h-4 w-4 mr-2 text-gray-400" />
                             <div>
-                              <div>
-                                {new Date(payment.created_at).toLocaleDateString('es-UY', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                })}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {new Date(payment.created_at).toLocaleTimeString('es-UY', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </div>
+                              <div>{formatDateShort(payment.created_at, settings)}</div>
+                              <div className="text-xs text-gray-500">{formatTime(payment.created_at, settings)}</div>
                             </div>
                           </div>
                         </td>
@@ -227,7 +218,7 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                                   Orden #{payment.order.id.slice(0, 8)}
                                 </div>
                                 <div className="text-xs text-gray-500">
-                                  Total: {formatPrice(payment.order.total)}
+                                  Total: {formatPrice(payment.order.total, settings)}
                                 </div>
                               </div>
                             ) : (
@@ -264,7 +255,7 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-right">
                           <div className={`text-sm font-semibold ${isCancelled ? 'text-red-600 line-through' : 'text-gray-900'}`}>
-                            {formatPrice(payment.amount)}
+                            {formatPrice(payment.amount, settings)}
                             {isCancelled && (
                               <span className="ml-1 text-xs font-normal text-red-500">(devolución)</span>
                             )}

@@ -12,6 +12,7 @@ import {
   Clock,
   Star
 } from 'lucide-react'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice } from '@/lib/utils'
 
 interface Metrics {
@@ -27,6 +28,7 @@ interface Metrics {
 
 export function DashboardMetrics() {
   const navigate = useNavigate()
+  const settings = useOrgSettings()
   const [metrics, setMetrics] = useState<Metrics>({
     totalRevenue: 0,
     totalOrders: 0,
@@ -146,7 +148,7 @@ export function DashboardMetrics() {
   const metricCards: MetricCard[] = [
     {
       title: 'Ingresos Totales',
-      value: formatPrice(metrics.totalRevenue),
+      value: formatPrice(metrics.totalRevenue, settings),
       icon: DollarSign,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
@@ -154,7 +156,7 @@ export function DashboardMetrics() {
     },
     {
       title: 'Ingresos de Hoy',
-      value: formatPrice(metrics.todayRevenue),
+      value: formatPrice(metrics.todayRevenue, settings),
       icon: TrendingUp,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
@@ -170,7 +172,7 @@ export function DashboardMetrics() {
     },
     {
       title: 'Ticket Promedio',
-      value: formatPrice(metrics.averageOrderValue),
+      value: formatPrice(metrics.averageOrderValue, settings),
       icon: Star,
       color: 'text-yellow-600',
       bgColor: 'bg-yellow-50',

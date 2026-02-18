@@ -79,6 +79,44 @@ export interface Database {
           updated_at?: string
         }
       }
+      organization_payment_methods: {
+        Row: {
+          id: string
+          organization_id: string
+          key: string
+          name: string
+          config: Json
+          is_active: boolean
+          display_order: number
+          requires_cash_session: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          key: string
+          name: string
+          config?: Json
+          is_active?: boolean
+          display_order?: number
+          requires_cash_session?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          key?: string
+          name?: string
+          config?: Json
+          is_active?: boolean
+          display_order?: number
+          requires_cash_session?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
       categories: {
         Row: {
           id: string
@@ -422,7 +460,7 @@ export interface Database {
           total: number
           status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
           shipping_address: Json
-          payment_method: 'transfer' | 'mercadopago' | 'cash'
+          payment_method: string
           branch_id: string | null
           created_at: string
           updated_at: string
@@ -435,7 +473,7 @@ export interface Database {
           total: number
           status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
           shipping_address: Json
-          payment_method?: 'transfer' | 'mercadopago' | 'cash'
+          payment_method?: string
           branch_id?: string | null
           created_at?: string
           updated_at?: string
@@ -448,7 +486,7 @@ export interface Database {
           total?: number
           status?: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
           shipping_address?: Json
-          payment_method?: 'transfer' | 'mercadopago' | 'cash'
+          payment_method?: string
           branch_id?: string | null
           created_at?: string
           updated_at?: string
@@ -795,7 +833,7 @@ export interface Database {
         Insert: {
           id?: string
           order_id: string
-          payment_method: 'transfer' | 'mercadopago' | 'cash'
+          payment_method: string
           amount: number
           cash_session_id?: string | null
           notes?: string | null
@@ -804,7 +842,7 @@ export interface Database {
         Update: {
           id?: string
           order_id?: string
-          payment_method?: 'transfer' | 'mercadopago' | 'cash'
+          payment_method?: string
           amount?: number
           cash_session_id?: string | null
           notes?: string | null
@@ -1003,9 +1041,19 @@ export interface Database {
   }
 }
 
+// Organization settings (stored in organizations.settings JSONB)
+export type OrganizationSettings = {
+  currency?: string
+  locale?: string
+  timezone?: string
+  decimal_places?: number
+  allow_negative_stock?: boolean
+}
+
 // Type helpers
 export type Organization = Database['public']['Tables']['organizations']['Row']
 export type OrganizationMember = Database['public']['Tables']['organization_members']['Row']
+export type OrganizationPaymentMethod = Database['public']['Tables']['organization_payment_methods']['Row']
 export type Category = Database['public']['Tables']['categories']['Row']
 export type Product = Database['public']['Tables']['products']['Row']
 export type ProductVariant = Database['public']['Tables']['product_variants']['Row']
@@ -1028,6 +1076,7 @@ export type Customer = Database['public']['Tables']['customers']['Row']
 
 export type OrganizationInsert = Database['public']['Tables']['organizations']['Insert']
 export type OrganizationMemberInsert = Database['public']['Tables']['organization_members']['Insert']
+export type OrganizationPaymentMethodInsert = Database['public']['Tables']['organization_payment_methods']['Insert']
 export type CategoryInsert = Database['public']['Tables']['categories']['Insert']
 export type ProductInsert = Database['public']['Tables']['products']['Insert']
 export type ProductVariantInsert = Database['public']['Tables']['product_variants']['Insert']
@@ -1047,6 +1096,7 @@ export type InventoryMovementInsert = Database['public']['Tables']['inventory_mo
 export type InventoryTransferInsert = Database['public']['Tables']['inventory_transfers']['Insert']
 export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
 
+export type OrganizationPaymentMethodUpdate = Database['public']['Tables']['organization_payment_methods']['Update']
 export type CategoryUpdate = Database['public']['Tables']['categories']['Update']
 export type ProductUpdate = Database['public']['Tables']['products']['Update']
 export type ProductVariantUpdate = Database['public']['Tables']['product_variants']['Update']

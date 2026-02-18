@@ -1,5 +1,7 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { formatDateTime } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { ArrowDown, ArrowUp, History, Minus, Truck, X } from 'lucide-react'
 import { useEffect, useState, useCallback } from 'react'
@@ -32,6 +34,7 @@ export function InventoryMovementsModal({
   variantName,
   onClose,
 }: InventoryMovementsModalProps) {
+  const settings = useOrgSettings()
   const [movements, setMovements] = useState<Movement[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -161,7 +164,7 @@ export function InventoryMovementsModal({
                       <p className="text-xs text-gray-500 mt-1">{movement.notes}</p>
                     )}
                     <p className="text-xs text-gray-400 mt-1">
-                      {new Date(movement.created_at).toLocaleString('es-UY')}
+                      {formatDateTime(movement.created_at, settings)}
                       {movement.user_email && ` • ${movement.user_email}`}
                     </p>
                   </div>

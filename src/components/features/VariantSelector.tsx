@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { ProductVariant, Product } from '@/types'
@@ -13,6 +14,7 @@ interface VariantSelectorProps {
 }
 
 export function VariantSelector({ product, selectedVariantId, onVariantChange }: VariantSelectorProps) {
+  const settings = useOrgSettings()
   const [variants, setVariants] = useState<ProductVariant[]>([])
   const [loading, setLoading] = useState(true)
   const [attributes, setAttributes] = useState<Record<string, string[]>>({})
@@ -206,7 +208,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-700">Precio:</span>
             <span className="text-lg font-bold text-primary-600">
-              {formatPrice(displayPrice)}
+              {formatPrice(displayPrice, settings)}
             </span>
           </div>
           <div className="flex justify-between items-center">

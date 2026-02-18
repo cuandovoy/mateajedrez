@@ -1,22 +1,71 @@
 import { type ClassValue, clsx } from 'clsx'
 import type { Product, ProductImage } from '@/types'
+import type { OrganizationSettings } from '@/types/database.types'
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs)
 }
 
-export function formatPrice(price: number): string {
-  return new Intl.NumberFormat('es-AR', {
+const DEFAULT_LOCALE = 'es-AR'
+const DEFAULT_CURRENCY = 'ARS'
+
+export function formatPrice(price: number, settings?: OrganizationSettings | null): string {
+  const locale = settings?.locale ?? DEFAULT_LOCALE
+  const currency = settings?.currency ?? DEFAULT_CURRENCY
+  const decimals = settings?.decimal_places ?? 2
+  return new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'ARS',
+    currency,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   }).format(price)
 }
 
-export function formatDate(date: string | Date): string {
-  return new Intl.DateTimeFormat('es-AR', {
+export function formatDate(date: string | Date, settings?: OrganizationSettings | null): string {
+  const locale = settings?.locale ?? DEFAULT_LOCALE
+  const timeZone = settings?.timezone ?? undefined
+  return new Intl.DateTimeFormat(locale, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
+    ...(timeZone && { timeZone }),
+  }).format(new Date(date))
+}
+
+/** Formatea fecha y hora según locale y timezone de la organización */
+export function formatDateTime(date: string | Date, settings?: OrganizationSettings | null): string {
+  const locale = settings?.locale ?? DEFAULT_LOCALE
+  const timeZone = settings?.timezone ?? undefined
+  return new Intl.DateTimeFormat(locale, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(timeZone && { timeZone }),
+  }).format(new Date(date))
+}
+
+/** Formatea solo la fecha (corto) para tablas y listas */
+export function formatDateShort(date: string | Date, settings?: OrganizationSettings | null): string {
+  const locale = settings?.locale ?? DEFAULT_LOCALE
+  const timeZone = settings?.timezone ?? undefined
+  return new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    ...(timeZone && { timeZone }),
+  }).format(new Date(date))
+}
+
+/** Formatea solo la hora */
+export function formatTime(date: string | Date, settings?: OrganizationSettings | null): string {
+  const locale = settings?.locale ?? DEFAULT_LOCALE
+  const timeZone = settings?.timezone ?? undefined
+  return new Intl.DateTimeFormat(locale, {
+    hour: '2-digit',
+    minute: '2-digit',
+    ...(timeZone && { timeZone }),
   }).format(new Date(date))
 }
 

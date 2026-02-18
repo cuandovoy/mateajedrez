@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
-import { formatPrice } from '@/lib/utils'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { formatDateTime, formatPrice } from '@/lib/utils'
 import type { Order, OrderItem } from '@/types'
 import { ArrowLeft, Calendar, CreditCard, MapPin, Package, Phone, User } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -49,6 +50,7 @@ interface OrderWithItems extends Order {
 
 export function AdminOrderDetail() {
   const { id } = useParams<{ id: string }>()
+  const settings = useOrgSettings()
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
@@ -214,20 +216,14 @@ export function AdminOrderDetail() {
                   <p className="font-medium flex items-center space-x-2">
                     <Calendar className="h-4 w-4" />
                     <span>
-                      {new Date(order.created_at).toLocaleDateString('es-ES', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
+                      {formatDateTime(order.created_at, settings)}
                     </span>
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total</p>
                   <p className="font-semibold text-lg text-admin-600">
-                    {formatPrice(order.total)}
+                    {formatPrice(order.total, settings)}
                   </p>
                 </div>
               </div>
@@ -309,11 +305,11 @@ export function AdminOrderDetail() {
                         )}
                         <p className="text-sm text-gray-600">SKU: {displaySku}</p>
                         <p className="text-sm text-gray-600">
-                          Cantidad: {item.quantity} × {formatPrice(item.price)}
+                          Cantidad: {item.quantity} × {formatPrice(item.price, settings)}
                         </p>
                       </div>
                       <p className="font-semibold text-gray-900">
-                        {formatPrice(item.price * item.quantity)}
+                        {formatPrice(item.price * item.quantity, settings)}
                       </p>
                     </div>
                   )
@@ -322,7 +318,7 @@ export function AdminOrderDetail() {
               <div className="border-t mt-4 pt-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span>{formatPrice(order.total)}</span>
+                  <span>{formatPrice(order.total, settings)}</span>
                 </div>
               </div>
             </CardContent>

@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { cn, formatPrice, getProductImageUrl } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useAuthStore } from '@/store/authStore'
@@ -13,6 +14,7 @@ import { useNavigate } from 'react-router-dom'
 
 function CartContent() {
   const navigate = useNavigate()
+  const settings = useOrgSettings()
   const { items, loading, fetchCart, updateQuantity, removeFromCart, getTotal } = useCartStore()
   const { user } = useAuthStore()
   const [stockWarnings, setStockWarnings] = useState<Record<string, { available: number; requested: number }>>({})
@@ -268,7 +270,7 @@ function CartContent() {
                           </div>
                         )}
                         <p className="text-primary-600 font-bold mt-2 text-sm sm:text-base">
-                          {formatPrice(item.variant?.price ?? item.product.price)}
+                          {formatPrice(item.variant?.price ?? item.product.price, settings)}
                         </p>
                         {itemStocks[item.id] !== undefined && itemStocks[item.id] > 0 && (
                           <p className="text-xs text-gray-500 mt-1">
@@ -302,7 +304,7 @@ function CartContent() {
                       </div>
                       <div className="flex flex-col items-end sm:items-end gap-2">
                         <p className="text-base sm:text-lg font-bold text-gray-900">
-                          {formatPrice((item.variant?.price ?? item.product.price) * item.quantity)}
+                          {formatPrice((item.variant?.price ?? item.product.price) * item.quantity, settings)}
                         </p>
                         <Button
                           variant="ghost"
@@ -329,12 +331,12 @@ function CartContent() {
             <CardContent className="space-y-4">
               <div className="flex justify-between">
                 <span className="text-gray-600">Subtotal</span>
-                <span className="font-semibold">{formatPrice(getTotal())}</span>
+                <span className="font-semibold">{formatPrice(getTotal(), settings)}</span>
               </div>
               <div className="border-t pt-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span>{formatPrice(getTotal())}</span>
+                  <span>{formatPrice(getTotal(), settings)}</span>
                 </div>
               </div>
               {Object.keys(stockWarnings).length > 0 && (

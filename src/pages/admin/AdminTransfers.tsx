@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { ArrowRight, Package, CheckCircle, Clock, Search } from 'lucide-react'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { formatDateShort } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { InventoryTransfer } from '@/types'
 
@@ -16,6 +18,7 @@ interface TransferWithDetails extends InventoryTransfer {
 
 export function AdminTransfers() {
   const { show } = useToastStore()
+  const settings = useOrgSettings()
   const [transfers, setTransfers] = useState<TransferWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -246,11 +249,11 @@ export function AdminTransfers() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-sm text-gray-600">
-                          {new Date(transfer.created_at).toLocaleDateString('es-UY')}
+                          {formatDateShort(transfer.created_at, settings)}
                         </p>
                         {transfer.completed_at && (
                           <p className="text-xs text-gray-400">
-                            Completada: {new Date(transfer.completed_at).toLocaleDateString('es-UY')}
+                            Completada: {formatDateShort(transfer.completed_at, settings)}
                           </p>
                         )}
                       </td>

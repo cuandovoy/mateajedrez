@@ -1,5 +1,6 @@
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
-import { formatPrice } from '@/lib/utils'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { formatDateShort, formatPrice, formatTime } from '@/lib/utils'
 import { Building2, DollarSign, Edit, Trash2, Receipt } from 'lucide-react'
 import type { CashSession } from '@/types'
 
@@ -18,6 +19,7 @@ export function CashSessionTable({
   onDelete,
   onViewPayments,
 }: CashSessionTableProps) {
+  const settings = useOrgSettings()
   if (sessions.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
@@ -75,36 +77,15 @@ export function CashSessionTable({
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900">
-                    {new Date(session.opened_at).toLocaleDateString('es-UY', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      year: 'numeric',
-                    })}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {new Date(session.opened_at).toLocaleTimeString('es-UY', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </div>
+                  <div className="text-sm text-gray-900">{formatDateShort(session.opened_at, settings)}</div>
+                  <div className="text-xs text-gray-500">{formatTime(session.opened_at, settings)}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   {session.closed_at ? (
                     <>
-                      <div className="text-sm text-gray-900">
-                        {new Date(session.closed_at).toLocaleDateString('es-UY', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                        })}
+                      <div className="text-sm text-gray-900">{formatDateShort(session.closed_at, settings)}
                       </div>
-                      <div className="text-xs text-gray-500">
-                        {new Date(session.closed_at).toLocaleTimeString('es-UY', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </div>
+                      <div className="text-xs text-gray-500">{formatTime(session.closed_at, settings)}</div>
                     </>
                   ) : (
                     <span className="text-sm text-gray-400">Abierta</span>
@@ -114,16 +95,16 @@ export function CashSessionTable({
                   <div className="text-sm space-y-1">
                     <div className="flex items-center text-gray-600">
                       <DollarSign className="h-3 w-3 mr-1" />
-                      <span>Apertura: {formatPrice(session.opening_amount)}</span>
+                      <span>Apertura: {formatPrice(session.opening_amount, settings)}</span>
                     </div>
                     {session.expected_amount !== null && (
                       <div className="text-xs text-gray-500">
-                        Esperado: {formatPrice(session.expected_amount)}
+                        Esperado: {formatPrice(session.expected_amount, settings)}
                       </div>
                     )}
                     {session.closing_amount !== null && (
                       <div className="text-xs text-gray-700 font-medium">
-                        Cierre: {formatPrice(session.closing_amount)}
+                        Cierre: {formatPrice(session.closing_amount, settings)}
                       </div>
                     )}
                   </div>
@@ -138,7 +119,7 @@ export function CashSessionTable({
                       }`}
                     >
                       {difference > 0 ? '+' : ''}
-                      {formatPrice(difference)}
+                      {formatPrice(difference, settings)}
                     </span>
                   ) : (
                     <span className="text-sm text-gray-400">—</span>

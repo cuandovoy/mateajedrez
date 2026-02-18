@@ -2,6 +2,8 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
+import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
@@ -23,18 +25,18 @@ interface ShippingForm {
   country: string
 }
 
-type PaymentMethod = 'transfer' | 'mercadopago' | 'cash'
-
 export function Checkout() {
   const navigate = useNavigate()
+  const settings = useOrgSettings()
   const { items, getTotal, clearCart } = useCartStore()
   const { user } = useAuthStore()
   const orgFromStore = useOrganizationStore((s) => s.currentOrganization?.id)
   const orgFromCart = items[0] && 'product' in items[0] ? (items[0] as CartItemWithProduct).product?.organization_id : null
   const organizationId = orgFromStore ?? orgFromCart
+  const { methods: paymentMethods } = useOrgPaymentMethods(organizationId)
   const { show } = useToastStore()
   const [loading, setLoading] = useState(false)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('transfer')
+  const [paymentMethod, setPaymentMethod] = useState<string>('')
   const [mainBranchId, setMainBranchId] = useState<string | null>(null)
   const [formData, setFormData] = useState<ShippingForm>({
     fullName: '',
@@ -85,6 +87,17 @@ export function Checkout() {
     fetchMainBranch()
   }, [organizationId])
 
+  // Sync payment method when enabled methods change
+  useEffect(() => {
+    const availableKeys = paymentMethods
+      .filter((m) => !m.requires_cash_session || mainBranchId)
+      .map((m) => m.key)
+    const firstEnabled = paymentMethods.find((m) => !m.requires_cash_session)?.key ?? paymentMethods.find((m) => m.requires_cash_session && mainBranchId)?.key ?? paymentMethods[0]?.key ?? ''
+    if (availableKeys.length > 0 && (!paymentMethod || !availableKeys.includes(paymentMethod))) {
+      setPaymentMethod(firstEnabled)
+    }
+  }, [paymentMethods, mainBranchId, paymentMethod])
+
   const validateForm = (): boolean => {
     const newErrors: Partial<ShippingForm> = {}
 
@@ -128,6 +141,12 @@ export function Checkout() {
       return
     }
 
+    const availableMethods = paymentMethods.filter((m) => !m.requires_cash_session || mainBranchId)
+    if (availableMethods.length === 0 || !paymentMethod || !availableMethods.some((m) => m.key === paymentMethod)) {
+      show('Selecciona un método de pago válido', 'error')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -166,7 +185,7 @@ export function Checkout() {
             continue
           }
           
-          if (inventory.stock < cartItem.quantity) {
+          if (!settings.allow_negative_stock && inventory.stock < cartItem.quantity) {
             stockIssues.push(
               `Variante "${variant.name || item.product.name}": Stock disponible ${inventory.stock}, solicitado ${cartItem.quantity}`
             )
@@ -208,7 +227,7 @@ export function Checkout() {
               continue
             }
 
-            if (inventory.stock < cartItem.quantity) {
+            if (!settings.allow_negative_stock && inventory.stock < cartItem.quantity) {
               stockIssues.push(
                 `Producto "${item.product.name}": Stock disponible ${inventory.stock}, solicitado ${cartItem.quantity}`
               )
@@ -356,8 +375,9 @@ export function Checkout() {
 
       // Create order_payment record
       // If payment is cash, link it to the open cash session for this branch
+      const selectedMethod = paymentMethods.find((m) => m.key === paymentMethod)
       let cashSessionId: string | null = null
-      if (paymentMethod === 'cash' && mainBranchId) {
+      if (selectedMethod?.requires_cash_session && mainBranchId) {
         // Find open cash session for this branch
         const { data: openSession } = await supabase
           .from('cash_sessions')
@@ -396,7 +416,7 @@ export function Checkout() {
           .from('order_payments')
           .select('amount')
           .eq('cash_session_id', cashSessionId)
-          .eq('payment_method', 'cash')
+          .eq('payment_method', paymentMethod)
 
         if (sessionData) {
           const session = sessionData as { opening_amount: number }
@@ -486,7 +506,7 @@ export function Checkout() {
               <div className="border-t pt-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Subtotal</span>
-                  <span className="font-semibold">{formatPrice(subtotal)}</span>
+                  <span className="font-semibold">{formatPrice(subtotal, settings)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Envío</span>
@@ -495,7 +515,7 @@ export function Checkout() {
                 <div className="border-t pt-2">
                   <div className="flex justify-between text-lg font-bold">
                     <span>Total</span>
-                    <span>{formatPrice(subtotal)}</span>
+                    <span>{formatPrice(subtotal, settings)}</span>
                   </div>
                 </div>
               </div>
@@ -633,52 +653,31 @@ export function Checkout() {
                     Método de Pago <span className="text-red-500">*</span>
                   </label>
                   <div className="space-y-3">
-                    <label className="flex items-center space-x-3 p-4 border-2 border-primary-200 rounded-lg cursor-pointer hover:bg-primary-50 transition-colors">
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value="transfer"
-                        checked={paymentMethod === 'transfer'}
-                        onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                        className="w-4 h-4 text-primary-200 focus:ring-primary-200"
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">Transferencia Bancaria</p>
-                        <p className="text-sm text-gray-600">
-                          Realiza la transferencia y envía el comprobante
-                        </p>
-                      </div>
-                    </label>
-                    <label className="flex items-center space-x-3 p-4 border-2 border-gray-200 rounded-lg cursor-not-allowed opacity-50">
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value="mercadopago"
-                        disabled
-                        className="w-4 h-4 text-primary-200 focus:ring-primary-200"
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">Mercado Pago</p>
-                        <p className="text-sm text-gray-600">
-                          Próximamente disponible
-                        </p>
-                      </div>
-                    </label>
-                    <label className="flex items-center space-x-3 p-4 border-2 border-gray-200 rounded-lg cursor-not-allowed opacity-50">
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value="cash"
-                        disabled
-                        className="w-4 h-4 text-primary-200 focus:ring-primary-200"
-                      />
-                      <div className="flex-1">
-                        <p className="font-medium text-gray-900">Efectivo</p>
-                        <p className="text-sm text-gray-600">
-                          Disponible solo en tienda física
-                        </p>
-                      </div>
-                    </label>
+                    {paymentMethods
+                      .filter((m) => !m.requires_cash_session || mainBranchId)
+                      .map((m) => (
+                        <label
+                          key={m.id}
+                          className={`flex items-center space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${paymentMethod === m.key ? 'border-primary-200 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'}`}
+                        >
+                          <input
+                            type="radio"
+                            name="paymentMethod"
+                            value={m.key}
+                            checked={paymentMethod === m.key}
+                            onChange={(e) => setPaymentMethod(e.target.value)}
+                            className="w-4 h-4 text-primary-200 focus:ring-primary-200"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">{m.name}</p>
+                            <p className="text-sm text-gray-600">
+                              {m.requires_cash_session && mainBranchId
+                                ? 'Disponible solo en tienda física'
+                                : 'Realiza el pago según las instrucciones'}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
                   </div>
                 </div>
 

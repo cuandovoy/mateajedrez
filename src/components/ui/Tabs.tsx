@@ -75,6 +75,7 @@ export function TabsTrigger({ value, children }: TabsTriggerProps) {
 
   return (
     <button
+      type="button"
       role="tab"
       aria-selected={isSelected}
       onClick={() => onChange(value)}

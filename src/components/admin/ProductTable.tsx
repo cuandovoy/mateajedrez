@@ -1,6 +1,7 @@
 import { Edit, Trash2, Package, Image as ImageIcon, ScanLine, Truck } from 'lucide-react'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice } from '@/lib/utils'
 import type { Product, ProductImage, Category } from '@/types'
 
@@ -28,6 +29,7 @@ export function ProductTable({
   onManageSuppliers,
   getPrimaryImage,
 }: ProductTableProps) {
+  const settings = useOrgSettings()
   if (products.length === 0) {
     return (
       <EmptyState
@@ -62,7 +64,7 @@ export function ProductTable({
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 truncate">{product.name}</p>
                   <p className="text-xs text-gray-500">{product.sku}</p>
-                  <p className="text-sm font-medium text-gray-900 mt-1">{formatPrice(product.price)}</p>
+                  <p className="text-sm font-medium text-gray-900 mt-1">{formatPrice(product.price, settings)}</p>
                   <span
                     className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full ${
                       product.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
@@ -175,7 +177,7 @@ export function ProductTable({
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900">
-                    {formatPrice(product.price)}
+                    {formatPrice(product.price, settings)}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">

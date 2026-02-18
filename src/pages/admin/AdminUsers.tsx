@@ -3,9 +3,10 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useUserManagement } from '@/hooks/useUserManagement'
 import { supabase } from '@/lib/supabase'
-import { cn } from '@/lib/utils'
+import { cn, formatDateShort } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useToastStore } from '@/store/toastStore'
 import type { UserProfile } from '@/types'
@@ -52,6 +53,7 @@ const getRoleColor = (role: string): string => {
 
 export function AdminUsers() {
   const { organizationId } = useOrganization()
+  const settings = useOrgSettings()
   const { isAdmin } = useAuthStore()
   const { show } = useToastStore()
   const navigate = useNavigate()
@@ -497,11 +499,7 @@ export function AdminUsers() {
                             </div>
                           </td>
                           <td className="py-3 px-4 text-sm text-gray-600">
-                            {new Date(user.created_at).toLocaleDateString('es-ES', {
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                            })}
+                            {formatDateShort(user.created_at, settings)}
                           </td>
                         </tr>
                       )

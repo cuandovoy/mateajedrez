@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ShoppingCart } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { Product, ProductImage } from '@/types'
@@ -25,6 +26,7 @@ function isValidImageUrl(url: string | null | undefined): boolean {
 }
 
 export function ProductCard({ product, noAddToCart = false }: ProductCardProps) {
+  const settings = useOrgSettings()
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
@@ -132,7 +134,7 @@ export function ProductCard({ product, noAddToCart = false }: ProductCardProps) 
         </p>
         <div className="flex items-center justify-between mb-4">
           <span className="text-2xl font-bold text-primary-600 group-hover:text-primary-700 transition-colors">
-            {formatPrice(product.price)}
+            {formatPrice(product.price, settings)}
           </span>
           <div className="flex items-center space-x-2">
             {stock === null ? (

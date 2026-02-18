@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice } from '@/lib/utils'
 import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
@@ -34,6 +35,7 @@ interface OrderWithItems extends Order {
 
 export function OrderConfirmation() {
   const { id } = useParams<{ id: string }>()
+  const settings = useOrgSettings()
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -129,7 +131,7 @@ export function OrderConfirmation() {
               <div>
                 <p className="text-sm text-gray-600">Total</p>
                 <p className="font-semibold text-lg text-primary-200">
-                  {formatPrice(order.total)}
+                  {formatPrice(order.total, settings)}
                 </p>
               </div>
             </div>
@@ -201,11 +203,11 @@ export function OrderConfirmation() {
                         </div>
                       )}
                       <p className="text-sm text-gray-600">
-                        Cantidad: {item.quantity} × {formatPrice(item.price)}
+                        Cantidad: {item.quantity} × {formatPrice(item.price, settings)}
                       </p>
                     </div>
                     <p className="font-semibold">
-                      {formatPrice(item.price * item.quantity)}
+                      {formatPrice(item.price * item.quantity, settings)}
                     </p>
                   </div>
                 )
@@ -214,7 +216,7 @@ export function OrderConfirmation() {
             <div className="border-t mt-4 pt-4">
               <div className="flex justify-between text-lg font-bold">
                 <span>Total</span>
-                <span>{formatPrice(order.total)}</span>
+                <span>{formatPrice(order.total, settings)}</span>
               </div>
             </div>
           </CardContent>

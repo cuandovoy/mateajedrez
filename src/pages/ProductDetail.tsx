@@ -3,6 +3,7 @@ import { VariantSelector } from '@/components/features/VariantSelector'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
@@ -25,6 +26,7 @@ function isValidImageUrl(url: string | null | undefined): boolean {
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>()
+  const settings = useOrgSettings()
   const { addToCart } = useCartStore()
   const [product, setProduct] = useState<ProductWithCategory | null>(null)
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([])
@@ -342,7 +344,7 @@ export function ProductDetail() {
             )}
             <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
             <p className="text-2xl font-bold text-primary-500 mb-4">
-              {formatPrice(selectedVariant?.price ?? product.price)}
+              {formatPrice(selectedVariant?.price ?? product.price, settings)}
             </p>
           </div>
 

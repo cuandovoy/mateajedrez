@@ -3,7 +3,9 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { supabase } from '@/lib/supabase'
+import { formatDateShort } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { Customer } from '@/types/database.types'
 import { Edit, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2 } from 'lucide-react'
@@ -25,6 +27,7 @@ interface CustomerForm {
 
 export function AdminCustomers() {
   const { organizationId } = useOrganization()
+  const settings = useOrgSettings()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -473,7 +476,7 @@ export function AdminCustomers() {
                           </td>
                           <td className="py-3 px-4">
                             <div className="text-sm text-gray-600">
-                              {new Date(customer.created_at).toLocaleDateString('es-UY')}
+                              {formatDateShort(customer.created_at, settings)}
                             </div>
                           </td>
                           <td className="py-3 px-4 text-right">
