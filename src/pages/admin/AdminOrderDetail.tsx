@@ -1,11 +1,16 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
+import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatDateTime, formatPrice } from '@/lib/utils'
+import { useOrganizationStore } from '@/store/organizationStore'
+import { useToastStore } from '@/store/toastStore'
 import type { Order, OrderItem } from '@/types'
-import { ArrowLeft, Calendar, CreditCard, MapPin, Package, Phone, User } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import type { OrderPayment } from '@/types/database.types'
+import { ArrowLeft, Calendar, Edit2, MapPin, Minus, Package, Phone, Plus, Save, Trash2, User, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
 const getStatusLabel = (status: string): string => {
@@ -30,124 +35,364 @@ const getStatusColor = (status: string): string => {
   return colorMap[status] || 'bg-gray-100 text-gray-800'
 }
 
-interface OrderWithItems extends Order {
-  payment_method: 'transfer' | 'mercadopago' | 'cash'
-  order_items: Array<OrderItem & { 
-    product: { name: string; image_url: string | null; sku: string }
-    variant?: { 
-      id: string
-      name: string | null
-      sku: string
-      attributes: Record<string, string>
-      image_url: string | null
-    } | null
-  }>
-  user_profile?: {
-    full_name: string | null
-    email: string
+type ShippingAddress = {
+  fullName: string
+  email?: string
+  phone: string
+  address: string
+  city: string
+  state: string
+  zipCode: string
+  country: string
+}
+
+interface OrderItemWithProduct extends OrderItem {
+  product: { name: string; image_url: string | null; sku: string; price?: number }
+  variant?: {
+    id: string
+    name: string | null
+    sku: string
+    attributes: Record<string, string>
+    image_url: string | null
+    price?: number | null
   } | null
+}
+
+interface OrderWithItems extends Order {
+  payment_method: string
+  order_items: OrderItemWithProduct[]
+  user_profile?: { full_name: string | null; email: string } | null
+  customer?: { email: string | null; full_name: string } | null
 }
 
 export function AdminOrderDetail() {
   const { id } = useParams<{ id: string }>()
   const settings = useOrgSettings()
+  const { show } = useToastStore()
+  const organizationId = useOrganizationStore((s) => s.currentOrganization?.id)
+  const { methods: paymentMethods } = useOrgPaymentMethods(organizationId)
   const [order, setOrder] = useState<OrderWithItems | null>(null)
+  const [orderPayments, setOrderPayments] = useState<OrderPayment[]>([])
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
+  const [products, setProducts] = useState<
+    Array<{
+      id: string
+      name: string
+      price: number
+      sku: string
+      defaultVariant?: { id: string; price: number | null }
+    }>
+  >([])
+  const [productSearch, setProductSearch] = useState('')
+  const [showProductSearch, setShowProductSearch] = useState(false)
 
-  useEffect(() => {
-    if (id) {
-      fetchOrder()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  const [editShipping, setEditShipping] = useState<ShippingAddress>({
+    fullName: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    country: '',
+  })
+  const [editPaymentMethod, setEditPaymentMethod] = useState('')
+  const [editPaymentAmount, setEditPaymentAmount] = useState('')
+  const [editItems, setEditItems] = useState<OrderItemWithProduct[]>([])
 
-  const fetchOrder = async () => {
+  const fetchOrder = useCallback(async () => {
+    if (!id) return
     setLoading(true)
     try {
-      // Fetch order with items, products, and variants
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
           *,
           order_items (
             *,
-            product:products (
-              name,
-              image_url,
-              sku
-            ),
-            variant:product_variants (
-              id,
-              name,
-              sku,
-              attributes,
-              image_url
-            )
+            product:products (name, image_url, sku, price),
+            variant:product_variants (id, name, sku, attributes, image_url, price)
           )
         `)
-        .eq('id', id as string)
+        .eq('id', id)
         .single()
 
       if (orderError) throw orderError
       if (!orderData) return
 
-      const order = orderData as OrderWithItems
+      const ord = orderData as OrderWithItems
+      const shipping = (ord.shipping_address as ShippingAddress) ?? {}
+      setEditShipping({
+        fullName: shipping.fullName ?? '',
+        email: shipping.email ?? '',
+        phone: shipping.phone ?? '',
+        address: shipping.address ?? '',
+        city: shipping.city ?? '',
+        state: shipping.state ?? '',
+        zipCode: shipping.zipCode ?? '',
+        country: shipping.country ?? '',
+      })
+      setEditPaymentMethod(ord.payment_method ?? '')
+      setEditItems(ord.order_items ?? [])
 
-      // Fetch user profile if user_id exists
+      const { data: paymentsData } = await supabase
+        .from('order_payments')
+        .select('*')
+        .eq('order_id', id)
+      const payments = (paymentsData ?? []) as OrderPayment[]
+      setOrderPayments(payments)
+      const mainPayment = payments.find((p) => p.payment_method === ord.payment_method) ?? payments[0]
+      setEditPaymentAmount(mainPayment ? String(mainPayment.amount) : String(ord.total))
+
       let userProfile: { full_name: string | null; email: string } | null = null
-      if (order.user_id) {
+      if (ord.user_id) {
         const { data: profileData } = await supabase
           .from('user_profiles')
           .select('full_name')
-          .eq('user_id', order.user_id)
+          .eq('user_id', ord.user_id)
           .single()
-
         if (profileData) {
           userProfile = {
             full_name: (profileData as { full_name: string }).full_name,
-            email: 'N/A', // Email not available without admin functions
+            email: 'N/A',
           }
         }
       }
 
+      let customer: { email: string | null; full_name: string } | null = null
+      if (ord.customer_id) {
+        const { data: custData } = await supabase
+          .from('customers')
+          .select('email, full_name')
+          .eq('id', ord.customer_id)
+          .single()
+        if (custData) {
+          customer = custData as { email: string | null; full_name: string }
+        }
+      }
+
       setOrder({
-        ...order,
-        order_items: order.order_items || [],
+        ...ord,
+        order_items: ord.order_items ?? [],
         user_profile: userProfile,
-      } as OrderWithItems)
+        customer,
+      })
     } catch (error) {
       console.error('Error fetching order:', error)
+      show('Error al cargar la orden', 'error')
     } finally {
       setLoading(false)
     }
-  }
+  }, [id, show])
+
+  useEffect(() => {
+    fetchOrder()
+  }, [fetchOrder])
+
+  useEffect(() => {
+    if (organizationId && isEditing) {
+      supabase
+        .from('products')
+        .select('id, name, price, sku')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('name')
+        .then(async ({ data: productsData }) => {
+          const prods = (productsData ?? []) as Array<{ id: string; name: string; price: number; sku: string }>
+          const withVariants = await Promise.all(
+            prods.map(async (p) => {
+              const { data: defaultVar } = await supabase
+                .from('product_variants')
+                .select('id, price')
+                .eq('product_id', p.id)
+                .eq('is_active', true)
+                .like('sku', '%-DEFAULT')
+                .limit(1)
+                .maybeSingle()
+              const { data: anyVar } = defaultVar
+                ? { data: [defaultVar] }
+                : await supabase
+                    .from('product_variants')
+                    .select('id, price')
+                    .eq('product_id', p.id)
+                    .eq('is_active', true)
+                    .limit(1)
+              const variantList = defaultVar ? [defaultVar] : (anyVar ?? [])
+              const v = variantList[0] as { id: string; price: number | null } | undefined
+              return {
+                ...p,
+                defaultVariant: v ? { id: v.id, price: v.price } : undefined,
+              }
+            })
+          )
+          setProducts(withVariants)
+        })
+    }
+  }, [organizationId, isEditing])
 
   const handleStatusUpdate = async (newStatus: Order['status']) => {
     if (!order || !id) return
-
     setUpdating(true)
     try {
-      const { error } = await (supabase
-        .from('orders') as any)
-        .update({ status: newStatus })
-        .eq('id', id as string)
-
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus } as never)
+        .eq('id', id)
       if (error) throw error
-
       setOrder({ ...order, status: newStatus })
+      show('Estado actualizado', 'success')
     } catch (error) {
       console.error('Error updating order status:', error)
-      alert('Error al actualizar el estado de la orden')
+      show('Error al actualizar el estado', 'error')
     } finally {
       setUpdating(false)
     }
   }
 
+  const handleSaveEdit = async () => {
+    if (!order || !id) return
+    setSaving(true)
+    try {
+      const total = editItems.reduce((sum, it) => sum + it.price * it.quantity, 0)
+      const amount = parseFloat(editPaymentAmount) || total
+
+      await supabase
+        .from('orders')
+        .update({
+          shipping_address: editShipping,
+          payment_method: editPaymentMethod,
+          total,
+        } as never)
+        .eq('id', id)
+
+      for (const item of editItems) {
+        if (item.id && !item.id.startsWith('new-')) {
+          await supabase
+            .from('order_items')
+            .update({ quantity: item.quantity, price: item.price } as never)
+            .eq('id', item.id)
+        } else {
+          await supabase.from('order_items').insert({
+            order_id: id,
+            product_id: item.product_id,
+            variant_id: item.variant_id ?? null,
+            quantity: item.quantity,
+            price: item.price,
+          } as never)
+        }
+      }
+
+      for (const item of order.order_items) {
+        if (!editItems.some((e) => e.id === item.id)) {
+          await supabase.from('order_items').delete().eq('id', item.id)
+        }
+      }
+
+      const mainPayment = orderPayments.find((p) => p.payment_method === editPaymentMethod) ?? orderPayments[0]
+      if (mainPayment) {
+        await supabase
+          .from('order_payments')
+          .update({ payment_method: editPaymentMethod, amount } as never)
+          .eq('id', mainPayment.id)
+      } else {
+        await supabase.from('order_payments').insert({
+          order_id: id,
+          payment_method: editPaymentMethod,
+          amount,
+        } as never)
+      }
+
+      show('Orden actualizada correctamente', 'success')
+      setIsEditing(false)
+      fetchOrder()
+    } catch (error) {
+      console.error('Error saving order:', error)
+      show('Error al guardar los cambios', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleAddProduct = (product: {
+    id: string
+    name: string
+    price: number
+    sku: string
+    defaultVariant?: { id: string; price: number | null }
+  }) => {
+    const variantId = product.defaultVariant?.id ?? null
+    const price = product.defaultVariant?.price ?? product.price
+    const existing = editItems.find(
+      (i) => i.product_id === product.id && (i.variant_id ?? null) === variantId
+    )
+    if (existing) {
+      setEditItems((prev) =>
+        prev.map((it) =>
+          it.id === existing.id ? { ...it, quantity: it.quantity + 1 } : it
+        )
+      )
+    } else {
+      setEditItems((prev) => [
+        ...prev,
+        {
+          id: `new-${Date.now()}`,
+          order_id: id!,
+          product_id: product.id,
+          variant_id: variantId,
+          quantity: 1,
+          price,
+          created_at: new Date().toISOString(),
+          product: { name: product.name, image_url: null, sku: product.sku, price },
+          variant: product.defaultVariant
+            ? { id: product.defaultVariant.id, name: null, sku: product.sku, attributes: {}, image_url: null, price }
+            : null,
+        } as OrderItemWithProduct,
+      ])
+    }
+    setProductSearch('')
+    setShowProductSearch(false)
+  }
+
+  const handleRemoveItem = (itemId: string) => {
+    setEditItems((prev) => prev.filter((i) => i.id !== itemId))
+  }
+
+  const handleItemQuantityChange = (itemId: string, delta: number) => {
+    setEditItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== itemId) return it
+        const q = Math.max(1, it.quantity + delta)
+        return { ...it, quantity: q }
+      })
+    )
+  }
+
+  const handleItemPriceChange = (itemId: string, price: number) => {
+    setEditItems((prev) =>
+      prev.map((it) => (it.id === itemId ? { ...it, price } : it))
+    )
+  }
+
+  const filteredProducts = products.filter(
+    (p) =>
+      productSearch.trim().length > 0 ||
+      !editItems.some(
+        (i) =>
+          i.product_id === p.id &&
+          (i.variant_id ?? null) === (p.defaultVariant?.id ?? null)
+      )
+  ).filter(
+    (p) =>
+      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+      p.sku.toLowerCase().includes(productSearch.toLowerCase())
+  ).slice(0, 8)
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600" />
       </div>
     )
   }
@@ -166,15 +411,12 @@ export function AdminOrderDetail() {
     )
   }
 
-  const shippingAddress = order.shipping_address as {
-    fullName: string
-    phone: string
-    address: string
-    city: string
-    state: string
-    zipCode: string
-    country: string
-  }
+  const shippingAddress = (order.shipping_address as ShippingAddress) ?? {}
+  const displayShipping = isEditing ? editShipping : shippingAddress
+  const displayItems = isEditing ? editItems : order.order_items
+  const displayTotal = isEditing
+    ? editItems.reduce((sum, it) => sum + it.price * it.quantity, 0)
+    : order.total
 
   return (
     <div>
@@ -189,12 +431,27 @@ export function AdminOrderDetail() {
           <h1 className="text-3xl font-bold text-gray-900">Detalle de Orden</h1>
           <p className="text-gray-600 mt-2">ID: {order.id}</p>
         </div>
+        {!isEditing ? (
+          <Button onClick={() => setIsEditing(true)} variant="outline">
+            <Edit2 className="h-4 w-4 mr-2" />
+            Editar
+          </Button>
+        ) : (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsEditing(false)} disabled={saving}>
+              <X className="h-4 w-4 mr-2" />
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={saving}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Order Info */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
@@ -202,9 +459,7 @@ export function AdminOrderDetail() {
                   <Package className="h-5 w-5" />
                   <span>Información de la Orden</span>
                 </span>
-                <span
-                  className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}
-                >
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
                   {getStatusLabel(order.status)}
                 </span>
               </CardTitle>
@@ -215,62 +470,117 @@ export function AdminOrderDetail() {
                   <p className="text-sm text-gray-600">Fecha de Creación</p>
                   <p className="font-medium flex items-center space-x-2">
                     <Calendar className="h-4 w-4" />
-                    <span>
-                      {formatDateTime(order.created_at, settings)}
-                    </span>
+                    <span>{formatDateTime(order.created_at, settings)}</span>
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Total</p>
                   <p className="font-semibold text-lg text-admin-600">
-                    {formatPrice(order.total, settings)}
+                    {formatPrice(displayTotal, settings)}
                   </p>
                 </div>
               </div>
 
-              {order.payment_method && (
-                <div>
-                  <p className="text-sm text-gray-600">Método de Pago</p>
-                  <p className="font-medium capitalize">
-                    {order.payment_method === 'transfer' ? 'Transferencia Bancaria' : 'Mercado Pago'}
-                  </p>
+              {isEditing ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Método de Pago</label>
+                    <select
+                      value={editPaymentMethod}
+                      onChange={(e) => setEditPaymentMethod(e.target.value)}
+                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 bg-white"
+                    >
+                      {paymentMethods.map((m) => (
+                        <option key={m.id} value={m.key}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Monto</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={editPaymentAmount}
+                      onChange={(e) => setEditPaymentAmount(e.target.value)}
+                    />
+                  </div>
                 </div>
+              ) : (
+                order.payment_method && (
+                  <div>
+                    <p className="text-sm text-gray-600">Método de Pago</p>
+                    <p className="font-medium capitalize">
+                      {paymentMethods.find((m) => m.key === order.payment_method)?.name ?? order.payment_method}
+                    </p>
+                  </div>
+                )
               )}
 
-              {/* Status Update */}
               <div>
                 <p className="text-sm text-gray-600 mb-2">Actualizar Estado</p>
                 <div className="flex flex-wrap gap-2">
-                  {(['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const).map(
-                    (status) => (
-                      <Button
-                        key={status}
-                        variant={order.status === status ? 'primary' : 'outline'}
-                        size="sm"
-                        onClick={() => handleStatusUpdate(status)}
-                        disabled={updating || order.status === status}
-                      >
-                        {getStatusLabel(status)}
-                      </Button>
-                    )
-                  )}
+                  {(['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const).map((status) => (
+                    <Button
+                      key={status}
+                      variant={order.status === status ? 'primary' : 'outline'}
+                      size="sm"
+                      onClick={() => handleStatusUpdate(status)}
+                      disabled={updating || order.status === status}
+                    >
+                      {getStatusLabel(status)}
+                    </Button>
+                  ))}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Order Items */}
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Productos</CardTitle>
+              {isEditing && (
+                <div className="relative">
+                  <Input
+                    placeholder="Buscar producto..."
+                    value={productSearch}
+                    onChange={(e) => {
+                      setProductSearch(e.target.value)
+                      setShowProductSearch(true)
+                    }}
+                    onFocus={() => setShowProductSearch(true)}
+                    className="w-48"
+                  />
+                  {showProductSearch && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 max-h-60 overflow-auto">
+                      {filteredProducts.length === 0 ? (
+                        <p className="p-3 text-sm text-gray-500">Sin resultados</p>
+                      ) : (
+                        filteredProducts.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className="w-full text-left px-3 py-2 hover:bg-gray-50 flex justify-between items-center"
+                            onClick={() => handleAddProduct(p)}
+                          >
+                            <span>{p.name}</span>
+                            <span className="text-sm text-gray-600">{formatPrice(p.price, settings)}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {order.order_items.map((item) => {
+                {displayItems.map((item) => {
                   const variant = item.variant
                   const displayImage = variant?.image_url || item.product.image_url
                   const displaySku = variant?.sku || item.product.sku
-                  
                   return (
                     <div
                       key={item.id}
@@ -280,35 +590,58 @@ export function AdminOrderDetail() {
                         <img
                           src={displayImage}
                           alt={item.product.name}
-                          className="w-16 h-16 object-cover rounded"
+                          className="w-16 h-16 object-cover rounded shrink-0"
                         />
                       )}
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900">{item.product.name}</p>
-                        {variant && (
-                          <div className="mt-1 space-y-1">
-                            {variant.name && (
-                              <p className="text-sm font-medium text-gray-700">
-                                Variante: {variant.name}
-                              </p>
-                            )}
-                            {variant.attributes && typeof variant.attributes === 'object' && (
-                              <div className="flex flex-wrap gap-1">
-                                {Object.entries(variant.attributes as Record<string, string>).map(([key, value]) => (
-                                  <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
-                                    {key}: {value}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
+                        {variant?.name && (
+                          <p className="text-sm text-gray-700">Variante: {variant.name}</p>
                         )}
                         <p className="text-sm text-gray-600">SKU: {displaySku}</p>
-                        <p className="text-sm text-gray-600">
-                          Cantidad: {item.quantity} × {formatPrice(item.price, settings)}
-                        </p>
+                        {isEditing ? (
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="flex items-center border rounded">
+                              <button
+                                type="button"
+                                onClick={() => handleItemQuantityChange(item.id, -1)}
+                                className="p-1 hover:bg-gray-100"
+                              >
+                                <Minus className="h-4 w-4" />
+                              </button>
+                              <span className="px-2 min-w-[2rem] text-center">{item.quantity}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleItemQuantityChange(item.id, 1)}
+                                className="p-1 hover:bg-gray-100"
+                              >
+                                <Plus className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={item.price}
+                              onChange={(e) => handleItemPriceChange(item.id, parseFloat(e.target.value) || 0)}
+                              className="w-24"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-600">
+                            Cantidad: {item.quantity} × {formatPrice(item.price, settings)}
+                          </p>
+                        )}
                       </div>
-                      <p className="font-semibold text-gray-900">
+                      <p className="font-semibold text-gray-900 shrink-0">
                         {formatPrice(item.price * item.quantity, settings)}
                       </p>
                     </div>
@@ -318,16 +651,14 @@ export function AdminOrderDetail() {
               <div className="border-t mt-4 pt-4">
                 <div className="flex justify-between text-lg font-bold">
                   <span>Total</span>
-                  <span>{formatPrice(order.total, settings)}</span>
+                  <span>{formatPrice(displayTotal, settings)}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Customer Info */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -336,7 +667,20 @@ export function AdminOrderDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {order.user_profile ? (
+              {order.customer ? (
+                <>
+                  <div>
+                    <p className="text-sm text-gray-600">Nombre</p>
+                    <p className="font-medium">{order.customer.full_name || 'N/A'}</p>
+                  </div>
+                  {order.customer.email && (
+                    <div>
+                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="font-medium">{order.customer.email}</p>
+                    </div>
+                  )}
+                </>
+              ) : order.user_profile ? (
                 <>
                   <div>
                     <p className="text-sm text-gray-600">Nombre</p>
@@ -353,7 +697,6 @@ export function AdminOrderDetail() {
             </CardContent>
           </Card>
 
-          {/* Shipping Address */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -362,49 +705,87 @@ export function AdminOrderDetail() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div>
-                <p className="text-sm text-gray-600 flex items-center space-x-2">
-                  <User className="h-4 w-4" />
-                  <span>Nombre</span>
-                </p>
-                <p className="font-medium">{shippingAddress.fullName}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600 flex items-center space-x-2">
-                  <Phone className="h-4 w-4" />
-                  <span>Teléfono</span>
-                </p>
-                <p className="font-medium">{shippingAddress.phone}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Dirección</p>
-                <p className="font-medium">{shippingAddress.address}</p>
-                <p className="font-medium">
-                  {shippingAddress.city}, {shippingAddress.state} {shippingAddress.zipCode}
-                </p>
-                <p className="font-medium">{shippingAddress.country}</p>
-              </div>
+              {isEditing ? (
+                <>
+                  <Input
+                    label="Nombre"
+                    value={editShipping.fullName}
+                    onChange={(e) => setEditShipping((s) => ({ ...s, fullName: e.target.value }))}
+                  />
+                  <Input
+                    label="Email"
+                    type="email"
+                    value={editShipping.email ?? ''}
+                    onChange={(e) => setEditShipping((s) => ({ ...s, email: e.target.value }))}
+                    placeholder="cliente@email.com"
+                  />
+                  <Input
+                    label="Teléfono"
+                    value={editShipping.phone}
+                    onChange={(e) => setEditShipping((s) => ({ ...s, phone: e.target.value }))}
+                  />
+                  <Input
+                    label="Dirección"
+                    value={editShipping.address}
+                    onChange={(e) => setEditShipping((s) => ({ ...s, address: e.target.value }))}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      label="Ciudad"
+                      value={editShipping.city}
+                      onChange={(e) => setEditShipping((s) => ({ ...s, city: e.target.value }))}
+                    />
+                    <Input
+                      label="Provincia"
+                      value={editShipping.state}
+                      onChange={(e) => setEditShipping((s) => ({ ...s, state: e.target.value }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      label="Código Postal"
+                      value={editShipping.zipCode}
+                      onChange={(e) => setEditShipping((s) => ({ ...s, zipCode: e.target.value }))}
+                    />
+                    <Input
+                      label="País"
+                      value={editShipping.country}
+                      onChange={(e) => setEditShipping((s) => ({ ...s, country: e.target.value }))}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <p className="text-sm text-gray-600 flex items-center space-x-2">
+                      <User className="h-4 w-4" />
+                      <span>Nombre</span>
+                    </p>
+                    <p className="font-medium">{displayShipping.fullName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Email</p>
+                    <p className="font-medium">{displayShipping.email || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600 flex items-center space-x-2">
+                      <Phone className="h-4 w-4" />
+                      <span>Teléfono</span>
+                    </p>
+                    <p className="font-medium">{displayShipping.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Dirección</p>
+                    <p className="font-medium">{displayShipping.address}</p>
+                    <p className="font-medium">
+                      {displayShipping.city}, {displayShipping.state} {displayShipping.zipCode}
+                    </p>
+                    <p className="font-medium">{displayShipping.country}</p>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
-
-          {/* Payment Info */}
-          {order.payment_method === 'transfer' && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <CreditCard className="h-5 w-5" />
-                  <span>Información de Pago</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600 mb-2">Método de Pago</p>
-                <p className="font-medium">Transferencia Bancaria</p>
-                <p className="text-xs text-gray-500 mt-2">
-                  El cliente debe enviar el comprobante de transferencia
-                </p>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
     </div>

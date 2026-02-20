@@ -27,8 +27,10 @@ import {
   Receipt,
   ShoppingCart,
 } from 'lucide-react'
+import { PlanGate } from '@/components/features/PlanGate'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import type { CashSession, CashSessionInsert, CashSessionUpdate, Branch } from '@/types'
@@ -848,5 +850,10 @@ function AdminCashRegisterContent() {
 }
 
 export function AdminCashRegister() {
-  return <AdminCashRegisterContent />
+  const { canUseFeature } = usePlanLimits()
+  return (
+    <PlanGate feature="cash_register" canUse={canUseFeature('cash_register')}>
+      <AdminCashRegisterContent />
+    </PlanGate>
+  )
 }

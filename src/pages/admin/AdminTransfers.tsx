@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { ArrowRight, Package, CheckCircle, Clock, Search } from 'lucide-react'
+import { PlanGate } from '@/components/features/PlanGate'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { formatDateShort } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { InventoryTransfer } from '@/types'
@@ -19,6 +21,7 @@ interface TransferWithDetails extends InventoryTransfer {
 export function AdminTransfers() {
   const { show } = useToastStore()
   const settings = useOrgSettings()
+  const { canUseFeature } = usePlanLimits()
   const [transfers, setTransfers] = useState<TransferWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -133,6 +136,7 @@ export function AdminTransfers() {
   const pendingTransfers = filteredTransfers.filter((t) => t.status === 'pending').length
 
   return (
+    <PlanGate feature="transfers" canUse={canUseFeature('transfers')}>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -279,5 +283,6 @@ export function AdminTransfers() {
         </CardContent>
       </Card>
     </div>
+    </PlanGate>
   )
 }

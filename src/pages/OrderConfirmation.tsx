@@ -150,6 +150,9 @@ export function OrderConfirmation() {
                 <p className="text-sm font-medium text-gray-700 mb-2">Dirección de Envío</p>
                 <div className="text-sm text-gray-600">
                   <p>{(order.shipping_address as { fullName: string }).fullName}</p>
+                  {(order.shipping_address as { email?: string }).email && (
+                    <p>Email: {(order.shipping_address as { email: string }).email}</p>
+                  )}
                   <p>{(order.shipping_address as { address: string }).address}</p>
                   <p>
                     {(order.shipping_address as { city: string }).city}, {(order.shipping_address as { state: string }).state}{' '}

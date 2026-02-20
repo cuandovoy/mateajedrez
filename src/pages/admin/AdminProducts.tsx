@@ -25,6 +25,8 @@ import { ArrowDown, ArrowUp, Edit, Filter, Grid3x3, List, Package, Plus, ScanLin
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { useToastStore } from '@/store/toastStore'
 import { z } from 'zod'
 
 const productSchema = z.object({
@@ -73,6 +75,8 @@ interface ProductFilters {
 function AdminProductsContent() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
+  const { show } = useToastStore()
+  const { isAtLimit, productCount, limits, tier } = usePlanLimits()
   const [products, setProducts] = useState<ProductWithImages[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -358,6 +362,11 @@ function AdminProductsContent() {
 
   const onSubmit = async (data: ProductForm) => {
     if (!organizationId) return
+
+    if (!editingProduct && isAtLimit('products')) {
+      show('Límite alcanzado (200 productos). Actualizá tu plan.', 'error')
+      return
+    }
 
     // When creating with stock > 0, branch is required for inventory
     if (!editingProduct && data.stock > 0) {
@@ -671,6 +680,10 @@ function AdminProductsContent() {
   }
 
   const handleNew = () => {
+    if (isAtLimit('products')) {
+      show('Límite alcanzado (200 productos). Actualizá tu plan.', 'error')
+      return
+    }
     setEditingProduct(null)
     setProductImages([])
     setInitialBranchId('')
@@ -736,7 +749,14 @@ function AdminProductsContent() {
     <div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">Productos</h1>
-        <p className="text-gray-600 mt-2">Gestiona todos los productos de tu tienda</p>
+        <p className="text-gray-600 mt-2">
+          Gestiona todos los productos de tu tienda
+          {tier === 'starter' && limits.products != null && (
+            <span className="ml-2 text-sm text-gray-500">
+              ({productCount} / {limits.products})
+            </span>
+          )}
+        </p>
       </div>
 
       <div className="mb-8 flex items-center justify-between gap-4">
@@ -756,7 +776,7 @@ function AdminProductsContent() {
             <Grid3x3 className="h-4 w-4" />
           </button>
         </div>
-        <Button onClick={handleNew}>
+        <Button onClick={handleNew} disabled={isAtLimit('products')}>
           <Plus className="h-4 w-4 mr-2" />
           Nuevo Producto
         </Button>

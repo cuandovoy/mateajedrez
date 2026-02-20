@@ -15,6 +15,7 @@ import { AdminSales } from '@/pages/admin/AdminSales'
 import { AdminSuppliers } from '@/pages/admin/AdminSuppliers'
 import { AdminTransfers } from '@/pages/admin/AdminTransfers'
 import { AdminOrganizations } from '@/pages/admin/AdminOrganizations'
+import { AdminPlans } from '@/pages/admin/AdminPlans'
 import { AdminUsers } from '@/pages/admin/AdminUsers'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
@@ -57,6 +58,7 @@ function App() {
           <Route path="/transfers" element={<AdminTransfers />} />
           <Route path="/cash-register" element={<AdminCashRegister />} />
           <Route path="/organizations" element={<AdminOrganizations />} />
+          <Route path="/planes" element={<AdminPlans />} />
           <Route path="/users" element={<AdminUsers />} />
           <Route path="/roles-permissions" element={<AdminRolesPermissions />} />
         </Route>

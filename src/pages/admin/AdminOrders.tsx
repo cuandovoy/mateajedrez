@@ -107,11 +107,12 @@ export function AdminOrders() {
       if (searchTerm) {
         filteredData = filteredData.filter((order) => {
           const orderId = (order as { id: string }).id.toLowerCase()
-          const shippingAddress = (order as { shipping_address: { fullName?: string; phone?: string; address?: string } }).shipping_address
+          const shippingAddress = (order as { shipping_address: { fullName?: string; email?: string; phone?: string; address?: string } }).shipping_address
           const searchLower = searchTerm.toLowerCase()
           return (
             orderId.includes(searchLower) ||
             shippingAddress?.fullName?.toLowerCase().includes(searchLower) ||
+            shippingAddress?.email?.toLowerCase().includes(searchLower) ||
             shippingAddress?.phone?.includes(searchTerm) ||
             shippingAddress?.address?.toLowerCase().includes(searchLower)
           )
@@ -277,6 +278,7 @@ export function AdminOrders() {
                     {orders.map((order) => {
                       const shippingAddress = order.shipping_address as {
                         fullName?: string
+                        email?: string
                         phone?: string
                       }
                       return (
@@ -291,8 +293,10 @@ export function AdminOrders() {
                               <p className="font-medium text-gray-900">
                                 {shippingAddress?.fullName || 'Cliente Invitado'}
                               </p>
-                              {shippingAddress?.phone && (
-                                <p className="text-sm text-gray-500">{shippingAddress.phone}</p>
+                              {(shippingAddress?.email || shippingAddress?.phone) && (
+                                <p className="text-sm text-gray-500">
+                                  {[shippingAddress.email, shippingAddress.phone].filter(Boolean).join(' · ')}
+                                </p>
                               )}
                             </div>
                           </td>

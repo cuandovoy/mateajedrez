@@ -40,6 +40,7 @@ interface SaleLine {
 
 const manualSaleSchema = z.object({
   customer_name: z.string().optional(),
+  customer_email: z.string().optional(),
   customer_phone: z.string().optional(),
   payment_method: z.string().min(1, 'Selecciona un método de pago'),
   notes: z.string().optional(),
@@ -415,6 +416,7 @@ export function ManualSaleForm({
         status: 'pending',
         shipping_address: {
           fullName: data.customer_name || 'Cliente en tienda',
+          email: data.customer_email?.trim() || undefined,
           phone: data.customer_phone || '',
           address: 'Venta en tienda física',
           city: '',
@@ -866,6 +868,17 @@ export function ManualSaleForm({
                     Cliente (opcional)
                   </label>
                   <Input {...register('customer_name')} placeholder="Nombre del cliente" className="text-sm py-1.5" />
+                </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                    Email (opcional)
+                  </label>
+                  <Input
+                    {...register('customer_email')}
+                    type="email"
+                    placeholder="cliente@email.com"
+                    className="text-sm py-1.5"
+                  />
                 </div>
               </div>
 

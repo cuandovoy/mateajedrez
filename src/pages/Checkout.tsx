@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom'
 
 interface ShippingForm {
   fullName: string
+  email: string
   phone: string
   address: string
   city: string
@@ -40,6 +41,7 @@ export function Checkout() {
   const [mainBranchId, setMainBranchId] = useState<string | null>(null)
   const [formData, setFormData] = useState<ShippingForm>({
     fullName: '',
+    email: '',
     phone: '',
     address: '',
     city: '',
@@ -87,6 +89,13 @@ export function Checkout() {
     fetchMainBranch()
   }, [organizationId])
 
+  // Pre-fill email from user when logged in
+  useEffect(() => {
+    if (user?.email && !formData.email) {
+      setFormData((prev) => ({ ...prev, email: user.email ?? '' }))
+    }
+  }, [user?.email])
+
   // Sync payment method when enabled methods change
   useEffect(() => {
     const availableKeys = paymentMethods
@@ -103,6 +112,9 @@ export function Checkout() {
 
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'El nombre completo es obligatorio'
+    }
+    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      newErrors.email = 'Email inválido'
     }
     if (!formData.phone.trim()) {
       newErrors.phone = 'El teléfono es obligatorio'
@@ -247,8 +259,10 @@ export function Checkout() {
       }
 
       const total = getTotal()
+      const customerEmail = (formData.email.trim() || user?.email) ?? null
       const shippingAddress = {
         fullName: formData.fullName,
+        email: customerEmail || undefined,
         phone: formData.phone,
         address: formData.address,
         city: formData.city,
@@ -289,23 +303,23 @@ export function Checkout() {
 
       if (existingCustomer) {
         customer = existingCustomer
-        // Update customer info if they have a new user_id
-        if (user?.id && !existingCustomer.user_id) {
+        const needsUpdate =
+          (user?.id && !existingCustomer.user_id) ||
+          customerEmail !== (existingCustomer.email ?? '') ||
+          formData.fullName !== existingCustomer.full_name
+        if (needsUpdate) {
           const { data: updatedCustomer } = await supabase
             .from('customers')
             .update({
-              user_id: user.id,
-              email: user.email || existingCustomer.email,
+              ...(user?.id && !existingCustomer.user_id ? { user_id: user.id } : {}),
+              email: customerEmail ?? user?.email ?? existingCustomer.email,
               full_name: formData.fullName,
               address: shippingAddress,
             } as never)
             .eq('id', existingCustomer.id)
             .select()
             .single()
-          
-          if (updatedCustomer) {
-            customer = updatedCustomer
-          }
+          if (updatedCustomer) customer = updatedCustomer as Customer
         }
       } else {
         // Create new customer
@@ -314,7 +328,7 @@ export function Checkout() {
           .insert({
             organization_id: organizationId,
             user_id: user?.id || null,
-            email: user?.email || null,
+            email: customerEmail,
             full_name: formData.fullName,
             phone: formData.phone,
             address: shippingAddress,
@@ -550,8 +564,28 @@ export function Checkout() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Teléfono <span className="text-red-500">*</span>
+                      Email
                     </label>
+                    <Input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleChange('email', e.target.value)}
+                      placeholder="tu@email.com"
+                      className={errors.email ? 'border-red-500' : ''}
+                    />
+                    {errors.email && (
+                      <p className="text-xs text-red-500 mt-1">{errors.email}</p>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Para recibir actualizaciones del estado de tu orden
+                    </p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Teléfono <span className="text-red-500">*</span>
+                  </label>
                     <Input
                       type="tel"
                       value={formData.phone}
@@ -562,7 +596,6 @@ export function Checkout() {
                     {errors.phone && (
                       <p className="text-xs text-red-500 mt-1">{errors.phone}</p>
                     )}
-                  </div>
                 </div>
 
                 <div>

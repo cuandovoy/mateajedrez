@@ -4,6 +4,7 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice, formatDateShort } from '@/lib/utils'
 import type { Branch, Order, OrderItem, Product } from '@/types'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
 import {
   ArrowUpRight, BarChart3, Building2, Calendar, DollarSign, Package, ShoppingCart,
   TrendingUp
@@ -46,6 +47,7 @@ interface DailySales {
 export function AdminSales() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
+  const { canUseFeature } = usePlanLimits()
   const [loading, setLoading] = useState(true)
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState<string>('') // Empty = all branches
@@ -344,6 +346,7 @@ export function AdminSales() {
             <p className="text-gray-600 mt-2">Análisis detallado de tus ventas y rendimiento</p>
           </div>
           <div className="flex items-center space-x-4">
+            {canUseFeature('advanced_reports') && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Sucursal</label>
               <select
@@ -359,9 +362,15 @@ export function AdminSales() {
                 ))}
               </select>
             </div>
+            )}
           </div>
         </div>
-        {selectedBranch && (
+        {!canUseFeature('advanced_reports') && (
+          <p className="mt-4 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg">
+            Actualizá a Profesional para reportes avanzados (gráficos, top productos, ventas por sucursal).
+          </p>
+        )}
+        {selectedBranch && canUseFeature('advanced_reports') && (
           <div className="mt-4 flex items-center space-x-2 text-sm text-gray-600">
             <Building2 className="h-4 w-4" />
             <span>Mostrando datos de: <strong>{selectedBranch.name}</strong></span>
@@ -444,8 +453,8 @@ export function AdminSales() {
         </Card>
       </div>
 
-      {/* Sales by Branch Summary (if no branch selected) */}
-      {!selectedBranchId && salesByBranch.length > 0 && (
+      {/* Sales by Branch Summary (if no branch selected) - Profesional only */}
+      {canUseFeature('advanced_reports') && !selectedBranchId && salesByBranch.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Ventas por Sucursal</CardTitle>
@@ -558,7 +567,8 @@ export function AdminSales() {
         </Card>
       </div>
 
-      {/* Gráfico de ventas diarias */}
+      {/* Gráfico de ventas diarias - Profesional only */}
+      {canUseFeature('advanced_reports') && (
       <Card className="mb-8">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -624,8 +634,10 @@ export function AdminSales() {
           </div>
         </CardContent>
       </Card>
+      )}
 
-      {/* Productos más vendidos */}
+      {/* Productos más vendidos - Profesional only */}
+      {canUseFeature('advanced_reports') && (
       <Card>
         <CardHeader>
           <CardTitle>Productos Más Vendidos</CardTitle>
@@ -674,6 +686,7 @@ export function AdminSales() {
           )}
         </CardContent>
       </Card>
+      )}
     </div>
   )
 }

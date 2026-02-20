@@ -3,13 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { PaymentMethodsManager } from '@/components/admin/PaymentMethodsManager'
+import { PlanGate } from '@/components/features/PlanGate'
 import { supabase } from '@/lib/supabase'
 import { uploadOrganizationLogo, deleteImage } from '@/lib/storage'
+import { canUseFeature } from '@/lib/planLimits'
 import { useAdminStore } from '@/store/adminStore'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Organization, OrganizationSettings } from '@/types/database.types'
-import { Building2, CreditCard, Globe, Upload, X } from 'lucide-react'
+import { Bell, Building2, CreditCard, Globe, Upload, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
@@ -68,6 +70,7 @@ type Props = {
 export function EditOrganizationModal({ organization, onClose }: Props) {
   const { fetchOrganizations, setCurrentOrganization, currentOrganization } = useOrganizationStore()
   const { show } = useToastStore()
+  const canUseNotifications = canUseFeature(organization.subscription_tier ?? 'starter', 'notifications_config')
   const setHasUnsavedChanges = useAdminStore((s) => s.setHasUnsavedChanges)
   const [name, setName] = useState(organization.name)
   const [slug, setSlug] = useState(organization.slug)
@@ -77,6 +80,12 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   const [locale, setLocale] = useState((rawSettings.locale as string) ?? 'es-AR')
   const [timezone, setTimezone] = useState((rawSettings.timezone as string) ?? 'America/Argentina/Buenos_Aires')
   const [allowNegativeStock, setAllowNegativeStock] = useState((rawSettings.allow_negative_stock as boolean) !== false)
+  const [notificationEmail, setNotificationEmail] = useState((rawSettings.notification_email as string) ?? '')
+  const [newOrderNotify, setNewOrderNotify] = useState((rawSettings.new_order_notify as boolean) ?? false)
+  const [lowStockNotify, setLowStockNotify] = useState((rawSettings.low_stock_notify as boolean) ?? false)
+  const [orderStatusNotifyCustomer, setOrderStatusNotifyCustomer] = useState(
+    (rawSettings.order_status_notify_customer as boolean) ?? false
+  )
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(organization.logo_url ?? null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -94,6 +103,10 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     setLocale((s.locale as string) ?? 'es-AR')
     setTimezone((s.timezone as string) ?? 'America/Argentina/Buenos_Aires')
     setAllowNegativeStock((s.allow_negative_stock as boolean) !== false)
+    setNotificationEmail((s.notification_email as string) ?? '')
+    setNewOrderNotify((s.new_order_notify as boolean) ?? false)
+    setLowStockNotify((s.low_stock_notify as boolean) ?? false)
+    setOrderStatusNotifyCustomer((s.order_status_notify_customer as boolean) ?? false)
   }, [organization])
 
   const prevSettings = (organization.settings as Record<string, unknown>) ?? {}
@@ -106,7 +119,11 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     currency !== (prevSettings.currency ?? 'ARS') ||
     locale !== (prevSettings.locale ?? 'es-AR') ||
     timezone !== (prevSettings.timezone ?? 'America/Argentina/Buenos_Aires') ||
-    allowNegativeStock !== ((prevSettings.allow_negative_stock as boolean) !== false)
+    allowNegativeStock !== ((prevSettings.allow_negative_stock as boolean) !== false) ||
+    notificationEmail !== ((prevSettings.notification_email as string) ?? '') ||
+    newOrderNotify !== ((prevSettings.new_order_notify as boolean) ?? false) ||
+    lowStockNotify !== ((prevSettings.low_stock_notify as boolean) ?? false) ||
+    orderStatusNotifyCustomer !== ((prevSettings.order_status_notify_customer as boolean) ?? false)
 
   useEffect(() => {
     setHasUnsavedChanges(Boolean(isDirty))
@@ -180,6 +197,10 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         locale: locale.trim() || 'es-AR',
         timezone: timezone.trim() || 'America/Argentina/Buenos_Aires',
         allow_negative_stock: allowNegativeStock,
+        notification_email: notificationEmail.trim() || undefined,
+        new_order_notify: newOrderNotify,
+        low_stock_notify: lowStockNotify,
+        order_status_notify_customer: orderStatusNotifyCustomer,
       }
       const { data, error: updateError } = await supabase
         .from('organizations')
@@ -237,7 +258,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         <CardContent className="pt-4 overflow-y-auto flex-1 min-h-0">
           <form onSubmit={handleSubmit} className="flex flex-col h-full">
             <Tabs defaultValue="general" className="flex flex-col flex-1 min-h-0">
-              <TabsList className="w-full grid grid-cols-3 shrink-0">
+              <TabsList className="w-full grid grid-cols-4 shrink-0">
                 <TabsTrigger value="general" className="flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" />
                   General
@@ -249,6 +270,10 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 <TabsTrigger value="pagos" className="flex items-center gap-1.5">
                   <CreditCard className="h-4 w-4" />
                   Pagos
+                </TabsTrigger>
+                <TabsTrigger value="notificaciones" className="flex items-center gap-1.5">
+                  <Bell className="h-4 w-4" />
+                  Notificaciones
                 </TabsTrigger>
               </TabsList>
 
@@ -397,6 +422,57 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
 
               <TabsContent value="pagos" className="mt-4 flex-1 min-h-0">
                 <PaymentMethodsManager organizationId={organization.id} />
+              </TabsContent>
+
+              <TabsContent value="notificaciones" className="mt-4 flex-1 min-h-0">
+                <PlanGate feature="notifications_config" canUse={canUseNotifications}>
+                  <div className="space-y-4">
+                    <p className="text-sm text-gray-600">
+                      Configura las notificaciones por email para tu organización.
+                    </p>
+                    <Input
+                      label="Email para notificaciones"
+                      type="email"
+                      value={notificationEmail}
+                      onChange={(e) => setNotificationEmail(e.target.value)}
+                      placeholder="admin@mitienda.com"
+                    />
+                    <p className="text-xs text-gray-500">
+                      Recibirás aquí las notificaciones de nuevas órdenes y stock bajo.
+                    </p>
+                    <div className="space-y-3 border-t pt-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newOrderNotify}
+                          onChange={(e) => setNewOrderNotify(e.target.checked)}
+                          className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Notificar nueva orden</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={lowStockNotify}
+                          onChange={(e) => setLowStockNotify(e.target.checked)}
+                          className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Notificar stock bajo</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={orderStatusNotifyCustomer}
+                          onChange={(e) => setOrderStatusNotifyCustomer(e.target.checked)}
+                          className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                        />
+                        <span className="text-sm font-medium text-gray-700">
+                          Notificar al cliente al cambiar estado de la orden
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </PlanGate>
               </TabsContent>
             </Tabs>
 

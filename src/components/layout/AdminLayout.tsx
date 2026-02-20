@@ -21,7 +21,8 @@ import {
   ArrowRight,
   Menu,
   X,
-  Users2
+  Users2,
+  CreditCard
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AdminBreadcrumbs } from '@/components/admin/AdminBreadcrumbs'
@@ -29,6 +30,7 @@ import { ToastContainer } from './ToastContainer'
 import { CreateOrganizationModal } from '@/components/admin/CreateOrganizationModal'
 import { PermissionGate } from '@/components/features/PermissionGate'
 import type { Permission } from '@/lib/permissions'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
@@ -41,6 +43,8 @@ type NavItem = {
   permission?: Permission
   /** Solo visible para admins (no managers) */
   adminOnly?: boolean
+  /** Feature requerida por plan (ej: transfers, cash_register) */
+  planFeature?: 'transfers' | 'cash_register' | 'advanced_reports'
 }
 
 type NavSection = {
@@ -51,6 +55,7 @@ type NavSection = {
 export function AdminLayout() {
   const { user, isAdmin, canAccessAdminPanel, signOut, loading } = useAuthStore()
   const { currentOrganization, organizations, setCurrentOrganization, fetchOrganizations, switchingOrganization } = useOrganizationStore()
+  const { canUseFeature } = usePlanLimits()
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -102,7 +107,7 @@ export function AdminLayout() {
     {
       title: 'Inicio',
       items: [
-        { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+        { path: '/', label: 'Inicio', icon: LayoutDashboard },
         { path: '/products', label: 'Productos', icon: Package },
         { path: '/categories', label: 'Categorías', icon: Folder },
         { path: '/inventory', label: 'Inventario', icon: Warehouse },
@@ -113,8 +118,8 @@ export function AdminLayout() {
       items: [
         { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
         { path: '/customers', label: 'Clientes', icon: Users2, permission: 'customers:view' },
-        { path: '/cash-register', label: 'Caja', icon: Wallet },
-        { path: '/transfers', label: 'Transferencias', icon: ArrowRight },
+        { path: '/cash-register', label: 'Caja', icon: Wallet, planFeature: 'cash_register' },
+        { path: '/transfers', label: 'Transferencias', icon: ArrowRight, planFeature: 'transfers' },
       ],
     },
     {
@@ -130,6 +135,7 @@ export function AdminLayout() {
       title: 'Configuración',
       items: [
         { path: '/organizations', label: 'Organizaciones', icon: Building2, adminOnly: true },
+        { path: '/planes', label: 'Planes', icon: CreditCard },
         { path: '/users', label: 'Usuarios', icon: Users, adminOnly: true },
         { path: '/roles-permissions', label: 'Roles', icon: FileText, permission: 'settings:manage_roles' },
       ],
@@ -162,8 +168,6 @@ export function AdminLayout() {
   if (!user || !canAccessAdminPanel) {
     return null
   }
-console.log(currentOrganization);
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Admin Header - compacto */}
@@ -197,6 +201,16 @@ console.log(currentOrganization);
                   </div>
                   <span className="font-medium text-gray-700 max-w-[100px] truncate text-xs md:text-sm">
                     {currentOrganization?.name ?? 'Org'}
+                  </span>
+                  <span
+                    className={cn(
+                      'shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium hidden sm:inline',
+                      currentOrganization?.subscription_tier === 'profesional'
+                        ? 'bg-admin-100 text-admin-800'
+                        : 'bg-gray-100 text-gray-600'
+                    )}
+                  >
+                    {currentOrganization?.subscription_tier === 'profesional' ? 'Pro' : 'Starter'}
                   </span>
                   <ChevronRight className={`h-4 w-4 text-gray-400 shrink-0 transition-transform ${orgDropdownOpen ? 'rotate-90' : ''}`} />
                 </button>
@@ -232,16 +246,33 @@ console.log(currentOrganization);
                             </div>
                             <span className="truncate text-sm">{org.name}</span>
                           </div>
-                          <span className={cn(
-                            'shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium',
-                            org.member?.role === 'admin' ? 'bg-admin-100 text-admin-800' : 'bg-gray-200 text-gray-700'
-                          )}>
-                            {org.member?.role === 'admin' ? 'Admin' : 'Manager'}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span
+                              className={cn(
+                                'px-1.5 py-0.5 rounded text-[10px] font-medium',
+                                org.subscription_tier === 'profesional' ? 'bg-admin-100 text-admin-800' : 'bg-gray-100 text-gray-600'
+                              )}
+                            >
+                              {org.subscription_tier === 'profesional' ? 'Pro' : 'Starter'}
+                            </span>
+                            <span className={cn(
+                              'px-1.5 py-0.5 rounded text-[10px] font-medium',
+                              org.member?.role === 'admin' ? 'bg-admin-100 text-admin-800' : 'bg-gray-200 text-gray-700'
+                            )}>
+                              {org.member?.role === 'admin' ? 'Admin' : 'Manager'}
+                            </span>
+                          </div>
                         </button>
                       ))}
-                      {isAdmin && (
-                        <div className="border-t border-gray-100 mt-1 pt-1">
+                      <div className="border-t border-gray-100 mt-1 pt-1">
+                        <Link
+                          to="/planes"
+                          onClick={() => setOrgDropdownOpen(false)}
+                          className="block px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+                        >
+                          Ver planes
+                        </Link>
+                        {isAdmin && (
                           <button
                             onClick={() => {
                               setOrgDropdownOpen(false)
@@ -251,8 +282,8 @@ console.log(currentOrganization);
                           >
                             + Crear organización
                           </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </>
                 )}
@@ -299,8 +330,8 @@ console.log(currentOrganization);
                     </h3>
                   )}
                   <ul className="space-y-0.5">
-                    {section.items
-                      .filter((item) => !item.adminOnly || isAdmin)
+                    {                    section.items
+                      .filter((item) => (!item.adminOnly || isAdmin) && (!item.planFeature || canUseFeature(item.planFeature)))
                       .map((item) => {
                       const Icon = item.icon
                       const active = isActive(item.path)

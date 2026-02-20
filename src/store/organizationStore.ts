@@ -103,7 +103,7 @@ export const useOrganizationStore = create<OrganizationState>()(
           return {
             ...row,
             settings: row.settings ?? {},
-            subscription_tier: 'free',
+            subscription_tier: 'starter',
             subscription_status: 'active',
           } as Organization
         } catch {

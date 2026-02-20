@@ -940,6 +940,44 @@ export interface Database {
           created_at?: string
         }
       }
+      notification_queue: {
+        Row: {
+          id: string
+          organization_id: string
+          type: string
+          payload: Json
+          metadata: Json | null
+          status: string
+          attempts: number
+          last_error: string | null
+          created_at: string
+          processed_at: string | null
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          type: string
+          payload: Json
+          metadata?: Json | null
+          status?: string
+          attempts?: number
+          last_error?: string | null
+          created_at?: string
+          processed_at?: string | null
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          type?: string
+          payload?: Json
+          metadata?: Json | null
+          status?: string
+          attempts?: number
+          last_error?: string | null
+          created_at?: string
+          processed_at?: string | null
+        }
+      }
       inventory_transfers: {
         Row: {
           id: string
@@ -1048,6 +1086,10 @@ export type OrganizationSettings = {
   timezone?: string
   decimal_places?: number
   allow_negative_stock?: boolean
+  notification_email?: string
+  new_order_notify?: boolean
+  low_stock_notify?: boolean
+  order_status_notify_customer?: boolean
 }
 
 // Type helpers
@@ -1071,6 +1113,7 @@ export type CashSession = Database['public']['Tables']['cash_sessions']['Row']
 export type OrderPayment = Database['public']['Tables']['order_payments']['Row']
 export type AuditLog = Database['public']['Tables']['audit_logs']['Row']
 export type InventoryMovement = Database['public']['Tables']['inventory_movements']['Row']
+export type NotificationQueue = Database['public']['Tables']['notification_queue']['Row']
 export type InventoryTransfer = Database['public']['Tables']['inventory_transfers']['Row']
 export type Customer = Database['public']['Tables']['customers']['Row']
 
@@ -1093,6 +1136,7 @@ export type CashSessionInsert = Database['public']['Tables']['cash_sessions']['I
 export type OrderPaymentInsert = Database['public']['Tables']['order_payments']['Insert']
 export type AuditLogInsert = Database['public']['Tables']['audit_logs']['Insert']
 export type InventoryMovementInsert = Database['public']['Tables']['inventory_movements']['Insert']
+export type NotificationQueueInsert = Database['public']['Tables']['notification_queue']['Insert']
 export type InventoryTransferInsert = Database['public']['Tables']['inventory_transfers']['Insert']
 export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
 
@@ -1113,6 +1157,7 @@ export type CashSessionUpdate = Database['public']['Tables']['cash_sessions']['U
 export type OrderPaymentUpdate = Database['public']['Tables']['order_payments']['Update']
 export type AuditLogUpdate = Database['public']['Tables']['audit_logs']['Update']
 export type InventoryMovementUpdate = Database['public']['Tables']['inventory_movements']['Update']
+export type NotificationQueueUpdate = Database['public']['Tables']['notification_queue']['Update']
 export type InventoryTransferUpdate = Database['public']['Tables']['inventory_transfers']['Update']
 export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
 

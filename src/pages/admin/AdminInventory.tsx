@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch } from '@/types'
@@ -58,6 +59,7 @@ const getPrimaryImageUrl = (images: ProductImageRef[] | null | undefined): strin
 export function AdminInventory() {
   const { organizationId } = useOrganization()
   const { show } = useToastStore()
+  const { canUseFeature } = usePlanLimits()
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
@@ -625,11 +627,15 @@ export function AdminInventory() {
                                 icon: <Edit className="h-4 w-4" />,
                                 onClick: () => setAdjustmentModalItem(item),
                               },
-                              {
-                                label: 'Transferir a otra Sucursal',
-                                icon: <ArrowRight className="h-4 w-4" />,
-                                onClick: () => setTransferModalItem(item),
-                              },
+                              ...(canUseFeature('transfers')
+                                ? [
+                                    {
+                                      label: 'Transferir a otra Sucursal',
+                                      icon: <ArrowRight className="h-4 w-4" />,
+                                      onClick: () => setTransferModalItem(item),
+                                    },
+                                  ]
+                                : []),
                               {
                                 label: 'Ver Historial',
                                 icon: <History className="h-4 w-4" />,

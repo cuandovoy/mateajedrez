@@ -97,7 +97,7 @@ export function CreateOrganizationModal({ onClose }: Props) {
       const orgData: OrganizationInsert = {
         name: name.trim(),
         slug: finalSlug,
-        subscription_tier: 'free',
+        subscription_tier: 'starter',
         subscription_status: 'active',
       }
 

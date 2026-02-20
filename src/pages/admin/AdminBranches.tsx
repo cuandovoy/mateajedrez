@@ -10,6 +10,8 @@ import { BranchTable } from '@/components/admin/BranchTable'
 import { SearchFilter } from '@/components/filters'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { useToastStore } from '@/store/toastStore'
 import {
   Building2,
   Edit,
@@ -44,6 +46,8 @@ type BranchForm = z.infer<typeof branchSchema>
 
 function AdminBranchesContent() {
   const { organizationId } = useOrganization()
+  const { show } = useToastStore()
+  const { isAtLimit } = usePlanLimits()
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -106,6 +110,10 @@ function AdminBranchesContent() {
   }, [branches, search])
 
   const onSubmit = async (data: BranchForm) => {
+    if (!editingBranch && isAtLimit('branches')) {
+      show('Plan Starter incluye 1 sucursal. Actualizá a Profesional.', 'error')
+      return
+    }
     try {
       const baseData = {
         ...data,
@@ -191,6 +199,10 @@ function AdminBranchesContent() {
   }
 
   const handleNew = () => {
+    if (isAtLimit('branches')) {
+      show('Plan Starter incluye 1 sucursal. Actualizá a Profesional.', 'error')
+      return
+    }
     setEditingBranch(null)
     reset({
       name: '',
@@ -247,7 +259,7 @@ function AdminBranchesContent() {
               <Grid3x3 className="h-4 w-4" />
             </button>
           </div>
-          <Button onClick={handleNew}>
+          <Button onClick={handleNew} disabled={isAtLimit('branches')}>
             <Plus className="h-4 w-4 mr-2" />
             Nueva Sucursal
           </Button>

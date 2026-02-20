@@ -1,0 +1,120 @@
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { Check } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+
+const PLANS = [
+  {
+    name: 'Starter',
+    price: '$UY 1.200',
+    period: '/mes',
+    description: 'Ideal para emprendimientos que arrancan con control básico.',
+    features: [
+      'Hasta 200 productos',
+      '1 sucursal',
+      'Control de stock básico',
+      'Gestión de órdenes',
+      'Gestión de proveedores',
+      'Códigos de barras',
+    ],
+    cta: 'Plan actual',
+    highlighted: false,
+    tier: 'starter',
+  },
+  {
+    name: 'Profesional',
+    price: '$UY 2.400',
+    period: '/mes',
+    description: 'Para negocios en crecimiento que necesitan más control.',
+    features: [
+      'Productos ilimitados',
+      'Múltiples sucursales',
+      'Inventario multi-sucursal',
+      'Transferencias internas',
+      'Tienda online personalizada',
+      'Soporte prioritario',
+      'Configuración de notificaciones',
+      'Manejo de cajas y cierres',
+      'Reportes avanzados de ventas y stock',
+    ],
+    cta: 'Elegir Profesional',
+    highlighted: true,
+    tier: 'profesional',
+  },
+]
+
+export function AdminPlans() {
+  const { tier } = usePlanLimits()
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900">Planes</h1>
+        <p className="text-gray-600 mt-2">
+          Elegí el plan que mejor se adapte a tu negocio
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {PLANS.map((plan) => {
+          const isCurrent = tier === plan.tier
+          return (
+            <Card
+              key={plan.name}
+              className={`relative overflow-hidden ${
+                plan.highlighted ? 'ring-2 ring-admin-600' : ''
+              }`}
+            >
+              {plan.highlighted && (
+                <div className="absolute top-0 right-0 bg-admin-600 text-white text-xs font-medium px-3 py-1 rounded-bl-lg">
+                  Recomendado
+                </div>
+              )}
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span>{plan.name}</span>
+                  {isCurrent && (
+                    <span className="text-xs font-normal bg-admin-100 text-admin-800 px-2 py-0.5 rounded">
+                      Plan actual
+                    </span>
+                  )}
+                </CardTitle>
+                <div className="mt-2">
+                  <span className="text-3xl font-bold text-gray-900">{plan.price}</span>
+                  <span className="text-gray-600">{plan.period}</span>
+                </div>
+                <p className="text-sm text-gray-600 mt-2">{plan.description}</p>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 mb-6">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-2 text-sm text-gray-700">
+                      <Check className="h-4 w-4 text-green-600 shrink-0" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                {isCurrent ? (
+                  <Button disabled className="w-full">
+                    Plan actual
+                  </Button>
+                ) : (
+                  <Link to="/organizations">
+                    <Button className="w-full">
+                      {plan.cta}
+                    </Button>
+                  </Link>
+                )}
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
+
+      <p className="mt-6 text-center text-sm text-gray-500">
+        Para actualizar tu plan, contactá al administrador o configurá el pago desde la sección de organizaciones.
+      </p>
+    </div>
+  )
+}
