@@ -1,12 +1,12 @@
-import { Link, useNavigate } from 'react-router-dom'
-import { ShoppingCart, Menu, X } from 'lucide-react'
-import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
 import { Dropdown } from '@/components/ui/Dropdown'
-import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Category, Organization } from '@/types'
-import { cn } from '@/lib/utils'
+import { useCartStore } from '@/store/cartStore'
+import type { Category } from '@/types'
+import { Organization } from '@/types/database.types'
+import { Menu, ShoppingCart, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 
 interface CategoryWithSubcategories {
   value: string
@@ -44,10 +44,10 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
         if (error) throw error
         if (isMounted && data) {
           const categoriesData: Category[] = data as Category[]
-          
+
           const parentCategories = categoriesData.filter((cat) => !cat.parent_id)
           const subcategoriesMap = new Map<string, Category[]>()
-          
+
           categoriesData.forEach((cat) => {
             if (cat.parent_id) {
               if (!subcategoriesMap.has(cat.parent_id)) {
@@ -56,7 +56,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
               subcategoriesMap.get(cat.parent_id)!.push(cat)
             }
           })
-          
+
           const options: CategoryWithSubcategories[] = parentCategories.map((parent) => {
             const subcategories = subcategoriesMap.get(parent.id) || []
             return {
@@ -64,13 +64,13 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
               label: parent.name,
               subcategories: subcategories.length > 0
                 ? subcategories.map((sub) => ({
-                    value: sub.slug,
-                    label: sub.name,
-                  }))
+                  value: sub.slug,
+                  label: sub.name,
+                }))
                 : undefined,
             }
           })
-          
+
           setCategoriesWithSubs(options)
         }
       } catch (error) {
@@ -102,9 +102,9 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
   const primaryColor = organization.primary_color || '#6366f1'
 
   return (
-    <header 
+    <header
       className="sticky top-0 z-30 border-b"
-      style={{ 
+      style={{
         backgroundColor: primaryColor,
         borderColor: `${primaryColor}dd`
       }}
@@ -115,10 +115,10 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
           <div className="flex-1">
             <Link to={`/${slug}`} className="flex items-center space-x-3">
               {organization.logo_url ? (
-                <img 
-                  src={organization.logo_url} 
-                  alt={organization.name} 
-                  className="h-16 w-16 object-contain" 
+                <img
+                  src={organization.logo_url}
+                  alt={organization.name}
+                  className="h-16 w-16 object-contain"
                 />
               ) : (
                 <div className="h-16 w-16 flex items-center justify-center bg-white/20 rounded-lg">
@@ -177,10 +177,10 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
           <div className="flex-1 flex justify-center">
             <Link to={`/${slug}`} className="flex items-center space-x-2" onClick={() => setIsMobileMenuOpen(false)}>
               {organization.logo_url ? (
-                <img 
-                  src={organization.logo_url} 
-                  alt={organization.name} 
-                  className="h-12 w-12 object-contain" 
+                <img
+                  src={organization.logo_url}
+                  alt={organization.name}
+                  className="h-12 w-12 object-contain"
                 />
               ) : (
                 <div className="h-12 w-12 flex items-center justify-center bg-white/20 rounded-lg">

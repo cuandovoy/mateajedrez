@@ -3,10 +3,9 @@ import { ProductListItem } from '@/components/features/ProductListItem'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { supabase } from '@/lib/supabase'
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization'
+import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
-import { useParams } from 'react-router-dom'
 import type { Category, Product } from '@/types'
 import { Filter, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -16,7 +15,6 @@ const DEFAULT_STORE_SLUG = 'default'
 export function Products() {
   const { organization, isPublicStore, slug } = useCurrentOrganization()
   const fetchOrgBySlug = useOrganizationStore((s) => s.fetchOrgBySlug)
-  const { slug: urlSlug } = useParams<{ slug?: string }>()
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
