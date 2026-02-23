@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization'
 import { useOrganizationStore } from '@/store/organizationStore'
+import { useParams } from 'react-router-dom'
 import type { Category, Product } from '@/types'
 import { Filter, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -12,8 +14,9 @@ import { useEffect, useState } from 'react'
 const DEFAULT_STORE_SLUG = 'default'
 
 export function Products() {
-  const currentOrg = useOrganizationStore((s) => s.currentOrganization)
+  const { organization, isPublicStore, slug } = useCurrentOrganization()
   const fetchOrgBySlug = useOrganizationStore((s) => s.fetchOrgBySlug)
+  const { slug: urlSlug } = useParams<{ slug?: string }>()
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,11 +28,15 @@ export function Products() {
 
   useEffect(() => {
     const loadOrg = async () => {
-      const id = currentOrg?.id ?? (await fetchOrgBySlug(DEFAULT_STORE_SLUG))?.id
-      setOrgId(id ?? null)
+      if (isPublicStore && organization) {
+        setOrgId(organization.id)
+      } else {
+        const id = organization?.id ?? (await fetchOrgBySlug(DEFAULT_STORE_SLUG))?.id
+        setOrgId(id ?? null)
+      }
     }
     loadOrg()
-  }, [currentOrg?.id, fetchOrgBySlug])
+  }, [organization, isPublicStore, fetchOrgBySlug])
 
   useEffect(() => {
     if (orgId) {
@@ -282,7 +289,11 @@ export function Products() {
               {/* Vista Cards para móvil y tablet */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-6">
                 {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard 
+                    key={product.id} 
+                    product={product} 
+                    basePath={isPublicStore && slug ? `/${slug}` : ''}
+                  />
                 ))}
               </div>
 

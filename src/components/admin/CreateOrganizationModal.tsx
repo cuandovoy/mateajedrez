@@ -92,7 +92,7 @@ export function CreateOrganizationModal({ onClose }: Props) {
 
     setLoading(true)
     setError(null)
-
+debugger
     try {
       const orgData: OrganizationInsert = {
         name: name.trim(),

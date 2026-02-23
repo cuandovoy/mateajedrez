@@ -34,7 +34,7 @@ BEGIN
         branch_record.id,
         NEW.id,
         NULL,
-        0, -- Default stock to 0, admin must set it
+        NEW.stock,
         COALESCE(NEW.min_stock, 0),
         COALESCE(NEW.low_stock_threshold, 10)
       );

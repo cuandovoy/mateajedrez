@@ -1,5 +1,13 @@
 import { AdminLayout } from '@/components/layout/AdminLayout'
+import { PublicStoreWrapper } from '@/components/layout/PublicStoreWrapper'
 import { Login } from '@/pages/Login'
+import { PublicStore } from '@/pages/PublicStore'
+import { Products } from '@/pages/Products'
+import { CategoryProducts } from '@/pages/CategoryProducts'
+import { ProductDetail } from '@/pages/ProductDetail'
+import { Cart } from '@/pages/Cart'
+import { Checkout } from '@/pages/Checkout'
+import { OrderConfirmation } from '@/pages/OrderConfirmation'
 import { AdminAuditLogs } from '@/pages/admin/AdminAuditLogs'
 import { AdminBranches } from '@/pages/admin/AdminBranches'
 import { AdminCashRegister } from '@/pages/admin/AdminCashRegister'
@@ -41,6 +49,17 @@ function App() {
       <Routes>
         {/* Login (sin auth) */}
         <Route path="/login" element={<Login />} />
+
+        {/* Rutas públicas de tienda por slug */}
+        <Route element={<PublicStoreWrapper />}>
+          <Route path="/:slug" element={<PublicStore />} />
+          <Route path="/:slug/products" element={<Products />} />
+          <Route path="/:slug/categories/:categorySlug" element={<CategoryProducts />} />
+          <Route path="/:slug/product/:id" element={<ProductDetail />} />
+          <Route path="/:slug/cart" element={<Cart />} />
+          <Route path="/:slug/checkout" element={<Checkout />} />
+          <Route path="/:slug/order-confirmation/:orderId" element={<OrderConfirmation />} />
+        </Route>
 
         {/* Panel Admin en ruta raíz */}
         <Route element={<AdminLayout />}>

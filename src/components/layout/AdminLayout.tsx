@@ -22,7 +22,8 @@ import {
   Menu,
   X,
   Users2,
-  CreditCard
+  CreditCard,
+  Store
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AdminBreadcrumbs } from '@/components/admin/AdminBreadcrumbs'
@@ -53,7 +54,8 @@ type NavSection = {
 }
 
 export function AdminLayout() {
-  const { user, isAdmin, canAccessAdminPanel, signOut, loading } = useAuthStore()
+  const { user, isAdmin, canAccessAdminPanel, signOut, loading, profile } = useAuthStore()
+  const canCreateOrganization = profile?.role === 'admin'
   const { currentOrganization, organizations, setCurrentOrganization, fetchOrganizations, switchingOrganization } = useOrganizationStore()
   const { canUseFeature } = usePlanLimits()
   const navigate = useNavigate()
@@ -272,7 +274,7 @@ export function AdminLayout() {
                         >
                           Ver planes
                         </Link>
-                        {isAdmin && (
+                        {canCreateOrganization && (
                           <button
                             onClick={() => {
                               setOrgDropdownOpen(false)
@@ -288,6 +290,18 @@ export function AdminLayout() {
                   </>
                 )}
               </div>
+              {currentOrganization?.slug && (
+                <a
+                  href={`/${currentOrganization.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-200 hover:bg-gray-50 text-sm text-gray-700 hover:text-gray-900 transition-colors"
+                  title="Ver tienda pública"
+                >
+                  <Store className="h-4 w-4" />
+                  <span className="text-xs font-medium">Ver tienda</span>
+                </a>
+              )}
               <div className="flex items-center gap-1">
                 <span className="hidden md:block text-xs text-gray-500 truncate max-w-[140px]">{user.email}</span>
                 <Button

@@ -75,6 +75,12 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   const [name, setName] = useState(organization.name)
   const [slug, setSlug] = useState(organization.slug)
   const [primaryColor, setPrimaryColor] = useState(organization.primary_color ?? '')
+  const [secondaryColor, setSecondaryColor] = useState(organization.secondary_color ?? '')
+  const [accentColor, setAccentColor] = useState(organization.accent_color ?? '')
+  const [fontFamily, setFontFamily] = useState(organization.font_family ?? '')
+  const [fontHeading, setFontHeading] = useState(organization.font_heading ?? '')
+  const [borderRadius, setBorderRadius] = useState(organization.border_radius ?? 'rounded-lg')
+  const [buttonStyle, setButtonStyle] = useState(organization.button_style ?? 'rounded')
   const rawSettings = (organization.settings as Record<string, unknown>) ?? {}
   const [currency, setCurrency] = useState((rawSettings.currency as string) ?? 'ARS')
   const [locale, setLocale] = useState((rawSettings.locale as string) ?? 'es-AR')
@@ -97,6 +103,12 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     setSlug(organization.slug)
     setLogoPreview(organization.logo_url ?? null)
     setPrimaryColor(organization.primary_color ?? '')
+    setSecondaryColor(organization.secondary_color ?? '')
+    setAccentColor(organization.accent_color ?? '')
+    setFontFamily(organization.font_family ?? '')
+    setFontHeading(organization.font_heading ?? '')
+    setBorderRadius(organization.border_radius ?? 'rounded-lg')
+    setButtonStyle(organization.button_style ?? 'rounded')
     setLogoFile(null)
     const s = (organization.settings as Record<string, unknown>) ?? {}
     setCurrency((s.currency as string) ?? 'ARS')
@@ -114,6 +126,12 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     name !== organization.name ||
     slug !== organization.slug ||
     primaryColor !== (organization.primary_color ?? '') ||
+    secondaryColor !== (organization.secondary_color ?? '') ||
+    accentColor !== (organization.accent_color ?? '') ||
+    fontFamily !== (organization.font_family ?? '') ||
+    fontHeading !== (organization.font_heading ?? '') ||
+    borderRadius !== (organization.border_radius ?? 'rounded-lg') ||
+    buttonStyle !== (organization.button_style ?? 'rounded') ||
     logoFile !== null ||
     (logoPreview === null && organization.logo_url) ||
     currency !== (prevSettings.currency ?? 'ARS') ||
@@ -209,6 +227,12 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
           slug: finalSlug,
           logo_url: finalLogoUrl,
           primary_color: primaryColor.trim() || null,
+          secondary_color: secondaryColor.trim() || null,
+          accent_color: accentColor.trim() || null,
+          font_family: fontFamily.trim() || null,
+          font_heading: fontHeading.trim() || null,
+          border_radius: borderRadius.trim() || null,
+          button_style: buttonStyle.trim() || null,
           settings: { ...existingSettings, ...settingsUpdate },
         } as never)
         .eq('id', organization.id)
@@ -258,10 +282,14 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         <CardContent className="pt-4 overflow-y-auto flex-1 min-h-0">
           <form onSubmit={handleSubmit} className="flex flex-col h-full">
             <Tabs defaultValue="general" className="flex flex-col flex-1 min-h-0">
-              <TabsList className="w-full grid grid-cols-4 shrink-0">
+              <TabsList className="w-full grid grid-cols-5 shrink-0">
                 <TabsTrigger value="general" className="flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" />
                   General
+                </TabsTrigger>
+                <TabsTrigger value="estilos" className="flex items-center gap-1.5">
+                  <span className="text-xs">🎨</span>
+                  Estilos
                 </TabsTrigger>
                 <TabsTrigger value="formato" className="flex items-center gap-1.5">
                   <Globe className="h-4 w-4" />
@@ -347,6 +375,119 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                     />
                   </div>
                   <p className="mt-1 text-xs text-gray-500">Color en formato hex para la tienda</p>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="estilos" className="mt-4 space-y-4 flex-1 min-h-0">
+                <p className="text-sm text-gray-600">Personaliza la apariencia de tu tienda pública.</p>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Color secundario</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={secondaryColor || '#8b5cf6'}
+                      onChange={(e) => setSecondaryColor(e.target.value)}
+                      className="h-10 w-14 cursor-pointer rounded border border-gray-300 bg-white p-1 shrink-0"
+                    />
+                    <input
+                      type="text"
+                      value={secondaryColor}
+                      onChange={(e) => setSecondaryColor(e.target.value)}
+                      placeholder="#8b5cf6"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 font-mono text-sm"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Color para acentos y elementos secundarios</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Color de acento</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={accentColor || '#ec4899'}
+                      onChange={(e) => setAccentColor(e.target.value)}
+                      className="h-10 w-14 cursor-pointer rounded border border-gray-300 bg-white p-1 shrink-0"
+                    />
+                    <input
+                      type="text"
+                      value={accentColor}
+                      onChange={(e) => setAccentColor(e.target.value)}
+                      placeholder="#ec4899"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 font-mono text-sm"
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Color para elementos destacados</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fuente principal</label>
+                  <select
+                    value={fontFamily}
+                    onChange={(e) => setFontFamily(e.target.value)}
+                    className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
+                  >
+                    <option value="">Poppins (por defecto)</option>
+                    <option value="Poppins">Poppins</option>
+                    <option value="Inter">Inter</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Lato">Lato</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Raleway">Raleway</option>
+                    <option value="Nunito">Nunito</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">Fuente para texto general</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fuente para títulos</label>
+                  <select
+                    value={fontHeading}
+                    onChange={(e) => setFontHeading(e.target.value)}
+                    className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
+                  >
+                    <option value="">Igual que fuente principal</option>
+                    <option value="Poppins">Poppins</option>
+                    <option value="Inter">Inter</option>
+                    <option value="Roboto">Roboto</option>
+                    <option value="Open Sans">Open Sans</option>
+                    <option value="Lato">Lato</option>
+                    <option value="Montserrat">Montserrat</option>
+                    <option value="Raleway">Raleway</option>
+                    <option value="Nunito">Nunito</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">Fuente para títulos y encabezados (opcional)</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Radio de bordes</label>
+                  <select
+                    value={borderRadius}
+                    onChange={(e) => setBorderRadius(e.target.value)}
+                    className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
+                  >
+                    <option value="rounded">Redondeado pequeño</option>
+                    <option value="rounded-lg">Redondeado mediano</option>
+                    <option value="rounded-xl">Redondeado grande</option>
+                    <option value="rounded-full">Completamente redondeado</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">Estilo de bordes para elementos</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estilo de botones</label>
+                  <select
+                    value={buttonStyle}
+                    onChange={(e) => setButtonStyle(e.target.value)}
+                    className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
+                  >
+                    <option value="rounded">Redondeado</option>
+                    <option value="pill">Píldora (muy redondeado)</option>
+                    <option value="square">Cuadrado</option>
+                  </select>
+                  <p className="mt-1 text-xs text-gray-500">Forma de los botones en la tienda</p>
                 </div>
               </TabsContent>
 

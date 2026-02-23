@@ -3,11 +3,12 @@ import type { Category } from '@/types'
 
 interface CategoryCardProps {
   category: Category
+  basePath?: string
 }
 
-export function CategoryCard({ category }: CategoryCardProps) {
+export function CategoryCard({ category, basePath = '' }: CategoryCardProps) {
   return (
-    <Link to={`/${category.slug}`}>
+    <Link to={`${basePath}/categories/${category.slug}`}>
       <div className="group relative bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:border-primary-300 transition-all duration-300 hover:scale-105">
         <div className="aspect-w-16 aspect-h-9 bg-gray-200 overflow-hidden">
           {category.image_url ? (

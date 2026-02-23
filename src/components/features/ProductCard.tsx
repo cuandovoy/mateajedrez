@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react'
 interface ProductCardProps {
   product: Product & { product_images?: ProductImage[] }
   noAddToCart?: boolean
+  basePath?: string
 }
 
 // Helper function to validate image URLs
@@ -25,7 +26,7 @@ function isValidImageUrl(url: string | null | undefined): boolean {
   }
 }
 
-export function ProductCard({ product, noAddToCart = false }: ProductCardProps) {
+export function ProductCard({ product, noAddToCart = false, basePath = '' }: ProductCardProps) {
   const settings = useOrgSettings()
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
@@ -96,8 +97,16 @@ export function ProductCard({ product, noAddToCart = false }: ProductCardProps) 
   const hasStock = stock !== null ? stock > 0 : false
 
   return (
-    <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:border-primary-300 transition-all duration-300 flex flex-col h-full group">
-      <Link to={`/products/${product.id}`} className="block overflow-hidden">
+    <div 
+      className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col h-full group"
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--org-primary-color, #6366f1)'
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = ''
+      }}
+    >
+      <Link to={`${basePath}/product/${product.id}`} className="block overflow-hidden">
         <div className="w-full bg-gray-200 relative" style={{ aspectRatio: '16/9', minHeight: '192px' }}>
           {currentImageUrl ? (
             <img
@@ -124,7 +133,7 @@ export function ProductCard({ product, noAddToCart = false }: ProductCardProps) 
         </div>
       </Link>
       <div className="p-4 flex flex-col flex-grow">
-        <Link to={`/products/${product.id}`} className="group/link">
+        <Link to={`${basePath}/product/${product.id}`} className="group/link">
           <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover/link:text-primary-600 transition-colors duration-300">
             {product.name}
           </h3>
@@ -133,7 +142,12 @@ export function ProductCard({ product, noAddToCart = false }: ProductCardProps) 
           {product.description || 'Sin descripción'}
         </p>
         <div className="flex items-center justify-between mb-4">
-          <span className="text-2xl font-bold text-primary-600 group-hover:text-primary-700 transition-colors">
+          <span 
+            className="text-2xl font-bold transition-colors"
+            style={{ 
+              color: 'var(--org-primary-color, #6366f1)',
+            }}
+          >
             {formatPrice(product.price, settings)}
           </span>
           <div className="flex items-center space-x-2">
@@ -148,7 +162,8 @@ export function ProductCard({ product, noAddToCart = false }: ProductCardProps) 
         </div>
         {!noAddToCart && (
           <Button
-            className="w-full bg-primary-300 text-white mt-auto hover:bg-primary-400 hover:shadow-md transition-all duration-300 font-semibold"
+            variant="primary"
+            className="w-full mt-auto hover:shadow-md transition-all duration-300 font-semibold"
             onClick={handleAddToCart}
             disabled={!hasStock || isAdding}
             isLoading={isAdding}

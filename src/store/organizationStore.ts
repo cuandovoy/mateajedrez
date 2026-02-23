@@ -50,7 +50,7 @@ export const useOrganizationStore = create<OrganizationState>()(
               id,
               role,
               organization_id,
-              organizations(id, name, slug, logo_url, primary_color, settings, subscription_tier, subscription_status)
+              organizations(id, name, slug, logo_url, primary_color, secondary_color, accent_color, font_family, font_heading, border_radius, button_style, settings, subscription_tier, subscription_status)
             `)
             .eq('user_id', user.id)
 
@@ -97,6 +97,12 @@ export const useOrganizationStore = create<OrganizationState>()(
             slug: string
             logo_url?: string | null
             primary_color?: string | null
+            secondary_color?: string | null
+            accent_color?: string | null
+            font_family?: string | null
+            font_heading?: string | null
+            border_radius?: string | null
+            button_style?: string | null
             settings?: Record<string, unknown> | null
           } | undefined
           if (!row?.id) return null

@@ -16,6 +16,12 @@ export interface Database {
           slug: string
           logo_url: string | null
           primary_color: string | null
+          secondary_color: string | null
+          accent_color: string | null
+          font_family: string | null
+          font_heading: string | null
+          border_radius: string | null
+          button_style: string | null
           settings: Json
           subscription_tier: string
           subscription_status: string
@@ -28,6 +34,12 @@ export interface Database {
           slug: string
           logo_url?: string | null
           primary_color?: string | null
+          secondary_color?: string | null
+          accent_color?: string | null
+          font_family?: string | null
+          font_heading?: string | null
+          border_radius?: string | null
+          button_style?: string | null
           settings?: Json
           subscription_tier?: string
           subscription_status?: string
@@ -40,6 +52,12 @@ export interface Database {
           slug?: string
           logo_url?: string | null
           primary_color?: string | null
+          secondary_color?: string | null
+          accent_color?: string | null
+          font_family?: string | null
+          font_heading?: string | null
+          border_radius?: string | null
+          button_style?: string | null
           settings?: Json
           subscription_tier?: string
           subscription_status?: string
