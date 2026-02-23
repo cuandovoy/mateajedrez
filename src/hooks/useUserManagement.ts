@@ -54,10 +54,16 @@ export function useUserManagement() {
       throw new Error('La contraseña debe tener al menos 6 caracteres')
     }
 
+    const frontendUrl =
+      import.meta.env.VITE_FRONTEND_URL ||
+      import.meta.env.VITE_APP_URL ||
+      (typeof window !== 'undefined' ? window.location.origin : '')
+
     const { data: signUpData, error: signUpError } = await signupClient.auth.signUp({
       email,
       password,
       options: {
+        emailRedirectTo: frontendUrl ? frontendUrl.replace(/\/$/, '') : undefined,
         data: {
           full_name: fullName,
         },

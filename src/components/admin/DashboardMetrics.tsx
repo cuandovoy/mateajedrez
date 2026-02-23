@@ -12,6 +12,7 @@ import {
   Clock,
   Star
 } from 'lucide-react'
+import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice } from '@/lib/utils'
 
@@ -28,6 +29,7 @@ interface Metrics {
 
 export function DashboardMetrics() {
   const navigate = useNavigate()
+  const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const [metrics, setMetrics] = useState<Metrics>({
     totalRevenue: 0,
@@ -42,60 +44,76 @@ export function DashboardMetrics() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetchMetrics()
-  }, [])
+    if (organizationId) fetchMetrics()
+  }, [organizationId])
 
   const fetchMetrics = async () => {
+    if (!organizationId) return
     try {
-      // Fetch all metrics in parallel for better performance
+      const todayStart = new Date().toISOString().split('T')[0]
+      // Todas las métricas filtradas por organización actual
       const [
         ordersResult,
         productsResult,
-        usersResult,
-        lowStockResult,
+        customersResult,
+        lowStockProductsResult,
+        lowStockVariantsResult,
         pendingOrdersResult,
         todayOrdersResult,
       ] = await Promise.all([
-        // Total revenue and orders
+        // Ingresos y órdenes completadas (por org)
         supabase
           .from('orders')
           .select('total, status')
+          .eq('organization_id', organizationId)
           .in('status', ['delivered', 'shipped', 'processing']),
-        
-        // Total products
+        // Productos activos (por org)
         supabase
           .from('products')
           .select('id, stock')
+          .eq('organization_id', organizationId)
           .eq('is_active', true),
-        
-        // Total users
+        // Clientes de la organización (tabla customers, no user_profiles)
         supabase
-          .from('user_profiles')
-          .select('id', { count: 'exact', head: false }),
-        
-        // Low stock items using RPC function (variants and products without variants)
-        supabase.rpc('get_low_stock_items').select('id'),
-        
-        // Pending orders
+          .from('customers')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId),
+        // Productos sin variantes con bajo stock (por org)
+        supabase
+          .from('products')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .eq('is_active', true)
+          .or('stock.lte(min_stock),stock.lte(low_stock_threshold)'),
+        // Variantes con bajo stock (vía product.organization_id)
+        supabase
+          .from('product_variants')
+          .select('id, product_id, products!inner(organization_id)')
+          .eq('is_active', true)
+          .or('stock.lte(min_stock),stock.lte(low_stock_threshold)')
+          .eq('products.organization_id', organizationId),
+        // Órdenes pendientes (por org)
         supabase
           .from('orders')
           .select('id')
+          .eq('organization_id', organizationId)
           .eq('status', 'pending'),
-        
-        // Today's revenue
+        // Ingresos de hoy (por org)
         supabase
           .from('orders')
           .select('total')
+          .eq('organization_id', organizationId)
           .in('status', ['delivered', 'shipped', 'processing'])
-          .gte('created_at', new Date().toISOString().split('T')[0]),
+          .gte('created_at', todayStart),
       ])
 
       const totalRevenue = (ordersResult.data as Array<{ total: number }> | null)?.reduce((sum, order) => sum + order.total, 0) || 0
       const totalOrders = (ordersResult.data as Array<{ total: number }> | null)?.length || 0
       const totalProducts = (productsResult.data as Array<{ id: string; stock: number }> | null)?.length || 0
-      const totalUsers = usersResult.count || 0
-      // Count low stock items (variants and products without variants)
-      const lowStockProducts = (lowStockResult.data as Array<{ id: string }> | null)?.length || 0
+      const totalUsers = customersResult.count ?? (customersResult.data as unknown[] | null)?.length ?? 0
+      const lowStockProducts =
+        ((lowStockProductsResult.data as Array<{ id: string }> | null)?.length ?? 0) +
+        ((lowStockVariantsResult.data as Array<{ id: string }> | null)?.length ?? 0)
       const pendingOrders = (pendingOrdersResult.data as Array<{ id: string }> | null)?.length || 0
       const todayRevenue = (todayOrdersResult.data as Array<{ total: number }> | null)?.reduce((sum, order) => sum + order.total, 0) || 0
       const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0

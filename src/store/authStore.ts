@@ -148,10 +148,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signUp: async (email: string, password: string, fullName?: string) => {
     try {
+      const frontendUrl =
+        import.meta.env.VITE_FRONTEND_URL ||
+        import.meta.env.VITE_APP_URL ||
+        (typeof window !== 'undefined' ? window.location.origin : '')
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: frontendUrl ? frontendUrl.replace(/\/$/, '') : undefined,
           data: {
             full_name: fullName || null,
           },
