@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "generate-types": "node scripts/generate-types.js",
-    "seed": "node scripts/seed-organizations.js"
+    "seed": "node scripts/seed-organizations.js",
+    "load-products": "node scripts/load-products-from-csv.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.2",
