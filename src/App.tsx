@@ -14,9 +14,11 @@ import { AdminAuditLogs } from '@/pages/admin/AdminAuditLogs'
 import { AdminBranches } from '@/pages/admin/AdminBranches'
 import { AdminCashRegister } from '@/pages/admin/AdminCashRegister'
 import { AdminCategories } from '@/pages/admin/AdminCategories'
+import { AdminCustomerReports } from '@/pages/admin/AdminCustomerReports'
 import { AdminCustomers } from '@/pages/admin/AdminCustomers'
 import { AdminDashboard } from '@/pages/admin/AdminDashboard'
 import { AdminInventory } from '@/pages/admin/AdminInventory'
+import { AdminInventoryReports } from '@/pages/admin/AdminInventoryReports'
 import { AdminOrderDetail } from '@/pages/admin/AdminOrderDetail'
 import { AdminOrders } from '@/pages/admin/AdminOrders'
 import { AdminProducts } from '@/pages/admin/AdminProducts'
@@ -76,6 +78,8 @@ function App() {
           <Route path="/customers" element={<AdminCustomers />} />
           <Route path="/reports/sales" element={<AdminSales />} />
           <Route path="/reports/audit-logs" element={<AdminAuditLogs />} />
+          <Route path="/reports/customers" element={<AdminCustomerReports />} />
+          <Route path="/reports/inventory" element={<AdminInventoryReports />} />
           <Route path="/branches" element={<AdminBranches />} />
           <Route path="/inventory" element={<AdminInventory />} />
           <Route path="/transfers" element={<AdminTransfers />} />

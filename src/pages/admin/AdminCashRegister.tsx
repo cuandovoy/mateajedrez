@@ -146,7 +146,7 @@ function AdminCashRegisterContent() {
                 .in('id', orderIds)
 
               const validOrderIds = new Set(
-                (ordersData || []).filter((o: { status: string }) => o.status !== 'cancelled').map((o: { id: string }) => o.id)
+                (ordersData || []).filter((o) => o.status !== 'cancelled').map((o) => o.id)
               )
               validPaymentsTotal = payments
                 .filter((p: { order_id: string }) => validOrderIds.has(p.order_id))
@@ -230,7 +230,6 @@ function AdminCashRegisterContent() {
 
       const { error } = await supabase
         .from('cash_sessions')
-        // @ts-expect-error - Supabase types need to be regenerated after migration
         .insert(sessionData)
 
       if (error) throw error
@@ -267,7 +266,6 @@ function AdminCashRegisterContent() {
 
       const { error } = await supabase
         .from('cash_sessions')
-        // @ts-expect-error - Supabase types need to be regenerated after migration
         .update(updateData)
         .eq('id', editingSession.id)
 

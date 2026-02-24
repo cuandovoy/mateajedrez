@@ -10,9 +10,12 @@ import { canUseFeature } from '@/lib/planLimits'
 import { useAdminStore } from '@/store/adminStore'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
-import type { Organization, OrganizationSettings } from '@/types/database.types'
+import type { Tables } from '@/types/database.types'
 import { Bell, Building2, CreditCard, Globe, Upload, X } from 'lucide-react'
 import { useState, useEffect } from 'react'
+
+type Organization = Tables<'organizations'>
+export type OrganizationSettings = Record<string, unknown>
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 const MAX_FILE_SIZE_MB = 5

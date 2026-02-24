@@ -69,7 +69,8 @@ export function InventoryReceiptModal({
     setLoading(true)
 
     try {
-      const { error } = await supabase.rpc('receive_inventory', {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('receive_inventory', {
         p_branch_inventory_id: inventoryItem.id,
         p_quantity: qty,
         p_notes: notes || null,

@@ -129,7 +129,6 @@ function AdminBranchesContent() {
       if (editingBranch) {
         const { error } = await supabase
           .from('branches')
-          // @ts-expect-error - Supabase types need to be regenerated after migration
           .update(baseData)
           .eq('id', editingBranch.id)
 
@@ -138,7 +137,6 @@ function AdminBranchesContent() {
         const branchData: BranchInsert = { ...baseData, organization_id: organizationId! }
         const { error } = await supabase
           .from('branches')
-          // @ts-expect-error - Supabase types need to be regenerated after migration
           .insert(branchData)
 
         if (error) throw error
@@ -177,7 +175,7 @@ function AdminBranchesContent() {
       phone: branch.phone || '',
       email: branch.email || '',
       notes: branch.notes || '',
-      is_active: branch.is_active,
+      is_active: branch.is_active ?? true,
     })
     setIsModalOpen(true)
   }

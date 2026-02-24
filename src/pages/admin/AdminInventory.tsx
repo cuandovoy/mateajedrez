@@ -317,13 +317,13 @@ export function AdminInventory() {
 
       const existingProductIds = new Set(
         (existingInventory || [])
-          .filter((inv: { product_id?: string }) => inv.product_id)
-          .map((inv: { product_id: string }) => inv.product_id)
+          .filter((inv): inv is { product_id: string; variant_id: string | null } => inv.product_id !== null)
+          .map((inv) => inv.product_id)
       )
       const existingVariantIds = new Set(
         (existingInventory || [])
-          .filter((inv: { variant_id?: string }) => inv.variant_id)
-          .map((inv: { variant_id: string }) => inv.variant_id)
+          .filter((inv): inv is { product_id: string | null; variant_id: string } => inv.variant_id !== null)
+          .map((inv) => inv.variant_id)
       )
 
       const missingProducts = prodIds.filter((id: string) => !existingProductIds.has(id))

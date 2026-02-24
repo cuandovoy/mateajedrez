@@ -76,7 +76,7 @@ export function ProductSupplierManager({ productId, onClose }: ProductSupplierMa
           supplier_price: ps.supplier_price?.toString() || '',
           lead_time_days: ps.lead_time_days?.toString() || '',
           min_order_quantity: ps.min_order_quantity?.toString() || '1',
-          is_primary: ps.is_primary,
+          is_primary: ps.is_primary ?? false,
           notes: ps.notes || '',
         }))
       )

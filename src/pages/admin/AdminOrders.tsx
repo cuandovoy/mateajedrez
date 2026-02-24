@@ -11,7 +11,7 @@ import { Search, Calendar, Filter, ChevronLeft, ChevronRight, Eye } from 'lucide
 import type { Order } from '@/types'
 import { cn } from '@/lib/utils'
 
-const getStatusLabel = (status: string): string => {
+const getStatusLabel = (status: string | null): string => {
   const statusMap: Record<string, string> = {
     pending: 'Pendiente',
     processing: 'En Proceso',
@@ -19,10 +19,10 @@ const getStatusLabel = (status: string): string => {
     delivered: 'Entregado',
     cancelled: 'Cancelado',
   }
-  return statusMap[status] || status
+  return (status && statusMap[status]) || status || 'Sin estado'
 }
 
-const getStatusColor = (status: string): string => {
+const getStatusColor = (status: string | null): string => {
   const colorMap: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-800',
     processing: 'bg-blue-100 text-blue-800',
@@ -30,12 +30,12 @@ const getStatusColor = (status: string): string => {
     delivered: 'bg-green-100 text-green-800',
     cancelled: 'bg-red-100 text-red-800',
   }
-  return colorMap[status] || 'bg-gray-100 text-gray-800'
+  return (status && colorMap[status]) || 'bg-gray-100 text-gray-800'
 }
 
 type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
 
-const ITEMS_PER_PAGE = 10
+const ITEMS_PER_PAGE = 20
 
 export function AdminOrders() {
   const { organizationId } = useOrganization()

@@ -112,7 +112,7 @@ export function BarcodeManager({ productId, variantId, onClose }: BarcodeManager
           id: b.id,
           barcode: b.barcode,
           barcode_type: b.barcode_type,
-          is_primary: b.is_primary,
+          is_primary: b.is_primary ?? false,
           notes: b.notes || '',
         }))
       )

@@ -110,13 +110,10 @@ export function AdminLayout() {
       title: 'Inicio',
       items: [
         { path: '/', label: 'Inicio', icon: LayoutDashboard },
-        { path: '/products', label: 'Productos', icon: Package },
-        { path: '/categories', label: 'Categorías', icon: Folder },
-        { path: '/inventory', label: 'Inventario', icon: Warehouse },
       ],
     },
     {
-      title: 'Operaciones',
+      title: 'Operación',
       items: [
         { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
         { path: '/customers', label: 'Clientes', icon: Users2, permission: 'customers:view' },
@@ -125,16 +122,26 @@ export function AdminLayout() {
       ],
     },
     {
-      title: 'Gestión',
+      title: 'Catálogo',
       items: [
+        { path: '/products', label: 'Productos', icon: Package },
+        { path: '/categories', label: 'Categorías', icon: Folder },
+        { path: '/inventory', label: 'Inventario', icon: Warehouse },
         { path: '/suppliers', label: 'Proveedores', icon: Truck },
         { path: '/branches', label: 'Sucursales', icon: Building2 },
-        { path: '/reports/sales', label: 'Ventas', icon: BarChart3 },
-        { path: '/reports/audit-logs', label: 'Logs', icon: FileText },
       ],
     },
     {
-      title: 'Configuración',
+      title: 'Reportes',
+      items: [
+        { path: '/reports/sales', label: 'Ventas', icon: BarChart3 },
+        { path: '/reports/audit-logs', label: 'Auditoría', icon: FileText },
+        { path: '/reports/customers', label: 'Clientes', icon: Users2 },
+        { path: '/reports/inventory', label: 'Inventario', icon: Warehouse },
+      ],
+    },
+    {
+      title: 'Administración',
       items: [
         { path: '/organizations', label: 'Organizaciones', icon: Building2, adminOnly: true },
         { path: '/planes', label: 'Planes', icon: CreditCard },
@@ -414,7 +421,7 @@ export function AdminLayout() {
 
         {/* Admin Content */}
         <main className={cn(
-          'w-full bg-gray-50 min-h-[calc(100vh-52px)] relative transition-all duration-300',
+          'flex-1 min-w-0 bg-gray-50 min-h-[calc(100vh-52px)] relative transition-all duration-300',
           sidebarCollapsed ? 'lg:ml-14' : 'lg:ml-56'
         )}>
           {switchingOrganization && (

@@ -31,24 +31,24 @@ interface NewUserFormData {
 
 const ITEMS_PER_PAGE = 10
 
-const getRoleLabel = (role: string): string => {
+const getRoleLabel = (role: string | null): string => {
   const roleMap: Record<string, string> = {
     user: 'Usuario',
     admin: 'Administrador',
     manager: 'Gerente',
     viewer: 'Visualizador',
   }
-  return roleMap[role] || role
+  return (role && roleMap[role]) || role || 'Sin rol'
 }
 
-const getRoleColor = (role: string): string => {
+const getRoleColor = (role: string | null): string => {
   const colorMap: Record<string, string> = {
     user: 'bg-blue-100 text-blue-800',
     admin: 'bg-purple-100 text-purple-800',
     manager: 'bg-emerald-100 text-emerald-800',
     viewer: 'bg-gray-200 text-gray-800',
   }
-  return colorMap[role] || 'bg-gray-100 text-gray-800'
+  return (role && colorMap[role]) || 'bg-gray-100 text-gray-800'
 }
 
 export function AdminUsers() {
@@ -483,7 +483,7 @@ export function AdminUsers() {
                           <td className="py-3 px-4">
                             <div className="flex items-center space-x-2">
                               <select
-                                value={user.role}
+                                value={user.role ?? 'user'}
                                 onChange={(e) => handleRoleChange(user.user_id ?? user.id, e.target.value as UserRole)}
                                 disabled={updatingRole === (user.user_id ?? user.id) || user.user_id === authUser?.id}
                                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-200 disabled:bg-gray-100 disabled:text-gray-500"

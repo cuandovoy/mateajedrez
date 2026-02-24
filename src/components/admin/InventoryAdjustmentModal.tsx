@@ -55,7 +55,6 @@ export function InventoryAdjustmentModal({
 
       const { error: updateError } = await supabase
         .from('branch_inventory')
-        // @ts-expect-error - Supabase types may need regeneration
         .update({ stock })
         .eq('id', inventoryItem.id)
 
@@ -63,7 +62,6 @@ export function InventoryAdjustmentModal({
 
       await supabase
         .from('inventory_movements')
-        // @ts-expect-error - Supabase types may need regeneration
         .insert({
           branch_inventory_id: inventoryItem.id,
           movement_type: 'adjustment',

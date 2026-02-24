@@ -86,7 +86,7 @@ export function AdminTransfers() {
     }
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string | null) => {
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-800'
@@ -99,7 +99,7 @@ export function AdminTransfers() {
     }
   }
 
-  const getStatusLabel = (status: string) => {
+  const getStatusLabel = (status: string | null) => {
     switch (status) {
       case 'completed':
         return 'Completada'

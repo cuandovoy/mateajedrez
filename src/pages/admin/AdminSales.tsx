@@ -1,89 +1,189 @@
+import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { supabase } from '@/lib/supabase'
-import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatPrice, formatDateShort } from '@/lib/utils'
-import type { Branch, Order, OrderItem, Product } from '@/types'
+import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
-import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { supabase } from '@/lib/supabase'
+import { formatDateShort, formatPrice } from '@/lib/utils'
+import type { Branch } from '@/types'
 import {
-  ArrowUpRight, BarChart3, Building2, Calendar, DollarSign, Package, ShoppingCart,
-  TrendingUp
+  BarChart3,
+  Building2,
+  Calendar,
+  CreditCard,
+  Download,
+  DollarSign,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
-interface SalesMetrics {
-  totalRevenue: number
-  totalOrders: number
-  averageOrderValue: number
-  todayRevenue: number
-  todayOrders: number
-  weekRevenue: number
-  weekOrders: number
-  monthRevenue: number
-  monthOrders: number
-  yearRevenue: number
-  yearOrders: number
-}
+type PeriodMode = 'month' | 'custom'
 
-interface TopProduct {
-  product_id: string
-  product_name: string
-  total_quantity: number
-  total_revenue: number
-}
-
-interface OrderStatusCount {
-  status: string
-  count: number
+type DailySale = {
+  date: string
+  orders: number
   revenue: number
 }
 
-interface DailySales {
-  date: string
+type MonthlySale = {
+  month: string
+  orders: number
+  revenue: number
+}
+
+type PaymentMethodSummary = {
+  method: string
+  label: string
+  amount: number
+}
+
+type BranchSummary = {
+  branch_id: string
+  branch_name: string
+  orders: number
+  revenue: number
+}
+
+type SummaryCurrent = {
+  revenue: number
+  orders: number
+  avgTicket: number
+}
+
+type SummaryPrevious = {
   revenue: number
   orders: number
 }
 
+const getPaymentMethodLabel = (method: string): string => {
+  const labels: Record<string, string> = {
+    cash: 'Efectivo',
+    mercadopago: 'Mercado Pago',
+    credit_card: 'Crédito',
+    debit_card: 'Débito',
+    transfer: 'Transferencia',
+  }
+  return labels[method] || method.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+const toDateKey = (date: Date): string => date.toISOString().split('T')[0]
+
+const monthRangeFromValue = (value: string): { start: Date; end: Date } => {
+  const [year, month] = value.split('-').map(Number)
+  const start = new Date(year, month - 1, 1)
+  const end = new Date(year, month, 0)
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
+
+const dateInputRange = (startDate: string, endDate: string): { start: Date; end: Date } => {
+  const start = new Date(startDate)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(endDate)
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
+
+const compareRange = (start: Date, end: Date): { start: Date; end: Date } => {
+  const diff = end.getTime() - start.getTime()
+  const prevEnd = new Date(start.getTime() - 1)
+  const prevStart = new Date(prevEnd.getTime() - diff)
+  return { start: prevStart, end: prevEnd }
+}
+
+const percentChange = (current: number, previous: number): number => {
+  if (previous === 0) return current > 0 ? 100 : 0
+  return ((current - previous) / previous) * 100
+}
+
+const monthLabel = (monthKey: string): string => {
+  const [year, month] = monthKey.split('-').map(Number)
+  return new Date(year, month - 1, 1).toLocaleDateString('es-UY', {
+    month: 'long',
+    year: 'numeric',
+  })
+}
+
+const escapeCsv = (value: string | number): string => {
+  const str = String(value)
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
+const asNumber = (value: unknown): number => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+const asString = (value: unknown): string => (typeof value === 'string' ? value : '')
+
 export function AdminSales() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
-  const { canUseFeature } = usePlanLimits()
-  const [loading, setLoading] = useState(true)
+
   const [branches, setBranches] = useState<Branch[]>([])
-  const [selectedBranchId, setSelectedBranchId] = useState<string>('') // Empty = all branches
-  const [metrics, setMetrics] = useState<SalesMetrics>({
-    totalRevenue: 0,
-    totalOrders: 0,
-    averageOrderValue: 0,
-    todayRevenue: 0,
-    todayOrders: 0,
-    weekRevenue: 0,
-    weekOrders: 0,
-    monthRevenue: 0,
-    monthOrders: 0,
-    yearRevenue: 0,
-    yearOrders: 0,
+  const [selectedBranchId, setSelectedBranchId] = useState('')
+  const [periodMode, setPeriodMode] = useState<PeriodMode>('month')
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([])
-  const [orderStatusCounts, setOrderStatusCounts] = useState<OrderStatusCount[]>([])
-  const [dailySales, setDailySales] = useState<DailySales[]>([])
-  const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '90d'>('30d')
-  const [salesByBranch, setSalesByBranch] = useState<Array<{ branch_id: string; branch_name: string; revenue: number; orders: number }>>([])
+  const [customStart, setCustomStart] = useState(() => toDateKey(new Date()))
+  const [customEnd, setCustomEnd] = useState(() => toDateKey(new Date()))
+  const [draftSelectedBranchId, setDraftSelectedBranchId] = useState(selectedBranchId)
+  const [draftPeriodMode, setDraftPeriodMode] = useState<PeriodMode>(periodMode)
+  const [draftSelectedMonth, setDraftSelectedMonth] = useState(selectedMonth)
+  const [draftCustomStart, setDraftCustomStart] = useState(customStart)
+  const [draftCustomEnd, setDraftCustomEnd] = useState(customEnd)
+
+  const [loading, setLoading] = useState(true)
+  const [currentSummary, setCurrentSummary] = useState<SummaryCurrent>({
+    revenue: 0,
+    orders: 0,
+    avgTicket: 0,
+  })
+  const [previousSummary, setPreviousSummary] = useState<SummaryPrevious>({
+    revenue: 0,
+    orders: 0,
+  })
+  const [dailySales, setDailySales] = useState<DailySale[]>([])
+  const [monthlySales, setMonthlySales] = useState<MonthlySale[]>([])
+  const [paymentMethodSales, setPaymentMethodSales] = useState<PaymentMethodSummary[]>([])
+  const [branchSummary, setBranchSummary] = useState<BranchSummary[]>([])
+
+  const requestSequenceRef = useRef(0)
 
   useEffect(() => {
-    if (organizationId) fetchBranches()
+    if (organizationId) {
+      fetchBranches()
+    }
   }, [organizationId])
 
+  const range = useMemo(() => {
+    if (periodMode === 'month') {
+      return monthRangeFromValue(selectedMonth)
+    }
+    return dateInputRange(customStart, customEnd)
+  }, [periodMode, selectedMonth, customStart, customEnd])
+
+  const comparison = useMemo(() => compareRange(range.start, range.end), [range])
+
   useEffect(() => {
-    if (organizationId) fetchSalesData()
-  }, [organizationId, selectedPeriod, selectedBranchId])
+    if (organizationId) {
+      fetchReportData()
+    }
+  }, [organizationId, selectedBranchId, range.start.getTime(), range.end.getTime(), comparison.start.getTime(), comparison.end.getTime()])
 
   const fetchBranches = async () => {
     if (!organizationId) return
+
     try {
       const { data, error } = await supabase
         .from('branches')
-        .select('id, name, code')
+        .select('id, name, code, organization_id, is_active, created_at, updated_at')
         .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name')
@@ -95,236 +195,196 @@ export function AdminSales() {
     }
   }
 
-  const fetchSalesData = async () => {
+  const fetchReportData = async () => {
     if (!organizationId) return
+
+    if (periodMode === 'custom' && customStart > customEnd) {
+      return
+    }
+
+    const monthlyStart = new Date(range.end)
+    monthlyStart.setDate(1)
+    monthlyStart.setMonth(monthlyStart.getMonth() - 11)
+    monthlyStart.setHours(0, 0, 0, 0)
+
+    const requestId = ++requestSequenceRef.current
+    setLoading(true)
+
     try {
-      setLoading(true)
-
-      const now = new Date()
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-      const weekAgo = new Date(today)
-      weekAgo.setDate(weekAgo.getDate() - 7)
-      const monthAgo = new Date(today)
-      monthAgo.setMonth(monthAgo.getMonth() - 1)
-      const yearAgo = new Date(today)
-      yearAgo.setFullYear(yearAgo.getFullYear() - 1)
-
-      // Fetch all orders with statuses that count as sales
-      // Filter by organization and branch if selected
-      let ordersQuery = supabase
-        .from('orders')
-        .select('id, total, status, created_at, branch_id')
-        .eq('organization_id', organizationId)
-        .in('status', ['delivered', 'shipped', 'processing', 'pending'])
-
-      if (selectedBranchId) {
-        ordersQuery = ordersQuery.eq('branch_id', selectedBranchId)
-      }
-
-      const { data: allOrders, error: ordersError } = await ordersQuery
-
-      if (ordersError) throw ordersError
-
-      const orders = allOrders as Order[]
-
-      // Calculate metrics
-      const completedOrders = orders.filter((o) =>
-        ['delivered', 'shipped', 'processing'].includes(o.status)
-      )
-
-      const totalRevenue = completedOrders.reduce((sum, o) => sum + o.total, 0)
-      const totalOrders = completedOrders.length
-      const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
-
-      const todayOrders = completedOrders.filter(
-        (o) => new Date(o.created_at) >= today
-      )
-      const todayRevenue = todayOrders.reduce((sum, o) => sum + o.total, 0)
-
-      const weekOrders = completedOrders.filter(
-        (o) => new Date(o.created_at) >= weekAgo
-      )
-      const weekRevenue = weekOrders.reduce((sum, o) => sum + o.total, 0)
-
-      const monthOrders = completedOrders.filter(
-        (o) => new Date(o.created_at) >= monthAgo
-      )
-      const monthRevenue = monthOrders.reduce((sum, o) => sum + o.total, 0)
-
-      const yearOrders = completedOrders.filter(
-        (o) => new Date(o.created_at) >= yearAgo
-      )
-      const yearRevenue = yearOrders.reduce((sum, o) => sum + o.total, 0)
-
-      setMetrics({
-        totalRevenue,
-        totalOrders,
-        averageOrderValue,
-        todayRevenue,
-        todayOrders: todayOrders.length,
-        weekRevenue,
-        weekOrders: weekOrders.length,
-        monthRevenue,
-        monthOrders: monthOrders.length,
-        yearRevenue,
-        yearOrders: yearOrders.length,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)('get_sales_report_summary', {
+        p_organization_id: organizationId,
+        p_range_start: range.start.toISOString(),
+        p_range_end: range.end.toISOString(),
+        p_compare_start: comparison.start.toISOString(),
+        p_compare_end: comparison.end.toISOString(),
+        p_monthly_start: monthlyStart.toISOString(),
+        p_branch_id: selectedBranchId || null,
       })
 
-      // Fetch top products
-      const { data: orderItems, error: itemsError }: { data: OrderItem[] | null, error: Error | null } = await supabase
-        .from('order_items')
-        .select('product_id, quantity, price, order_id')
-        .in(
-          'order_id',
-          completedOrders.map((o) => o.id)
-        )
+      if (error) throw error
+      if (requestId !== requestSequenceRef.current) return
 
-      if (itemsError) throw itemsError
+      const payload = (data || {}) as Record<string, unknown>
 
-      // Get product names
-      const productIds = [...new Set((orderItems || []).map((item) => item.product_id))]
-      const { data: products, error: productsError }: { data: Product[] | null, error: Error | null } = await supabase
-        .from('products')
-        .select('id, name')
-        .in('id', productIds)
+      const current = (payload.current as Record<string, unknown> | undefined) || {}
+      const previous = (payload.previous as Record<string, unknown> | undefined) || {}
 
-      if (productsError) throw productsError
-
-      const productMap = new Map((products || []).map((p) => [p.id, p.name]))
-
-      // Calculate top products
-      const productStats = new Map<string, { quantity: number; revenue: number }>()
-      ;(orderItems || []).forEach((item) => {
-        const current = productStats.get(item.product_id) || { quantity: 0, revenue: 0 }
-        productStats.set(item.product_id, {
-          quantity: current.quantity + item.quantity,
-          revenue: current.revenue + item.price * item.quantity,
-        })
+      setCurrentSummary({
+        revenue: asNumber(current.revenue),
+        orders: asNumber(current.orders),
+        avgTicket: asNumber(current.avg_ticket),
       })
 
-      const topProductsData: TopProduct[] = Array.from(productStats.entries())
-        .map(([product_id, stats]) => ({
-          product_id,
-          product_name: productMap.get(product_id) || 'Producto desconocido',
-          total_quantity: stats.quantity,
-          total_revenue: stats.revenue,
-        }))
-        .sort((a, b) => b.total_revenue - a.total_revenue)
-        .slice(0, 10)
-
-      setTopProducts(topProductsData)
-
-      // Calculate order status distribution
-      const statusMap = new Map<string, { count: number; revenue: number }>()
-      orders.forEach((order) => {
-        const current = statusMap.get(order.status) || { count: 0, revenue: 0 }
-        statusMap.set(order.status, {
-          count: current.count + 1,
-          revenue: current.revenue + order.total,
-        })
+      setPreviousSummary({
+        revenue: asNumber(previous.revenue),
+        orders: asNumber(previous.orders),
       })
 
-      const statusLabels: Record<string, string> = {
-        pending: 'Pendiente',
-        processing: 'En Proceso',
-        shipped: 'Enviado',
-        delivered: 'Entregado',
-        cancelled: 'Cancelado',
-      }
-
-      const statusCountsData: OrderStatusCount[] = Array.from(statusMap.entries()).map(
-        ([status, stats]) => ({
-          status: statusLabels[status] || status,
-          count: stats.count,
-          revenue: stats.revenue,
-        })
-      )
-
-      setOrderStatusCounts(statusCountsData)
-
-      // Calculate daily sales for chart
-      const daysToShow = selectedPeriod === '7d' ? 7 : selectedPeriod === '30d' ? 30 : 90
-      const startDate = new Date(today)
-      startDate.setDate(startDate.getDate() - daysToShow)
-
-      const dailyMap = new Map<string, { revenue: number; orders: number }>()
-      completedOrders
-        .filter((o) => new Date(o.created_at) >= startDate)
-        .forEach((order) => {
-          const dateKey = new Date(order.created_at).toISOString().split('T')[0]
-          const current = dailyMap.get(dateKey) || { revenue: 0, orders: 0 }
-          dailyMap.set(dateKey, {
-            revenue: current.revenue + order.total,
-            orders: current.orders + 1,
-          })
-        })
-
-      // Fill in missing dates with zero values
-      const dailySalesData: DailySales[] = []
-      for (let i = daysToShow - 1; i >= 0; i--) {
-        const date = new Date(today)
-        date.setDate(date.getDate() - i)
-        const dateKey = date.toISOString().split('T')[0]
-        const stats = dailyMap.get(dateKey) || { revenue: 0, orders: 0 }
-        dailySalesData.push({
-          date: dateKey,
-          revenue: stats.revenue,
-          orders: stats.orders,
-        })
-      }
-
-      setDailySales(dailySalesData)
-
-      // Calculate sales by branch (if no branch filter is selected)
-      if (!selectedBranchId) {
-        const branchSalesMap = new Map<string, { revenue: number; orders: number }>()
-        
-        completedOrders.forEach((order) => {
-          const branchId = (order as Order).branch_id
-          if (branchId) {
-            const current = branchSalesMap.get(branchId) || { revenue: 0, orders: 0 }
-            branchSalesMap.set(branchId, {
-              revenue: current.revenue + order.total,
-              orders: current.orders + 1,
-            })
-          }
-        })
-
-        const branchSalesData = Array.from(branchSalesMap.entries()).map(([branch_id, stats]) => {
-          const branch = branches.find((b) => b.id === branch_id)
+      const daily = Array.isArray(payload.daily) ? payload.daily : []
+      setDailySales(
+        daily.map((item) => {
+          const row = item as Record<string, unknown>
           return {
-            branch_id,
-            branch_name: branch?.name || 'Sucursal desconocida',
-            revenue: stats.revenue,
-            orders: stats.orders,
+            date: asString(row.date),
+            orders: asNumber(row.orders),
+            revenue: asNumber(row.revenue),
           }
         })
+      )
 
-        setSalesByBranch(branchSalesData)
-      } else {
-        setSalesByBranch([])
-      }
+      const monthly = Array.isArray(payload.monthly) ? payload.monthly : []
+      setMonthlySales(
+        monthly.map((item) => {
+          const row = item as Record<string, unknown>
+          return {
+            month: asString(row.month),
+            orders: asNumber(row.orders),
+            revenue: asNumber(row.revenue),
+          }
+        })
+      )
+
+      const methods = Array.isArray(payload.payment_methods) ? payload.payment_methods : []
+      setPaymentMethodSales(
+        methods.map((item) => {
+          const row = item as Record<string, unknown>
+          const method = asString(row.method)
+          return {
+            method,
+            label: getPaymentMethodLabel(method),
+            amount: asNumber(row.amount),
+          }
+        })
+      )
+
+      const branchesData = Array.isArray(payload.branches) ? payload.branches : []
+      setBranchSummary(
+        branchesData.map((item) => {
+          const row = item as Record<string, unknown>
+          return {
+            branch_id: asString(row.branch_id),
+            branch_name: asString(row.branch_name) || 'Sin sucursal',
+            orders: asNumber(row.orders),
+            revenue: asNumber(row.revenue),
+          }
+        })
+      )
     } catch (error) {
-      console.error('Error fetching sales data:', error)
+      if (requestId !== requestSequenceRef.current) return
+      console.error('Error fetching sales report data:', error)
     } finally {
-      setLoading(false)
+      if (requestId === requestSequenceRef.current) {
+        setLoading(false)
+      }
     }
   }
 
-  const maxRevenue = useMemo(
-    () => Math.max(...dailySales.map((d) => d.revenue), 1),
-    [dailySales]
-  )
+  const selectedBranch = branches.find((b) => b.id === selectedBranchId)
+  const invalidDraftCustomRange = draftPeriodMode === 'custom' && draftCustomStart > draftCustomEnd
+  const hasPendingFilterChanges =
+    draftSelectedBranchId !== selectedBranchId ||
+    draftPeriodMode !== periodMode ||
+    draftSelectedMonth !== selectedMonth ||
+    draftCustomStart !== customStart ||
+    draftCustomEnd !== customEnd
 
-  const getStatusColor = (status: string): string => {
-    const colorMap: Record<string, string> = {
-      Pendiente: 'bg-yellow-100 text-yellow-800',
-      'En Proceso': 'bg-blue-100 text-blue-800',
-      Enviado: 'bg-purple-100 text-purple-800',
-      Entregado: 'bg-green-100 text-green-800',
-      Cancelado: 'bg-red-100 text-red-800',
+  const comparisonSummary = useMemo(() => {
+    return {
+      prevRevenue: previousSummary.revenue,
+      prevOrders: previousSummary.orders,
+      revenueChange: percentChange(currentSummary.revenue, previousSummary.revenue),
+      ordersChange: percentChange(currentSummary.orders, previousSummary.orders),
     }
-    return colorMap[status] || 'bg-gray-100 text-gray-800'
+  }, [currentSummary, previousSummary])
+
+  const periodLabel =
+    periodMode === 'month'
+      ? monthLabel(selectedMonth)
+      : `${formatDateShort(range.start, settings)} - ${formatDateShort(range.end, settings)}`
+
+  const handleExport = () => {
+    const rows: Array<Array<string | number>> = []
+
+    rows.push(['Reporte de Ventas'])
+    rows.push(['Período', periodLabel])
+    rows.push(['Sucursal', selectedBranch?.name || 'Todas'])
+    rows.push([])
+
+    rows.push(['Resumen General'])
+    rows.push(['Ingresos', 'Órdenes', 'Ticket promedio'])
+    rows.push([currentSummary.revenue, currentSummary.orders, currentSummary.avgTicket])
+    rows.push([])
+
+    rows.push(['Comparación entre períodos'])
+    rows.push(['Ingresos actual', 'Ingresos anterior', 'Variación %', 'Órdenes actual', 'Órdenes anterior', 'Variación %'])
+    rows.push([
+      currentSummary.revenue,
+      comparisonSummary.prevRevenue,
+      comparisonSummary.revenueChange.toFixed(2),
+      currentSummary.orders,
+      comparisonSummary.prevOrders,
+      comparisonSummary.ordersChange.toFixed(2),
+    ])
+    rows.push([])
+
+    rows.push(['Ventas por método de pago'])
+    rows.push(['Método', 'Monto'])
+    paymentMethodSales.forEach((row) => rows.push([row.label, row.amount]))
+    rows.push([])
+
+    rows.push(['Resumen por sucursal'])
+    rows.push(['Sucursal', 'Órdenes', 'Ingresos'])
+    branchSummary.forEach((row) => rows.push([row.branch_name, row.orders, row.revenue]))
+    rows.push([])
+
+    rows.push(['Ventas diarias'])
+    rows.push(['Fecha', 'Órdenes', 'Ingresos'])
+    dailySales.forEach((row) => rows.push([row.date, row.orders, row.revenue]))
+    rows.push([])
+
+    rows.push(['Ventas mensuales (últimos 12 meses)'])
+    rows.push(['Mes', 'Órdenes', 'Ingresos'])
+    monthlySales.forEach((row) => rows.push([row.month, row.orders, row.revenue]))
+
+    const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const dateStamp = toDateKey(new Date()).replace(/-/g, '')
+    a.href = url
+    a.download = `reporte_ventas_${dateStamp}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleApplyFilters = () => {
+    if (invalidDraftCustomRange) return
+    setSelectedBranchId(draftSelectedBranchId)
+    setPeriodMode(draftPeriodMode)
+    setSelectedMonth(draftSelectedMonth)
+    setCustomStart(draftCustomStart)
+    setCustomEnd(draftCustomEnd)
   }
 
   if (loading) {
@@ -335,358 +395,294 @@ export function AdminSales() {
     )
   }
 
-  const selectedBranch = branches.find((b) => b.id === selectedBranchId)
-
   return (
-    <div>
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Reportes de Ventas</h1>
-            <p className="text-gray-600 mt-2">Análisis detallado de tus ventas y rendimiento</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            {canUseFeature('advanced_reports') && (
+    <div className="space-y-6">
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Reportes de Ventas</h1>
+          <p className="text-gray-600 mt-1">Ventas diarias, mensuales, comparación, método de pago y resumen por sucursal.</p>
+        </div>
+        <Button onClick={handleExport} className="gap-2" variant="outline">
+          <Download className="h-4 w-4" />
+          Exportar Excel (CSV)
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            <span>Filtros del reporte</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Filtrar por Sucursal</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Modo período</label>
               <select
-                value={selectedBranchId}
-                onChange={(e) => setSelectedBranchId(e.target.value)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 min-w-[200px]"
+                value={draftPeriodMode}
+                onChange={(e) => setDraftPeriodMode(e.target.value as PeriodMode)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+              >
+                <option value="month">Mensual</option>
+                <option value="custom">Rango personalizado</option>
+              </select>
+            </div>
+
+            {draftPeriodMode === 'month' ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Mes</label>
+                <Input
+                  type="month"
+                  value={draftSelectedMonth}
+                  onChange={(e) => setDraftSelectedMonth(e.target.value)}
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fecha inicio</label>
+                  <Input
+                    type="date"
+                    value={draftCustomStart}
+                    onChange={(e) => setDraftCustomStart(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Fecha fin</label>
+                  <Input
+                    type="date"
+                    value={draftCustomEnd}
+                    onChange={(e) => setDraftCustomEnd(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Sucursal</label>
+              <select
+                value={draftSelectedBranchId}
+                onChange={(e) => setDraftSelectedBranchId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
               >
                 <option value="">Todas las sucursales</option>
                 {branches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
-                    {branch.name} {branch.code && `(${branch.code})`}
+                    {branch.name}
                   </option>
                 ))}
               </select>
             </div>
-            )}
           </div>
-        </div>
-        {!canUseFeature('advanced_reports') && (
-          <p className="mt-4 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-lg">
-            Actualizá a Profesional para reportes avanzados (gráficos, top productos, ventas por sucursal).
-          </p>
-        )}
-        {selectedBranch && canUseFeature('advanced_reports') && (
-          <div className="mt-4 flex items-center space-x-2 text-sm text-gray-600">
-            <Building2 className="h-4 w-4" />
-            <span>Mostrando datos de: <strong>{selectedBranch.name}</strong></span>
-          </div>
-        )}
-      </div>
 
-      {/* Métricas principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-green-50 p-3 rounded-lg">
-                <DollarSign className="h-6 w-6 text-green-600" />
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Ingresos Totales</p>
-                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.totalRevenue, settings)}</p>
-              </div>
-            </div>
-            <div className="flex items-center text-sm text-gray-600">
-              <TrendingUp className="h-4 w-4 mr-1 text-green-600" />
-              <span>{metrics.totalOrders} órdenes completadas</span>
-            </div>
-          </CardContent>
-        </Card>
+          {invalidDraftCustomRange && (
+            <p className="mt-3 text-sm text-red-600">La fecha inicio no puede ser mayor que la fecha fin.</p>
+          )}
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <ShoppingCart className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Ticket Promedio</p>
-                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.averageOrderValue, settings)}</p>
-              </div>
-            </div>
-            <div className="flex items-center text-sm text-gray-600">
-              <BarChart3 className="h-4 w-4 mr-1 text-blue-600" />
-              <span>Por orden</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-purple-50 p-3 rounded-lg">
-                <Calendar className="h-6 w-6 text-purple-600" />
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Este Mes</p>
-                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.monthRevenue, settings)}</p>
-              </div>
-            </div>
-            <div className="flex items-center text-sm text-gray-600">
-              <Package className="h-4 w-4 mr-1 text-purple-600" />
-              <span>{metrics.monthOrders} órdenes</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="bg-orange-50 p-3 rounded-lg">
-                <TrendingUp className="h-6 w-6 text-orange-600" />
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-500">Hoy</p>
-                <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.todayRevenue, settings)}</p>
-              </div>
-            </div>
-            <div className="flex items-center text-sm text-gray-600">
-              <ArrowUpRight className="h-4 w-4 mr-1 text-orange-600" />
-              <span>{metrics.todayOrders} órdenes</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sales by Branch Summary (if no branch selected) - Profesional only */}
-      {canUseFeature('advanced_reports') && !selectedBranchId && salesByBranch.length > 0 && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Ventas por Sucursal</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {salesByBranch
-                .sort((a, b) => b.revenue - a.revenue)
-                .map((branchSale) => {
-                  const branch = branches.find((b) => b.id === branchSale.branch_id)
-                  return (
-                    <div
-                      key={branchSale.branch_id}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <Building2 className="h-5 w-5 text-admin-600" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{branchSale.branch_name}</p>
-                          <p className="text-xs text-gray-500">{branch?.code || 'Sin código'}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-gray-900">{formatPrice(branchSale.revenue, settings)}</p>
-                        <p className="text-xs text-gray-500">{branchSale.orders} órdenes</p>
-                      </div>
-                    </div>
-                  )
-                })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Ventas por período */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Ventas por Período</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Hoy</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.todayRevenue, settings)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">{metrics.todayOrders} órdenes</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Esta Semana</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.weekRevenue, settings)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">{metrics.weekOrders} órdenes</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Este Mes</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.monthRevenue, settings)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">{metrics.monthOrders} órdenes</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Este Año</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatPrice(metrics.yearRevenue, settings)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-gray-500">{metrics.yearOrders} órdenes</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Estado de Órdenes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {orderStatusCounts.map((status) => (
-                <div key={status.status} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
-                        status.status
-                      )}`}
-                    >
-                      {status.status}
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">{status.count} órdenes</p>
-                    <p className="text-xs text-gray-500">{formatPrice(status.revenue, settings)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Gráfico de ventas diarias - Profesional only */}
-      {canUseFeature('advanced_reports') && (
-      <Card className="mb-8">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Ventas Diarias</CardTitle>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setSelectedPeriod('7d')}
-                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                  selectedPeriod === '7d'
-                    ? 'bg-admin-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                7 días
-              </button>
-              <button
-                onClick={() => setSelectedPeriod('30d')}
-                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                  selectedPeriod === '30d'
-                    ? 'bg-admin-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                30 días
-              </button>
-              <button
-                onClick={() => setSelectedPeriod('90d')}
-                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                  selectedPeriod === '90d'
-                    ? 'bg-admin-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                90 días
-              </button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 flex items-end justify-between space-x-1">
-            {dailySales.map((day, index) => {
-              const height = maxRevenue > 0 ? (day.revenue / maxRevenue) * 100 : 0
-              const dayLabel = formatDateShort(day.date, settings)
-              return (
-                <div
-                  key={index}
-                  className="flex-1 flex flex-col items-center group relative"
-                  style={{ minWidth: '20px' }}
-                >
-                  <div
-                    className="w-full bg-admin-600 rounded-t transition-all hover:bg-admin-700 cursor-pointer"
-                    style={{ height: `${height}%`, minHeight: height > 0 ? '4px' : '0' }}
-                    title={`${dayLabel}: ${formatPrice(day.revenue, settings)} - ${day.orders} órdenes`}
-                  />
-                  {index % Math.ceil(dailySales.length / 7) === 0 && (
-                    <span className="text-xs text-gray-500 mt-2 transform -rotate-45 origin-left whitespace-nowrap">
-                      {dayLabel}
-                    </span>
-                  )}
-                </div>
-              )
-            })}
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={handleApplyFilters}
+              disabled={invalidDraftCustomRange || !hasPendingFilterChanges || loading}
+            >
+              Aplicar filtros
+            </Button>
           </div>
         </CardContent>
       </Card>
-      )}
 
-      {/* Productos más vendidos - Profesional only */}
-      {canUseFeature('advanced_reports') && (
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Ingresos del período</p>
+                <p className="text-2xl font-bold text-gray-900">{formatPrice(currentSummary.revenue, settings)}</p>
+              </div>
+              <DollarSign className="h-6 w-6 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Órdenes del período</p>
+                <p className="text-2xl font-bold text-gray-900">{currentSummary.orders}</p>
+              </div>
+              <BarChart3 className="h-6 w-6 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Ticket promedio</p>
+                <p className="text-2xl font-bold text-gray-900">{formatPrice(currentSummary.avgTicket, settings)}</p>
+              </div>
+              <CreditCard className="h-6 w-6 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle>Productos Más Vendidos</CardTitle>
+          <CardTitle>Comparación entre períodos</CardTitle>
         </CardHeader>
         <CardContent>
-          {topProducts.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-4 rounded-lg border border-gray-200">
+              <p className="text-sm text-gray-500">Ingresos</p>
+              <div className="mt-2 flex items-center gap-2">
+                {comparisonSummary.revenueChange >= 0 ? (
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                )}
+                <p className={`text-sm font-semibold ${comparisonSummary.revenueChange >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  {comparisonSummary.revenueChange >= 0 ? '+' : ''}{comparisonSummary.revenueChange.toFixed(2)}%
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Actual: {formatPrice(currentSummary.revenue, settings)} | Anterior: {formatPrice(comparisonSummary.prevRevenue, settings)}
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg border border-gray-200">
+              <p className="text-sm text-gray-500">Órdenes</p>
+              <div className="mt-2 flex items-center gap-2">
+                {comparisonSummary.ordersChange >= 0 ? (
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                )}
+                <p className={`text-sm font-semibold ${comparisonSummary.ordersChange >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  {comparisonSummary.ordersChange >= 0 ? '+' : ''}{comparisonSummary.ordersChange.toFixed(2)}%
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Actual: {currentSummary.orders} | Anterior: {comparisonSummary.prevOrders}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Ventas por método de pago</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {paymentMethodSales.length === 0 ? (
+              <p className="text-sm text-gray-500">No hay datos de pagos para el período seleccionado.</p>
+            ) : (
+              <div className="space-y-3">
+                {paymentMethodSales.map((row) => (
+                  <div key={row.method} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                    <span className="text-sm font-medium text-gray-700">{row.label}</span>
+                    <span className="text-sm font-semibold text-gray-900">{formatPrice(row.amount, settings)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              <span>Resumen general y por sucursal</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {branchSummary.length === 0 ? (
+              <p className="text-sm text-gray-500">No hay ventas registradas para mostrar por sucursal.</p>
+            ) : (
+              <div className="space-y-3">
+                {branchSummary.map((row) => (
+                  <div key={row.branch_id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{row.branch_name}</p>
+                      <p className="text-xs text-gray-500">{row.orders} órdenes</p>
+                    </div>
+                    <span className="text-sm font-semibold text-gray-900">{formatPrice(row.revenue, settings)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ventas diarias</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {dailySales.length === 0 ? (
+            <p className="text-sm text-gray-500">No hay datos diarios para el período seleccionado.</p>
+          ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Producto
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cantidad Vendida
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ingresos
-                    </th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Órdenes</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ingresos</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {topProducts.map((product, index) => (
-                    <tr key={product.product_id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-admin-100 text-admin-700 font-semibold mr-3">
-                            {index + 1}
-                          </span>
-                          <span className="text-sm font-medium text-gray-900">{product.product_name}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {product.total_quantity} unidades
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                        {formatPrice(product.total_revenue, settings)}
-                      </td>
+                <tbody className="divide-y divide-gray-100">
+                  {dailySales.map((row) => (
+                    <tr key={row.date}>
+                      <td className="px-4 py-2 text-sm text-gray-700">{formatDateShort(row.date, settings)}</td>
+                      <td className="px-4 py-2 text-sm text-gray-700">{row.orders}</td>
+                      <td className="px-4 py-2 text-sm font-medium text-gray-900">{formatPrice(row.revenue, settings)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-          ) : (
-            <p className="text-center text-gray-500 py-8">No hay datos de productos vendidos</p>
           )}
         </CardContent>
       </Card>
-      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Ventas mensuales (últimos 12 meses)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {monthlySales.length === 0 ? (
+            <p className="text-sm text-gray-500">No hay datos mensuales para mostrar.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Mes</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Órdenes</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Ingresos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {monthlySales.map((row) => (
+                    <tr key={row.month}>
+                      <td className="px-4 py-2 text-sm text-gray-700 capitalize">{monthLabel(row.month)}</td>
+                      <td className="px-4 py-2 text-sm text-gray-700">{row.orders}</td>
+                      <td className="px-4 py-2 text-sm font-medium text-gray-900">{formatPrice(row.revenue, settings)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

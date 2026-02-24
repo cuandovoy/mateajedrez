@@ -13,7 +13,7 @@ import { ArrowLeft, Calendar, Edit2, MapPin, Minus, Package, Phone, Plus, Save, 
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
-const getStatusLabel = (status: string): string => {
+const getStatusLabel = (status: string | null): string => {
   const statusMap: Record<string, string> = {
     pending: 'Pendiente',
     processing: 'En Proceso',
@@ -21,10 +21,10 @@ const getStatusLabel = (status: string): string => {
     delivered: 'Entregado',
     cancelled: 'Cancelado',
   }
-  return statusMap[status] || status
+  return (status && statusMap[status]) || status || 'Sin estado'
 }
 
-const getStatusColor = (status: string): string => {
+const getStatusColor = (status: string | null): string => {
   const colorMap: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-800',
     processing: 'bg-blue-100 text-blue-800',
@@ -32,7 +32,7 @@ const getStatusColor = (status: string): string => {
     delivered: 'bg-green-100 text-green-800',
     cancelled: 'bg-red-100 text-red-800',
   }
-  return colorMap[status] || 'bg-gray-100 text-gray-800'
+  return (status && colorMap[status]) || 'bg-gray-100 text-gray-800'
 }
 
 type ShippingAddress = {

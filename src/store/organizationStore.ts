@@ -50,7 +50,7 @@ export const useOrganizationStore = create<OrganizationState>()(
               id,
               role,
               organization_id,
-              organizations(id, name, slug, logo_url, cover_image_url, primary_color, secondary_color, accent_color, font_family, font_heading, border_radius, button_style, settings, subscription_tier, subscription_status)
+              organizations(id, name, slug, logo_url, cover_image_url, primary_color, secondary_color, accent_color, font_family, font_heading, border_radius, button_style, settings, subscription_tier, subscription_status, created_at, updated_at)
             `)
             .eq('user_id', user.id)
 
@@ -58,7 +58,7 @@ export const useOrganizationStore = create<OrganizationState>()(
 
           const orgs: OrganizationWithMember[] = (members || [])
             .filter((m: { organizations: unknown }) => m.organizations != null)
-            .map((m: { organizations: Organization; role: string }) => ({
+            .map((m) => ({
               ...m.organizations,
               member: { role: m.role } as OrganizationMember,
             }))

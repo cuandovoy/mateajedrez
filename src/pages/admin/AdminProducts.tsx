@@ -21,7 +21,7 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowDown, ArrowUp, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { getMaxProductImages } from '@/lib/planLimits'
@@ -51,6 +51,8 @@ interface ProductImageItem {
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+const DEFAULT_PAGE_SIZE = 25
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
 
 type ProductForm = z.infer<typeof productSchema>
 
@@ -94,6 +96,8 @@ function AdminProductsContent() {
   const [supplierManagerProduct, setSupplierManagerProduct] = useState<Product | null>(null)
   const [initialBranchId, setInitialBranchId] = useState<string>('')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [filters, setFilters] = useState<ProductFilters>({
     search: '',
     categoryId: '',
@@ -222,6 +226,29 @@ function AdminProductsContent() {
         product.sku.toLowerCase().includes(searchLower)
     )
   }, [products, filters.search])
+
+  useEffect(() => {
+    setPage(0)
+  }, [filters, viewMode])
+
+  const totalFiltered = filteredProducts.length
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize))
+  const safePage = Math.min(page, totalPages - 1)
+  const fromItem = totalFiltered === 0 ? 0 : safePage * pageSize + 1
+  const toItem = Math.min((safePage + 1) * pageSize, totalFiltered)
+  const hasPrev = safePage > 0
+  const hasNext = safePage < totalPages - 1
+
+  const paginatedProducts = useMemo(() => {
+    const start = safePage * pageSize
+    return filteredProducts.slice(start, start + pageSize)
+  }, [filteredProducts, safePage, pageSize])
+
+  useEffect(() => {
+    if (page !== safePage) {
+      setPage(safePage)
+    }
+  }, [page, safePage])
 
   const fetchCategories = async () => {
     if (!organizationId) return
@@ -410,36 +437,38 @@ function AdminProductsContent() {
     try {
       setUploadingImage(true)
 
-      const productData: ProductInsert | ProductUpdate = {
+      const baseProductData = {
         ...data,
         image_url: null, // We'll use product_images table instead
-        ...(editingProduct ? {} : { organization_id: organizationId }),
       }
 
       let productId: string
 
       if (editingProduct) {
+        const productData: ProductUpdate = baseProductData
         const { data: updatedProduct, error } = await supabase
           .from('products')
-          // @ts-expect-error - Supabase types need to be regenerated after migration
           .update(productData)
           .eq('id', editingProduct.id)
           .select()
           .single()
 
         if (error) throw error
-        // @ts-expect-error - Supabase types need to be regenerated after migration
+        if (!updatedProduct) throw new Error('Producto no encontrado luego de actualizar')
         productId = updatedProduct.id
       } else {
+        const productData: ProductInsert = {
+          ...baseProductData,
+          organization_id: organizationId!,
+        }
         const { data: newProduct, error } = await supabase
           .from('products')
-          // @ts-expect-error - Supabase types need to be regenerated after migration
           .insert(productData)
           .select()
           .single()
 
         if (error) throw error
-        // @ts-expect-error - Supabase types need to be regenerated after migration
+        if (!newProduct) throw new Error('No se pudo obtener el producto creado')
         productId = newProduct.id
 
         // Load initial stock into branch_inventory when creating with stock + branch
@@ -459,14 +488,12 @@ function AdminProductsContent() {
 
             const { error: updateError } = await supabase
               .from('branch_inventory')
-              // @ts-expect-error - Supabase types may need regeneration
               .update({ stock: newStock })
               .eq('id', bi.id)
 
             if (!updateError) {
               await supabase
                 .from('inventory_movements')
-                // @ts-expect-error - Supabase types may need regeneration
                 .insert({
                   branch_inventory_id: bi.id,
                   movement_type: 'receipt',
@@ -570,7 +597,6 @@ function AdminProductsContent() {
 
             const { error: updateError } = await supabase
               .from('product_images')
-              // @ts-expect-error - Supabase types need to be regenerated after migration
               .update({
                 image_url: imageToUpdate.image_url,
                 display_order: imageToUpdate.display_order,
@@ -601,7 +627,6 @@ function AdminProductsContent() {
             const { error: imagesError } = await supabase
               .from('product_images')
               .insert(
-                // @ts-expect-error - Supabase types need to be regenerated after migration
                 newImages.map((img) => ({
                   product_id: productId,
                   image_url: img.image_url,
@@ -617,7 +642,6 @@ function AdminProductsContent() {
           const { error: imagesError } = await supabase
             .from('product_images')
             .insert(
-              // @ts-expect-error - Supabase types need to be regenerated after migration
               imagesToSave.map((img) => ({
                 product_id: productId,
                 image_url: img.image_url,
@@ -672,7 +696,7 @@ function AdminProductsContent() {
         id: img.id,
         image_url: img.image_url,
         display_order: img.display_order,
-        is_primary: img.is_primary,
+        is_primary: img.is_primary ?? false,
       }))
 
     setProductImages(existingImages)
@@ -684,7 +708,7 @@ function AdminProductsContent() {
       stock: product.stock,
       category_id: product.category_id,
       sku: product.sku,
-      is_active: product.is_active,
+      is_active: product.is_active ?? true,
     })
     setIsModalOpen(true)
   }
@@ -729,6 +753,7 @@ function AdminProductsContent() {
   }
 
   const clearFilters = () => {
+    setPage(0)
     setFilters({
       search: '',
       categoryId: '',
@@ -864,16 +889,35 @@ function AdminProductsContent() {
       </Card>
 
       {/* Results count */}
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <p className="text-sm text-gray-600">
-          Mostrando {filteredProducts.length} de {products.length} productos
+          Mostrando {fromItem}-{toItem} de {totalFiltered} producto{totalFiltered !== 1 ? 's' : ''}
+          {totalFiltered !== products.length && ` (filtrados de ${products.length})`}
         </p>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600" htmlFor="products-page-size">Mostrar</label>
+          <select
+            id="products-page-size"
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value))
+              setPage(0)
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size} por página
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Products Display */}
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProducts.map((product) => {
+          {paginatedProducts.map((product) => {
             const primaryImage = getPrimaryImage(product)
             return (
               <Card key={product.id} className="relative">
@@ -952,7 +996,7 @@ function AdminProductsContent() {
         <Card>
           <CardContent className="p-0">
             <ProductTable
-              products={filteredProducts}
+              products={paginatedProducts}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onManageVariants={setVariantManagerProduct}
@@ -976,6 +1020,36 @@ function AdminProductsContent() {
               Limpiar filtros
             </Button>
           )}
+        </div>
+      )}
+
+      {!loading && totalFiltered > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-gray-200">
+          <p className="text-sm text-gray-600">
+            Página {safePage + 1} de {totalPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={!hasPrev}
+              className="gap-1"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={!hasNext}
+              className="gap-1"
+            >
+              Siguiente
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 

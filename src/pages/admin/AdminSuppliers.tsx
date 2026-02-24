@@ -155,7 +155,6 @@ function AdminSuppliersContent() {
         const supplierData: SupplierUpdate = { ...baseData }
         const { error } = await supabase
           .from('suppliers')
-          // @ts-expect-error - Supabase types need to be regenerated after migration
           .update(supplierData)
           .eq('id', editingSupplier.id)
 
@@ -164,7 +163,6 @@ function AdminSuppliersContent() {
         const supplierData: SupplierInsert = { ...baseData, organization_id: organizationId! }
         const { error } = await supabase
           .from('suppliers')
-          // @ts-expect-error - Supabase types need to be regenerated after migration
           .insert(supplierData)
 
         if (error) throw error
@@ -207,7 +205,7 @@ function AdminSuppliersContent() {
       tax_id: formatRUTForInput(supplier.tax_id || ''),
       website: supplier.website || '',
       notes: supplier.notes || '',
-      is_active: supplier.is_active,
+      is_active: supplier.is_active ?? true,
     })
     setIsModalOpen(true)
   }

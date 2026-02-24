@@ -8,7 +8,7 @@ import type { Product, ProductVariant, ProductVariantInsert, ProductVariantUpdat
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type SubmitHandler } from 'react-hook-form'
 import { z } from 'zod'
 
 const variantSchema = z.object({
@@ -64,7 +64,7 @@ export function VariantForm({ product, variant, onClose }: VariantFormProps) {
           unit: variant.unit || product.unit || 'unidad',
           min_stock: variant.min_stock || 0,
           low_stock_threshold: variant.low_stock_threshold || 10,
-          is_active: variant.is_active,
+          is_active: variant.is_active ?? true,
           image_url: variant.image_url || '',
         }
       : {
@@ -134,7 +134,7 @@ export function VariantForm({ product, variant, onClose }: VariantFormProps) {
     })
   }
 
-  const onSubmit = async (data: VariantFormData) => {
+  const onSubmit: SubmitHandler<VariantFormData> = async (data) => {
     setLoading(true)
     try {
       let imageUrl = data.image_url || null

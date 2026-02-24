@@ -61,6 +61,7 @@ export function ProductDetail() {
   }, [loading, product])
 
   const fetchProduct = async () => {
+    if (!id) return
     try {
       const { data, error } = await supabase
         .from('products')
@@ -74,7 +75,7 @@ export function ProductDetail() {
             is_primary
           )
         `)
-        .eq('id', id as string)
+        .eq('id', id)
         .eq('is_active', true)
         .single()
 

@@ -27,7 +27,8 @@ export function formatPrice(price: number, settings?: OrganizationSettings | nul
   }).format(price)
 }
 
-export function formatDate(date: string | Date, settings?: OrganizationSettings | null): string {
+export function formatDate(date: string | Date | null | undefined, settings?: OrganizationSettings | null): string {
+  if (!date) return '-'
   const locale = settings?.locale ?? DEFAULT_LOCALE
   const timeZone = settings?.timezone ?? undefined
   return new Intl.DateTimeFormat(locale, {
@@ -39,7 +40,8 @@ export function formatDate(date: string | Date, settings?: OrganizationSettings 
 }
 
 /** Formatea fecha y hora según locale y timezone de la organización */
-export function formatDateTime(date: string | Date, settings?: OrganizationSettings | null): string {
+export function formatDateTime(date: string | Date | null | undefined, settings?: OrganizationSettings | null): string {
+  if (!date) return '-'
   const locale = settings?.locale ?? DEFAULT_LOCALE
   const timeZone = settings?.timezone ?? undefined
   return new Intl.DateTimeFormat(locale, {
@@ -53,7 +55,8 @@ export function formatDateTime(date: string | Date, settings?: OrganizationSetti
 }
 
 /** Formatea solo la fecha (corto) para tablas y listas */
-export function formatDateShort(date: string | Date, settings?: OrganizationSettings | null): string {
+export function formatDateShort(date: string | Date | null | undefined, settings?: OrganizationSettings | null): string {
+  if (!date) return '-'
   const locale = settings?.locale ?? DEFAULT_LOCALE
   const timeZone = settings?.timezone ?? undefined
   return new Intl.DateTimeFormat(locale, {
@@ -65,7 +68,8 @@ export function formatDateShort(date: string | Date, settings?: OrganizationSett
 }
 
 /** Formatea solo la hora */
-export function formatTime(date: string | Date, settings?: OrganizationSettings | null): string {
+export function formatTime(date: string | Date | null | undefined, settings?: OrganizationSettings | null): string {
+  if (!date) return '-'
   const locale = settings?.locale ?? DEFAULT_LOCALE
   const timeZone = settings?.timezone ?? undefined
   return new Intl.DateTimeFormat(locale, {

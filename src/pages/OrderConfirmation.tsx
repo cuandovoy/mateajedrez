@@ -8,7 +8,7 @@ import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
 
-const getStatusLabel = (status: string): string => {
+const getStatusLabel = (status: string | null): string => {
   const statusMap: Record<string, string> = {
     pending: 'Pendiente',
     processing: 'En Proceso',
@@ -16,7 +16,7 @@ const getStatusLabel = (status: string): string => {
     delivered: 'Entregado',
     cancelled: 'Cancelado',
   }
-  return statusMap[status] || status
+  return (status && statusMap[status]) || status || 'Sin estado'
 }
 
 interface OrderWithItems extends Order {
