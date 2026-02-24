@@ -15,6 +15,7 @@ export interface Database {
           name: string
           slug: string
           logo_url: string | null
+          cover_image_url: string | null
           primary_color: string | null
           secondary_color: string | null
           accent_color: string | null
@@ -33,6 +34,7 @@ export interface Database {
           name: string
           slug: string
           logo_url?: string | null
+          cover_image_url?: string | null
           primary_color?: string | null
           secondary_color?: string | null
           accent_color?: string | null
@@ -51,6 +53,7 @@ export interface Database {
           name?: string
           slug?: string
           logo_url?: string | null
+          cover_image_url?: string | null
           primary_color?: string | null
           secondary_color?: string | null
           accent_color?: string | null

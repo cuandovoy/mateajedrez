@@ -84,27 +84,43 @@ export function PublicStore() {
     <div className="bg-white">
       {/* Hero Banner Section */}
       <section className="relative w-full mb-0">
-        <div className="relative w-full bg-gradient-to-br from-gray-100 to-gray-200 py-16 md:py-24">
-          <div className="container-custom text-center">
-            <h1 
+        <div
+          className="relative w-full py-16 md:py-24 bg-cover bg-center bg-no-repeat"
+          style={
+            organization.cover_image_url
+              ? {
+                  backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.4)), url(${organization.cover_image_url})`,
+                }
+              : { background: 'linear-gradient(to bottom right, rgb(243 244 246), rgb(229 231 235))' }
+          }
+        >
+          <div className="container-custom text-center relative z-10">
+            <h1
               className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4"
-              style={{ 
-                color: `var(--org-primary-color, #6366f1)`,
-                fontFamily: `var(--org-font-heading, var(--org-font-family, Poppins))`
+              style={{
+                color: organization.cover_image_url ? 'white' : `var(--org-primary-color, #6366f1)`,
+                fontFamily: `var(--org-font-heading, var(--org-font-family, Poppins))`,
+                textShadow: organization.cover_image_url ? '0 1px 2px rgba(0,0,0,0.5)' : undefined,
               }}
             >
               {organization.name}
             </h1>
-            <p className="text-lg md:text-xl text-gray-600 mb-8">
+            <p
+              className="text-lg md:text-xl mb-8"
+              style={{
+                color: organization.cover_image_url ? 'rgba(255,255,255,0.95)' : 'rgb(75 85 99)',
+                textShadow: organization.cover_image_url ? '0 1px 2px rgba(0,0,0,0.4)' : undefined,
+              }}
+            >
               Bienvenido a nuestra tienda
             </p>
             <Link to={`/${slug}/products`}>
-              <Button 
-                size="lg" 
+              <Button
+                size="lg"
                 className="px-8 py-4 md:px-12 md:py-5 text-base md:text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
                 style={{
                   backgroundColor: `var(--org-primary-color, #6366f1)`,
-                  color: 'white'
+                  color: 'white',
                 }}
               >
                 Ver Productos

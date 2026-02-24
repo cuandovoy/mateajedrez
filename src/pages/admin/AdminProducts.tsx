@@ -18,12 +18,13 @@ import { Input } from '@/components/ui/Input'
 import { deleteImage, uploadProductImage } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowDown, ArrowUp, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { getMaxProductImages } from '@/lib/planLimits'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useToastStore } from '@/store/toastStore'
@@ -77,6 +78,7 @@ function AdminProductsContent() {
   const settings = useOrgSettings()
   const { show } = useToastStore()
   const { isAtLimit, productCount, limits, tier } = usePlanLimits()
+  const maxProductImages = getMaxProductImages(tier)
   const [products, setProducts] = useState<ProductWithImages[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
@@ -275,7 +277,19 @@ function AdminProductsContent() {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
 
-    files.forEach((file) => {
+    const slotsLeft = maxProductImages - productImages.length
+    if (slotsLeft <= 0) {
+      show(`Tu plan permite hasta ${maxProductImages} imagen${maxProductImages !== 1 ? 'es' : ''} por producto.`, 'error')
+      e.target.value = ''
+      return
+    }
+
+    const filesToAdd = files.slice(0, slotsLeft)
+    if (files.length > slotsLeft) {
+      show(`Solo se agregarán ${slotsLeft} imagen${slotsLeft !== 1 ? 'es' : ''} (máx. ${maxProductImages} por producto).`, 'info')
+    }
+
+    filesToAdd.forEach((file) => {
       if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
         alert(`Tipo de archivo no permitido para ${file.name}. Use JPG, PNG o WEBP`)
         return
@@ -288,25 +302,30 @@ function AdminProductsContent() {
 
       const reader = new FileReader()
       reader.onloadend = () => {
-        const newImage: ProductImageItem = {
-          image_url: '',
-          display_order: productImages.length,
-          is_primary: productImages.length === 0,
-          file,
-          preview: reader.result as string,
-        }
-        setProductImages([...productImages, newImage])
+        setProductImages((prev) => {
+          if (prev.length >= maxProductImages) return prev
+          const newImage: ProductImageItem = {
+            image_url: '',
+            display_order: prev.length,
+            is_primary: prev.length === 0,
+            file,
+            preview: reader.result as string,
+          }
+          return [...prev, newImage]
+        })
       }
       reader.readAsDataURL(file)
     })
 
-    // Reset input
     e.target.value = ''
   }
 
   const handleImageUrlAdd = (url: string) => {
     if (!url.trim()) return
-
+    if (productImages.length >= maxProductImages) {
+      show(`Tu plan permite hasta ${maxProductImages} imagen${maxProductImages !== 1 ? 'es' : ''} por producto.`, 'error')
+      return
+    }
     const newImage: ProductImageItem = {
       image_url: url.trim(),
       display_order: productImages.length,
@@ -378,6 +397,14 @@ function AdminProductsContent() {
         alert('Si indicas stock inicial, debes seleccionar la sucursal donde se cargará el inventario.')
         return
       }
+    }
+
+    if (productImages.length > maxProductImages) {
+      show(
+        `Tu plan permite hasta ${maxProductImages} imagen${maxProductImages !== 1 ? 'es' : ''} por producto. Eliminá las que sobran para guardar.`,
+        'error'
+      )
+      return
     }
 
     try {
@@ -887,15 +914,17 @@ function AdminProductsContent() {
                   {primaryImage && (
                     <img
                       src={primaryImage}
-                      alt={product.name}
+                      alt={capitalizeFirst(product.name)}
                       className="w-full h-48 object-cover rounded mb-4"
                     />
                   )}
                   <h3 className="text-lg font-semibold text-gray-900 mb-2 pr-8">
-                    {product.name}
+                    <span className="line-clamp-1">
+                      {capitalizeFirst(product.name)}
+                    </span>
                   </h3>
                   <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-                    {product.description || 'Sin descripción'}
+                    {capitalizeFirst(product.description) || 'Sin descripción'}
                   </p>
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-xl font-bold text-admin-600">
@@ -1059,7 +1088,12 @@ function AdminProductsContent() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Imágenes del Producto
+                    Imágenes del Producto ({productImages.length} / {maxProductImages})
+                    {tier === 'starter' && (
+                      <span className="ml-2 text-xs font-normal text-gray-500">
+                        Plan Starter: 1 imagen. Actualizá a Profesional para hasta 3.
+                      </span>
+                    )}
                   </label>
 
                   {/* Existing Images */}
@@ -1134,55 +1168,64 @@ function AdminProductsContent() {
                     </div>
                   )}
 
-                  {/* Add Image Buttons */}
-                  <div className="space-y-2">
-                    <label className="block cursor-pointer">
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                        onChange={handleImageAdd}
-                        multiple
-                        className="hidden"
-                      />
-                      <div className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
-                        <Upload className="h-5 w-5 mr-2" />
-                        <span className="text-sm text-gray-700">
-                          Subir imágenes
-                        </span>
+                  {/* Add Image Buttons - ocultos o deshabilitados cuando se alcanza el límite */}
+                  {productImages.length < maxProductImages && (
+                    <div className="space-y-2">
+                      <label className="block cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/jpg,image/png,image/webp"
+                          onChange={handleImageAdd}
+                          multiple
+                          className="hidden"
+                        />
+                        <div className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                          <Upload className="h-5 w-5 mr-2" />
+                          <span className="text-sm text-gray-700">
+                            Subir imágenes
+                          </span>
+                        </div>
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <Input
+                          type="url"
+                          placeholder="https://ejemplo.com/imagen.jpg"
+                          className="flex-1"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              const input = e.target as HTMLInputElement
+                              handleImageUrlAdd(input.value)
+                              input.value = ''
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={(e) => {
+                            const input = e.currentTarget.previousElementSibling as HTMLInputElement
+                            if (input) {
+                              handleImageUrlAdd(input.value)
+                              input.value = ''
+                            }
+                          }}
+                        >
+                          Agregar URL
+                        </Button>
                       </div>
-                    </label>
-                    <div className="flex items-center space-x-2">
-                      <Input
-                        type="url"
-                        placeholder="https://ejemplo.com/imagen.jpg"
-                        className="flex-1"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            const input = e.target as HTMLInputElement
-                            handleImageUrlAdd(input.value)
-                            input.value = ''
-                          }
-                        }}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={(e) => {
-                          const input = e.currentTarget.previousElementSibling as HTMLInputElement
-                          if (input) {
-                            handleImageUrlAdd(input.value)
-                            input.value = ''
-                          }
-                        }}
-                      >
-                        Agregar URL
-                      </Button>
+                      <p className="text-xs text-gray-500">
+                        {maxProductImages === 1
+                          ? 'Una imagen por producto (Plan Starter).'
+                          : `Hasta ${maxProductImages} imágenes. La primera será la principal.`}
+                      </p>
                     </div>
-                    <p className="text-xs text-gray-500">
-                      Puedes agregar múltiples imágenes. La primera será la imagen principal por defecto.
+                  )}
+                  {productImages.length >= maxProductImages && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Límite alcanzado ({maxProductImages} imagen{maxProductImages !== 1 ? 'es' : ''}). Eliminá una para agregar otra.
                     </p>
-                  </div>
+                  )}
                 </div>
                 <div className="flex items-center">
                   <input

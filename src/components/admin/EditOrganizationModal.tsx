@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/Tabs'
 import { PaymentMethodsManager } from '@/components/admin/PaymentMethodsManager'
 import { PlanGate } from '@/components/features/PlanGate'
 import { supabase } from '@/lib/supabase'
-import { uploadOrganizationLogo, deleteImage } from '@/lib/storage'
+import { uploadOrganizationLogo, uploadOrganizationCover, deleteImage } from '@/lib/storage'
 import { canUseFeature } from '@/lib/planLimits'
 import { useAdminStore } from '@/store/adminStore'
 import { useOrganizationStore } from '@/store/organizationStore'
@@ -94,7 +94,10 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   )
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(organization.logo_url ?? null)
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverPreview, setCoverPreview] = useState<string | null>(organization.cover_image_url ?? null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingCover, setUploadingCover] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -102,6 +105,8 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     setName(organization.name)
     setSlug(organization.slug)
     setLogoPreview(organization.logo_url ?? null)
+    setCoverPreview(organization.cover_image_url ?? null)
+    setCoverFile(null)
     setPrimaryColor(organization.primary_color ?? '')
     setSecondaryColor(organization.secondary_color ?? '')
     setAccentColor(organization.accent_color ?? '')
@@ -134,6 +139,8 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     buttonStyle !== (organization.button_style ?? 'rounded') ||
     logoFile !== null ||
     (logoPreview === null && organization.logo_url) ||
+    coverFile !== null ||
+    (coverPreview === null && organization.cover_image_url) ||
     currency !== (prevSettings.currency ?? 'ARS') ||
     locale !== (prevSettings.locale ?? 'es-AR') ||
     timezone !== (prevSettings.timezone ?? 'America/Argentina/Buenos_Aires') ||
@@ -166,6 +173,26 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   const removeLogo = () => {
     setLogoFile(null)
     setLogoPreview(null)
+  }
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      show('Formato no válido. Usa JPG, PNG o WEBP', 'error')
+      return
+    }
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      show(`La imagen es demasiado grande. Máximo ${MAX_FILE_SIZE_MB}MB`, 'error')
+      return
+    }
+    setCoverFile(file)
+    setCoverPreview(URL.createObjectURL(file))
+  }
+
+  const removeCover = () => {
+    setCoverFile(null)
+    setCoverPreview(null)
   }
 
   const handleNameChange = (value: string) => {
@@ -209,6 +236,24 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         await deleteImage(organization.logo_url, 'organization-logos')
       }
 
+      let finalCoverUrl: string | null = coverPreview && !coverFile ? coverPreview : null
+      if (coverFile) {
+        setUploadingCover(true)
+        try {
+          if (organization.cover_image_url?.includes('organization-logos')) {
+            await deleteImage(organization.cover_image_url, 'organization-logos')
+          }
+          finalCoverUrl = await uploadOrganizationCover(coverFile, organization.id)
+        } catch (uploadErr) {
+          throw uploadErr
+        } finally {
+          setUploadingCover(false)
+        }
+      } else if (!coverPreview && organization.cover_image_url?.includes('organization-logos')) {
+        finalCoverUrl = null
+        await deleteImage(organization.cover_image_url, 'organization-logos')
+      }
+
       const existingSettings = (organization.settings as Record<string, unknown>) ?? {}
       const settingsUpdate: OrganizationSettings = {
         currency: currency.trim() || 'ARS',
@@ -226,6 +271,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
           name: name.trim(),
           slug: finalSlug,
           logo_url: finalLogoUrl,
+          cover_image_url: finalCoverUrl,
           primary_color: primaryColor.trim() || null,
           secondary_color: secondaryColor.trim() || null,
           accent_color: accentColor.trim() || null,
@@ -263,9 +309,9 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <Card className="w-full max-w-md max-h-[90vh] flex flex-col shrink-0">
-        <CardHeader className="flex flex-row items-center justify-between pb-4 border-b shrink-0">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6 overflow-y-auto">
+      <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col shrink-0">
+        <CardHeader className="flex flex-row items-center justify-between px-6 pb-5 border-b shrink-0">
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-admin-600" />
             Editar Organización
@@ -279,10 +325,10 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
             <X className="h-5 w-5" />
           </button>
         </CardHeader>
-        <CardContent className="pt-4 overflow-y-auto flex-1 min-h-0">
-          <form onSubmit={handleSubmit} className="flex flex-col h-full">
+        <CardContent className="pt-6 px-6 pb-6 overflow-y-auto flex-1 min-h-0">
+          <form onSubmit={handleSubmit} className="flex flex-col h-full gap-6">
             <Tabs defaultValue="general" className="flex flex-col flex-1 min-h-0">
-              <TabsList className="w-full grid grid-cols-5 shrink-0">
+              <TabsList className="w-full grid grid-cols-5 shrink-0 gap-1 p-1">
                 <TabsTrigger value="general" className="flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" />
                   General
@@ -305,7 +351,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="general" className="mt-4 space-y-4 flex-1 min-h-0">
+              <TabsContent value="general" className="mt-6 space-y-6 flex-1 min-h-0">
                 <Input
                   label="Nombre de la organización *"
                   value={name}
@@ -378,9 +424,47 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 </div>
               </TabsContent>
 
-              <TabsContent value="estilos" className="mt-4 space-y-4 flex-1 min-h-0">
+              <TabsContent value="estilos" className="mt-6 space-y-6 flex-1 min-h-0">
                 <p className="text-sm text-gray-600">Personaliza la apariencia de tu tienda pública.</p>
-                
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Imagen de portada (hero)</label>
+                  {coverPreview && (
+                    <div className="relative inline-block mb-3">
+                      <img
+                        src={coverPreview}
+                        alt="Portada"
+                        className="max-w-full h-32 w-full object-cover rounded-lg border-2 border-gray-200 bg-gray-50"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeCover}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-lg"
+                        aria-label="Eliminar portada"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                  <label className="cursor-pointer block">
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png,image/webp"
+                      onChange={handleCoverChange}
+                      className="hidden"
+                    />
+                    <div className="flex items-center justify-center px-4 py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-admin-500 hover:bg-admin-50 transition-colors">
+                      <Upload className="h-5 w-5 mr-2 text-gray-400" />
+                      <span className="text-sm text-gray-700 font-medium">
+                        {coverFile ? 'Cambiar imagen de portada' : 'Seleccionar imagen de portada'}
+                      </span>
+                    </div>
+                  </label>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Se muestra como fondo del banner principal de la tienda. JPG, PNG o WEBP. Máximo {MAX_FILE_SIZE_MB}MB. Se recomienda 1920×600 px (relación 16:5) para mejor resultado.
+                  </p>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Color secundario</label>
                   <div className="flex items-center gap-3">
@@ -491,7 +575,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 </div>
               </TabsContent>
 
-              <TabsContent value="formato" className="mt-4 space-y-4 flex-1 min-h-0">
+              <TabsContent value="formato" className="mt-6 space-y-6 flex-1 min-h-0">
                 <p className="text-sm text-gray-600">Configuración regional y reglas de negocio.</p>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Moneda</label>
@@ -561,13 +645,13 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 </div>
               </TabsContent>
 
-              <TabsContent value="pagos" className="mt-4 flex-1 min-h-0">
+              <TabsContent value="pagos" className="mt-6 flex-1 min-h-0">
                 <PaymentMethodsManager organizationId={organization.id} />
               </TabsContent>
 
-              <TabsContent value="notificaciones" className="mt-4 flex-1 min-h-0">
+              <TabsContent value="notificaciones" className="mt-6 flex-1 min-h-0">
                 <PlanGate feature="notifications_config" canUse={canUseNotifications}>
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <p className="text-sm text-gray-600">
                       Configura las notificaciones por email para tu organización.
                     </p>
@@ -618,11 +702,11 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
             </Tabs>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg mt-4 shrink-0">{error}</p>
+              <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg shrink-0">{error}</p>
             )}
-            <div className="flex gap-3 pt-4 mt-4 border-t shrink-0">
-              <Button type="submit" disabled={loading || uploadingLogo} className="flex-1">
-                {loading || uploadingLogo ? 'Guardando...' : 'Guardar'}
+            <div className="flex gap-4 pt-5 border-t shrink-0">
+              <Button type="submit" disabled={loading || uploadingLogo || uploadingCover} className="flex-1">
+                {loading || uploadingLogo || uploadingCover ? 'Guardando...' : 'Guardar'}
               </Button>
               <Button type="button" variant="outline" onClick={onClose} className="flex-1">
                 Cancelar

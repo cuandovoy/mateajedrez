@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { cn, formatPrice, getProductImageUrl } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, getProductImageUrl } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
@@ -231,7 +231,7 @@ function CartContent() {
                             {imageUrl ? (
                               <img
                                 src={imageUrl}
-                                alt={item.product.name}
+                                alt={capitalizeFirst(item.product.name)}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {
                                   // Fallback to placeholder if image fails
@@ -249,13 +249,13 @@ function CartContent() {
                       })()}
                       <div className="flex-1 min-w-0">
                         <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                          {item.product.name}
+                          {capitalizeFirst(item.product.name)}
                         </h3>
                         {item.variant && (
                           <div className="mt-1 space-y-1">
                             {item.variant.name && (
                               <p className="text-sm text-gray-600 font-medium">
-                                {item.variant.name}
+                                {capitalizeFirst(item.variant.name)}
                               </p>
                             )}
                             {item.variant.attributes && typeof item.variant.attributes === 'object' && (

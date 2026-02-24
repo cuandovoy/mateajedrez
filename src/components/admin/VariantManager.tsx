@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { ProductVariant, Product } from '@/types'
 import { VariantForm } from './VariantForm'
@@ -86,7 +86,7 @@ export function VariantManager({ product, onClose }: VariantManagerProps) {
       <Card className="w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         <CardHeader className="flex-shrink-0">
           <div className="flex items-center justify-between">
-            <CardTitle>Gestionar Variantes - {product.name}</CardTitle>
+            <CardTitle>Gestionar Variantes - {capitalizeFirst(product.name)}</CardTitle>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-5 w-5" />
             </Button>

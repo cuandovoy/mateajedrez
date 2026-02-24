@@ -6,6 +6,12 @@ export function cn(...inputs: ClassValue[]) {
   return clsx(inputs)
 }
 
+/** Devuelve el texto con la primera letra en mayúscula (para mostrar nombres/descripciones). */
+export function capitalizeFirst(str: string | null | undefined): string {
+  if (str == null || str === '') return ''
+  return str.charAt(0).toUpperCase() + str.slice(1)
+}
+
 const DEFAULT_LOCALE = 'es-AR'
 const DEFAULT_CURRENCY = 'ARS'
 

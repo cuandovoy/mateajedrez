@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
 
@@ -181,17 +181,17 @@ export function OrderConfirmation() {
                     {displayImage && (
                       <img
                         src={displayImage}
-                        alt={item.product.name}
+                        alt={capitalizeFirst(item.product.name)}
                         className="w-16 h-16 object-cover rounded"
                       />
                     )}
                     <div className="flex-1">
-                      <p className="font-medium">{item.product.name}</p>
+                      <p className="font-medium">{capitalizeFirst(item.product.name)}</p>
                       {variant && (
                         <div className="mt-1 space-y-1">
                           {variant.name && (
                             <p className="text-sm font-medium text-gray-700">
-                              Variante: {variant.name}
+                              Variante: {capitalizeFirst(variant.name)}
                             </p>
                           )}
                           {variant.attributes && typeof variant.attributes === 'object' && (

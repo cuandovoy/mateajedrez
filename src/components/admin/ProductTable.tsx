@@ -2,7 +2,7 @@ import { Edit, Trash2, Package, Image as ImageIcon, ScanLine, Truck } from 'luci
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import type { Product, ProductImage, Category } from '@/types'
 
 interface ProductWithCategory extends Product {
@@ -54,7 +54,7 @@ export function ProductTable({
               <div className="flex gap-4">
                 <div className="h-16 w-16 shrink-0 rounded-lg overflow-hidden bg-gray-100">
                   {primaryImage ? (
-                    <img src={primaryImage} alt={product.name} className="h-full w-full object-cover" />
+                    <img src={primaryImage} alt={capitalizeFirst(product.name)} className="h-full w-full object-cover" />
                   ) : (
                     <div className="h-full w-full flex items-center justify-center">
                       <ImageIcon className="h-8 w-8 text-gray-400" />
@@ -62,7 +62,7 @@ export function ProductTable({
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">{product.name}</p>
+                  <p className="font-medium text-gray-900 truncate">{capitalizeFirst(product.name)}</p>
                   <p className="text-xs text-gray-500">{product.sku}</p>
                   <p className="text-sm font-medium text-gray-900 mt-1">{formatPrice(product.price, settings)}</p>
                   <span
@@ -147,7 +147,7 @@ export function ProductTable({
                     {primaryImage ? (
                       <img
                         src={primaryImage}
-                        alt={product.name}
+                        alt={capitalizeFirst(product.name)}
                         className="h-12 w-12 rounded object-cover"
                       />
                     ) : (
@@ -158,10 +158,10 @@ export function ProductTable({
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                  <div className="text-sm font-medium text-gray-900">{capitalizeFirst(product.name)}</div>
                   {product.description && (
                     <div className="text-sm text-gray-500 line-clamp-1">
-                      {product.description}
+                      {capitalizeFirst(product.description)}
                     </div>
                   )}
                 </td>

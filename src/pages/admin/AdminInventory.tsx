@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { capitalizeFirst } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch } from '@/types'
@@ -567,14 +568,14 @@ export function AdminInventory() {
                                 onClick={() =>
                                   setPreviewImage({
                                     url: item.thumbnail_url as string,
-                                    name: item.product_name,
+                                    name: capitalizeFirst(item.product_name),
                                   })
                                 }
                                 className="h-full w-full block"
                               >
                                 <img
                                   src={item.thumbnail_url}
-                                  alt={item.product_name}
+                                  alt={capitalizeFirst(item.product_name)}
                                   className="h-full w-full object-cover hover:scale-105 transition-transform"
                                   loading="lazy"
                                 />
@@ -586,9 +587,9 @@ export function AdminInventory() {
                             )}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{item.product_name}</p>
+                            <p className="text-sm font-medium text-gray-900">{capitalizeFirst(item.product_name)}</p>
                             {item.variant_name && (
-                              <p className="text-xs text-gray-500">Variante: {item.variant_name}</p>
+                              <p className="text-xs text-gray-500">Variante: {capitalizeFirst(item.variant_name)}</p>
                             )}
                             <p className="text-xs text-gray-500">SKU: {item.sku || 'N/A'}</p>
                           </div>

@@ -298,7 +298,7 @@ export function Products() {
               {/* Vista Lista para desktop */}
               <div className="hidden lg:block space-y-4">
                 {filteredProducts.map((product) => (
-                  <ProductListItem key={product.id} product={product} />
+                  <ProductListItem key={product.id} product={product} basePath={isPublicStore && slug ? `/${slug}` : ''} />
                 ))}
               </div>
             </>

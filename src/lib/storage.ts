@@ -94,6 +94,35 @@ export async function uploadOrganizationLogo(
 }
 
 /**
+ * Upload organization cover/hero image. Path: {orgId}/cover-{timestamp}.{ext}
+ */
+export async function uploadOrganizationCover(
+  file: File,
+  organizationId: string
+): Promise<string> {
+  const fileExt = file.name.split('.').pop()
+  const fileName = `cover-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+  const filePath = `${organizationId}/${fileName}`
+
+  const { error: uploadError } = await supabase.storage
+    .from(ORGANIZATION_LOGOS_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+    })
+
+  if (uploadError) {
+    throw uploadError
+  }
+
+  const { data } = supabase.storage
+    .from(ORGANIZATION_LOGOS_BUCKET)
+    .getPublicUrl(filePath)
+
+  return data.publicUrl
+}
+
+/**
  * Delete image from storage. Extracts path from URL (handles both org-prefixed and legacy paths).
  */
 export async function deleteImage(

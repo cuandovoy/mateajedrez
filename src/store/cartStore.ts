@@ -1,3 +1,4 @@
+import { capitalizeFirst } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import type { CartItem, CartItemWithProduct, Product, ProductVariant } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
@@ -344,7 +345,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         // Show toast notification
         useToastStore.getState().show(
-          `${newItem.product.name} agregado al carrito`,
+          `${capitalizeFirst(newItem.product.name)} agregado al carrito`,
           'success'
         )
       } else {

@@ -3,7 +3,7 @@ import { ShoppingCart } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { Product, ProductImage } from '@/types'
 import { useState, useEffect } from 'react'
@@ -11,6 +11,7 @@ import { useState, useEffect } from 'react'
 interface ProductListItemProps {
   product: Product & { product_images?: ProductImage[] }
   noAddToCart?: boolean
+  basePath?: string
 }
 
 // Helper function to validate image URLs
@@ -25,7 +26,7 @@ function isValidImageUrl(url: string | null | undefined): boolean {
   }
 }
 
-export function ProductListItem({ product, noAddToCart = false }: ProductListItemProps) {
+export function ProductListItem({ product, noAddToCart = false, basePath = '' }: ProductListItemProps) {
   const settings = useOrgSettings()
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
@@ -98,13 +99,13 @@ export function ProductListItem({ product, noAddToCart = false }: ProductListIte
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
       <div className="flex flex-col md:flex-row">
-        <Link to={`/products/${product.id}`} className="md:w-64 flex-shrink-0">
+        <Link to={`${basePath}/product/${product.id}`} className="md:w-64 flex-shrink-0">
           <div className="w-full h-48 md:h-full bg-gray-200">
             {currentImageUrl ? (
               <img
                 key={currentImageIndex}
                 src={currentImageUrl}
-                alt={product.name}
+                alt={capitalizeFirst(product.name)}
                 className="w-full h-full object-cover"
                 onError={() => {
                   console.error('Error loading product image:', currentImageUrl)
@@ -125,16 +126,16 @@ export function ProductListItem({ product, noAddToCart = false }: ProductListIte
         </Link>
         <div className="flex-1 p-6 flex flex-col md:flex-row md:items-center md:justify-between">
           <div className="flex-1 mb-4 md:mb-0 md:mr-6">
-            <Link to={`/products/${product.id}`}>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2 hover:text-primary-200 transition-colors">
-                {product.name}
-              </h3>
+            <Link to={`${basePath}/product/${product.id}`}>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2 hover:text-primary-400 transition-colors ">
+<span className="line-clamp-1">{capitalizeFirst(product.name)}</span>
+            </h3>
             </Link>
             <p className="text-gray-600 text-sm mb-3 line-clamp-2">
-              {product.description || 'Sin descripción'}
+              {capitalizeFirst(product.description) || 'Sin descripción'}
             </p>
             <div className="flex items-center space-x-4">
-              <span className="text-2xl font-bold text-primary-600">
+              <span className="text-2xl font-bold" style={{ color: 'var(--org-primary-color,rgb(0, 0, 0))' }}>
                 {formatPrice(product.price, settings)}
               </span>
               {stock === null ? (
@@ -148,7 +149,7 @@ export function ProductListItem({ product, noAddToCart = false }: ProductListIte
           </div>
           <div className="md:w-48 flex-shrink-0">
             {!noAddToCart && <Button
-              className="w-full bg-primary-400 text-white"
+              className="w-full bg-primary-600 text-white"
               onClick={handleAddToCart}
               disabled={!hasStock || isAdding}
               isLoading={isAdding}

@@ -5,7 +5,7 @@ import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
-import { formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { CashSession, Product } from '@/types'
 import type { OrderInsert, OrderPaymentInsert } from '@/types/database.types'
@@ -622,7 +622,7 @@ export function ManualSaleForm({
                       >
                         <div className="flex items-center justify-between">
                           <div>
-                            <p className="font-medium text-gray-900 text-sm">{product.name}</p>
+                            <p className="font-medium text-gray-900 text-sm">{capitalizeFirst(product.name)}</p>
                             <p className="text-xs text-gray-600">{formatPrice(product.price, settings)}</p>
                           </div>
                           <Plus className="h-4 w-4 text-admin-600 flex-shrink-0" />

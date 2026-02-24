@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
 import type { Product, ProductWithCategory, ProductImage } from '@/types'
@@ -25,7 +25,7 @@ function isValidImageUrl(url: string | null | undefined): boolean {
 }
 
 export function ProductDetail() {
-  const { id } = useParams<{ id: string }>()
+  const { slug, id } = useParams<{ slug?: string; id: string }>()
   const settings = useOrgSettings()
   const { addToCart } = useCartStore()
   const [product, setProduct] = useState<ProductWithCategory | null>(null)
@@ -142,7 +142,10 @@ export function ProductDetail() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-200"></div>
+        <div
+          className="animate-spin rounded-full h-12 w-12 border-b-2"
+          style={{ borderColor: 'var(--org-primary-color, #6366f1)' }}
+        />
       </div>
     )
   }
@@ -151,7 +154,7 @@ export function ProductDetail() {
     return (
       <div className="container-custom py-8 text-center">
         <p className="text-gray-600 text-lg mb-4">Producto no encontrado</p>
-        <Link to="/products">
+        <Link to={slug ? `/${slug}/products` : '/products'}>
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a productos
@@ -163,7 +166,7 @@ export function ProductDetail() {
 
   return (
     <div className="container-custom py-8">
-      <Link to="/products">
+      <Link to={slug ? `/${slug}/products` : '/products'}>
         <Button variant="ghost" className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver a productos
@@ -248,7 +251,7 @@ export function ProductDetail() {
                     <img
                       key={currentImageIndex}
                       src={currentImageUrl}
-                      alt={product.name}
+                      alt={capitalizeFirst(product.name)}
                       className={`w-full h-full object-cover transition-opacity duration-300 ${
                         fadeIn ? 'opacity-100' : 'opacity-0'
                       }`}
@@ -314,15 +317,21 @@ export function ProductDetail() {
                           }
                         }}
                         className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
-                          index === currentImageIndex
-                            ? 'border-primary-500 ring-2 ring-primary-200 scale-105'
-                            : 'border-gray-300 hover:border-gray-400 hover:scale-105'
+                          index === currentImageIndex ? 'ring-2 scale-105' : 'border-gray-300 hover:border-gray-400 hover:scale-105'
                         }`}
+                        style={
+                          index === currentImageIndex
+                            ? {
+                                borderColor: 'var(--org-primary-color, #6366f1)',
+                                boxShadow: '0 0 0 2px color-mix(in srgb, var(--org-primary-color, #6366f1) 30%, transparent)',
+                              }
+                            : undefined
+                        }
                         aria-label={`Ver imagen ${index + 1}`}
                       >
                         <img
                           src={url}
-                          alt={`${product.name} - Imagen ${index + 1}`}
+                          alt={`${capitalizeFirst(product.name)} - Imagen ${index + 1}`}
                           className="w-full h-full object-cover"
                         />
                       </button>
@@ -338,19 +347,33 @@ export function ProductDetail() {
         <div>
           <div className="mb-4">
             {product.category && (
-              <span className="inline-block px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm font-medium mb-2">
+              <span
+                className="inline-block px-3 py-1 rounded-full text-sm font-medium mb-2"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #6366f1) 15%, white)',
+                  color: 'var(--org-primary-color, #6366f1)',
+                }}
+              >
                 {product.category.name}
               </span>
             )}
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">{product.name}</h1>
-            <p className="text-2xl font-bold text-primary-500 mb-4">
+            <h1
+              className="text-3xl font-bold text-gray-900 mb-2"
+              style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
+            >
+              {capitalizeFirst(product.name)}
+            </h1>
+            <p
+              className="text-2xl font-bold mb-4"
+              style={{ color: 'var(--org-primary-color, #6366f1)' }}
+            >
               {formatPrice(selectedVariant?.price ?? product.price, settings)}
             </p>
           </div>
 
           <div className="mb-6">
             <p className="text-gray-700 leading-relaxed">
-              {product.description || 'Sin descripción disponible'}
+              {capitalizeFirst(product.description) || 'Sin descripción disponible'}
             </p>
           </div>
 
@@ -466,7 +489,7 @@ export function ProductDetail() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {relatedProducts.map((relatedProduct) => (
-              <ProductCard key={relatedProduct.id} product={relatedProduct} />
+              <ProductCard key={relatedProduct.id} product={relatedProduct} basePath={slug ? `/${slug}` : ''} />
             ))}
           </div>
         </div>

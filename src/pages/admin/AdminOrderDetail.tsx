@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatDateTime, formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatDateTime, formatPrice } from '@/lib/utils'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Order, OrderItem } from '@/types'
@@ -589,14 +589,14 @@ export function AdminOrderDetail() {
                       {displayImage && (
                         <img
                           src={displayImage}
-                          alt={item.product.name}
+                          alt={capitalizeFirst(item.product.name)}
                           className="w-16 h-16 object-cover rounded shrink-0"
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900">{item.product.name}</p>
+                        <p className="font-medium text-gray-900">{capitalizeFirst(item.product.name)}</p>
                         {variant?.name && (
-                          <p className="text-sm text-gray-700">Variante: {variant.name}</p>
+                          <p className="text-sm text-gray-700">Variante: {capitalizeFirst(variant.name)}</p>
                         )}
                         <p className="text-sm text-gray-600">SKU: {displaySku}</p>
                         {isEditing ? (

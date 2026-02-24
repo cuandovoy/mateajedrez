@@ -3,7 +3,7 @@ import { ShoppingCart } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { Product, ProductImage } from '@/types'
 import { useState, useEffect } from 'react'
@@ -112,7 +112,7 @@ export function ProductCard({ product, noAddToCart = false, basePath = '' }: Pro
             <img
               key={currentImageIndex}
               src={currentImageUrl}
-              alt={product.name}
+              alt={capitalizeFirst(product.name)}
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
               style={{ aspectRatio: '16/9' }}
               onError={() => {
@@ -135,11 +135,11 @@ export function ProductCard({ product, noAddToCart = false, basePath = '' }: Pro
       <div className="p-4 flex flex-col flex-grow">
         <Link to={`${basePath}/product/${product.id}`} className="group/link">
           <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover/link:text-primary-600 transition-colors duration-300">
-            {product.name}
+            {capitalizeFirst(product.name)}
           </h3>
         </Link>
         <p className="text-gray-600 text-sm mb-3 line-clamp-2 flex-grow">
-          {product.description || 'Sin descripción'}
+          {capitalizeFirst(product.description) || 'Sin descripción'}
         </p>
         <div className="flex items-center justify-between mb-4">
           <span 

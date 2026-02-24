@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatPrice } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { ProductVariant, Product } from '@/types'
-import { cn } from '@/lib/utils'
 import { PostgrestError } from '@supabase/supabase-js'
 
 interface VariantSelectorProps {
@@ -235,7 +234,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
         <div className="mt-4">
           <img
             src={displayImage}
-            alt={selectedVariant?.name || product.name}
+            alt={capitalizeFirst(selectedVariant?.name || product.name)}
             className="w-full h-64 object-cover rounded-lg"
           />
         </div>

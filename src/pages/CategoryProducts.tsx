@@ -14,7 +14,7 @@ import { PostgrestError } from '@supabase/supabase-js'
 const DEFAULT_STORE_SLUG = 'default'
 
 export function CategoryProducts() {
-  const { categorySlug } = useParams<{ categorySlug: string }>()
+  const { slug, categorySlug } = useParams<{ slug?: string; categorySlug: string }>()
   const currentOrg = useOrganizationStore((s) => s.currentOrganization)
   const fetchOrgBySlug = useOrganizationStore((s) => s.fetchOrgBySlug)
   const [orgId, setOrgId] = useState<string | null>(null)
@@ -238,7 +238,7 @@ export function CategoryProducts() {
     return (
       <div className="container-custom py-8 text-center">
         <p className="text-gray-600 text-lg mb-4">Categoría no encontrada</p>
-        <Link to="/products">
+        <Link to={slug ? `/${slug}/products` : '/products'}>
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a productos
@@ -250,7 +250,7 @@ export function CategoryProducts() {
 
   return (
     <div className="container-custom py-8">
-      <Link to="/products">
+      <Link to={slug ? `/${slug}/products` : '/products'}>
         <Button variant="ghost" className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver a productos
@@ -479,14 +479,14 @@ export function CategoryProducts() {
               {/* Vista Cards para móvil y tablet */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-6">
                 {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} />
+                  <ProductCard key={product.id} product={product} basePath={slug ? `/${slug}` : ''} />
                 ))}
               </div>
 
               {/* Vista Lista para desktop */}
               <div className="hidden lg:block space-y-4">
                 {filteredProducts.map((product) => (
-                  <ProductListItem key={product.id} product={product} />
+                  <ProductListItem key={product.id} product={product} basePath={slug ? `/${slug}` : ''} />
                 ))}
               </div>
             </>

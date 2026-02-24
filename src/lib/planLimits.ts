@@ -64,3 +64,8 @@ export function getProductLimit(tier: string): number | null {
 export function getBranchLimit(tier: string): number | null {
   return getPlanLimits(tier).branches
 }
+
+/** Máximo de imágenes por producto según el plan: Starter 1, Profesional 3 */
+export function getMaxProductImages(tier: string): number {
+  return tier === PLAN_PROFESIONAL ? 3 : 1
+}

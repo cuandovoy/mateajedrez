@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { useOrganizationStore } from '@/store/organizationStore'
@@ -499,13 +499,13 @@ export function Checkout() {
                     {item.product.image_url && (
                       <img
                         src={item.product.image_url}
-                        alt={item.product.name}
+                        alt={capitalizeFirst(item.product.name)}
                         className="w-16 h-16 object-cover rounded"
                       />
                     )}
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">
-                        {item.product.name}
+                        {capitalizeFirst(item.product.name)}
                       </p>
                       <p className="text-xs text-gray-600">
                         Cantidad: {item.quantity}
