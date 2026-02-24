@@ -55,7 +55,6 @@ export function useUserManagement() {
     }
 
     const frontendUrl =
-      import.meta.env.VITE_FRONTEND_URL ||
       import.meta.env.VITE_APP_URL ||
       (typeof window !== 'undefined' ? window.location.origin : '')
 

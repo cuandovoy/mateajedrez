@@ -1,6 +1,8 @@
 import { AdminLayout } from '@/components/layout/AdminLayout'
 import { PublicStoreWrapper } from '@/components/layout/PublicStoreWrapper'
+import { ForgotPassword } from '@/pages/ForgotPassword'
 import { Login } from '@/pages/Login'
+import { ResetPassword } from '@/pages/ResetPassword'
 import { PublicStore } from '@/pages/PublicStore'
 import { Products } from '@/pages/Products'
 import { CategoryProducts } from '@/pages/CategoryProducts'
@@ -47,8 +49,10 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Login (sin auth) */}
+        {/* Auth (sin sesión requerida) */}
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Rutas públicas de tienda por slug */}
         <Route element={<PublicStoreWrapper />}>

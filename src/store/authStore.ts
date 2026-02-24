@@ -13,6 +13,7 @@ interface AuthState {
   canAccessAdminPanel: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, fullName?: string) => Promise<void>
+  resetPasswordRequest: (email: string) => Promise<void>
   signOut: () => Promise<void>
   fetchProfile: () => Promise<void>
   initialize: () => Promise<void>
@@ -149,7 +150,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   signUp: async (email: string, password: string, fullName?: string) => {
     try {
       const frontendUrl =
-        import.meta.env.VITE_FRONTEND_URL ||
         import.meta.env.VITE_APP_URL ||
         (typeof window !== 'undefined' ? window.location.origin : '')
 
@@ -178,6 +178,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.error('Error signing up:', error)
       throw error
     }
+  },
+
+  resetPasswordRequest: async (email: string) => {
+    const frontendUrl =
+      import.meta.env.VITE_APP_URL ||
+      (typeof window !== 'undefined' ? window.location.origin : '')
+    const redirectTo = frontendUrl ? `${frontendUrl.replace(/\/$/, '')}/reset-password` : undefined
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      redirectTo,
+    })
+    if (error) throw error
   },
 
   signOut: async () => {

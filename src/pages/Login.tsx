@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -17,9 +17,11 @@ type LoginForm = z.infer<typeof loginSchema>
 
 export function Login() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { signIn, user, canAccessAdminPanel, loading } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const passwordReset = (location.state as { passwordReset?: boolean } | null)?.passwordReset ?? false
 
   useEffect(() => {
     document.body.classList.add('admin-theme')
@@ -92,6 +94,11 @@ export function Login() {
           <Card>
             <CardContent className="p-6">
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                {passwordReset && (
+                  <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg text-sm">
+                    Tu contraseña se actualizó correctamente. Ya puedes iniciar sesión.
+                  </div>
+                )}
                 {error && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
                     {error}
@@ -112,6 +119,14 @@ export function Login() {
                 <Button type="submit" className="w-full" isLoading={isLoading}>
                   Iniciar Sesión
                 </Button>
+                <div className="text-center">
+                  <Link
+                    to="/forgot-password"
+                    className="text-sm text-admin-600 hover:text-admin-700 font-medium"
+                  >
+                    ¿Olvidaste tu contraseña?
+                  </Link>
+                </div>
               </form>
             </CardContent>
           </Card>
