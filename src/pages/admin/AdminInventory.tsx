@@ -15,6 +15,8 @@ import {
   AlertTriangle,
   ArrowRight,
   Building2,
+  ChevronLeft,
+  ChevronRight,
   Edit,
   History,
   Package,
@@ -24,7 +26,10 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+
+const DEFAULT_PAGE_SIZE = 25
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
 
 interface InventoryItem {
   id: string
@@ -64,7 +69,6 @@ export function AdminInventory() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedBranch, setSelectedBranch] = useState<string>('')
-  const [searchTerm, setSearchTerm] = useState('')
   const [editingItem, setEditingItem] = useState<{ id: string; stock: number; min_stock: number; low_stock_threshold: number } | null>(null)
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -74,12 +78,24 @@ export function AdminInventory() {
   const [transferModalItem, setTransferModalItem] = useState<InventoryItem | null>(null)
   const [movementsModalItem, setMovementsModalItem] = useState<InventoryItem | null>(null)
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [totalCount, setTotalCount] = useState(0)
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(searchInput.trim())
+      setPage(0)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
   useEffect(() => {
     if (organizationId) {
       fetchBranches()
       fetchProducts()
-      fetchInventory()
       checkMissingProducts()
     }
   }, [organizationId])
@@ -89,6 +105,123 @@ export function AdminInventory() {
       checkMissingProducts()
     }
   }, [selectedBranch, organizationId])
+
+  const fetchInventory = useCallback(async () => {
+    if (!organizationId) return
+    try {
+      setLoading(true)
+      const from = page * pageSize
+      const to = from + pageSize - 1
+
+      let query = supabase
+        .from('branch_inventory')
+        .select(
+          `
+          id,
+          branch_id,
+          product_id,
+          variant_id,
+          stock,
+          min_stock,
+          low_stock_threshold,
+          branches!inner(id, name, organization_id),
+          products(
+            id,
+            name,
+            sku,
+            image_url,
+            product_images (
+              image_url,
+              is_primary,
+              display_order
+            )
+          ),
+          product_variants(
+            id,
+            name,
+            sku,
+            image_url,
+            product_id,
+            products!inner(
+              id,
+              name,
+              sku,
+              image_url,
+              product_images (
+                image_url,
+                is_primary,
+                display_order
+              )
+            )
+          )
+        `,
+          { count: 'exact' }
+        )
+        .eq('branches.organization_id', organizationId)
+        .order('stock', { ascending: true })
+        .range(from, to)
+
+      if (selectedBranch) {
+        query = query.eq('branch_id', selectedBranch)
+      }
+      if (debouncedSearch) {
+        const term = `%${debouncedSearch}%`
+        query = query.or(`products.name.ilike.${term},product_variants.name.ilike.${term}`)
+      }
+
+      const { data, error, count } = await query
+
+      if (error) throw error
+      const inventoryItems: InventoryItem[] = (data || []).map((item: Record<string, unknown>) => {
+        const branch = item.branches as { id: string; name: string } | null
+        const product = item.product_id
+          ? (item.products as Record<string, unknown> | null)
+          : ((item.product_variants as { products?: Record<string, unknown> } | null)?.products ?? null)
+        const variant = item.variant_id ? (item.product_variants as Record<string, unknown> | null) : null
+        const productPrimaryImage = getPrimaryImageUrl(
+          (product as { product_images?: ProductImageRef[] } | null)?.product_images
+        )
+
+        return {
+          id: item.id as string,
+          branch_id: item.branch_id as string,
+          branch_name: branch?.name || 'N/A',
+          product_id: item.product_id as string | null,
+          variant_id: item.variant_id as string | null,
+          product_name:
+            (product as { name?: string } | null)?.name ||
+            (variant as { name?: string } | null)?.name ||
+            'N/A',
+          variant_name: (variant as { name?: string } | null)?.name ?? null,
+          sku:
+            (variant as { sku?: string } | null)?.sku ??
+            (product as { sku?: string } | null)?.sku ??
+            null,
+          thumbnail_url:
+            (variant as { image_url?: string } | null)?.image_url ||
+            productPrimaryImage ||
+            (product as { image_url?: string } | null)?.image_url ||
+            null,
+          stock: item.stock as number,
+          min_stock: item.min_stock as number,
+          low_stock_threshold: item.low_stock_threshold as number,
+          is_low_stock: (item.stock as number) <= (item.low_stock_threshold as number),
+        }
+      })
+
+      setInventory(inventoryItems)
+      setTotalCount(count ?? 0)
+    } catch (err) {
+      console.error('Error fetching inventory:', err)
+      show('Error al cargar el inventario', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }, [organizationId, page, pageSize, selectedBranch, debouncedSearch, show])
+
+  useEffect(() => {
+    if (organizationId) fetchInventory()
+  }, [organizationId, fetchInventory])
 
   const fetchBranches = async () => {
     if (!organizationId) return
@@ -126,105 +259,6 @@ export function AdminInventory() {
       console.error('Error fetching products:', error)
     }
   }
-
-  const fetchInventory = async () => {
-    if (!organizationId) return
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('branch_inventory')
-        .select(`
-          id,
-          branch_id,
-          product_id,
-          variant_id,
-          stock,
-          min_stock,
-          low_stock_threshold,
-          branches!inner(id, name),
-          products(
-            id,
-            name,
-            sku,
-            image_url,
-            product_images (
-              image_url,
-              is_primary,
-              display_order
-            )
-          ),
-          product_variants(
-            id,
-            name,
-            sku,
-            image_url,
-            product_id,
-            products!inner(
-              id,
-              name,
-              sku,
-              image_url,
-              product_images (
-                image_url,
-                is_primary,
-                display_order
-              )
-            )
-          )
-        `)
-        .order('stock', { ascending: true })
-
-      if (error) throw error
-      const inventoryItems: InventoryItem[] = (data || []).map((item: any) => {
-        const branch = item.branches
-        const product = item.product_id ? item.products : (item.product_variants?.products || null)
-        const variant = item.variant_id ? item.product_variants : null
-        const productPrimaryImage = getPrimaryImageUrl(product?.product_images as ProductImageRef[] | undefined)
-
-        return {
-          id: item.id,
-          branch_id: item.branch_id,
-          branch_name: branch?.name || 'N/A',
-          product_id: item.product_id,
-          variant_id: item.variant_id,
-          product_name: product?.name || variant?.name || 'N/A',
-          variant_name: variant?.name || null,
-          sku: variant?.sku || product?.sku || null,
-          thumbnail_url: variant?.image_url || productPrimaryImage || product?.image_url || null,
-          stock: item.stock,
-          min_stock: item.min_stock,
-          low_stock_threshold: item.low_stock_threshold,
-          is_low_stock: item.stock <= item.low_stock_threshold,
-        }
-      })
-
-      setInventory(inventoryItems)
-    } catch (error) {
-      console.error('Error fetching inventory:', error)
-      show('Error al cargar el inventario', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const filteredInventory = useMemo(() => {
-    let filtered = inventory
-
-    if (selectedBranch) {
-      filtered = filtered.filter((item) => item.branch_id === selectedBranch)
-    }
-
-    if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase()
-      filtered = filtered.filter(
-        (item) =>
-          item.product_name.toLowerCase().includes(searchLower) ||
-          (item.variant_name && item.variant_name.toLowerCase().includes(searchLower))
-      )
-    }
-
-    return filtered
-  }, [inventory, selectedBranch, searchTerm])
 
   const handleEdit = (item: InventoryItem) => {
     setEditingItem({
@@ -305,11 +339,14 @@ export function AdminInventory() {
       return
     }
 
+    if (!organizationId) return
     try {
       setSyncing(true)
       // Type assertion needed because PostgREST types may not be updated
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase.rpc as any)('populate_missing_inventory_entries_rpc')
+      const { data, error } = await (supabase.rpc as any)('populate_missing_inventory_entries_rpc', {
+        p_organization_id: organizationId,
+      })
 
       if (error) throw error
 
@@ -378,7 +415,12 @@ export function AdminInventory() {
     }
   }
 
-  const lowStockCount = filteredInventory.filter((item) => item.is_low_stock).length
+  const lowStockCount = inventory.filter((item) => item.is_low_stock).length
+  const fromItem = totalCount === 0 ? 0 : page * pageSize + 1
+  const toItem = Math.min((page + 1) * pageSize, totalCount)
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  const hasPrev = page > 0
+  const hasNext = page < totalPages - 1
 
   return (
     <div className="space-y-6">
@@ -420,12 +462,15 @@ export function AdminInventory() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Sucursal</label>
               <select
                 value={selectedBranch}
-                onChange={(e) => setSelectedBranch(e.target.value)}
+                onChange={(e) => {
+                  setSelectedBranch(e.target.value)
+                  setPage(0)
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
               >
                 <option value="">Todas las sucursales</option>
@@ -442,12 +487,29 @@ export function AdminInventory() {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
                   type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder="Buscar por nombre..."
                   className="pl-10"
                 />
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Mostrar</label>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value))
+                  setPage(0)
+                }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size} por página
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </CardContent>
@@ -458,7 +520,7 @@ export function AdminInventory() {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Package className="h-5 w-5" />
-            <span>Inventario ({filteredInventory.length} productos)</span>
+            <span>Inventario ({totalCount} producto{totalCount !== 1 ? 's' : ''} en total)</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -466,7 +528,7 @@ export function AdminInventory() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600"></div>
             </div>
-          ) : filteredInventory.length === 0 ? (
+          ) : inventory.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No se encontraron productos en el inventario</p>
@@ -485,7 +547,7 @@ export function AdminInventory() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {filteredInventory.map((item) => (
+                  {inventory.map((item) => (
                     <tr
                       key={item.id}
                       className={`hover:bg-gray-50 ${item.is_low_stock ? 'bg-yellow-50' : ''}`}
@@ -649,6 +711,40 @@ export function AdminInventory() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Paginación */}
+          {!loading && totalCount > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-600">
+                Mostrando {fromItem}-{toItem} de {totalCount}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={!hasPrev}
+                  className="gap-1"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <span className="text-sm text-gray-600 px-2">
+                  Página {page + 1} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={!hasNext}
+                  className="gap-1"
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
