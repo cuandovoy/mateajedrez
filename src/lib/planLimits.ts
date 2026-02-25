@@ -15,7 +15,7 @@ export type PlanLimits = {
 
 export const PLAN_LIMITS: Record<string, PlanLimits> = {
   [PLAN_STARTER]: {
-    products: 200,
+    products: 700,
     branches: 1,
   },
   [PLAN_PROFESIONAL]: {
