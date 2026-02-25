@@ -51,11 +51,6 @@ export function getPlanLimits(tier: string): PlanLimits {
 
 export function canUseFeature(tier: string, feature: PlanFeature): boolean {
   const minTier = PLAN_FEATURES[feature]
- if(feature=='cash_register'){
-
-   console.log(feature=='cash_register');
-   debugger
- }
   
   if (!minTier) return true
   const tierLevel = TIER_ORDER[tier] ?? 0
