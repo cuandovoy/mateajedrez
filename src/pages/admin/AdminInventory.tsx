@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { trackAuditAction } from '@/lib/audit'
 import { capitalizeFirst } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
@@ -160,14 +161,16 @@ export function AdminInventory() {
         )
         .eq('branches.organization_id', organizationId)
         .order('stock', { ascending: true })
-        .range(from, to)
 
       if (selectedBranch) {
         query = query.eq('branch_id', selectedBranch)
       }
-      if (debouncedSearch) {
-        const term = `%${debouncedSearch}%`
-        query = query.or(`products.name.ilike.${term},product_variants.name.ilike.${term}`)
+
+      // Avoid PostgREST parser issues in `or(...)` with related fields + spaces.
+      // When searching, fetch the branch scope and filter in memory, then paginate.
+      const hasSearch = debouncedSearch.length > 0
+      if (!hasSearch) {
+        query = query.range(from, to)
       }
 
       const { data, error, count } = await query
@@ -210,8 +213,19 @@ export function AdminInventory() {
         }
       })
 
-      setInventory(inventoryItems)
-      setTotalCount(count ?? 0)
+      if (hasSearch) {
+        const searchLower = debouncedSearch.toLowerCase()
+        const filteredItems = inventoryItems.filter((item) => {
+          const haystack = `${item.product_name} ${item.variant_name || ''} ${item.sku || ''}`.toLowerCase()
+          return haystack.includes(searchLower)
+        })
+        const pagedItems = filteredItems.slice(from, from + pageSize)
+        setInventory(pagedItems)
+        setTotalCount(filteredItems.length)
+      } else {
+        setInventory(inventoryItems)
+        setTotalCount(count ?? 0)
+      }
     } catch (err) {
       console.error('Error fetching inventory:', err)
       show('Error al cargar el inventario', 'error')
@@ -352,6 +366,14 @@ export function AdminInventory() {
       if (error) throw error
 
       const createdCount = data || 0
+      await trackAuditAction({
+        organizationId,
+        tableName: 'branch_inventory',
+        recordId: selectedBranch || 'all-branches',
+        action: 'SYNC',
+        notes: 'Sincronización de productos y variantes faltantes en inventario.',
+        newData: { created_entries: createdCount, branch_id: selectedBranch || null },
+      })
       show(`Se crearon ${createdCount} entradas de inventario faltantes`, 'success')
       setMissingProductsCount(0)
       fetchInventory()
@@ -383,21 +405,14 @@ export function AdminInventory() {
 
     try {
       setSaving(true)
-      // Use adjust_inventory function to track the change
-      // Type assertion needed because PostgREST types may not be updated after migration 028
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.rpc as any)('adjust_inventory', {
-        p_branch_inventory_id: editingItem.id,
-        p_new_stock: editingItem.stock,
-        p_notes: 'Ajuste manual desde panel de inventario',
-      })
+      const currentItem = inventory.find((item) => item.id === editingItem.id)
+      const previousStock = currentItem?.stock ?? editingItem.stock
+      const quantityChange = editingItem.stock - previousStock
 
-      if (error) throw error
-
-      // Update min_stock and low_stock_threshold separately
       const { error: updateError } = await supabase
         .from('branch_inventory')
         .update({
+          stock: editingItem.stock,
           min_stock: editingItem.min_stock,
           low_stock_threshold: editingItem.low_stock_threshold,
         } as never)
@@ -405,12 +420,47 @@ export function AdminInventory() {
 
       if (updateError) throw updateError
 
+      if (quantityChange !== 0) {
+        const { error: movementError } = await supabase
+          .from('inventory_movements')
+          .insert({
+            branch_inventory_id: editingItem.id,
+            movement_type: 'adjustment',
+            quantity: quantityChange,
+            previous_stock: previousStock,
+            new_stock: editingItem.stock,
+            reference_type: 'manual',
+            notes: 'Ajuste manual desde panel de inventario',
+          })
+
+        if (movementError) throw movementError
+      }
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'branch_inventory',
+        recordId: editingItem.id,
+        action: 'UPDATE',
+        notes: 'Actualización manual de stock y umbrales desde panel de inventario.',
+        oldData: {
+          stock: previousStock,
+          min_stock: currentItem?.min_stock ?? null,
+          low_stock_threshold: currentItem?.low_stock_threshold ?? null,
+        },
+        newData: {
+          stock: editingItem.stock,
+          min_stock: editingItem.min_stock,
+          low_stock_threshold: editingItem.low_stock_threshold,
+          quantity_change: quantityChange,
+        },
+      })
+
       show('Inventario actualizado exitosamente', 'success')
       setEditingItem(null)
       fetchInventory()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating inventory:', error)
-      show('Error al actualizar el inventario', 'error')
+      show(error?.message || 'Error al actualizar el inventario', 'error')
     } finally {
       setSaving(false)
     }
@@ -681,7 +731,7 @@ export function AdminInventory() {
                                 onClick: () => handleEdit(item),
                               },
                               {
-                                label: 'Recepción de Mercadería',
+                                label: 'Ingreso manual de stock',
                                 icon: <Plus className="h-4 w-4" />,
                                 onClick: () => setReceiptModalItem(item),
                               },

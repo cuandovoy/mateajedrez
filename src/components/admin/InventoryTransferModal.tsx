@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { trackAuditAction } from '@/lib/audit'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { X, ArrowRight } from 'lucide-react'
+import { useOrganization } from '@/hooks/useOrganization'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch } from '@/types'
 
@@ -29,6 +31,7 @@ export function InventoryTransferModal({
   onClose,
   onSuccess,
 }: InventoryTransferModalProps) {
+  const { organizationId } = useOrganization()
   const { show } = useToastStore()
   const [toBranchId, setToBranchId] = useState('')
   const [quantity, setQuantity] = useState('')
@@ -71,6 +74,22 @@ export function InventoryTransferModal({
       })
 
       if (error) throw error
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'inventory_transfers',
+        recordId: inventoryItem.id,
+        action: 'INSERT',
+        notes: 'Transferencia de inventario entre sucursales creada desde modal.',
+        newData: {
+          from_branch_id: inventoryItem.branch_id,
+          to_branch_id: toBranchId,
+          quantity: qty,
+          product_id: inventoryItem.product_id,
+          variant_id: inventoryItem.variant_id,
+          notes: notes || null,
+        },
+      })
 
       show(`Transferencia creada: ${qty} unidades a ${branches.find((b) => b.id === toBranchId)?.name}`, 'success')
       onSuccess()

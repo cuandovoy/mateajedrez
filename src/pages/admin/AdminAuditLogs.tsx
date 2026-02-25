@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { useOrganization } from '@/hooks/useOrganization'
 import { formatDateTime } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import {
@@ -19,7 +20,7 @@ type AuditLog = {
   id: string
   table_name: string
   record_id: string | null
-  action: 'INSERT' | 'UPDATE' | 'DELETE'
+  action: string
   user_id: string | null
   user_email: string | null
   old_data: Record<string, any> | null
@@ -30,21 +31,41 @@ type AuditLog = {
 }
 
 const TABLE_NAMES = [
+  'organizations',
+  'organization_members',
+  'organization_payment_methods',
+  'branches',
+  'user_profiles',
   'products',
   'categories',
   'product_variants',
-  'branch_inventory',
-  'orders',
-  'cash_sessions',
-  'order_payments',
+  'product_images',
+  'product_barcodes',
+  'product_suppliers',
   'suppliers',
-  'branches',
-  'user_profiles',
+  'branch_inventory',
+  'inventory_movements',
+  'inventory_transfers',
+  'purchase_orders',
+  'purchase_order_items',
+  'goods_receipts',
+  'goods_receipt_items',
+  'supplier_invoices',
+  'supplier_payments',
+  'expense_ledger',
+  'order_returns',
+  'order_return_items',
+  'orders',
+  'order_items',
+  'order_payments',
+  'cash_sessions',
+  'audit_logs',
 ] as const
 
 const ACTIONS = ['INSERT', 'UPDATE', 'DELETE'] as const
 
 export function AdminAuditLogs() {
+  const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const [logs, setLogs] = useState<AuditLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -71,12 +92,18 @@ export function AdminAuditLogs() {
       const params: any = {
         p_limit: pageSize,
         p_offset: (page - 1) * pageSize,
+        p_organization_id: organizationId || null,
       }
 
       if (filters.table_name) params.p_table_name = filters.table_name
       if (filters.action) params.p_action = filters.action
       if (filters.user_id) params.p_user_id = filters.user_id
-      if (filters.record_id) params.p_record_id = filters.record_id
+      if (
+        filters.record_id &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(filters.record_id)
+      ) {
+        params.p_record_id = filters.record_id
+      }
       if (filters.start_date) params.p_start_date = filters.start_date
       if (filters.end_date) params.p_end_date = filters.end_date
 
@@ -131,20 +158,64 @@ export function AdminAuditLogs() {
     }
   }
 
+  const getActionLabel = (action: string) => {
+    const labels: Record<string, string> = {
+      INSERT: 'Alta',
+      UPDATE: 'Actualización',
+      DELETE: 'Eliminación',
+      SYNC: 'Sincronización',
+    }
+    return labels[action] || `Acción técnica: ${action}`
+  }
+
+  const getChangeSummary = (log: AuditLog): string => {
+    if (log.action === 'UPDATE' && log.changed_fields && log.changed_fields.length > 0) {
+      const fields = log.changed_fields.slice(0, 3).join(', ')
+      const extra =
+        log.changed_fields.length > 3 ? ` (+${log.changed_fields.length - 3} más)` : ''
+      return `Se actualizaron: ${fields}${extra}`
+    }
+
+    if (log.action === 'INSERT') return 'Se dio de alta un nuevo registro'
+    if (log.action === 'DELETE') return 'Se eliminó el registro'
+    if (log.action === 'SYNC') return 'Se ejecutó una sincronización'
+
+    return 'No hay detalle adicional disponible'
+  }
+
   const getTableDisplayName = (tableName: string) => {
     const names: Record<string, string> = {
-      products: 'Productos',
-      categories: 'Categorías',
-      product_variants: 'Variantes',
-      branch_inventory: 'Inventario',
-      orders: 'Órdenes',
-      cash_sessions: 'Sesiones de Caja',
-      order_payments: 'Pagos',
+      organizations: 'Organizaciones: configuración general de la empresa',
+      organization_members: 'Miembros de organización: altas, bajas y roles',
+      organization_payment_methods: 'Métodos de pago de la organización',
+      branches: 'Sucursales: datos de locales y puntos de venta',
+      user_profiles: 'Perfiles de usuario del sistema',
+      products: 'Productos del catálogo',
+      categories: 'Categorías de productos',
+      product_variants: 'Variantes de producto',
+      product_images: 'Imágenes de productos',
+      product_barcodes: 'Códigos de barras de productos',
+      product_suppliers: 'Relación producto-proveedor',
       suppliers: 'Proveedores',
-      branches: 'Sucursales',
-      user_profiles: 'Perfiles de Usuario',
+      branch_inventory: 'Inventario por sucursal',
+      inventory_movements: 'Movimientos de inventario (entradas, salidas, ajustes)',
+      inventory_transfers: 'Transferencias de inventario entre sucursales',
+      purchase_orders: 'Órdenes de compra',
+      purchase_order_items: 'Ítems de órdenes de compra',
+      goods_receipts: 'Recepciones de mercadería',
+      goods_receipt_items: 'Ítems de recepciones de mercadería',
+      supplier_invoices: 'Facturas de proveedor',
+      supplier_payments: 'Pagos a proveedores',
+      expense_ledger: 'Libro de egresos',
+      order_returns: 'Devoluciones y anulaciones de ventas',
+      order_return_items: 'Ítems devueltos de ventas',
+      orders: 'Órdenes de venta',
+      order_items: 'Ítems de órdenes de venta',
+      order_payments: 'Pagos de órdenes de venta',
+      cash_sessions: 'Sesiones de caja',
+      audit_logs: 'Auditoría interna del sistema',
     }
-    return names[tableName] || tableName
+    return names[tableName] || `Actividad registrada sobre la tabla técnica "${tableName}"`
   } 
 
   const totalPages = Math.ceil(totalCount / pageSize)
@@ -279,9 +350,6 @@ export function AdminAuditLogs() {
                         Fecha/Hora
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                        Tabla
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
                         Acción
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
@@ -291,7 +359,10 @@ export function AdminAuditLogs() {
                         ID Registro
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
-                        Cambios
+                        Módulo
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">
+                        Resumen de cambio
                       </th>
                     </tr>
                   </thead>
@@ -301,19 +372,13 @@ export function AdminAuditLogs() {
                         <td className="px-4 py-3 text-sm text-gray-900">
                           {formatDateTime(log.created_at, settings)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-900">
-                          <span className="inline-flex items-center space-x-1">
-                            <Database className="h-4 w-4 text-gray-400" />
-                            <span>{getTableDisplayName(log.table_name)}</span>
-                          </span>
-                        </td>
                         <td className="px-4 py-3">
                           <span
                             className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getActionColor(
                               log.action
                             )}`}
                           >
-                            {log.action}
+                            {getActionLabel(log.action)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-600">
@@ -330,27 +395,13 @@ export function AdminAuditLogs() {
                           {log.record_id ? log.record_id.substring(0, 8) + '...' : 'N/A'}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          {log.action === 'UPDATE' && log.changed_fields && log.changed_fields.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {log.changed_fields.slice(0, 3).map((field) => (
-                                <span
-                                  key={field}
-                                  className="inline-flex px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded"
-                                >
-                                  {field}
-                                </span>
-                              ))}
-                              {log.changed_fields.length > 3 && (
-                                <span className="text-xs text-gray-500">+{log.changed_fields.length - 3}</span>
-                              )}
-                            </div>
-                          ) : log.action === 'INSERT' ? (
-                            <span className="text-green-600 text-xs">Nuevo registro</span>
-                          ) : log.action === 'DELETE' ? (
-                            <span className="text-red-600 text-xs">Eliminado</span>
-                          ) : (
-                            <span className="text-gray-400 text-xs">-</span>
-                          )}
+                          <div className="inline-flex items-center space-x-1 text-gray-700">
+                            <Database className="h-4 w-4 text-gray-400" />
+                            <span className="text-xs">{getTableDisplayName(log.table_name)}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="text-xs text-gray-700">{getChangeSummary(log)}</span>
                         </td>
                       </tr>
                     ))}

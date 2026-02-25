@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { trackAuditAction } from '@/lib/audit'
 import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
@@ -436,6 +437,21 @@ export function ManualSaleForm({
 
       if (orderError || !order) throw orderError || new Error('Failed to create order')
 
+      await trackAuditAction({
+        organizationId,
+        tableName: 'orders',
+        recordId: (order as { id: string }).id,
+        action: 'INSERT',
+        notes: 'Venta manual creada desde módulo de caja.',
+        newData: {
+          branch_id: branchId,
+          total,
+          payment_method: data.payment_method,
+          lines_count: saleLines.length,
+          has_cash_session: Boolean(currentCashSession),
+        },
+      })
+
       // Create order items (only for product lines)
       const productLines = saleLines.filter((line) => line.type === 'product' && line.product_id)
       if (productLines.length > 0) {
@@ -510,6 +526,20 @@ export function ManualSaleForm({
             .eq('id', cashSessionId)
         }
       }
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'order_payments',
+        recordId: (order as { id: string }).id,
+        action: 'INSERT',
+        notes: 'Pago registrado para venta manual.',
+        newData: {
+          order_id: (order as { id: string }).id,
+          payment_method: data.payment_method,
+          amount: total,
+          cash_session_id: cashSessionId,
+        },
+      })
 
       show('Venta registrada exitosamente', 'success')
       reset()

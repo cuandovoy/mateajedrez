@@ -56,6 +56,19 @@ type SummaryPrevious = {
   orders: number
 }
 
+type MarginSummary = {
+  grossMargin: number
+  trackedCost: number
+  trackedRevenue: number
+  marginPct: number
+  trackedItems: number
+  totalItems: number
+  missingItems: number
+  branchMissingItems: number
+  inventoryCostMissingItems: number
+  otherMissingItems: number
+}
+
 const getPaymentMethodLabel = (method: string): string => {
   const labels: Record<string, string> = {
     cash: 'Efectivo',
@@ -149,6 +162,30 @@ export function AdminSales() {
     revenue: 0,
     orders: 0,
   })
+  const [currentMargin, setCurrentMargin] = useState<MarginSummary>({
+    grossMargin: 0,
+    trackedCost: 0,
+    trackedRevenue: 0,
+    marginPct: 0,
+    trackedItems: 0,
+    totalItems: 0,
+    missingItems: 0,
+    branchMissingItems: 0,
+    inventoryCostMissingItems: 0,
+    otherMissingItems: 0,
+  })
+  const [previousMargin, setPreviousMargin] = useState<MarginSummary>({
+    grossMargin: 0,
+    trackedCost: 0,
+    trackedRevenue: 0,
+    marginPct: 0,
+    trackedItems: 0,
+    totalItems: 0,
+    missingItems: 0,
+    branchMissingItems: 0,
+    inventoryCostMissingItems: 0,
+    otherMissingItems: 0,
+  })
   const [dailySales, setDailySales] = useState<DailySale[]>([])
   const [monthlySales, setMonthlySales] = useState<MonthlySale[]>([])
   const [paymentMethodSales, setPaymentMethodSales] = useState<PaymentMethodSummary[]>([])
@@ -241,6 +278,34 @@ export function AdminSales() {
         orders: asNumber(previous.orders),
       })
 
+      const currentMarginPayload = (payload.current_margin as Record<string, unknown> | undefined) || {}
+      setCurrentMargin({
+        grossMargin: asNumber(currentMarginPayload.gross_margin),
+        trackedCost: asNumber(currentMarginPayload.tracked_cost),
+        trackedRevenue: asNumber(currentMarginPayload.tracked_revenue),
+        marginPct: asNumber(currentMarginPayload.margin_pct),
+        trackedItems: asNumber(currentMarginPayload.tracked_items),
+        totalItems: asNumber(currentMarginPayload.total_items),
+        missingItems: asNumber(currentMarginPayload.missing_items),
+        branchMissingItems: asNumber(currentMarginPayload.branch_missing_items),
+        inventoryCostMissingItems: asNumber(currentMarginPayload.inventory_cost_missing_items),
+        otherMissingItems: asNumber(currentMarginPayload.other_missing_items),
+      })
+
+      const previousMarginPayload = (payload.previous_margin as Record<string, unknown> | undefined) || {}
+      setPreviousMargin({
+        grossMargin: asNumber(previousMarginPayload.gross_margin),
+        trackedCost: asNumber(previousMarginPayload.tracked_cost),
+        trackedRevenue: asNumber(previousMarginPayload.tracked_revenue),
+        marginPct: asNumber(previousMarginPayload.margin_pct),
+        trackedItems: asNumber(previousMarginPayload.tracked_items),
+        totalItems: asNumber(previousMarginPayload.total_items),
+        missingItems: asNumber(previousMarginPayload.missing_items),
+        branchMissingItems: asNumber(previousMarginPayload.branch_missing_items),
+        inventoryCostMissingItems: asNumber(previousMarginPayload.inventory_cost_missing_items),
+        otherMissingItems: asNumber(previousMarginPayload.other_missing_items),
+      })
+
       const daily = Array.isArray(payload.daily) ? payload.daily : []
       setDailySales(
         daily.map((item) => {
@@ -313,10 +378,16 @@ export function AdminSales() {
     return {
       prevRevenue: previousSummary.revenue,
       prevOrders: previousSummary.orders,
+      prevMargin: previousMargin.grossMargin,
       revenueChange: percentChange(currentSummary.revenue, previousSummary.revenue),
       ordersChange: percentChange(currentSummary.orders, previousSummary.orders),
+      marginChange: percentChange(currentMargin.grossMargin, previousMargin.grossMargin),
     }
-  }, [currentSummary, previousSummary])
+  }, [currentSummary, previousSummary, currentMargin, previousMargin])
+
+  const marginCoveragePct = currentMargin.totalItems > 0
+    ? (currentMargin.trackedItems / currentMargin.totalItems) * 100
+    : 0
 
   const periodLabel =
     periodMode === 'month'
@@ -332,12 +403,29 @@ export function AdminSales() {
     rows.push([])
 
     rows.push(['Resumen General'])
-    rows.push(['Ingresos', 'Órdenes', 'Ticket promedio'])
-    rows.push([currentSummary.revenue, currentSummary.orders, currentSummary.avgTicket])
+    rows.push(['Ingresos', 'Órdenes', 'Ticket promedio', 'Margen bruto', 'Margen %', 'Cobertura costo %'])
+    rows.push([
+      currentSummary.revenue,
+      currentSummary.orders,
+      currentSummary.avgTicket,
+      currentMargin.grossMargin,
+      currentMargin.marginPct.toFixed(2),
+      marginCoveragePct.toFixed(2),
+    ])
     rows.push([])
 
     rows.push(['Comparación entre períodos'])
-    rows.push(['Ingresos actual', 'Ingresos anterior', 'Variación %', 'Órdenes actual', 'Órdenes anterior', 'Variación %'])
+    rows.push([
+      'Ingresos actual',
+      'Ingresos anterior',
+      'Variación %',
+      'Órdenes actual',
+      'Órdenes anterior',
+      'Variación %',
+      'Margen actual',
+      'Margen anterior',
+      'Variación %',
+    ])
     rows.push([
       currentSummary.revenue,
       comparisonSummary.prevRevenue,
@@ -345,6 +433,9 @@ export function AdminSales() {
       currentSummary.orders,
       comparisonSummary.prevOrders,
       comparisonSummary.ordersChange.toFixed(2),
+      currentMargin.grossMargin,
+      comparisonSummary.prevMargin,
+      comparisonSummary.marginChange.toFixed(2),
     ])
     rows.push([])
 
@@ -400,7 +491,7 @@ export function AdminSales() {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Reportes de Ventas</h1>
-          <p className="text-gray-600 mt-1">Ventas diarias, mensuales, comparación, método de pago y resumen por sucursal.</p>
+          <p className="text-gray-600 mt-1">Ventas, márgenes, comparación, método de pago y resumen por sucursal.</p>
         </div>
         <Button onClick={handleExport} className="gap-2" variant="outline">
           <Download className="h-4 w-4" />
@@ -491,7 +582,7 @@ export function AdminSales() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
@@ -524,6 +615,21 @@ export function AdminSales() {
                 <p className="text-2xl font-bold text-gray-900">{formatPrice(currentSummary.avgTicket, settings)}</p>
               </div>
               <CreditCard className="h-6 w-6 text-purple-600" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Margen bruto (costo trazado)</p>
+                <p className="text-2xl font-bold text-gray-900">{formatPrice(currentMargin.grossMargin, settings)}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {currentMargin.marginPct.toFixed(2)}% · Cobertura {marginCoveragePct.toFixed(1)}%
+                </p>
+              </div>
+              <TrendingUp className="h-6 w-6 text-emerald-600" />
             </div>
           </CardContent>
         </Card>
@@ -568,9 +674,45 @@ export function AdminSales() {
                 Actual: {currentSummary.orders} | Anterior: {comparisonSummary.prevOrders}
               </p>
             </div>
+
+            <div className="p-4 rounded-lg border border-gray-200 md:col-span-2">
+              <p className="text-sm text-gray-500">Margen bruto (costo trazado)</p>
+              <div className="mt-2 flex items-center gap-2">
+                {comparisonSummary.marginChange >= 0 ? (
+                  <TrendingUp className="h-4 w-4 text-green-600" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 text-red-600" />
+                )}
+                <p className={`text-sm font-semibold ${comparisonSummary.marginChange >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  {comparisonSummary.marginChange >= 0 ? '+' : ''}{comparisonSummary.marginChange.toFixed(2)}%
+                </p>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Actual: {formatPrice(currentMargin.grossMargin, settings)} | Anterior: {formatPrice(comparisonSummary.prevMargin, settings)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Cobertura actual: {currentMargin.trackedItems} de {currentMargin.totalItems} items con costo trazado.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {currentMargin.missingItems > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="p-4">
+            <p className="text-sm font-semibold text-amber-900">Advertencia de cobertura de costo</p>
+            <p className="mt-1 text-sm text-amber-800">
+              Hay {currentMargin.missingItems} items de venta sin costo trazado en el período seleccionado.
+            </p>
+            <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-amber-900 md:grid-cols-3">
+              <div>Sin sucursal en orden: {currentMargin.branchMissingItems}</div>
+              <div>Sin costo de inventario: {currentMargin.inventoryCostMissingItems}</div>
+              <div>Otros casos: {currentMargin.otherMissingItems}</div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <Card>

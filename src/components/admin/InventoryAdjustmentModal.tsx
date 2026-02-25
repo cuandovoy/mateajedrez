@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { trackAuditAction } from '@/lib/audit'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { X, Edit } from 'lucide-react'
+import { useOrganization } from '@/hooks/useOrganization'
 import { useToastStore } from '@/store/toastStore'
 
 interface InventoryAdjustmentModalProps {
@@ -26,6 +28,7 @@ export function InventoryAdjustmentModal({
   onClose,
   onSuccess,
 }: InventoryAdjustmentModalProps) {
+  const { organizationId } = useOrganization()
   const { show } = useToastStore()
   const [newStock, setNewStock] = useState(inventoryItem.current_stock.toString())
   const [notes, setNotes] = useState('')
@@ -72,8 +75,25 @@ export function InventoryAdjustmentModal({
           notes: notes || null,
         })
 
+      await trackAuditAction({
+        organizationId,
+        tableName: 'branch_inventory',
+        recordId: inventoryItem.id,
+        action: 'UPDATE',
+        notes: 'Ajuste manual de inventario desde modal de inventario.',
+        oldData: { stock: previousStock },
+        newData: {
+          stock,
+          quantity_change: quantityChange,
+          reason: notes || null,
+          branch_id: inventoryItem.branch_id,
+          product_id: inventoryItem.product_id,
+          variant_id: inventoryItem.variant_id,
+        },
+      })
+
       show(
-        `Ajuste realizado: ${difference > 0 ? '+' : ''}${difference} unidades (${inventoryItem.current_stock} → ${stock})`,
+        `Ajuste manual realizado: ${difference > 0 ? '+' : ''}${difference} unidades (${inventoryItem.current_stock} → ${stock})`,
         'success'
       )
       onSuccess()
@@ -93,7 +113,7 @@ export function InventoryAdjustmentModal({
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl flex items-center space-x-2">
               <Edit className="h-5 w-5 text-admin-600" />
-              <span>Ajuste de Inventario</span>
+              <span>Ajuste manual de inventario</span>
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-5 w-5" />
@@ -102,6 +122,10 @@ export function InventoryAdjustmentModal({
         </CardHeader>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Este ajuste es operativo y no genera compra, factura ni egreso contable. Para movimientos de compra usa el módulo de Compras y Egresos.
+            </div>
+
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Producto</p>
               <p className="font-medium text-gray-900">{inventoryItem.product_name}</p>
@@ -116,7 +140,7 @@ export function InventoryAdjustmentModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nuevo Stock *
+                Nuevo stock contado *
               </label>
               <Input
                 type="number"
@@ -156,7 +180,7 @@ export function InventoryAdjustmentModal({
 
             <div className="flex space-x-4 pt-4">
               <Button type="submit" className="flex-1" disabled={loading}>
-                {loading ? 'Ajustando...' : 'Aplicar Ajuste'}
+                {loading ? 'Guardando ajuste...' : 'Guardar ajuste manual'}
               </Button>
               <Button type="button" variant="outline" onClick={onClose} className="flex-1" disabled={loading}>
                 Cancelar

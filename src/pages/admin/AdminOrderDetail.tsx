@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { trackAuditAction } from '@/lib/audit'
 import { capitalizeFirst, formatDateTime, formatPrice } from '@/lib/utils'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
@@ -47,6 +48,7 @@ type ShippingAddress = {
 }
 
 interface OrderItemWithProduct extends OrderItem {
+  returned_quantity: number
   product: { name: string; image_url: string | null; sku: string; price?: number }
   variant?: {
     id: string
@@ -76,6 +78,7 @@ export function AdminOrderDetail() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [returningItemId, setReturningItemId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [products, setProducts] = useState<
     Array<{
@@ -234,15 +237,62 @@ export function AdminOrderDetail() {
 
   const handleStatusUpdate = async (newStatus: Order['status']) => {
     if (!order || !id) return
+    const previousStatus = order.status
     setUpdating(true)
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus } as never)
-        .eq('id', id)
-      if (error) throw error
+      if (newStatus === 'cancelled') {
+        const reason = window.prompt('Ingresa el motivo de la anulación de la venta:')
+        if (!reason || reason.trim().length === 0) {
+          show('Debes indicar un motivo para anular la venta.', 'error')
+          return
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: returnId, error } = await (supabase.rpc as any)('create_full_order_cancellation', {
+          p_order_id: id,
+          p_reason: reason.trim(),
+          p_refund_method: order.payment_method || null,
+          p_notes: 'Anulación ejecutada desde detalle de orden',
+        })
+        if (error) throw error
+
+        await trackAuditAction({
+          organizationId,
+          tableName: 'order_returns',
+          recordId: String(returnId || id),
+          action: 'INSERT',
+          notes: 'Anulación completa de orden desde detalle de orden.',
+          newData: {
+            order_id: id,
+            previous_status: previousStatus,
+            new_status: 'cancelled',
+            reason: reason.trim(),
+          },
+        })
+      } else {
+        const { error } = await supabase
+          .from('orders')
+          .update({ status: newStatus } as never)
+          .eq('id', id)
+        if (error) throw error
+      }
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'orders',
+        recordId: id,
+        action: 'UPDATE',
+        notes: 'Cambio de estado de orden desde detalle de orden.',
+        oldData: { status: previousStatus },
+        newData: { status: newStatus },
+      })
       setOrder({ ...order, status: newStatus })
-      show('Estado actualizado', 'success')
+      show(
+        newStatus === 'cancelled'
+          ? 'Orden anulada correctamente. Se restauró stock y se registró la devolución total.'
+          : 'Estado actualizado',
+        'success'
+      )
     } catch (error) {
       console.error('Error updating order status:', error)
       show('Error al actualizar el estado', 'error')
@@ -257,6 +307,11 @@ export function AdminOrderDetail() {
     try {
       const total = editItems.reduce((sum, it) => sum + it.price * it.quantity, 0)
       const amount = parseFloat(editPaymentAmount) || total
+      const previousOrderSnapshot = {
+        shipping_address: order.shipping_address,
+        payment_method: order.payment_method,
+        total: order.total,
+      }
 
       await supabase
         .from('orders')
@@ -267,26 +322,82 @@ export function AdminOrderDetail() {
         } as never)
         .eq('id', id)
 
+      await trackAuditAction({
+        organizationId,
+        tableName: 'orders',
+        recordId: id,
+        action: 'UPDATE',
+        notes: 'Edición de datos principales de la orden.',
+        oldData: previousOrderSnapshot,
+        newData: {
+          shipping_address: editShipping,
+          payment_method: editPaymentMethod,
+          total,
+        },
+      })
+
       for (const item of editItems) {
         if (item.id && !item.id.startsWith('new-')) {
           await supabase
             .from('order_items')
             .update({ quantity: item.quantity, price: item.price } as never)
             .eq('id', item.id)
+          await trackAuditAction({
+            organizationId,
+            tableName: 'order_items',
+            recordId: item.id,
+            action: 'UPDATE',
+            notes: 'Edición de item de orden.',
+            newData: {
+              order_id: id,
+              quantity: item.quantity,
+              price: item.price,
+            },
+          })
         } else {
-          await supabase.from('order_items').insert({
+          const { data: insertedItem } = await supabase.from('order_items').insert({
             order_id: id,
             product_id: item.product_id,
             variant_id: item.variant_id ?? null,
             quantity: item.quantity,
             price: item.price,
-          } as never)
+          } as never).select('id').single()
+          if (insertedItem?.id) {
+            await trackAuditAction({
+              organizationId,
+              tableName: 'order_items',
+              recordId: insertedItem.id,
+              action: 'INSERT',
+              notes: 'Item agregado a orden en edición.',
+              newData: {
+                order_id: id,
+                product_id: item.product_id,
+                variant_id: item.variant_id ?? null,
+                quantity: item.quantity,
+                price: item.price,
+              },
+            })
+          }
         }
       }
 
       for (const item of order.order_items) {
         if (!editItems.some((e) => e.id === item.id)) {
           await supabase.from('order_items').delete().eq('id', item.id)
+          await trackAuditAction({
+            organizationId,
+            tableName: 'order_items',
+            recordId: item.id,
+            action: 'DELETE',
+            notes: 'Item eliminado de orden en edición.',
+            oldData: {
+              order_id: id,
+              product_id: item.product_id,
+              variant_id: item.variant_id ?? null,
+              quantity: item.quantity,
+              price: item.price,
+            },
+          })
         }
       }
 
@@ -296,12 +407,41 @@ export function AdminOrderDetail() {
           .from('order_payments')
           .update({ payment_method: editPaymentMethod, amount } as never)
           .eq('id', mainPayment.id)
+        await trackAuditAction({
+          organizationId,
+          tableName: 'order_payments',
+          recordId: mainPayment.id,
+          action: 'UPDATE',
+          notes: 'Actualización de pago principal de la orden.',
+          oldData: {
+            payment_method: mainPayment.payment_method,
+            amount: mainPayment.amount,
+          },
+          newData: {
+            payment_method: editPaymentMethod,
+            amount,
+          },
+        })
       } else {
-        await supabase.from('order_payments').insert({
+        const { data: insertedPayment } = await supabase.from('order_payments').insert({
           order_id: id,
           payment_method: editPaymentMethod,
           amount,
-        } as never)
+        } as never).select('id').single()
+        if (insertedPayment?.id) {
+          await trackAuditAction({
+            organizationId,
+            tableName: 'order_payments',
+            recordId: insertedPayment.id,
+            action: 'INSERT',
+            notes: 'Alta de pago principal de la orden.',
+            newData: {
+              order_id: id,
+              payment_method: editPaymentMethod,
+              amount,
+            },
+          })
+        }
       }
 
       show('Orden actualizada correctamente', 'success')
@@ -373,6 +513,77 @@ export function AdminOrderDetail() {
     setEditItems((prev) =>
       prev.map((it) => (it.id === itemId ? { ...it, price } : it))
     )
+  }
+
+  const getReturnedQuantity = (item: OrderItemWithProduct): number => {
+    const value = Number(item.returned_quantity ?? 0)
+    return Number.isFinite(value) ? value : 0
+  }
+
+  const handlePartialReturn = async (item: OrderItemWithProduct) => {
+    if (!id || !organizationId) return
+
+    const returnedQty = getReturnedQuantity(item)
+    const remainingQty = item.quantity - returnedQty
+
+    if (remainingQty <= 0) {
+      show('Este item ya fue devuelto completamente.', 'info')
+      return
+    }
+
+    const quantityInput = window.prompt(
+      `Cantidad a devolver (máximo ${remainingQty})`,
+      String(remainingQty)
+    )
+    if (!quantityInput) return
+
+    const quantity = Number(quantityInput)
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > remainingQty) {
+      show('Cantidad de devolución inválida.', 'error')
+      return
+    }
+
+    const reason = window.prompt('Motivo de la devolución parcial:')
+    if (!reason || reason.trim().length === 0) {
+      show('Debes indicar un motivo para la devolución.', 'error')
+      return
+    }
+
+    setReturningItemId(item.id)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: returnId, error } = await (supabase.rpc as any)('process_partial_order_return', {
+        p_order_id: id,
+        p_reason: reason.trim(),
+        p_items: [{ order_item_id: item.id, quantity }],
+        p_refund_method: order?.payment_method || null,
+        p_notes: 'Devolución parcial desde detalle de orden',
+      })
+
+      if (error) throw error
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'order_returns',
+        recordId: String(returnId || item.id),
+        action: 'INSERT',
+        notes: 'Devolución parcial de item desde detalle de orden.',
+        newData: {
+          order_id: id,
+          order_item_id: item.id,
+          quantity,
+          reason: reason.trim(),
+        },
+      })
+
+      show('Devolución parcial registrada correctamente.', 'success')
+      await fetchOrder()
+    } catch (error) {
+      console.error('Error processing partial return:', error)
+      show('No se pudo registrar la devolución parcial.', 'error')
+    } finally {
+      setReturningItemId(null)
+    }
   }
 
   const filteredProducts = products.filter(
@@ -636,9 +847,27 @@ export function AdminOrderDetail() {
                             </Button>
                           </div>
                         ) : (
-                          <p className="text-sm text-gray-600">
-                            Cantidad: {item.quantity} × {formatPrice(item.price, settings)}
-                          </p>
+                          <>
+                            <p className="text-sm text-gray-600">
+                              Cantidad: {item.quantity} × {formatPrice(item.price, settings)}
+                            </p>
+                            {getReturnedQuantity(item) > 0 && (
+                              <p className="text-xs text-amber-700">
+                                Devuelto: {getReturnedQuantity(item)} / {item.quantity}
+                              </p>
+                            )}
+                            {order.status !== 'cancelled' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handlePartialReturn(item)}
+                                disabled={Boolean(returningItemId) || getReturnedQuantity(item) >= item.quantity}
+                                className="mt-2"
+                              >
+                                {returningItemId === item.id ? 'Procesando...' : 'Registrar devolución parcial'}
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                       <p className="font-semibold text-gray-900 shrink-0">

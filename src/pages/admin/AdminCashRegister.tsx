@@ -31,6 +31,7 @@ import { PlanGate } from '@/components/features/PlanGate'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { trackAuditAction } from '@/lib/audit'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import type { CashSession, CashSessionInsert, CashSessionUpdate, Branch } from '@/types'
@@ -228,11 +229,27 @@ function AdminCashRegisterContent() {
         notes: data.notes || null,
       }
 
-      const { error } = await supabase
+      const { data: insertedSession, error } = await supabase
         .from('cash_sessions')
         .insert(sessionData)
+        .select('id')
+        .single()
 
       if (error) throw error
+      if (insertedSession?.id) {
+        await trackAuditAction({
+          organizationId,
+          tableName: 'cash_sessions',
+          recordId: insertedSession.id,
+          action: 'INSERT',
+          notes: 'Apertura de sesión de caja.',
+          newData: {
+            branch_id: data.branch_id,
+            opening_amount: data.opening_amount,
+            notes: data.notes || null,
+          },
+        })
+      }
 
       setIsModalOpen(false)
       resetOpen()
@@ -270,6 +287,23 @@ function AdminCashRegisterContent() {
         .eq('id', editingSession.id)
 
       if (error) throw error
+      await trackAuditAction({
+        organizationId,
+        tableName: 'cash_sessions',
+        recordId: editingSession.id,
+        action: 'UPDATE',
+        notes: 'Cierre de sesión de caja.',
+        oldData: {
+          opening_amount: editingSession.opening_amount,
+          expected_amount: editingSession.expected_amount,
+        },
+        newData: {
+          closing_amount: data.closing_amount,
+          difference,
+          closed_at: updateData.closed_at,
+          notes: data.notes || editingSession.notes || null,
+        },
+      })
 
       setIsCloseModalOpen(false)
       setEditingSession(null)
@@ -287,9 +321,18 @@ function AdminCashRegisterContent() {
     }
 
     try {
+      const sessionToDelete = sessions.find((session) => session.id === id)
       const { error } = await supabase.from('cash_sessions').delete().eq('id', id)
 
       if (error) throw error
+      await trackAuditAction({
+        organizationId,
+        tableName: 'cash_sessions',
+        recordId: id,
+        action: 'DELETE',
+        notes: 'Eliminación de sesión de caja.',
+        oldData: sessionToDelete || null,
+      })
       fetchSessions()
     } catch (error) {
       console.error('Error deleting cash session:', error)

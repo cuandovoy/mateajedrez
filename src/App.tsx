@@ -17,6 +17,8 @@ import { AdminCategories } from '@/pages/admin/AdminCategories'
 import { AdminCustomerReports } from '@/pages/admin/AdminCustomerReports'
 import { AdminCustomers } from '@/pages/admin/AdminCustomers'
 import { AdminDashboard } from '@/pages/admin/AdminDashboard'
+import { AdminExpenses } from '@/pages/admin/AdminExpenses'
+import { AdminFinancialReports } from '@/pages/admin/AdminFinancialReports'
 import { AdminInventory } from '@/pages/admin/AdminInventory'
 import { AdminInventoryReports } from '@/pages/admin/AdminInventoryReports'
 import { AdminOrderDetail } from '@/pages/admin/AdminOrderDetail'
@@ -32,6 +34,17 @@ import { AdminUsers } from '@/pages/admin/AdminUsers'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { usePlanLimits } from '@/hooks/usePlanLimits'
+
+function ReportsRouteGuard({ children }: { children: JSX.Element }) {
+  const { canUseFeature } = usePlanLimits()
+
+  if (!canUseFeature('advanced_reports')) {
+    return <Navigate to="/planes" replace />
+  }
+
+  return children
+}
 
 function App() {
   const { initialize, loading } = useAuthStore()
@@ -76,10 +89,12 @@ function App() {
           <Route path="/orders" element={<AdminOrders />} />
           <Route path="/orders/:id" element={<AdminOrderDetail />} />
           <Route path="/customers" element={<AdminCustomers />} />
-          <Route path="/reports/sales" element={<AdminSales />} />
-          <Route path="/reports/audit-logs" element={<AdminAuditLogs />} />
-          <Route path="/reports/customers" element={<AdminCustomerReports />} />
-          <Route path="/reports/inventory" element={<AdminInventoryReports />} />
+          <Route path="/expenses" element={<AdminExpenses />} />
+          <Route path="/reports/sales" element={<ReportsRouteGuard><AdminSales /></ReportsRouteGuard>} />
+          <Route path="/reports/financial" element={<ReportsRouteGuard><AdminFinancialReports /></ReportsRouteGuard>} />
+          <Route path="/reports/audit-logs" element={<ReportsRouteGuard><AdminAuditLogs /></ReportsRouteGuard>} />
+          <Route path="/reports/customers" element={<ReportsRouteGuard><AdminCustomerReports /></ReportsRouteGuard>} />
+          <Route path="/reports/inventory" element={<ReportsRouteGuard><AdminInventoryReports /></ReportsRouteGuard>} />
           <Route path="/branches" element={<AdminBranches />} />
           <Route path="/inventory" element={<AdminInventory />} />
           <Route path="/transfers" element={<AdminTransfers />} />

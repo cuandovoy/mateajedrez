@@ -8,6 +8,7 @@ import type { Product, ProductImage, Category } from '@/types'
 interface ProductWithCategory extends Product {
   product_images?: ProductImage[]
   category?: Category | null
+  inventory_stock?: number
 }
 
 interface ProductTableProps {
@@ -140,6 +141,7 @@ export function ProductTable({
         <tbody className="bg-white divide-y divide-gray-200">
           {products.map((product) => {
             const primaryImage = getPrimaryImage(product)
+            const displayStock = product.inventory_stock ?? product.stock ?? 0
             return (
               <tr key={product.id} className="hover:bg-gray-50 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -183,14 +185,14 @@ export function ProductTable({
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div
                     className={`text-sm font-medium ${
-                      product.stock > 0
-                        ? product.stock <= (product.low_stock_threshold || 10)
+                      displayStock > 0
+                        ? displayStock <= (product.low_stock_threshold || 10)
                           ? 'text-yellow-600'
                           : 'text-green-600'
                         : 'text-red-600'
                     }`}
                   >
-                    {product.stock}
+                    {displayStock}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">

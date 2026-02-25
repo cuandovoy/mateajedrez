@@ -116,6 +116,7 @@ export function AdminLayout() {
       title: 'Operación',
       items: [
         { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
+        { path: '/expenses', label: 'Compras y Egresos', icon: Wallet },
         { path: '/customers', label: 'Clientes', icon: Users2, permission: 'customers:view' },
         { path: '/cash-register', label: 'Caja', icon: Wallet, planFeature: 'cash_register' },
         { path: '/transfers', label: 'Transferencias', icon: ArrowRight, planFeature: 'transfers' },
@@ -134,10 +135,11 @@ export function AdminLayout() {
     {
       title: 'Reportes',
       items: [
-        { path: '/reports/sales', label: 'Ventas', icon: BarChart3 },
-        { path: '/reports/audit-logs', label: 'Auditoría', icon: FileText },
-        { path: '/reports/customers', label: 'Clientes', icon: Users2 },
-        { path: '/reports/inventory', label: 'Inventario', icon: Warehouse },
+        { path: '/reports/sales', label: 'Ventas', icon: BarChart3, planFeature: 'advanced_reports' },
+        { path: '/reports/financial', label: 'Finanzas', icon: Wallet, planFeature: 'advanced_reports' },
+        { path: '/reports/audit-logs', label: 'Auditoría', icon: FileText, planFeature: 'advanced_reports' },
+        { path: '/reports/customers', label: 'Clientes', icon: Users2, planFeature: 'advanced_reports' },
+        { path: '/reports/inventory', label: 'Inventario', icon: Warehouse, planFeature: 'advanced_reports' },
       ],
     },
     {
@@ -351,36 +353,64 @@ export function AdminLayout() {
                     </h3>
                   )}
                   <ul className="space-y-0.5">
-                    {                    section.items
-                      .filter((item) => (!item.adminOnly || isAdmin) && (!item.planFeature || canUseFeature(item.planFeature)))
+                    {section.items
+                      .filter((item) => {
+                        if (item.adminOnly && !isAdmin) return false
+                        if (section.title === 'Reportes') return true
+                        return !item.planFeature || canUseFeature(item.planFeature)
+                      })
                       .map((item) => {
+                      const isLockedByPlan = Boolean(
+                        section.title === 'Reportes' &&
+                        item.planFeature &&
+                        !canUseFeature(item.planFeature)
+                      )
                       const Icon = item.icon
-                      const active = isActive(item.path)
+                      const active = !isLockedByPlan && isActive(item.path)
+                      const targetPath = isLockedByPlan ? '/planes' : item.path
+                      const itemTitle = sidebarCollapsed
+                        ? `${item.label}${isLockedByPlan ? ' (Disponible en Plan Profesional)' : ''}`
+                        : undefined
 
                       const content = (
                         <li key={item.path}>
                           <Link
-                            to={item.path}
+                            to={targetPath}
                             onClick={() => setSidebarOpen(false)}
-                            title={sidebarCollapsed ? item.label : undefined}
+                            title={itemTitle}
                             className={cn(
                               'flex items-center rounded-md transition-colors group',
                               sidebarCollapsed ? 'justify-center p-2' : 'px-2 py-2 gap-2',
-                              active
+                              isLockedByPlan
+                                ? 'bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-500'
+                                : active
                                 ? 'bg-admin-600 text-white'
                                 : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                             )}
                           >
                             <Icon className={cn(
                               'h-4 w-4 shrink-0',
-                              active ? 'text-white' : 'text-gray-500 group-hover:text-gray-600'
+                              isLockedByPlan
+                                ? 'text-gray-400'
+                                : active
+                                ? 'text-white'
+                                : 'text-gray-500 group-hover:text-gray-600'
                             )} />
                             {!sidebarCollapsed && (
                               <span className={cn(
                                 'text-sm truncate',
-                                active ? 'text-white font-medium' : 'text-gray-700'
+                                isLockedByPlan
+                                  ? 'text-gray-500'
+                                  : active
+                                  ? 'text-white font-medium'
+                                  : 'text-gray-700'
                               )}>
                                 {item.label}
+                              </span>
+                            )}
+                            {!sidebarCollapsed && isLockedByPlan && (
+                              <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
+                                Pro
                               </span>
                             )}
                             {!sidebarCollapsed && active && (

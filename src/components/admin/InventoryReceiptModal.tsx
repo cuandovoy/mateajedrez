@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { trackAuditAction } from '@/lib/audit'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { X, Package, Truck } from 'lucide-react'
+import { useOrganization } from '@/hooks/useOrganization'
 import { useToastStore } from '@/store/toastStore'
 import type { Supplier } from '@/types'
 
@@ -27,6 +29,7 @@ export function InventoryReceiptModal({
   onClose,
   onSuccess,
 }: InventoryReceiptModalProps) {
+  const { organizationId } = useOrganization()
   const { show } = useToastStore()
   const [quantity, setQuantity] = useState('')
   const [notes, setNotes] = useState('')
@@ -79,7 +82,23 @@ export function InventoryReceiptModal({
 
       if (error) throw error
 
-      show(`Recepción registrada: +${qty} unidades`, 'success')
+      await trackAuditAction({
+        organizationId,
+        tableName: 'inventory_movements',
+        recordId: inventoryItem.id,
+        action: 'INSERT',
+        notes: 'Ingreso manual de stock desde modal de inventario (sin impacto contable).',
+        newData: {
+          quantity: qty,
+          branch_id: inventoryItem.branch_id,
+          product_id: inventoryItem.product_id,
+          variant_id: inventoryItem.variant_id,
+          supplier_id: supplierId || null,
+          notes: notes || null,
+        },
+      })
+
+      show(`Ingreso manual registrado: +${qty} unidades (sin impacto contable)`, 'success')
       onSuccess()
       onClose()
     } catch (error: any) {
@@ -97,7 +116,7 @@ export function InventoryReceiptModal({
           <div className="flex items-center justify-between">
             <CardTitle className="text-xl flex items-center space-x-2">
               <Package className="h-5 w-5 text-admin-600" />
-              <span>Recepción de Mercadería</span>
+              <span>Ingreso manual de stock</span>
             </CardTitle>
             <Button variant="ghost" size="sm" onClick={onClose}>
               <X className="h-5 w-5" />
@@ -106,6 +125,10 @@ export function InventoryReceiptModal({
         </CardHeader>
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Este ingreso es manual y no genera compra, factura ni egreso contable. Para compras reales usa el modulo de Compras y Egresos.
+            </div>
+
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm text-gray-600 mb-1">Producto</p>
               <p className="font-medium text-gray-900">{inventoryItem.product_name}</p>
@@ -118,7 +141,7 @@ export function InventoryReceiptModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cantidad a recibir *
+                Cantidad a ingresar *
               </label>
               <Input
                 type="number"
@@ -134,7 +157,7 @@ export function InventoryReceiptModal({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Proveedor (opcional)
+                Proveedor (opcional, solo referencia)
               </label>
               <div className="relative">
                 <Truck className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -172,7 +195,7 @@ export function InventoryReceiptModal({
 
             <div className="flex space-x-4 pt-4">
               <Button type="submit" className="flex-1" disabled={loading}>
-                {loading ? 'Registrando...' : 'Registrar Recepción'}
+                {loading ? 'Registrando...' : 'Registrar ingreso manual'}
               </Button>
               <Button type="button" variant="outline" onClick={onClose} className="flex-1" disabled={loading}>
                 Cancelar

@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Check } from 'lucide-react'
-import { Link } from 'react-router-dom'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 
 const PLANS = [
@@ -46,6 +45,14 @@ const PLANS = [
 
 export function AdminPlans() {
   const { tier } = usePlanLimits()
+  const whatsappNumber = '59898257909'
+
+  const handleChooseProfessional = () => {
+    const message = encodeURIComponent(
+      'Hola, quiero activar el Plan Profesional para mi organización.'
+    )
+    window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank')
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -96,15 +103,21 @@ export function AdminPlans() {
                   ))}
                 </ul>
                 {isCurrent ? (
-                  <Button disabled className="w-full">
-                    Plan actual
+                  <Button
+                    disabled
+                    variant="outline"
+                    className="w-full border-gray-300 bg-gray-100 text-gray-500 hover:bg-gray-100"
+                  >
+                    Plan actual seleccionado
+                  </Button>
+                ) : plan.tier === 'profesional' ? (
+                  <Button className="w-full" onClick={handleChooseProfessional}>
+                    {plan.cta}
                   </Button>
                 ) : (
-                  <Link to="/organizations">
-                    <Button className="w-full">
-                      {plan.cta}
-                    </Button>
-                  </Link>
+                  <Button disabled variant="outline" className="w-full border-gray-300 text-gray-500">
+                    Plan básico
+                  </Button>
                 )}
               </CardContent>
             </Card>
@@ -113,7 +126,7 @@ export function AdminPlans() {
       </div>
 
       <p className="mt-6 text-center text-sm text-gray-500">
-        Para actualizar tu plan, contactá al administrador o configurá el pago desde la sección de organizaciones.
+        Para actualizar al plan Profesional, usá el botón "Elegir Profesional" y te contactamos por WhatsApp.
       </p>
     </div>
   )

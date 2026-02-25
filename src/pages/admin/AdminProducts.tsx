@@ -59,6 +59,7 @@ type ProductForm = z.infer<typeof productSchema>
 interface ProductWithImages extends Product {
   product_images?: ProductImage[]
   category?: Category | null
+  inventory_stock?: number
 }
 
 type ViewMode = 'grid' | 'list'
@@ -123,7 +124,7 @@ function AdminProductsContent() {
       setLoading(true)
 
       // If filtering by supplier, we need to get product IDs first
-      let productIds: string[] | null = null
+      let supplierProductIds: string[] | null = null
       if (filters.supplierId) {
         const { data: productSuppliersData, error: supplierError } = await supabase
           .from('product_suppliers')
@@ -131,10 +132,10 @@ function AdminProductsContent() {
           .eq('supplier_id', filters.supplierId)
 
         if (supplierError) throw supplierError
-        productIds = productSuppliersData?.map((ps: { product_id: string }) => ps.product_id) || []
+        supplierProductIds = productSuppliersData?.map((ps: { product_id: string }) => ps.product_id) || []
 
         // If no products found for this supplier, return empty array
-        if (productIds.length === 0) {
+        if (supplierProductIds.length === 0) {
           setProducts([])
           setLoading(false)
           return
@@ -163,8 +164,8 @@ function AdminProductsContent() {
         query = query.eq('category_id', filters.categoryId)
       }
 
-      if (filters.supplierId && productIds) {
-        query = query.in('id', productIds)
+      if (filters.supplierId && supplierProductIds) {
+        query = query.in('id', supplierProductIds)
       }
 
       if (filters.status !== 'all') {
@@ -180,19 +181,57 @@ function AdminProductsContent() {
       }
 
       if (filters.stock !== 'all') {
-        if (filters.stock === 'out_of_stock') {
-          query = query.eq('stock', 0)
-        } else if (filters.stock === 'low_stock') {
-          query = query.lte('stock', 10) // Using default low stock threshold
-        } else if (filters.stock === 'in_stock') {
-          query = query.gt('stock', 0)
-        }
+        // Stock filtering is applied client-side using branch_inventory aggregated stock.
       }
 
       const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) throw error
-      setProducts((data || []) as ProductWithImages[])
+      const productsData = (data || []) as ProductWithImages[]
+
+      const loadedProductIds = productsData.map((p) => p.id)
+      let inventoryStockByProduct = new Map<string, number>()
+      if (loadedProductIds.length > 0) {
+        const [directStockRes, variantStockRes] = await Promise.all([
+          supabase
+            .from('branch_inventory')
+            .select('product_id, stock, branches!inner(organization_id)')
+            .in('product_id', loadedProductIds)
+            .eq('branches.organization_id', organizationId),
+          supabase
+            .from('branch_inventory')
+            .select('stock, product_variants!inner(product_id), branches!inner(organization_id)')
+            .not('variant_id', 'is', null)
+            .eq('branches.organization_id', organizationId),
+        ])
+
+        if (directStockRes.error) throw directStockRes.error
+        if (variantStockRes.error) throw variantStockRes.error
+
+        inventoryStockByProduct = new Map<string, number>()
+
+        ;(directStockRes.data || []).forEach((row: any) => {
+          const productId = row.product_id as string | null
+          if (!productId) return
+          const prev = inventoryStockByProduct.get(productId) || 0
+          inventoryStockByProduct.set(productId, prev + (row.stock || 0))
+        })
+
+        ;(variantStockRes.data || []).forEach((row: any) => {
+          const productId = row.product_variants?.product_id as string | null
+          if (!productId) return
+          if (!loadedProductIds.includes(productId)) return
+          const prev = inventoryStockByProduct.get(productId) || 0
+          inventoryStockByProduct.set(productId, prev + (row.stock || 0))
+        })
+      }
+
+      setProducts(
+        productsData.map((product) => ({
+          ...product,
+          inventory_stock: inventoryStockByProduct.get(product.id) ?? 0,
+        }))
+      )
     } catch (error) {
       console.error('Error fetching products:', error)
     } finally {
@@ -214,18 +253,30 @@ function AdminProductsContent() {
 
   // Filter products by search term (client-side for better UX)
   const filteredProducts = useMemo(() => {
-    if (!filters.search.trim()) {
-      return products
+    let filtered = products
+
+    if (filters.search.trim()) {
+      const searchLower = filters.search.toLowerCase()
+      filtered = filtered.filter(
+        (product) =>
+          product.name.toLowerCase().includes(searchLower) ||
+          product.description?.toLowerCase().includes(searchLower) ||
+          product.sku.toLowerCase().includes(searchLower)
+      )
     }
 
-    const searchLower = filters.search.toLowerCase()
-    return products.filter(
-      (product) =>
-        product.name.toLowerCase().includes(searchLower) ||
-        product.description?.toLowerCase().includes(searchLower) ||
-        product.sku.toLowerCase().includes(searchLower)
-    )
-  }, [products, filters.search])
+    if (filters.stock !== 'all') {
+      filtered = filtered.filter((product) => {
+        const stock = product.inventory_stock ?? 0
+        if (filters.stock === 'out_of_stock') return stock === 0
+        if (filters.stock === 'in_stock') return stock > 0
+        if (filters.stock === 'low_stock') return stock > 0 && stock <= (product.low_stock_threshold || 10)
+        return true
+      })
+    }
+
+    return filtered
+  }, [products, filters.search, filters.stock])
 
   useEffect(() => {
     setPage(0)
@@ -437,8 +488,9 @@ function AdminProductsContent() {
     try {
       setUploadingImage(true)
 
+      const { stock, ...restData } = data
       const baseProductData = {
-        ...data,
+        ...restData,
         image_url: null, // We'll use product_images table instead
       }
 
@@ -459,6 +511,7 @@ function AdminProductsContent() {
       } else {
         const productData: ProductInsert = {
           ...baseProductData,
+          stock,
           organization_id: organizationId!,
         }
         const { data: newProduct, error } = await supabase
@@ -472,7 +525,7 @@ function AdminProductsContent() {
         productId = newProduct.id
 
         // Load initial stock into branch_inventory when creating with stock + branch
-        if (data.stock > 0 && initialBranchId) {
+        if (stock > 0 && initialBranchId) {
           const { data: branchInventory, error: biError } = await supabase
             .from('branch_inventory')
             .select('id, stock')
@@ -484,7 +537,7 @@ function AdminProductsContent() {
           const bi = branchInventory as { id: string; stock: number } | null
           if (!biError && bi?.id) {
             const previousStock = bi.stock ?? 0
-            const newStock = previousStock + data.stock
+            const newStock = previousStock + stock
 
             const { error: updateError } = await supabase
               .from('branch_inventory')
@@ -497,7 +550,7 @@ function AdminProductsContent() {
                 .insert({
                   branch_inventory_id: bi.id,
                   movement_type: 'receipt',
-                  quantity: data.stock,
+                  quantity: stock,
                   previous_stock: previousStock,
                   new_stock: newStock,
                   reference_type: 'receipt',
@@ -705,7 +758,7 @@ function AdminProductsContent() {
       name: product.name,
       description: product.description || '',
       price: product.price,
-      stock: product.stock,
+      stock: product.inventory_stock ?? 0,
       category_id: product.category_id,
       sku: product.sku,
       is_active: product.is_active ?? true,
@@ -974,8 +1027,8 @@ function AdminProductsContent() {
                     <span className="text-xl font-bold text-admin-600">
                       {formatPrice(product.price, settings)}
                     </span>
-                    <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      Stock: {product.stock}
+                    <span className={`text-sm ${(product.inventory_stock ?? 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      Stock: {product.inventory_stock ?? 0}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2 text-xs text-gray-500">

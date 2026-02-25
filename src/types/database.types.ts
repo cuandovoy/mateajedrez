@@ -72,9 +72,12 @@ export type Database = {
       }
       branch_inventory: {
         Row: {
+          avg_unit_cost: number
           branch_id: string
+          cost_updated_at: string | null
           created_at: string | null
           id: string
+          last_purchase_unit_cost: number | null
           low_stock_threshold: number | null
           min_stock: number | null
           product_id: string | null
@@ -83,9 +86,12 @@ export type Database = {
           variant_id: string | null
         }
         Insert: {
+          avg_unit_cost?: number
           branch_id: string
+          cost_updated_at?: string | null
           created_at?: string | null
           id?: string
+          last_purchase_unit_cost?: number | null
           low_stock_threshold?: number | null
           min_stock?: number | null
           product_id?: string | null
@@ -94,9 +100,12 @@ export type Database = {
           variant_id?: string | null
         }
         Update: {
+          avg_unit_cost?: number
           branch_id?: string
+          cost_updated_at?: string | null
           created_at?: string | null
           id?: string
+          last_purchase_unit_cost?: number | null
           low_stock_threshold?: number | null
           min_stock?: number | null
           product_id?: string | null
@@ -597,30 +606,45 @@ export type Database = {
       }
       order_items: {
         Row: {
+          cost_at_sale: number | null
+          cost_source: string | null
           created_at: string | null
           id: string
+          margin_at_sale: number | null
+          margin_percentage_at_sale: number | null
           order_id: string
           price: number
           product_id: string
           quantity: number
+          returned_quantity: number
           variant_id: string | null
         }
         Insert: {
+          cost_at_sale?: number | null
+          cost_source?: string | null
           created_at?: string | null
           id?: string
+          margin_at_sale?: number | null
+          margin_percentage_at_sale?: number | null
           order_id: string
           price: number
           product_id: string
           quantity: number
+          returned_quantity?: number
           variant_id?: string | null
         }
         Update: {
+          cost_at_sale?: number | null
+          cost_source?: string | null
           created_at?: string | null
           id?: string
+          margin_at_sale?: number | null
+          margin_percentage_at_sale?: number | null
           order_id?: string
           price?: number
           product_id?: string
           quantity?: number
+          returned_quantity?: number
           variant_id?: string | null
         }
         Relationships: [
@@ -1468,6 +1492,25 @@ export type Database = {
         Args: { p_bucket_id: string; p_path: string }
         Returns: boolean
       }
+      create_full_order_cancellation: {
+        Args: {
+          p_notes?: string
+          p_order_id: string
+          p_reason: string
+          p_refund_method?: string
+        }
+        Returns: string
+      }
+      process_partial_order_return: {
+        Args: {
+          p_items: Json
+          p_notes?: string
+          p_order_id: string
+          p_reason: string
+          p_refund_method?: string
+        }
+        Returns: string
+      }
       check_branch_limit: { Args: { p_org_id: string }; Returns: boolean }
       check_product_limit: { Args: { p_org_id: string }; Returns: boolean }
       create_audit_log:
@@ -1599,6 +1642,40 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_financial_report_summary: {
+        Args: {
+          p_as_of_date?: string
+          p_branch_id?: string
+          p_organization_id: string
+          p_range_end: string
+          p_range_start: string
+        }
+        Returns: Json
+      }
+      export_financial_report_rows: {
+        Args: {
+          p_as_of_date?: string
+          p_branch_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_organization_id: string
+          p_range_end: string
+          p_range_start: string
+        }
+        Returns: {
+          extra: Json
+          metric_label: string
+          row_key: string
+          section: string
+          value_1: number | null
+          value_2: number | null
+          value_3: number | null
+        }[]
+      }
+      refresh_financial_reporting_materialized_views: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       get_sales_report_summary: {
         Args: {
