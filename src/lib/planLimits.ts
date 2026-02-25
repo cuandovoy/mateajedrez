@@ -34,7 +34,7 @@ export type PlanFeature =
 /** Tier mínimo requerido para cada feature */
 export const PLAN_FEATURES: Record<PlanFeature, PlanTier> = {
   transfers: PLAN_PROFESIONAL,
-  cash_register: PLAN_PROFESIONAL,
+  cash_register: PLAN_STARTER,
   advanced_reports: PLAN_PROFESIONAL,
   custom_store: PLAN_PROFESIONAL,
   notifications_config: PLAN_PROFESIONAL,
@@ -51,6 +51,12 @@ export function getPlanLimits(tier: string): PlanLimits {
 
 export function canUseFeature(tier: string, feature: PlanFeature): boolean {
   const minTier = PLAN_FEATURES[feature]
+ if(feature=='cash_register'){
+
+   console.log(feature=='cash_register');
+   debugger
+ }
+  
   if (!minTier) return true
   const tierLevel = TIER_ORDER[tier] ?? 0
   const minLevel = TIER_ORDER[minTier] ?? 0
