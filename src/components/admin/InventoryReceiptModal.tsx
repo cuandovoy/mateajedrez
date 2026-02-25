@@ -39,15 +39,21 @@ export function InventoryReceiptModal({
   const [loadingSuppliers, setLoadingSuppliers] = useState(true)
 
   useEffect(() => {
-    fetchSuppliers()
-  }, [])
+    if (!organizationId) {
+      setSuppliers([])
+      setLoadingSuppliers(false)
+      return
+    }
+    fetchSuppliers(organizationId)
+  }, [organizationId])
 
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = async (orgId: string) => {
     try {
       setLoadingSuppliers(true)
       const { data, error } = await supabase
         .from('suppliers')
         .select('*')
+        .eq('organization_id', orgId)
         .eq('is_active', true)
         .order('name')
 
