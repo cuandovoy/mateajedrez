@@ -6,11 +6,11 @@ import { usePlanLimits } from '@/hooks/usePlanLimits'
 const PLANS = [
   {
     name: 'Starter',
-    price: '$UY 1.200',
+    price: '$UY 1.800',
     period: '/mes',
     description: 'Ideal para emprendimientos que arrancan con control básico.',
     features: [
-      'Hasta 200 productos',
+      'Hasta 600 productos',
       '1 sucursal',
       'Control de stock básico',
       'Gestión de órdenes',
@@ -23,7 +23,7 @@ const PLANS = [
   },
   {
     name: 'Profesional',
-    price: '$UY 2.400',
+    price: '$UY 3.400',
     period: '/mes',
     description: 'Para negocios en crecimiento que necesitan más control.',
     features: [
@@ -31,10 +31,11 @@ const PLANS = [
       'Múltiples sucursales',
       'Inventario multi-sucursal',
       'Transferencias internas',
-      'Tienda online personalizada',
+      'Tienda y catálogo online',
       'Soporte prioritario',
       'Configuración de notificaciones',
       'Manejo de cajas y cierres',
+      'Gestión de compras/egresos',
       'Reportes avanzados de ventas y stock',
     ],
     cta: 'Elegir Profesional',
