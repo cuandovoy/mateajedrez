@@ -11,7 +11,7 @@ import { useToastStore } from '@/store/toastStore'
 import type { CashSession, Product } from '@/types'
 import type { OrderInsert, OrderPaymentInsert } from '@/types/database.types'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { DollarSign, Edit2, Minus, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, DollarSign, Edit2, Minus, Plus, Search, ShoppingCart, Trash2, UserCheck, Users, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -55,12 +55,27 @@ const manualSaleSchema = z.object({
   customer_name: z.string().optional(),
   customer_email: z.string().optional(),
   customer_phone: z.string().optional(),
+  customer_rut: z.string().optional(),
   sale_condition: z.enum(['contado', 'credito']),
   payment_method: z.string().optional(),
   notes: z.string().optional(),
 })
 
 type ManualSaleForm = z.infer<typeof manualSaleSchema>
+
+type CustomerLite = {
+  id: string
+  full_name: string
+  email: string | null
+  phone: string
+  rut?: string | null
+  notes?: string | null
+}
+
+const normalizeEmail = (value: string | undefined): string => (value || '').trim().toLowerCase()
+const normalizePhone = (value: string | undefined): string => (value || '').trim().replace(/\s+/g, '')
+const normalizeRut = (value: string | undefined): string =>
+  (value || '').trim().toUpperCase().replace(/[.\-\s]/g, '')
 
 export function ManualSaleForm({
   branchId: initialBranchId,
@@ -88,6 +103,12 @@ export function ManualSaleForm({
   const [manualDiscountReason, setManualDiscountReason] = useState('')
   const [selectedDiscountRuleId, setSelectedDiscountRuleId] = useState('')
   const [loading, setLoading] = useState(false)
+  const [linkedCustomer, setLinkedCustomer] = useState<CustomerLite | null>(null)
+  const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false)
+  const [customerPickerSearch, setCustomerPickerSearch] = useState('')
+  const [customerPickerLoading, setCustomerPickerLoading] = useState(false)
+  const [customerPickerResults, setCustomerPickerResults] = useState<CustomerLite[]>([])
+  const [showOptionalCustomerData, setShowOptionalCustomerData] = useState(false)
   const [newLineDescription, setNewLineDescription] = useState('')
   const [newLinePrice, setNewLinePrice] = useState('')
   const [newLineQuantity, setNewLineQuantity] = useState('1')
@@ -126,6 +147,7 @@ export function ManualSaleForm({
     defaultValues: {
       sale_condition: 'contado',
       payment_method: defaultPaymentMethod,
+      customer_rut: '',
     },
   })
 
@@ -202,6 +224,120 @@ export function ManualSaleForm({
       console.error('Error fetching discount rules:', error)
       setDiscountRules([])
     }
+  }
+
+  const findExistingCustomer = async (
+    normalizedRut: string,
+    normalizedPhone: string,
+    normalizedEmail: string
+  ): Promise<CustomerLite | null> => {
+    if (!organizationId || (!normalizedRut && !normalizedPhone && !normalizedEmail)) return null
+
+    if (normalizedRut) {
+      const { data: byRut, error: rutError } = await supabase
+        .from('customers')
+        .select('id, full_name, email, phone, rut, notes')
+        .eq('organization_id', organizationId)
+        .ilike('rut', normalizedRut)
+        .limit(1)
+        .maybeSingle()
+
+      if (rutError) throw rutError
+      if (byRut) return byRut as CustomerLite
+    }
+
+    if (normalizedPhone) {
+      const { data: byPhone, error: phoneError } = await supabase
+        .from('customers')
+        .select('id, full_name, email, phone, rut, notes')
+        .eq('organization_id', organizationId)
+        .eq('phone', normalizedPhone)
+        .limit(1)
+        .maybeSingle()
+
+      if (phoneError) throw phoneError
+      if (byPhone) return byPhone as CustomerLite
+    }
+
+    if (normalizedEmail) {
+      const { data: byEmail, error: emailError } = await supabase
+        .from('customers')
+        .select('id, full_name, email, phone, rut, notes')
+        .eq('organization_id', organizationId)
+        .ilike('email', normalizedEmail)
+        .limit(1)
+        .maybeSingle()
+
+      if (emailError) throw emailError
+      if (byEmail) return byEmail as CustomerLite
+    }
+
+    return null
+  }
+
+  const openCustomerPicker = async (resetSearch = true) => {
+    if (!organizationId) return
+    setIsCustomerPickerOpen(true)
+    if (resetSearch) {
+      setCustomerPickerSearch('')
+    }
+    setCustomerPickerLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, full_name, email, phone, rut, notes')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(30)
+      if (error) throw error
+      setCustomerPickerResults((data || []) as CustomerLite[])
+    } catch (error) {
+      console.error('Error loading customers:', error)
+      show('No se pudieron cargar clientes.', 'error')
+    } finally {
+      setCustomerPickerLoading(false)
+    }
+  }
+
+  const searchCustomersForPicker = async (term: string) => {
+    if (!organizationId) return
+    const queryTerm = term.trim()
+    if (!queryTerm) {
+      await openCustomerPicker(false)
+      return
+    }
+
+    setCustomerPickerLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, full_name, email, phone, rut, notes')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .or(
+          `full_name.ilike.%${queryTerm}%,phone.ilike.%${queryTerm}%,email.ilike.%${queryTerm}%,rut.ilike.%${queryTerm}%,notes.ilike.%${queryTerm}%`
+        )
+        .order('full_name')
+        .limit(50)
+      if (error) throw error
+      setCustomerPickerResults((data || []) as CustomerLite[])
+    } catch (error) {
+      console.error('Error searching customers:', error)
+      show('No se pudo buscar clientes.', 'error')
+    } finally {
+      setCustomerPickerLoading(false)
+    }
+  }
+
+  const handleSelectCustomer = (customer: CustomerLite) => {
+    setLinkedCustomer(customer)
+    setValue('customer_name', customer.full_name)
+    setValue('customer_email', customer.email || '')
+    setValue('customer_phone', customer.phone || '')
+    setValue('customer_rut', customer.rut || '')
+    setIsCustomerPickerOpen(false)
+    show(`Cliente seleccionado: ${customer.full_name}.`, 'success')
   }
 
   // Real-time search
@@ -408,6 +544,10 @@ export function ManualSaleForm({
       show('Agrega al menos una línea a la venta', 'error')
       return
     }
+    if (!organizationId) {
+      show('No hay organización seleccionada.', 'error')
+      return
+    }
 
     const isCreditSale = data.sale_condition === 'credito'
     if (!isCreditSale && !data.payment_method) {
@@ -527,14 +667,65 @@ export function ManualSaleForm({
         }
       }
 
-      // Create order (organization_id from current org)
-      const { useOrganizationStore } = await import('@/store/organizationStore')
-      const organizationId = useOrganizationStore.getState().currentOrganization?.id
+      // Resolve customer association for the order (customer_id + shipping snapshot)
+      const normalizedRut = normalizeRut(data.customer_rut)
+      const normalizedPhone = normalizePhone(data.customer_phone)
+      const normalizedEmail = normalizeEmail(data.customer_email)
+      const customerNameInput = (data.customer_name || '').trim()
+      let resolvedCustomer: CustomerLite | null = linkedCustomer
+
+      if (!resolvedCustomer) {
+        resolvedCustomer = await findExistingCustomer(normalizedRut, normalizedPhone, normalizedEmail)
+      }
+
+      if (!resolvedCustomer && (normalizedPhone || normalizedEmail || customerNameInput)) {
+        if (!normalizedPhone) {
+          show('Sin teléfono no se puede crear un cliente nuevo. La venta quedará como cliente no vinculado.', 'info')
+        } else {
+          const createCustomerPayload = {
+            organization_id: organizationId,
+            full_name: customerNameInput || 'Cliente mostrador',
+            email: normalizedEmail || null,
+            phone: normalizedPhone,
+            rut: normalizedRut || null,
+            is_active: true,
+          }
+
+          const { data: createdCustomer, error: createCustomerError } = await supabase
+            .from('customers')
+            .insert(createCustomerPayload as any)
+            .select('id, full_name, email, phone, rut')
+            .single()
+
+          if (createCustomerError) {
+            const isDuplicatePhone = createCustomerError.message?.toLowerCase().includes('idx_customers_org_phone')
+            const isDuplicateRut = createCustomerError.message?.toLowerCase().includes('idx_customers_org_rut')
+            if (isDuplicatePhone || isDuplicateRut) {
+              resolvedCustomer = await findExistingCustomer(normalizedRut, normalizedPhone, normalizedEmail)
+            } else {
+              throw createCustomerError
+            }
+          } else if (createdCustomer) {
+            resolvedCustomer = createdCustomer as CustomerLite
+            show(`Cliente creado y vinculado: ${resolvedCustomer.full_name}.`, 'success')
+          }
+        }
+      } else if (resolvedCustomer) {
+        show(`Cliente existente vinculado: ${resolvedCustomer.full_name}.`, 'info')
+      }
+
+      // Create order
       if (!organizationId) throw new Error('No hay organización seleccionada')
+
+      const shippingFullName = customerNameInput || resolvedCustomer?.full_name || 'Cliente en tienda'
+      const shippingEmail = normalizedEmail || resolvedCustomer?.email || undefined
+      const shippingPhone = normalizedPhone || resolvedCustomer?.phone || ''
+      const shippingRut = normalizedRut || resolvedCustomer?.rut || undefined
 
       const orderData: OrderInsert = {
         organization_id: organizationId,
         user_id: null,
+        customer_id: resolvedCustomer?.id || null,
         total,
         subtotal_before_discount: subtotalBeforeDiscount,
         discount_total: discountTotal,
@@ -542,9 +733,11 @@ export function ManualSaleForm({
         discount_metadata: (discountMetadata as any) ?? null,
         status: 'delivered',
         shipping_address: {
-          fullName: data.customer_name || 'Cliente en tienda',
-          email: data.customer_email?.trim() || undefined,
-          phone: data.customer_phone || '',
+          fullName: shippingFullName,
+          email: shippingEmail,
+          phone: shippingPhone,
+          rut: shippingRut,
+          taxId: shippingRut,
           address: 'Venta en tienda física',
           city: '',
           state: '',
@@ -571,6 +764,7 @@ export function ManualSaleForm({
         notes: 'Venta manual creada desde módulo de caja.',
         newData: {
           branch_id: branchId,
+          customer_id: resolvedCustomer?.id || null,
           total,
           subtotal_before_discount: subtotalBeforeDiscount,
           discount_total: discountTotal,
@@ -690,6 +884,8 @@ export function ManualSaleForm({
       setManualDiscountValue('')
       setManualDiscountReason('')
       setSelectedDiscountRuleId('')
+      setLinkedCustomer(null)
+      setShowOptionalCustomerData(false)
       onSaleCreated()
       onClose()
     } catch (error) {
@@ -1179,39 +1375,103 @@ export function ManualSaleForm({
                 </div>
               )}
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                    Cliente (opcional)
-                  </label>
-                  <Input {...register('customer_name')} placeholder="Nombre del cliente" className="text-sm py-1.5" />
+              <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-sm">
+                    <p className="font-medium text-gray-800">Cliente de la venta</p>
+                    {linkedCustomer ? (
+                      <p className="text-xs text-emerald-700">
+                        Vinculado: {linkedCustomer.full_name} ({linkedCustomer.phone})
+                        {linkedCustomer.rut ? ` · RUT ${linkedCustomer.rut}` : ''}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-gray-500">Sin cliente seleccionado (venta mostrador)</p>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => void openCustomerPicker()} className="h-8 text-xs">
+                      <Users className="h-3.5 w-3.5 mr-1" />
+                      Elegir cliente
+                    </Button>
+                    {linkedCustomer && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setLinkedCustomer(null)
+                          setValue('customer_name', '')
+                          setValue('customer_email', '')
+                          setValue('customer_phone', '')
+                          setValue('customer_rut', '')
+                        }}
+                        className="h-8 text-xs"
+                      >
+                        Quitar
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                    Email (opcional)
-                  </label>
-                  <Input
-                    {...register('customer_email')}
-                    type="email"
-                    placeholder="cliente@email.com"
-                    className="text-sm py-1.5"
-                  />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                    Teléfono (opcional)
-                  </label>
-                  <Input {...register('customer_phone')} placeholder="Teléfono" className="text-sm py-1.5" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowOptionalCustomerData((prev) => !prev)}
+                    className="h-8 text-xs"
+                  >
+                    {showOptionalCustomerData ? (
+                      <>
+                        <ChevronUp className="h-3.5 w-3.5 mr-1" />
+                        Ocultar datos opcionales
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3.5 w-3.5 mr-1" />
+                        Cargar datos opcionales
+                      </>
+                    )}
+                  </Button>
                 </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                    Notas (opcional)
-                  </label>
-                  <Input {...register('notes')} placeholder="Notas adicionales..." className="text-sm py-1.5" />
-                </div>
+
+                {showOptionalCustomerData && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        Nombre cliente (opcional)
+                      </label>
+                      <Input {...register('customer_name')} placeholder="Nombre del cliente" className="text-sm py-1.5" />
+                    </div>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        Email (opcional)
+                      </label>
+                      <Input
+                        {...register('customer_email')}
+                        type="email"
+                        placeholder="cliente@email.com"
+                        className="text-sm py-1.5"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        Teléfono (opcional)
+                      </label>
+                      <Input {...register('customer_phone')} placeholder="Teléfono" className="text-sm py-1.5" />
+                    </div>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        RUT (opcional)
+                      </label>
+                      <Input {...register('customer_rut')} placeholder="RUT / documento fiscal" className="text-sm py-1.5" />
+                    </div>
+                    <div>
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        Notas (opcional)
+                      </label>
+                      <Input {...register('notes')} placeholder="Notas adicionales..." className="text-sm py-1.5" />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Actions */}
@@ -1225,6 +1485,82 @@ export function ManualSaleForm({
               </div>
             </div>
           </form>
+
+          {isCustomerPickerOpen && (
+            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-3">
+              <Card className="w-full max-w-2xl max-h-[85vh] flex flex-col">
+                <CardHeader className="border-b pb-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <UserCheck className="h-5 w-5 text-admin-600" />
+                      Elegir cliente
+                    </CardTitle>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={() => setIsCustomerPickerOpen(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Buscar por nombre, teléfono, email o RUT.
+                  </p>
+                </CardHeader>
+                <CardContent className="flex-1 overflow-y-auto space-y-3 pt-4">
+                  <div className="flex gap-2">
+                    <Input
+                      value={customerPickerSearch}
+                      onChange={(event) => setCustomerPickerSearch(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          void searchCustomersForPicker(customerPickerSearch)
+                        }
+                      }}
+                      placeholder="Ej: Juan, 099..., cliente@mail.com, 2145..."
+                      className="text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => void searchCustomersForPicker(customerPickerSearch)}
+                    >
+                      <Search className="h-4 w-4 mr-1" />
+                      Buscar
+                    </Button>
+                  </div>
+
+                  {customerPickerLoading ? (
+                    <div className="py-10 text-center text-sm text-gray-500">Cargando clientes...</div>
+                  ) : customerPickerResults.length === 0 ? (
+                    <div className="py-10 text-center text-sm text-gray-500">No se encontraron clientes.</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {customerPickerResults.map((customer) => (
+                        <button
+                          key={customer.id}
+                          type="button"
+                          onClick={() => handleSelectCustomer(customer)}
+                          className="w-full rounded-lg border border-gray-200 p-3 text-left hover:border-admin-300 hover:bg-admin-50 transition-colors"
+                        >
+                          <p className="text-sm font-semibold text-gray-900">{customer.full_name}</p>
+                          <p className="text-xs text-gray-600">
+                            {[customer.phone, customer.email, customer.rut ? `RUT ${customer.rut}` : ''].filter(Boolean).join(' · ') || 'Sin contacto'}
+                          </p>
+                          {customer.notes && (
+                            <p className="mt-1 text-xs text-gray-500 line-clamp-1">{customer.notes}</p>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

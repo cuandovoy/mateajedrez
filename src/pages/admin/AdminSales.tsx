@@ -47,12 +47,18 @@ type BranchSummary = {
 
 type SummaryCurrent = {
   revenue: number
+  grossSales: number
+  discountsGranted: number
+  netSales: number
   orders: number
   avgTicket: number
 }
 
 type SummaryPrevious = {
   revenue: number
+  grossSales: number
+  discountsGranted: number
+  netSales: number
   orders: number
 }
 
@@ -155,11 +161,17 @@ export function AdminSales() {
   const [loading, setLoading] = useState(true)
   const [currentSummary, setCurrentSummary] = useState<SummaryCurrent>({
     revenue: 0,
+    grossSales: 0,
+    discountsGranted: 0,
+    netSales: 0,
     orders: 0,
     avgTicket: 0,
   })
   const [previousSummary, setPreviousSummary] = useState<SummaryPrevious>({
     revenue: 0,
+    grossSales: 0,
+    discountsGranted: 0,
+    netSales: 0,
     orders: 0,
   })
   const [currentMargin, setCurrentMargin] = useState<MarginSummary>({
@@ -269,12 +281,18 @@ export function AdminSales() {
 
       setCurrentSummary({
         revenue: asNumber(current.revenue),
+        grossSales: asNumber(current.gross_sales),
+        discountsGranted: asNumber(current.discounts_granted),
+        netSales: asNumber(current.net_sales || current.revenue),
         orders: asNumber(current.orders),
         avgTicket: asNumber(current.avg_ticket),
       })
 
       setPreviousSummary({
         revenue: asNumber(previous.revenue),
+        grossSales: asNumber(previous.gross_sales),
+        discountsGranted: asNumber(previous.discounts_granted),
+        netSales: asNumber(previous.net_sales || previous.revenue),
         orders: asNumber(previous.orders),
       })
 
@@ -376,10 +394,10 @@ export function AdminSales() {
 
   const comparisonSummary = useMemo(() => {
     return {
-      prevRevenue: previousSummary.revenue,
+      prevRevenue: previousSummary.netSales,
       prevOrders: previousSummary.orders,
       prevMargin: previousMargin.grossMargin,
-      revenueChange: percentChange(currentSummary.revenue, previousSummary.revenue),
+      revenueChange: percentChange(currentSummary.netSales, previousSummary.netSales),
       ordersChange: percentChange(currentSummary.orders, previousSummary.orders),
       marginChange: percentChange(currentMargin.grossMargin, previousMargin.grossMargin),
     }
@@ -403,9 +421,20 @@ export function AdminSales() {
     rows.push([])
 
     rows.push(['Resumen General'])
-    rows.push(['Ingresos', 'Órdenes', 'Ticket promedio', 'Margen bruto', 'Margen %', 'Cobertura costo %'])
     rows.push([
-      currentSummary.revenue,
+      'Ventas brutas',
+      'Descuentos otorgados',
+      'Ventas netas (devengadas)',
+      'Órdenes',
+      'Ticket promedio',
+      'Margen bruto',
+      'Margen %',
+      'Cobertura costo %',
+    ])
+    rows.push([
+      currentSummary.grossSales,
+      currentSummary.discountsGranted,
+      currentSummary.netSales,
       currentSummary.orders,
       currentSummary.avgTicket,
       currentMargin.grossMargin,
@@ -416,8 +445,8 @@ export function AdminSales() {
 
     rows.push(['Comparación entre períodos'])
     rows.push([
-      'Ingresos actual',
-      'Ingresos anterior',
+      'Ventas netas actuales',
+      'Ventas netas anteriores',
       'Variación %',
       'Órdenes actual',
       'Órdenes anterior',
@@ -427,7 +456,7 @@ export function AdminSales() {
       'Variación %',
     ])
     rows.push([
-      currentSummary.revenue,
+      currentSummary.netSales,
       comparisonSummary.prevRevenue,
       comparisonSummary.revenueChange.toFixed(2),
       currentSummary.orders,
@@ -587,8 +616,11 @@ export function AdminSales() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Ingresos del período</p>
-                <p className="text-2xl font-bold text-gray-900">{formatPrice(currentSummary.revenue, settings)}</p>
+                <p className="text-sm text-gray-500">Ventas netas (devengadas)</p>
+                <p className="text-2xl font-bold text-gray-900">{formatPrice(currentSummary.netSales, settings)}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Brutas: {formatPrice(currentSummary.grossSales, settings)} · Desc.: {formatPrice(currentSummary.discountsGranted, settings)}
+                </p>
               </div>
               <DollarSign className="h-6 w-6 text-green-600" />
             </div>
@@ -642,7 +674,7 @@ export function AdminSales() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="p-4 rounded-lg border border-gray-200">
-              <p className="text-sm text-gray-500">Ingresos</p>
+              <p className="text-sm text-gray-500">Ventas netas</p>
               <div className="mt-2 flex items-center gap-2">
                 {comparisonSummary.revenueChange >= 0 ? (
                   <TrendingUp className="h-4 w-4 text-green-600" />
@@ -654,7 +686,7 @@ export function AdminSales() {
                 </p>
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                Actual: {formatPrice(currentSummary.revenue, settings)} | Anterior: {formatPrice(comparisonSummary.prevRevenue, settings)}
+                Actual: {formatPrice(currentSummary.netSales, settings)} | Anterior: {formatPrice(comparisonSummary.prevRevenue, settings)}
               </p>
             </div>
 
@@ -720,6 +752,9 @@ export function AdminSales() {
             <CardTitle>Ventas por método de pago</CardTitle>
           </CardHeader>
           <CardContent>
+            <p className="text-xs text-gray-500 mb-3">
+              Se consideran solo cobros reales registrados (order_payments) en el período.
+            </p>
             {paymentMethodSales.length === 0 ? (
               <p className="text-sm text-gray-500">No hay datos de pagos para el período seleccionado.</p>
             ) : (

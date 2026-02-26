@@ -15,6 +15,7 @@ interface CustomerForm {
   full_name: string
   email: string
   phone: string
+  rut: string
   address: {
     address: string
     city: string
@@ -37,6 +38,7 @@ export function AdminCustomers() {
     full_name: '',
     email: '',
     phone: '',
+    rut: '',
     address: {
       address: '',
       city: '',
@@ -85,6 +87,7 @@ export function AdminCustomers() {
             full_name: formData.full_name,
             email: formData.email || null,
             phone: formData.phone,
+            rut: formData.rut.trim() || null,
             address: formData.address,
             notes: formData.notes || null,
           } as never)
@@ -101,6 +104,7 @@ export function AdminCustomers() {
             full_name: formData.full_name,
             email: formData.email || null,
             phone: formData.phone,
+            rut: formData.rut.trim() || null,
             address: formData.address,
             notes: formData.notes || null,
             is_active: true,
@@ -114,6 +118,7 @@ export function AdminCustomers() {
         full_name: '',
         email: '',
         phone: '',
+        rut: '',
         address: {
           address: '',
           city: '',
@@ -140,6 +145,7 @@ export function AdminCustomers() {
       full_name: customer.full_name,
       email: customer.email || '',
       phone: customer.phone,
+      rut: customer.rut || '',
       address: {
         address: address.address || '',
         city: address.city || '',
@@ -178,6 +184,7 @@ export function AdminCustomers() {
       full_name: '',
       email: '',
       phone: '',
+      rut: '',
       address: {
         address: '',
         city: '',
@@ -216,7 +223,8 @@ export function AdminCustomers() {
   const filteredCustomers = customers.filter((customer) =>
     customer.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     customer.phone.includes(searchTerm) ||
-    (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
+    (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (customer.rut && customer.rut.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   return (
@@ -272,6 +280,20 @@ export function AdminCustomers() {
                       setFormData({ ...formData, phone: e.target.value })
                     }
                     required
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    RUT (opcional)
+                  </label>
+                  <Input
+                    type="text"
+                    value={formData.rut}
+                    onChange={(e) =>
+                      setFormData({ ...formData, rut: e.target.value })
+                    }
+                    placeholder="Ej: 214567890012"
                   />
                 </div>
 
@@ -394,7 +416,7 @@ export function AdminCustomers() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Buscar por nombre, teléfono o email..."
+              placeholder="Buscar por nombre, teléfono, email o RUT..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -457,6 +479,12 @@ export function AdminCustomers() {
                                 <div className="flex items-center gap-2 text-gray-600">
                                   <Mail className="h-4 w-4" />
                                   {customer.email}
+                                </div>
+                              )}
+                              {customer.rut && (
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <span className="inline-block h-4 w-4 rounded-sm bg-gray-200 text-[10px] leading-4 text-center font-semibold text-gray-700">R</span>
+                                  {customer.rut}
                                 </div>
                               )}
                             </div>

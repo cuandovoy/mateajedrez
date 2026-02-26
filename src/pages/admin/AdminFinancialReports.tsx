@@ -8,7 +8,7 @@ import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch } from '@/types'
 import { Calendar, Download, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type Summary = {
   salesRevenue: number
@@ -117,8 +117,10 @@ export function AdminFinancialReports() {
     openInvoices: 0,
   })
   const [topSuppliers, setTopSuppliers] = useState<SupplierOutstanding[]>([])
+  const requestSequenceRef = useRef(0)
 
   const invalidRange = draftStartDate > draftEndDate
+  const invalidAsOfDate = !draftAsOfDate
   const hasPendingChanges =
     draftBranchId !== selectedBranchId ||
     draftStartDate !== startDate ||
@@ -154,6 +156,7 @@ export function AdminFinancialReports() {
 
   const fetchFinancialData = async () => {
     if (!organizationId) return
+    const requestId = ++requestSequenceRef.current
     setLoading(true)
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -166,6 +169,7 @@ export function AdminFinancialReports() {
       })
 
       if (error) throw error
+      if (requestId !== requestSequenceRef.current) return
 
       const payload = (data || {}) as Record<string, unknown>
       const summaryPayload = (payload.summary as Record<string, unknown> | undefined) || {}
@@ -232,14 +236,17 @@ export function AdminFinancialReports() {
         })
       )
     } catch (error) {
+      if (requestId !== requestSequenceRef.current) return
       console.error('Error fetching financial report:', error)
     } finally {
-      setLoading(false)
+      if (requestId === requestSequenceRef.current) {
+        setLoading(false)
+      }
     }
   }
 
   const applyFilters = () => {
-    if (invalidRange) return
+    if (invalidRange || invalidAsOfDate) return
     setSelectedBranchId(draftBranchId)
     setStartDate(draftStartDate)
     setEndDate(draftEndDate)
@@ -467,9 +474,10 @@ export function AdminFinancialReports() {
           </div>
 
           {invalidRange && <p className="mt-3 text-sm text-red-600">La fecha inicio no puede ser mayor que la fecha fin.</p>}
+          {invalidAsOfDate && <p className="mt-3 text-sm text-red-600">La fecha de corte de antigüedad es obligatoria.</p>}
 
           <div className="mt-4 flex justify-end">
-            <Button onClick={applyFilters} disabled={invalidRange || !hasPendingChanges}>
+            <Button onClick={applyFilters} disabled={invalidRange || invalidAsOfDate || !hasPendingChanges}>
               Aplicar filtros
             </Button>
           </div>
@@ -479,7 +487,7 @@ export function AdminFinancialReports() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-gray-500">Ventas</p>
+            <p className="text-sm text-gray-500">Ventas netas (devengadas)</p>
             <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.netSales || summary.salesRevenue, settings)}</p>
             <p className="text-xs text-gray-500">{summary.salesOrders} órdenes · Neto</p>
           </CardContent>

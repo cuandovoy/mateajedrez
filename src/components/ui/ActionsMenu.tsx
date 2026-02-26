@@ -7,6 +7,7 @@ interface ActionItem {
   onClick: () => void
   icon?: React.ReactNode
   variant?: 'default' | 'danger'
+  disabled?: boolean
 }
 
 interface ActionsMenuProps {
@@ -76,6 +77,7 @@ export function ActionsMenu({ actions, className }: ActionsMenuProps) {
   }, [isOpen, actions.length])
 
   const handleActionClick = (action: ActionItem) => {
+    if (action.disabled) return
     action.onClick()
     setIsOpen(false)
     setMenuPosition(null)
@@ -126,13 +128,16 @@ export function ActionsMenu({ actions, className }: ActionsMenuProps) {
                 <button
                   key={index}
                   type="button"
+                  disabled={action.disabled}
                   onClick={(e) => {
                     e.stopPropagation()
                     handleActionClick(action)
                   }}
                   className={cn(
                     'w-full px-4 py-2 text-left text-sm flex items-center space-x-2 transition-colors',
-                    action.variant === 'danger'
+                    action.disabled
+                      ? 'cursor-not-allowed text-gray-400'
+                      : action.variant === 'danger'
                       ? 'text-red-600 hover:bg-red-50'
                       : 'text-gray-700 hover:bg-gray-100'
                   )}

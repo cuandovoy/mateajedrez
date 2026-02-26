@@ -115,6 +115,7 @@ function AdminProductsContent() {
     sortBy: 'created_at',
     sortDirection: 'desc',
   })
+  const [appliedSearch, setAppliedSearch] = useState('')
 
   const {
     register,
@@ -187,6 +188,13 @@ function AdminProductsContent() {
         query = query.lte('price', parseFloat(filters.priceMax))
       }
 
+      if (appliedSearch) {
+        const term = appliedSearch.replace(/[%]/g, '').replace(/,/g, ' ').trim()
+        if (term) {
+          query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%,sku.ilike.%${term}%`)
+        }
+      }
+
       if (filters.stock !== 'all') {
         // Stock filtering is applied client-side using branch_inventory aggregated stock.
       }
@@ -244,7 +252,7 @@ function AdminProductsContent() {
     } finally {
       setLoading(false)
     }
-  }, [organizationId, filters.categoryId, filters.supplierId, filters.status, filters.priceMin, filters.priceMax, filters.stock])
+  }, [organizationId, filters.categoryId, filters.supplierId, filters.status, filters.priceMin, filters.priceMax, filters.stock, appliedSearch])
 
   useEffect(() => {
     if (organizationId) {
@@ -258,19 +266,9 @@ function AdminProductsContent() {
     fetchProducts()
   }, [fetchProducts])
 
-  // Filter products by search term (client-side for better UX)
+  // Filter products client-side only for stock and ordering.
   const filteredProducts = useMemo(() => {
     let filtered = products
-
-    if (filters.search.trim()) {
-      const searchLower = filters.search.toLowerCase()
-      filtered = filtered.filter(
-        (product) =>
-          product.name.toLowerCase().includes(searchLower) ||
-          product.description?.toLowerCase().includes(searchLower) ||
-          product.sku.toLowerCase().includes(searchLower)
-      )
-    }
 
     if (filters.stock !== 'all') {
       filtered = filtered.filter((product) => {
@@ -302,11 +300,22 @@ function AdminProductsContent() {
     })
 
     return sorted
-  }, [products, filters.search, filters.stock, filters.sortBy, filters.sortDirection])
+  }, [products, filters.stock, filters.sortBy, filters.sortDirection])
 
   useEffect(() => {
     setPage(0)
-  }, [filters, viewMode])
+  }, [
+    viewMode,
+    appliedSearch,
+    filters.categoryId,
+    filters.supplierId,
+    filters.priceMin,
+    filters.priceMax,
+    filters.status,
+    filters.stock,
+    filters.sortBy,
+    filters.sortDirection,
+  ])
 
   const totalFiltered = filteredProducts.length
   const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize))
@@ -833,6 +842,7 @@ function AdminProductsContent() {
 
   const clearFilters = () => {
     setPage(0)
+    setAppliedSearch('')
     setFilters({
       search: '',
       categoryId: '',
@@ -849,6 +859,7 @@ function AdminProductsContent() {
   const hasActiveFilters = useMemo(() => {
     return (
       filters.search !== '' ||
+      appliedSearch !== '' ||
       filters.categoryId !== '' ||
       filters.supplierId !== '' ||
       filters.priceMin !== '' ||
@@ -858,7 +869,7 @@ function AdminProductsContent() {
       filters.sortBy !== 'created_at' ||
       filters.sortDirection !== 'desc'
     )
-  }, [filters])
+  }, [filters, appliedSearch])
 
   if (loading) {
     return (
@@ -952,11 +963,35 @@ function AdminProductsContent() {
                 Filtros de listado
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <SearchFilter
-                  value={filters.search}
-                  onChange={(value) => setFilters({ ...filters, search: value })}
-                  placeholder="Buscar productos..."
-                />
+                <div className="lg:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Búsqueda en base de datos
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex-1">
+                      <SearchFilter
+                        value={filters.search}
+                        onChange={(value) => setFilters({ ...filters, search: value })}
+                        placeholder="Nombre, SKU o descripción"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setPage(0)
+                        setAppliedSearch(filters.search.trim())
+                      }}
+                    >
+                      Buscar
+                    </Button>
+                  </div>
+                  {appliedSearch && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Filtro aplicado: <span className="font-medium text-gray-700">"{appliedSearch}"</span>
+                    </p>
+                  )}
+                </div>
                 <CategoryFilter
                   categories={categories}
                   selectedCategoryId={filters.categoryId}

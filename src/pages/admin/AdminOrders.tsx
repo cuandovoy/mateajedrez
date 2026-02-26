@@ -44,8 +44,24 @@ type OrderPaymentLite = {
   amount: number
   created_at: string
 }
+type CustomerLite = {
+  id: string
+  full_name: string
+  email: string | null
+  phone: string
+  rut?: string | null
+}
+
+type ShippingAddressLite = {
+  fullName?: string
+  email?: string
+  phone?: string
+  address?: string
+}
+
 type OrderWithPayments = Order & {
   order_payments?: OrderPaymentLite[] | null
+  customer?: CustomerLite | null
 }
 
 const ITEMS_PER_PAGE = 20
@@ -90,7 +106,7 @@ export function AdminOrders() {
     try {
       let query = supabase
         .from('orders')
-        .select('*, order_payments(id, amount, created_at)', { count: 'exact' })
+        .select('*, customer:customers(id, full_name, email, phone, rut), order_payments(id, amount, created_at)', { count: 'exact' })
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
 
@@ -122,17 +138,22 @@ export function AdminOrders() {
 
       if (error) throw error
 
-      // Filter by search term (order ID or shipping address)
+      // Filter by search term (order ID, customer, shipping snapshot)
       let filteredData = data || []
       if (searchTerm) {
         filteredData = filteredData.filter((order) => {
           const orderId = (order as { id: string }).id.toLowerCase()
           const orderNumber = (order as { order_number?: number | null }).order_number
-          const shippingAddress = (order as { shipping_address: { fullName?: string; email?: string; phone?: string; address?: string } }).shipping_address
+          const shippingAddress = (order as { shipping_address: ShippingAddressLite }).shipping_address
+          const customer = (order as { customer?: CustomerLite | null }).customer
           const searchLower = searchTerm.toLowerCase()
           return (
             orderId.includes(searchLower) ||
             (orderNumber ? String(orderNumber).includes(searchTerm) : false) ||
+            customer?.full_name?.toLowerCase().includes(searchLower) ||
+            customer?.email?.toLowerCase().includes(searchLower) ||
+            customer?.phone?.includes(searchTerm) ||
+            customer?.rut?.toLowerCase().includes(searchLower) ||
             shippingAddress?.fullName?.toLowerCase().includes(searchLower) ||
             shippingAddress?.email?.toLowerCase().includes(searchLower) ||
             shippingAddress?.phone?.includes(searchTerm) ||
@@ -365,11 +386,10 @@ export function AdminOrders() {
                   <tbody>
                     {orders.map((order) => {
                       const collectionStatus = getCollectionStatus(order)
-                      const shippingAddress = order.shipping_address as {
-                        fullName?: string
-                        email?: string
-                        phone?: string
-                      }
+                      const shippingAddress = order.shipping_address as ShippingAddressLite
+                      const customerName = order.customer?.full_name || shippingAddress?.fullName || 'Cliente Invitado'
+                      const customerEmail = order.customer?.email || shippingAddress?.email
+                      const customerPhone = order.customer?.phone || shippingAddress?.phone
                       return (
                         <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-4">
@@ -381,12 +401,18 @@ export function AdminOrders() {
                           <td className="py-3 px-4">
                             <div>
                               <p className="font-medium text-gray-900">
-                                {shippingAddress?.fullName || 'Cliente Invitado'}
+                                {customerName}
                               </p>
-                              {(shippingAddress?.email || shippingAddress?.phone) && (
+                              {(customerEmail || customerPhone) && (
                                 <p className="text-sm text-gray-500">
-                                  {[shippingAddress.email, shippingAddress.phone].filter(Boolean).join(' · ')}
+                                  {[customerEmail, customerPhone].filter(Boolean).join(' · ')}
                                 </p>
+                              )}
+                              {order.customer?.rut && (
+                                <p className="text-xs text-gray-500">RUT: {order.customer.rut}</p>
+                              )}
+                              {order.customer?.id && (
+                                <p className="text-[11px] font-medium text-emerald-700">Cliente vinculado</p>
                               )}
                             </div>
                           </td>

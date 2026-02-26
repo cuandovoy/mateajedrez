@@ -103,22 +103,22 @@ export function InventoryTransferModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="pb-4 border-b">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-2 pt-4 sm:items-center sm:p-4">
+      <Card className="flex w-full max-w-md max-h-[95vh] flex-col overflow-hidden sm:max-h-[90vh]">
+        <CardHeader className="border-b pb-3 sm:pb-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-xl flex items-center space-x-2">
+            <CardTitle className="flex items-center space-x-2 text-base sm:text-xl">
               <ArrowRight className="h-5 w-5 text-admin-600" />
               <span>Transferencia entre Sucursales</span>
             </CardTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
               <X className="h-5 w-5" />
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="flex-1 overflow-y-auto pt-4 sm:pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="rounded-lg bg-gray-50 p-3 sm:p-4">
               <p className="text-sm text-gray-600 mb-1">Producto</p>
               <p className="font-medium text-gray-900">{inventoryItem.product_name}</p>
               {inventoryItem.variant_name && (
@@ -189,7 +189,7 @@ export function InventoryTransferModal({
               </p>
             </div>
 
-            <div className="flex space-x-4 pt-4">
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:space-x-4 sm:gap-0 sm:pt-4">
               <Button type="submit" className="flex-1" disabled={loading || availableBranches.length === 0}>
                 {loading ? 'Creando...' : 'Crear Transferencia'}
               </Button>

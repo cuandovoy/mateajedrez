@@ -49,6 +49,7 @@ interface InventoryItem {
   min_stock: number
   low_stock_threshold: number
   is_low_stock: boolean
+  source_stock: number | null
 }
 
 type ProductImageRef = {
@@ -66,7 +67,7 @@ const getPrimaryImageUrl = (images: ProductImageRef[] | null | undefined): strin
 }
 
 export function AdminInventory() {
-  const { organizationId } = useOrganization()
+  const { organizationId, isAdmin } = useOrganization()
   const { show } = useToastStore()
   const { canUseFeature } = usePlanLimits()
   const [inventory, setInventory] = useState<InventoryItem[]>([])
@@ -76,6 +77,9 @@ export function AdminInventory() {
   const [editingItem, setEditingItem] = useState<{ id: string; stock: number; min_stock: number; low_stock_threshold: number } | null>(null)
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [syncingItemId, setSyncingItemId] = useState<string | null>(null)
+  const [syncingAll, setSyncingAll] = useState(false)
+  const [unsyncedCount, setUnsyncedCount] = useState<number | null>(null)
   const [missingProductsCount, setMissingProductsCount] = useState<number | null>(null)
   const [receiptModalItem, setReceiptModalItem] = useState<InventoryItem | null>(null)
   const [adjustmentModalItem, setAdjustmentModalItem] = useState<InventoryItem | null>(null)
@@ -112,6 +116,12 @@ export function AdminInventory() {
     }
   }, [selectedBranch, organizationId])
 
+  useEffect(() => {
+    if (organizationId) {
+      checkUnsyncedItems()
+    }
+  }, [organizationId, selectedBranch])
+
   const fetchInventory = useCallback(async () => {
     if (!organizationId) return
     try {
@@ -133,8 +143,10 @@ export function AdminInventory() {
           branches!inner(id, name, organization_id),
           products(
             id,
+            organization_id,
             name,
             sku,
+            stock,
             image_url,
             product_images (
               image_url,
@@ -148,10 +160,13 @@ export function AdminInventory() {
             sku,
             image_url,
             product_id,
+            stock,
             products!inner(
               id,
+              organization_id,
               name,
               sku,
+              stock,
               image_url,
               product_images (
                 image_url,
@@ -180,7 +195,7 @@ export function AdminInventory() {
       const { data, error, count } = await query
 
       if (error) throw error
-      const inventoryItems: InventoryItem[] = (data || []).map((item: Record<string, unknown>) => {
+      const rawItems = (data || []).map((item: Record<string, unknown>) => {
         const branch = item.branches as { id: string; name: string } | null
         const product = item.product_id
           ? (item.products as Record<string, unknown> | null)
@@ -214,8 +229,24 @@ export function AdminInventory() {
           min_stock: item.min_stock as number,
           low_stock_threshold: item.low_stock_threshold as number,
           is_low_stock: (item.stock as number) <= (item.low_stock_threshold as number),
+          source_stock:
+            (variant as { stock?: number } | null)?.stock ??
+            (product as { stock?: number } | null)?.stock ??
+            null,
+          source_org_id: (product as { organization_id?: string } | null)?.organization_id ?? null,
         }
       })
+
+      const inventoryItems: InventoryItem[] = rawItems
+        .filter((item) => {
+          const scoped = item as InventoryItem & { source_org_id?: string | null }
+          return !scoped.source_org_id || scoped.source_org_id === organizationId
+        })
+        .map((item) => {
+          const sanitized = { ...(item as InventoryItem & { source_org_id?: string | null }) }
+          delete (sanitized as { source_org_id?: string | null }).source_org_id
+          return sanitized
+        })
 
       if (hasSearch) {
         const searchLower = debouncedSearch.toLowerCase()
@@ -292,6 +323,22 @@ export function AdminInventory() {
     setEditingItem(null)
   }
 
+  const updateInventoryItemLocal = (
+    itemId: string,
+    updates: Partial<Pick<InventoryItem, 'stock' | 'min_stock' | 'low_stock_threshold'>>
+  ) => {
+    setInventory((prev) =>
+      prev.map((inv) => {
+        if (inv.id !== itemId) return inv
+        const next = { ...inv, ...updates }
+        return {
+          ...next,
+          is_low_stock: next.stock <= next.low_stock_threshold,
+        }
+      })
+    )
+  }
+
   const checkMissingProducts = async () => {
     try {
       const branchId = selectedBranch || branches[0]?.id
@@ -350,6 +397,74 @@ export function AdminInventory() {
       setMissingProductsCount(missingProducts.length + missingVariants.length)
     } catch (error) {
       console.error('Error checking missing products:', error)
+    }
+  }
+
+  const getSourceStockFromSyncRow = (row: Record<string, unknown>): number | null => {
+    const product = row.product_id
+      ? (row.products as Record<string, unknown> | null)
+      : ((row.product_variants as { products?: Record<string, unknown> } | null)?.products ?? null)
+    const variant = row.variant_id ? (row.product_variants as Record<string, unknown> | null) : null
+    const sourceStock =
+      (variant as { stock?: number } | null)?.stock ??
+      (product as { stock?: number } | null)?.stock ??
+      null
+    return typeof sourceStock === 'number' ? sourceStock : null
+  }
+
+  const fetchSyncScopeRows = async () => {
+    if (!organizationId) return []
+
+    let query = supabase
+      .from('branch_inventory')
+      .select(
+        `
+        id,
+        branch_id,
+        product_id,
+        variant_id,
+        stock,
+        branches!inner(organization_id),
+        products(
+          id,
+          organization_id,
+          stock
+        ),
+        product_variants(
+          id,
+          stock,
+          products!inner(
+            id,
+            organization_id
+          )
+        )
+      `
+      )
+      .eq('branches.organization_id', organizationId)
+
+    if (selectedBranch) {
+      query = query.eq('branch_id', selectedBranch)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+    return (data || []) as Record<string, unknown>[]
+  }
+
+  const checkUnsyncedItems = async () => {
+    if (!organizationId) return
+    try {
+      const rows = await fetchSyncScopeRows()
+      const count = rows.reduce((acc, row) => {
+        const sourceStock = getSourceStockFromSyncRow(row)
+        const currentStock = Number(row.stock ?? 0)
+        if (sourceStock !== null && sourceStock !== currentStock) return acc + 1
+        return acc
+      }, 0)
+      setUnsyncedCount(count)
+    } catch (error) {
+      console.error('Error checking unsynced inventory items:', error)
+      setUnsyncedCount(null)
     }
   }
 
@@ -460,13 +575,155 @@ export function AdminInventory() {
       })
 
       show('Inventario actualizado exitosamente', 'success')
+      updateInventoryItemLocal(editingItem.id, {
+        stock: editingItem.stock,
+        min_stock: editingItem.min_stock,
+        low_stock_threshold: editingItem.low_stock_threshold,
+      })
       setEditingItem(null)
-      fetchInventory()
     } catch (error: any) {
       console.error('Error updating inventory:', error)
       show(error?.message || 'Error al actualizar el inventario', 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSyncItemStock = async (item: InventoryItem) => {
+    if (!organizationId) return
+    try {
+      setSyncingItemId(item.id)
+
+      let sourceStock: number | null = null
+      let sourceLabel = 'producto'
+
+      if (item.variant_id) {
+        const { data: variantData, error: variantError } = await supabase
+          .from('product_variants')
+          .select('id, stock, product_id, products!inner(organization_id)')
+          .eq('id', item.variant_id)
+          .eq('products.organization_id', organizationId)
+          .maybeSingle()
+
+        if (variantError) throw variantError
+        sourceStock = (variantData as { stock?: number } | null)?.stock ?? null
+        sourceLabel = 'variante'
+      } else if (item.product_id) {
+        const { data: productData, error: productError } = await supabase
+          .from('products')
+          .select('id, stock')
+          .eq('id', item.product_id)
+          .eq('organization_id', organizationId)
+          .maybeSingle()
+
+        if (productError) throw productError
+        sourceStock = (productData as { stock?: number } | null)?.stock ?? null
+      }
+
+      if (sourceStock === null) {
+        show('No se encontró stock de origen para sincronizar.', 'error')
+        return
+      }
+
+      if (sourceStock === item.stock) {
+        show('El inventario ya está sincronizado con el stock de origen.', 'info')
+        return
+      }
+
+      const previousStock = item.stock
+      const quantityChange = sourceStock - previousStock
+
+      const { error: updateError } = await supabase
+        .from('branch_inventory')
+        .update({ stock: sourceStock } as never)
+        .eq('id', item.id)
+
+      if (updateError) throw updateError
+
+      const { error: movementError } = await supabase
+        .from('inventory_movements')
+        .insert({
+          branch_inventory_id: item.id,
+          movement_type: 'adjustment',
+          quantity: quantityChange,
+          previous_stock: previousStock,
+          new_stock: sourceStock,
+          reference_type: 'sync_stock',
+          notes: `Sincronización manual desde stock de ${sourceLabel}`,
+        })
+
+      if (movementError) throw movementError
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'branch_inventory',
+        recordId: item.id,
+        action: 'SYNC',
+        notes: `Sincronización manual con stock de ${sourceLabel}.`,
+        oldData: { stock: previousStock },
+        newData: {
+          stock: sourceStock,
+          quantity_change: quantityChange,
+          source: sourceLabel,
+          product_id: item.product_id,
+          variant_id: item.variant_id,
+          branch_id: item.branch_id,
+        },
+      })
+
+      show(`Stock sincronizado (${sourceLabel}): ${previousStock} → ${sourceStock}`, 'success')
+      updateInventoryItemLocal(item.id, { stock: sourceStock })
+      checkUnsyncedItems()
+    } catch (error: any) {
+      console.error('Error syncing item stock:', error)
+      show(error?.message || 'Error al sincronizar stock', 'error')
+    } finally {
+      setSyncingItemId(null)
+    }
+  }
+
+  const handleSyncAllUnsynced = async () => {
+    if (!organizationId || !isAdmin) return
+    if (!confirm('¿Sincronizar todos los stocks desincronizados de este alcance?')) return
+
+    try {
+      setSyncingAll(true)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)('sync_inventory_from_master_stock', {
+        p_organization_id: organizationId,
+        p_branch_id: selectedBranch || null,
+        p_only_desynced: true,
+      })
+      if (error) throw error
+
+      const updatedCount = Number(data || 0)
+      if (updatedCount === 0) {
+        show('No hay items desincronizados para sincronizar.', 'info')
+        setUnsyncedCount(0)
+        return
+      }
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'branch_inventory',
+        recordId: selectedBranch || 'all-branches',
+        action: 'SYNC',
+        notes: 'Sincronización masiva de stocks desincronizados.',
+        newData: {
+          synced_items: updatedCount,
+          branch_id: selectedBranch || null,
+          source: 'rpc_sync_inventory_from_master_stock',
+        },
+      })
+
+      show(`Se sincronizaron ${updatedCount} item(s) desincronizados.`, 'success')
+      fetchInventory()
+      checkUnsyncedItems()
+    } catch (error: any) {
+      console.error('Error syncing all unsynced inventory items:', error)
+      show(error?.message || 'Error al sincronizar todos los desincronizados', 'error')
+    } finally {
+      setSyncingAll(false)
     }
   }
 
@@ -500,6 +757,24 @@ export function AdminInventory() {
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
                 {syncing ? 'Sincronizando...' : 'Sincronizar'}
+              </Button>
+            </div>
+          )}
+          {isAdmin && unsyncedCount !== null && unsyncedCount > 0 && (
+            <div className="flex items-center space-x-2 px-4 py-2 bg-purple-50 border border-purple-200 rounded-lg">
+              <RefreshCw className="h-5 w-5 text-purple-600" />
+              <span className="text-sm font-medium text-purple-900">
+                {unsyncedCount} item{unsyncedCount !== 1 ? 's' : ''} desincronizado{unsyncedCount !== 1 ? 's' : ''}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSyncAllUnsynced}
+                disabled={syncingAll}
+                className="ml-2"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${syncingAll ? 'animate-spin' : ''}`} />
+                {syncingAll ? 'Sincronizando...' : 'Sincronizar todos'}
               </Button>
             </div>
           )}
@@ -804,6 +1079,17 @@ export function AdminInventory() {
                         ) : (
                           <ActionsMenu
                             actions={[
+                              {
+                                label:
+                                  syncingItemId === item.id
+                                    ? 'Sincronizando stock...'
+                                    : item.source_stock === null
+                                      ? 'Sin stock de origen'
+                                      : `Sincronizar stock (${item.source_stock})`,
+                                icon: <RefreshCw className={`h-4 w-4 ${syncingItemId === item.id ? 'animate-spin' : ''}`} />,
+                                onClick: () => handleSyncItemStock(item),
+                                disabled: syncingItemId !== null || item.source_stock === null,
+                              },
                               {
                                 label: 'Editar Stock',
                                 icon: <Edit className="h-4 w-4" />,
