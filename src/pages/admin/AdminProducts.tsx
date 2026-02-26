@@ -65,6 +65,8 @@ interface ProductWithImages extends Product {
 type ViewMode = 'grid' | 'list'
 type StatusFilterValue = 'all' | 'active' | 'inactive'
 type StockFilterValue = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
+type ProductSortBy = 'created_at' | 'name' | 'sku' | 'price' | 'stock'
+type SortDirection = 'asc' | 'desc'
 
 interface ProductFilters {
   search: string
@@ -74,6 +76,8 @@ interface ProductFilters {
   priceMax: string
   status: StatusFilterValue
   stock: StockFilterValue
+  sortBy: ProductSortBy
+  sortDirection: SortDirection
 }
 
 function AdminProductsContent() {
@@ -97,6 +101,7 @@ function AdminProductsContent() {
   const [supplierManagerProduct, setSupplierManagerProduct] = useState<Product | null>(null)
   const [initialBranchId, setInitialBranchId] = useState<string>('')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [filters, setFilters] = useState<ProductFilters>({
@@ -107,6 +112,8 @@ function AdminProductsContent() {
     priceMax: '',
     status: 'all',
     stock: 'all',
+    sortBy: 'created_at',
+    sortDirection: 'desc',
   })
 
   const {
@@ -275,8 +282,27 @@ function AdminProductsContent() {
       })
     }
 
-    return filtered
-  }, [products, filters.search, filters.stock])
+    const directionMultiplier = filters.sortDirection === 'asc' ? 1 : -1
+    const sorted = [...filtered].sort((a, b) => {
+      if (filters.sortBy === 'name') {
+        return a.name.localeCompare(b.name, 'es') * directionMultiplier
+      }
+      if (filters.sortBy === 'sku') {
+        return a.sku.localeCompare(b.sku, 'es') * directionMultiplier
+      }
+      if (filters.sortBy === 'price') {
+        return (Number(a.price || 0) - Number(b.price || 0)) * directionMultiplier
+      }
+      if (filters.sortBy === 'stock') {
+        return (Number(a.inventory_stock || 0) - Number(b.inventory_stock || 0)) * directionMultiplier
+      }
+      const aTime = new Date(a.created_at || 0).getTime()
+      const bTime = new Date(b.created_at || 0).getTime()
+      return (aTime - bTime) * directionMultiplier
+    })
+
+    return sorted
+  }, [products, filters.search, filters.stock, filters.sortBy, filters.sortDirection])
 
   useEffect(() => {
     setPage(0)
@@ -815,6 +841,8 @@ function AdminProductsContent() {
       priceMax: '',
       status: 'all',
       stock: 'all',
+      sortBy: 'created_at',
+      sortDirection: 'desc',
     })
   }
 
@@ -826,7 +854,9 @@ function AdminProductsContent() {
       filters.priceMin !== '' ||
       filters.priceMax !== '' ||
       filters.status !== 'all' ||
-      filters.stock !== 'all'
+      filters.stock !== 'all' ||
+      filters.sortBy !== 'created_at' ||
+      filters.sortDirection !== 'desc'
     )
   }, [filters])
 
@@ -889,56 +919,117 @@ function AdminProductsContent() {
 
       {/* Filters Panel */}
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filtros</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <SearchFilter
-              value={filters.search}
-              onChange={(value) => setFilters({ ...filters, search: value })}
-              placeholder="Buscar productos..."
-            />
-            <CategoryFilter
-              categories={categories}
-              selectedCategoryId={filters.categoryId}
-              onCategoryChange={(categoryId) =>
-                setFilters({ ...filters, categoryId })
-              }
-            />
-            <SupplierFilter
-              suppliers={suppliers}
-              selectedSupplierId={filters.supplierId}
-              onSupplierChange={(supplierId) =>
-                setFilters({ ...filters, supplierId })
-              }
-            />
-            <StatusFilter
-              value={filters.status}
-              onChange={(value) => setFilters({ ...filters, status: value })}
-            />
-            <StockFilter
-              value={filters.stock}
-              onChange={(value) => setFilters({ ...filters, stock: value })}
-            />
-            <PriceRangeFilter
-              min={filters.priceMin}
-              max={filters.priceMax}
-              onMinChange={(min) => setFilters({ ...filters, priceMin: min })}
-              onMaxChange={(max) => setFilters({ ...filters, priceMax: max })}
-            />
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="flex items-center space-x-2">
+              <Filter className="h-5 w-5" />
+              <span>Filtros</span>
+            </CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setFiltersCollapsed((prev) => !prev)}
+            >
+              {filtersCollapsed ? (
+                <>
+                  <ChevronRight className="h-4 w-4 mr-1" />
+                  Mostrar
+                </>
+              ) : (
+                <>
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Ocultar
+                </>
+              )}
+            </Button>
           </div>
-          {hasActiveFilters && (
-            <div className="mt-4">
-              <Button variant="outline" onClick={clearFilters}>
-                Limpiar Filtros
-              </Button>
+        </CardHeader>
+        {!filtersCollapsed && (
+          <CardContent className="space-y-5">
+            <div>
+              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
+                Filtros de listado
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <SearchFilter
+                  value={filters.search}
+                  onChange={(value) => setFilters({ ...filters, search: value })}
+                  placeholder="Buscar productos..."
+                />
+                <CategoryFilter
+                  categories={categories}
+                  selectedCategoryId={filters.categoryId}
+                  onCategoryChange={(categoryId) =>
+                    setFilters({ ...filters, categoryId })
+                  }
+                />
+                <SupplierFilter
+                  suppliers={suppliers}
+                  selectedSupplierId={filters.supplierId}
+                  onSupplierChange={(supplierId) =>
+                    setFilters({ ...filters, supplierId })
+                  }
+                />
+                <StatusFilter
+                  value={filters.status}
+                  onChange={(value) => setFilters({ ...filters, status: value })}
+                />
+                <StockFilter
+                  value={filters.stock}
+                  onChange={(value) => setFilters({ ...filters, stock: value })}
+                />
+                <PriceRangeFilter
+                  min={filters.priceMin}
+                  max={filters.priceMax}
+                  onMinChange={(min) => setFilters({ ...filters, priceMin: min })}
+                  onMaxChange={(max) => setFilters({ ...filters, priceMax: max })}
+                />
+              </div>
             </div>
-          )}
-        </CardContent>
+
+            <div className="pt-4 border-t border-gray-200">
+              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
+                Ordenamiento
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ordenar por</label>
+                  <select
+                    value={filters.sortBy}
+                    onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as ProductSortBy })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  >
+                    <option value="created_at">Fecha de creación</option>
+                    <option value="name">Nombre</option>
+                    <option value="sku">SKU</option>
+                    <option value="price">Precio</option>
+                    <option value="stock">Stock</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dirección</label>
+                  <select
+                    value={filters.sortDirection}
+                    onChange={(e) => setFilters({ ...filters, sortDirection: e.target.value as SortDirection })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  >
+                    <option value="desc">Descendente</option>
+                    <option value="asc">Ascendente</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {hasActiveFilters && (
+              <div className="pt-1">
+                <Button variant="outline" onClick={clearFilters}>
+                  Limpiar Filtros
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       {/* Results count */}

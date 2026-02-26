@@ -13,7 +13,7 @@ import {
 import type { Supplier, SupplierInsert, SupplierUpdate } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useOrganization } from '@/hooks/useOrganization'
-import { Building2, Edit, Filter, Globe, Grid3x3, List, Mail, MapPin, Phone, Plus, Trash2, X } from 'lucide-react'
+import { Building2, ChevronLeft, ChevronRight, Edit, Filter, Globe, Grid3x3, List, Mail, MapPin, Phone, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -40,6 +40,8 @@ function formatPhoneForInput(phone: string): string {
 }
 
 type ViewMode = 'grid' | 'list'
+type SupplierSortBy = 'name' | 'city' | 'country' | 'created_at'
+type SortDirection = 'asc' | 'desc'
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -81,7 +83,10 @@ function AdminSuppliersContent() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false)
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<SupplierSortBy>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const {
     register,
@@ -117,21 +122,29 @@ function AdminSuppliersContent() {
 
   // Filter suppliers by search term
   const filteredSuppliers = useMemo(() => {
-    if (!search.trim()) {
-      return suppliers
-    }
+    const searchLower = search.toLowerCase().trim()
+    const filtered = !searchLower
+      ? suppliers
+      : suppliers.filter(
+          (supplier) =>
+            supplier.name.toLowerCase().includes(searchLower) ||
+            supplier.contact_name?.toLowerCase().includes(searchLower) ||
+            supplier.email?.toLowerCase().includes(searchLower) ||
+            supplier.phone?.toLowerCase().includes(searchLower) ||
+            supplier.city?.toLowerCase().includes(searchLower) ||
+            supplier.country?.toLowerCase().includes(searchLower)
+        )
 
-    const searchLower = search.toLowerCase()
-    return suppliers.filter(
-      (supplier) =>
-        supplier.name.toLowerCase().includes(searchLower) ||
-        supplier.contact_name?.toLowerCase().includes(searchLower) ||
-        supplier.email?.toLowerCase().includes(searchLower) ||
-        supplier.phone?.toLowerCase().includes(searchLower) ||
-        supplier.city?.toLowerCase().includes(searchLower) ||
-        supplier.country?.toLowerCase().includes(searchLower)
-    )
-  }, [suppliers, search])
+    const direction = sortDirection === 'asc' ? 1 : -1
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'name') return a.name.localeCompare(b.name, 'es') * direction
+      if (sortBy === 'city') return (a.city || '').localeCompare(b.city || '', 'es') * direction
+      if (sortBy === 'country') return (a.country || '').localeCompare(b.country || '', 'es') * direction
+      const aTime = new Date(a.created_at || 0).getTime()
+      const bTime = new Date(b.created_at || 0).getTime()
+      return (aTime - bTime) * direction
+    })
+  }, [suppliers, search, sortBy, sortDirection])
 
   const onSubmit = async (data: SupplierForm) => {
     try {
@@ -287,28 +300,93 @@ function AdminSuppliersContent() {
 
       {/* Filters Panel */}
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filtros</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <SearchFilter
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar proveedores..."
-            />
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="flex items-center space-x-2">
+              <Filter className="h-5 w-5" />
+              <span>Filtros</span>
+            </CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setFiltersCollapsed((prev) => !prev)}
+            >
+              {filtersCollapsed ? (
+                <>
+                  <ChevronRight className="h-4 w-4 mr-1" />
+                  Mostrar
+                </>
+              ) : (
+                <>
+                  <ChevronLeft className="h-4 w-4 mr-1" />
+                  Ocultar
+                </>
+              )}
+            </Button>
           </div>
-          {search && (
-            <div className="mt-4">
-              <Button variant="outline" onClick={() => setSearch('')}>
-                Limpiar Filtros
-              </Button>
+        </CardHeader>
+        {!filtersCollapsed && (
+          <CardContent className="space-y-5">
+            <div>
+              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
+                Filtros de listado
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <SearchFilter
+                  value={search}
+                  onChange={setSearch}
+                  placeholder="Buscar proveedores..."
+                />
+              </div>
             </div>
-          )}
-        </CardContent>
+            <div className="pt-4 border-t border-gray-200">
+              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
+                Ordenamiento
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ordenar por</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SupplierSortBy)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  >
+                    <option value="name">Nombre</option>
+                    <option value="city">Ciudad</option>
+                    <option value="country">País</option>
+                    <option value="created_at">Fecha de creación</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dirección</label>
+                  <select
+                    value={sortDirection}
+                    onChange={(e) => setSortDirection(e.target.value as SortDirection)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  >
+                    <option value="asc">Ascendente</option>
+                    <option value="desc">Descendente</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            {(search || sortBy !== 'name' || sortDirection !== 'asc') && (
+              <div className="pt-1">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearch('')
+                    setSortBy('name')
+                    setSortDirection('asc')
+                  }}
+                >
+                  Limpiar Filtros
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       {/* Results count */}

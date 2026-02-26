@@ -17,6 +17,8 @@ import {
   AlertTriangle,
   ArrowRight,
   Building2,
+  ChevronDown,
+  ChevronUp,
   ChevronLeft,
   ChevronRight,
   Edit,
@@ -80,6 +82,8 @@ export function AdminInventory() {
   const [transferModalItem, setTransferModalItem] = useState<InventoryItem | null>(null)
   const [movementsModalItem, setMovementsModalItem] = useState<InventoryItem | null>(null)
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [totalCount, setTotalCount] = useState(0)
@@ -160,7 +164,7 @@ export function AdminInventory() {
           { count: 'exact' }
         )
         .eq('branches.organization_id', organizationId)
-        .order('stock', { ascending: true })
+        .order('stock', { ascending: sortDirection === 'asc' })
 
       if (selectedBranch) {
         query = query.eq('branch_id', selectedBranch)
@@ -232,7 +236,7 @@ export function AdminInventory() {
     } finally {
       setLoading(false)
     }
-  }, [organizationId, page, pageSize, selectedBranch, debouncedSearch, show])
+  }, [organizationId, page, pageSize, selectedBranch, debouncedSearch, sortDirection, show])
 
   useEffect(() => {
     if (organizationId) fetchInventory()
@@ -512,58 +516,133 @@ export function AdminInventory() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="text-base flex items-center space-x-2">
+              <Search className="h-4 w-4" />
+              <span>Filtros</span>
+            </CardTitle>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setFiltersCollapsed((prev) => !prev)}
+            >
+              {filtersCollapsed ? (
+                <>
+                  <ChevronDown className="h-4 w-4 mr-1" />
+                  Mostrar
+                </>
+              ) : (
+                <>
+                  <ChevronUp className="h-4 w-4 mr-1" />
+                  Ocultar
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        {!filtersCollapsed && (
+          <CardContent className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sucursal</label>
-              <select
-                value={selectedBranch}
-                onChange={(e) => {
-                  setSelectedBranch(e.target.value)
-                  setPage(0)
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-              >
-                <option value="">Todas las sucursales</option>
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Producto</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                <Input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Buscar por nombre..."
-                  className="pl-10"
-                />
+              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
+                Filtros de listado
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Sucursal</label>
+                  <select
+                    value={selectedBranch}
+                    onChange={(e) => {
+                      setSelectedBranch(e.target.value)
+                      setPage(0)
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  >
+                    <option value="">Todas las sucursales</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Producto</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <Input
+                      type="text"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      placeholder="Buscar por nombre..."
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Mostrar</label>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value))
+                      setPage(0)
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size} por página
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Mostrar</label>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value))
-                  setPage(0)
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-              >
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <option key={size} value={size}>
-                    {size} por página
-                  </option>
-                ))}
-              </select>
+
+            <div className="pt-4 border-t border-gray-200">
+              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
+                Ordenamiento
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Ordenar por</label>
+                  <Input value="Stock" readOnly className="bg-gray-50" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dirección</label>
+                  <select
+                    value={sortDirection}
+                    onChange={(e) => {
+                      setSortDirection(e.target.value as 'asc' | 'desc')
+                      setPage(0)
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  >
+                    <option value="asc">Ascendente (menor stock primero)</option>
+                    <option value="desc">Descendente (mayor stock primero)</option>
+                  </select>
+                </div>
+              </div>
             </div>
-          </div>
-        </CardContent>
+
+            {(selectedBranch || searchInput || sortDirection !== 'asc') && (
+              <div className="pt-1">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedBranch('')
+                    setSearchInput('')
+                    setSortDirection('asc')
+                    setPage(0)
+                  }}
+                >
+                  Limpiar Filtros
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       {/* Inventory Table */}
