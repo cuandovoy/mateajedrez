@@ -606,9 +606,12 @@ export type Database = {
       }
       order_items: {
         Row: {
+          base_unit_price: number
           cost_at_sale: number | null
           cost_source: string | null
           created_at: string | null
+          discount_amount: number
+          discount_metadata: Json | null
           id: string
           margin_at_sale: number | null
           margin_percentage_at_sale: number | null
@@ -620,9 +623,12 @@ export type Database = {
           variant_id: string | null
         }
         Insert: {
+          base_unit_price?: number
           cost_at_sale?: number | null
           cost_source?: string | null
           created_at?: string | null
+          discount_amount?: number
+          discount_metadata?: Json | null
           id?: string
           margin_at_sale?: number | null
           margin_percentage_at_sale?: number | null
@@ -634,9 +640,12 @@ export type Database = {
           variant_id?: string | null
         }
         Update: {
+          base_unit_price?: number
           cost_at_sale?: number | null
           cost_source?: string | null
           created_at?: string | null
+          discount_amount?: number
+          discount_metadata?: Json | null
           id?: string
           margin_at_sale?: number | null
           margin_percentage_at_sale?: number | null
@@ -721,11 +730,16 @@ export type Database = {
           branch_id: string | null
           created_at: string | null
           customer_id: string | null
+          discount_metadata: Json | null
+          discount_total: number
           id: string
+          order_number: number | null
           organization_id: string
           payment_method: string | null
           shipping_address: Json
           status: Database["public"]["Enums"]["order_status"] | null
+          subtotal_before_discount: number
+          tax_total: number
           total: number
           updated_at: string | null
           user_id: string | null
@@ -734,11 +748,16 @@ export type Database = {
           branch_id?: string | null
           created_at?: string | null
           customer_id?: string | null
+          discount_metadata?: Json | null
+          discount_total?: number
           id?: string
+          order_number?: number | null
           organization_id: string
           payment_method?: string | null
           shipping_address: Json
           status?: Database["public"]["Enums"]["order_status"] | null
+          subtotal_before_discount?: number
+          tax_total?: number
           total: number
           updated_at?: string | null
           user_id?: string | null
@@ -747,11 +766,16 @@ export type Database = {
           branch_id?: string | null
           created_at?: string | null
           customer_id?: string | null
+          discount_metadata?: Json | null
+          discount_total?: number
           id?: string
+          order_number?: number | null
           organization_id?: string
           payment_method?: string | null
           shipping_address?: Json
           status?: Database["public"]["Enums"]["order_status"] | null
+          subtotal_before_discount?: number
+          tax_total?: number
           total?: number
           updated_at?: string | null
           user_id?: string | null

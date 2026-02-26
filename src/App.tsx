@@ -33,14 +33,15 @@ import { AdminPlans } from '@/pages/admin/AdminPlans'
 import { AdminUsers } from '@/pages/admin/AdminUsers'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 
 function ReportsRouteGuard({ children }: { children: JSX.Element }) {
   const { canUseFeature } = usePlanLimits()
+  const location = useLocation()
 
   if (!canUseFeature('advanced_reports')) {
-    return <Navigate to="/planes" replace />
+    return <Navigate to={`/planes?from=${encodeURIComponent(location.pathname)}`} replace />
   }
 
   return children

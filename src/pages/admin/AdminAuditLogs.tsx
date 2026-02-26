@@ -62,7 +62,17 @@ const TABLE_NAMES = [
   'audit_logs',
 ] as const
 
-const ACTIONS = ['INSERT', 'UPDATE', 'DELETE'] as const
+const ACTIONS = [
+  'INSERT',
+  'UPDATE',
+  'DELETE',
+  'ORDER_DISCOUNT_APPLIED',
+  'ORDER_DISCOUNT_REMOVED',
+  'ORDER_ITEM_DISCOUNT_APPLIED',
+  'ORDER_ITEM_DISCOUNT_REMOVED',
+  'ORDER_COLLECTION_REGISTERED',
+  'ORDER_PAYMENT_DELETED',
+] as const
 
 export function AdminAuditLogs() {
   const { organizationId } = useOrganization()
@@ -153,6 +163,16 @@ export function AdminAuditLogs() {
         return 'bg-blue-100 text-blue-800'
       case 'DELETE':
         return 'bg-red-100 text-red-800'
+      case 'ORDER_DISCOUNT_APPLIED':
+      case 'ORDER_ITEM_DISCOUNT_APPLIED':
+        return 'bg-orange-100 text-orange-800'
+      case 'ORDER_DISCOUNT_REMOVED':
+      case 'ORDER_ITEM_DISCOUNT_REMOVED':
+        return 'bg-amber-100 text-amber-800'
+      case 'ORDER_COLLECTION_REGISTERED':
+        return 'bg-green-100 text-green-800'
+      case 'ORDER_PAYMENT_DELETED':
+        return 'bg-red-100 text-red-800'
       default:
         return 'bg-gray-100 text-gray-800'
     }
@@ -164,6 +184,12 @@ export function AdminAuditLogs() {
       UPDATE: 'Actualización',
       DELETE: 'Eliminación',
       SYNC: 'Sincronización',
+      ORDER_DISCOUNT_APPLIED: 'Descuento aplicado (orden)',
+      ORDER_DISCOUNT_REMOVED: 'Descuento removido (orden)',
+      ORDER_ITEM_DISCOUNT_APPLIED: 'Descuento aplicado (ítem)',
+      ORDER_ITEM_DISCOUNT_REMOVED: 'Descuento removido (ítem)',
+      ORDER_COLLECTION_REGISTERED: 'Cobro registrado',
+      ORDER_PAYMENT_DELETED: 'Cobro eliminado',
     }
     return labels[action] || `Acción técnica: ${action}`
   }
@@ -179,6 +205,12 @@ export function AdminAuditLogs() {
     if (log.action === 'INSERT') return 'Se dio de alta un nuevo registro'
     if (log.action === 'DELETE') return 'Se eliminó el registro'
     if (log.action === 'SYNC') return 'Se ejecutó una sincronización'
+    if (log.action === 'ORDER_DISCOUNT_APPLIED') return 'Se aplicó un descuento a la orden'
+    if (log.action === 'ORDER_DISCOUNT_REMOVED') return 'Se removió el descuento de la orden'
+    if (log.action === 'ORDER_ITEM_DISCOUNT_APPLIED') return 'Se aplicó un descuento a un ítem'
+    if (log.action === 'ORDER_ITEM_DISCOUNT_REMOVED') return 'Se removió el descuento de un ítem'
+    if (log.action === 'ORDER_COLLECTION_REGISTERED') return 'Se registró un cobro de orden'
+    if (log.action === 'ORDER_PAYMENT_DELETED') return 'Se eliminó un cobro de orden'
 
     return 'No hay detalle adicional disponible'
   }
@@ -269,7 +301,7 @@ export function AdminAuditLogs() {
                 <option value="">Todas</option>
                 {ACTIONS.map((action) => (
                   <option key={action} value={action}>
-                    {action}
+                    {getActionLabel(action)}
                   </option>
                 ))}
               </select>

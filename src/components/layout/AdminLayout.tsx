@@ -367,7 +367,9 @@ export function AdminLayout() {
                       )
                       const Icon = item.icon
                       const active = !isLockedByPlan && isActive(item.path)
-                      const targetPath = isLockedByPlan ? '/planes' : item.path
+                      const targetPath = isLockedByPlan
+                        ? `/planes?from=${encodeURIComponent(item.path)}`
+                        : item.path
                       const itemTitle = sidebarCollapsed
                         ? `${item.label}${isLockedByPlan ? ' (Disponible en Plan Profesional)' : ''}`
                         : undefined

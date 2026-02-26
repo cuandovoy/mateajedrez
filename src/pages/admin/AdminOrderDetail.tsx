@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
@@ -10,7 +11,7 @@ import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Order, OrderItem } from '@/types'
 import type { OrderPayment } from '@/types/database.types'
-import { ArrowLeft, Calendar, Edit2, MapPin, Minus, Package, Phone, Plus, Save, Trash2, User, X } from 'lucide-react'
+import { ArrowLeft, Calendar, DollarSign, Edit2, FileText, MapPin, Minus, Package, Phone, Plus, Save, Trash2, User, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -34,6 +35,11 @@ const getStatusColor = (status: string | null): string => {
     cancelled: 'bg-red-100 text-red-800',
   }
   return (status && colorMap[status]) || 'bg-gray-100 text-gray-800'
+}
+
+const formatOrderDisplayNumber = (orderId: string, orderNumber?: number | null): string => {
+  if (orderNumber && orderNumber > 0) return `#${String(orderNumber).padStart(6, '0')}`
+  return `#${orderId.slice(0, 8).toUpperCase()}`
 }
 
 type ShippingAddress = {
@@ -67,6 +73,17 @@ interface OrderWithItems extends Order {
   customer?: { email: string | null; full_name: string } | null
 }
 
+type DiscountKind = 'percentage' | 'fixed_amount' | 'price_override'
+type SalesDiscountRule = {
+  id: string
+  name: string
+  scope: 'order' | 'item'
+  kind: DiscountKind
+  value: number
+  min_order_total: number | null
+  max_discount_amount: number | null
+}
+
 export function AdminOrderDetail() {
   const { id } = useParams<{ id: string }>()
   const settings = useOrgSettings()
@@ -78,6 +95,12 @@ export function AdminOrderDetail() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [collecting, setCollecting] = useState(false)
+  const [isCollectModalOpen, setIsCollectModalOpen] = useState(false)
+  const [collectAmount, setCollectAmount] = useState('')
+  const [collectMethod, setCollectMethod] = useState('')
+  const [collectNotes, setCollectNotes] = useState('')
+  const [paymentToDelete, setPaymentToDelete] = useState<OrderPayment | null>(null)
   const [returningItemId, setReturningItemId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [products, setProducts] = useState<
@@ -104,6 +127,8 @@ export function AdminOrderDetail() {
   const [editPaymentMethod, setEditPaymentMethod] = useState('')
   const [editPaymentAmount, setEditPaymentAmount] = useState('')
   const [editItems, setEditItems] = useState<OrderItemWithProduct[]>([])
+  const [orderDiscountRules, setOrderDiscountRules] = useState<SalesDiscountRule[]>([])
+  const [itemDiscountRules, setItemDiscountRules] = useState<SalesDiscountRule[]>([])
 
   const fetchOrder = useCallback(async () => {
     if (!id) return
@@ -234,6 +259,161 @@ export function AdminOrderDetail() {
         })
     }
   }, [organizationId, isEditing])
+
+  useEffect(() => {
+    if (!organizationId) return
+    const fetchDiscountRules = async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const [{ data: orderRules }, { data: itemRules }] = await Promise.all([
+          (supabase.rpc as any)('list_active_sales_discount_rules', {
+            p_organization_id: organizationId,
+            p_scope: 'order',
+          }),
+          (supabase.rpc as any)('list_active_sales_discount_rules', {
+            p_organization_id: organizationId,
+            p_scope: 'item',
+          }),
+        ])
+        setOrderDiscountRules((Array.isArray(orderRules) ? orderRules : []) as SalesDiscountRule[])
+        setItemDiscountRules((Array.isArray(itemRules) ? itemRules : []) as SalesDiscountRule[])
+      } catch (error) {
+        console.error('Error fetching discount rules:', error)
+        setOrderDiscountRules([])
+        setItemDiscountRules([])
+      }
+    }
+    fetchDiscountRules()
+  }, [organizationId])
+
+  const handleApplyOrderDiscount = async () => {
+    if (!order || !organizationId || !id) return
+
+    const selected = window.prompt(
+      `Reglas disponibles:\n${orderDiscountRules.map((r, idx) => `${idx + 1}. ${r.name} (${r.kind}=${r.value})`).join('\n')}\n\nEscribe el número de regla o "manual".`
+    )
+    if (!selected) return
+
+    let payload: Record<string, unknown> | null = null
+    if (selected.toLowerCase() === 'manual') {
+      const kind = window.prompt('Tipo de descuento: percentage | fixed_amount | price_override', 'percentage')
+      if (!kind || !['percentage', 'fixed_amount', 'price_override'].includes(kind)) {
+        show('Tipo inválido.', 'error')
+        return
+      }
+      const value = Number(window.prompt('Valor del descuento', '0'))
+      if (!Number.isFinite(value) || value <= 0) {
+        show('Valor inválido.', 'error')
+        return
+      }
+      const reason = window.prompt('Motivo (opcional):') || null
+      payload = { kind, value, reason }
+    } else {
+      const index = Number(selected) - 1
+      const rule = orderDiscountRules[index]
+      if (!rule) {
+        show('Regla inválida.', 'error')
+        return
+      }
+      payload = { rule_id: rule.id }
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('apply_order_discount', {
+        p_order_id: id,
+        p_discount: payload,
+      })
+      if (error) throw error
+      show('Descuento de orden aplicado.', 'success')
+      await fetchOrder()
+    } catch (error: unknown) {
+      console.error('Error applying order discount:', error)
+      show(error instanceof Error ? error.message : 'No se pudo aplicar el descuento.', 'error')
+    }
+  }
+
+  const handleRemoveOrderDiscount = async () => {
+    if (!id) return
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('remove_order_discount', {
+        p_order_id: id,
+        p_reason: 'Removido desde detalle de orden',
+      })
+      if (error) throw error
+      show('Descuento de orden removido.', 'success')
+      await fetchOrder()
+    } catch (error: unknown) {
+      console.error('Error removing order discount:', error)
+      show(error instanceof Error ? error.message : 'No se pudo remover el descuento.', 'error')
+    }
+  }
+
+  const handleApplyItemDiscount = async (item: OrderItemWithProduct) => {
+    if (!id) return
+    const selected = window.prompt(
+      `Reglas item disponibles:\n${itemDiscountRules.map((r, idx) => `${idx + 1}. ${r.name} (${r.kind}=${r.value})`).join('\n')}\n\nEscribe el número de regla o "manual".`
+    )
+    if (!selected) return
+
+    let payload: Record<string, unknown> | null = null
+    if (selected.toLowerCase() === 'manual') {
+      const kind = window.prompt('Tipo: percentage | fixed_amount | price_override', 'percentage')
+      if (!kind || !['percentage', 'fixed_amount', 'price_override'].includes(kind)) {
+        show('Tipo inválido.', 'error')
+        return
+      }
+      const value = Number(window.prompt('Valor del descuento', '0'))
+      if (!Number.isFinite(value) || value <= 0) {
+        show('Valor inválido.', 'error')
+        return
+      }
+      const reason = window.prompt('Motivo (opcional):') || null
+      payload = { kind, value, reason }
+    } else {
+      const index = Number(selected) - 1
+      const rule = itemDiscountRules[index]
+      if (!rule) {
+        show('Regla inválida.', 'error')
+        return
+      }
+      payload = { rule_id: rule.id }
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('apply_order_item_discount', {
+        p_order_id: id,
+        p_order_item_id: item.id,
+        p_discount: payload,
+      })
+      if (error) throw error
+      show('Descuento de ítem aplicado.', 'success')
+      await fetchOrder()
+    } catch (error: unknown) {
+      console.error('Error applying item discount:', error)
+      show(error instanceof Error ? error.message : 'No se pudo aplicar el descuento de ítem.', 'error')
+    }
+  }
+
+  const handleRemoveItemDiscount = async (item: OrderItemWithProduct) => {
+    if (!id) return
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('remove_order_item_discount', {
+        p_order_id: id,
+        p_order_item_id: item.id,
+        p_reason: 'Removido desde detalle de orden',
+      })
+      if (error) throw error
+      show('Descuento de ítem removido.', 'success')
+      await fetchOrder()
+    } catch (error: unknown) {
+      console.error('Error removing item discount:', error)
+      show(error instanceof Error ? error.message : 'No se pudo remover el descuento de ítem.', 'error')
+    }
+  }
 
   const handleStatusUpdate = async (newStatus: Order['status']) => {
     if (!order || !id) return
@@ -515,6 +695,216 @@ export function AdminOrderDetail() {
     )
   }
 
+  const handleOpenCollectModal = () => {
+    const defaultMethod = paymentMethods[0]?.key ?? ''
+    setCollectAmount('')
+    setCollectMethod(defaultMethod)
+    setCollectNotes('')
+    setIsCollectModalOpen(true)
+  }
+
+  const handleRegisterCollection = async () => {
+    if (!id || !order) return
+
+    const amount = Number(collectAmount)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      show('Ingresa un monto válido', 'error')
+      return
+    }
+
+    const totalPaid = orderPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+    const pendingAmount = Math.max(Number(order.total || 0) - totalPaid, 0)
+    if (amount > pendingAmount) {
+      show(`El cobro no puede superar el saldo pendiente (${formatPrice(pendingAmount, settings)})`, 'error')
+      return
+    }
+
+    if (!collectMethod) {
+      show('Selecciona un método de cobro', 'error')
+      return
+    }
+
+    setCollecting(true)
+    try {
+      const selectedMethod = paymentMethods.find((m) => m.key === collectMethod)
+      let cashSessionId: string | null = null
+
+      if (selectedMethod?.requires_cash_session) {
+        if (!order.branch_id) {
+          show('La orden no tiene sucursal asignada, no se puede asociar una sesión de caja.', 'error')
+          return
+        }
+        const { data: openSession } = await supabase
+          .from('cash_sessions')
+          .select('id')
+          .eq('branch_id', order.branch_id)
+          .is('closed_at', null)
+          .maybeSingle()
+
+        cashSessionId = (openSession as { id: string } | null)?.id ?? null
+        if (!cashSessionId) {
+          show('Para registrar este cobro debes tener una sesión de caja abierta en la sucursal de la orden.', 'error')
+          return
+        }
+      }
+
+      const { data: insertedPayment, error: paymentError } = await supabase
+        .from('order_payments')
+        .insert({
+          order_id: id,
+          payment_method: collectMethod,
+          amount,
+          cash_session_id: cashSessionId,
+          notes: collectNotes || 'Cobro registrado desde detalle de orden',
+        } as never)
+        .select('id')
+        .single()
+
+      if (paymentError) throw paymentError
+
+      if (cashSessionId) {
+        const cashMethodKeys = paymentMethods.filter((m) => m.requires_cash_session).map((m) => m.key)
+        const { data: sessionData } = await supabase
+          .from('cash_sessions')
+          .select('opening_amount')
+          .eq('id', cashSessionId)
+          .single()
+
+        const { data: paymentsData } =
+          cashMethodKeys.length > 0
+            ? await supabase
+                .from('order_payments')
+                .select('amount')
+                .eq('cash_session_id', cashSessionId)
+                .in('payment_method', cashMethodKeys)
+            : await supabase
+                .from('order_payments')
+                .select('amount')
+                .eq('cash_session_id', cashSessionId)
+                .eq('payment_method', collectMethod)
+
+        if (sessionData && (sessionData as { opening_amount: number }).opening_amount !== undefined) {
+          const cashPaymentsTotal = (paymentsData || []).reduce((sum: number, p: { amount: number }) => sum + p.amount, 0)
+          const newExpectedAmount = ((sessionData as { opening_amount: number }).opening_amount || 0) + cashPaymentsTotal
+          await supabase
+            .from('cash_sessions')
+            .update({ expected_amount: newExpectedAmount } as never)
+            .eq('id', cashSessionId)
+        }
+      }
+
+      if (!order.payment_method) {
+        await supabase
+          .from('orders')
+          .update({ payment_method: collectMethod } as never)
+          .eq('id', id)
+      }
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'order_payments',
+        recordId: insertedPayment?.id || id,
+        action: 'INSERT',
+        actionCode: 'ORDER_COLLECTION_REGISTERED',
+        module: 'ventas',
+        notes: 'Registro de cobro parcial/total desde detalle de orden.',
+        newData: {
+          order_id: id,
+          amount,
+          payment_method: collectMethod,
+          cash_session_id: cashSessionId,
+          notes: collectNotes || null,
+        },
+      })
+
+      setIsCollectModalOpen(false)
+      show('Cobro registrado correctamente', 'success')
+      await fetchOrder()
+    } catch (error) {
+      console.error('Error registering collection:', error)
+      show('No se pudo registrar el cobro', 'error')
+    } finally {
+      setCollecting(false)
+    }
+  }
+
+  const handleDeletePayment = async () => {
+    if (!paymentToDelete || !id) return
+
+    setCollecting(true)
+    try {
+      const paymentId = paymentToDelete.id
+      const cashSessionId = paymentToDelete.cash_session_id
+      const paymentMethod = paymentToDelete.payment_method
+
+      const { error } = await supabase
+        .from('order_payments')
+        .delete()
+        .eq('id', paymentId)
+      if (error) throw error
+
+      if (cashSessionId) {
+        const cashMethodKeys = paymentMethods.filter((m) => m.requires_cash_session).map((m) => m.key)
+        const { data: sessionData } = await supabase
+          .from('cash_sessions')
+          .select('opening_amount')
+          .eq('id', cashSessionId)
+          .single()
+
+        const { data: paymentsData } =
+          cashMethodKeys.length > 0
+            ? await supabase
+                .from('order_payments')
+                .select('amount')
+                .eq('cash_session_id', cashSessionId)
+                .in('payment_method', cashMethodKeys)
+            : await supabase
+                .from('order_payments')
+                .select('amount')
+                .eq('cash_session_id', cashSessionId)
+                .eq('payment_method', paymentMethod)
+
+        if (sessionData && (sessionData as { opening_amount: number }).opening_amount !== undefined) {
+          const cashPaymentsTotal = (paymentsData || []).reduce((sum: number, p: { amount: number }) => sum + p.amount, 0)
+          const newExpectedAmount = ((sessionData as { opening_amount: number }).opening_amount || 0) + cashPaymentsTotal
+          await supabase
+            .from('cash_sessions')
+            .update({ expected_amount: newExpectedAmount } as never)
+            .eq('id', cashSessionId)
+        }
+      }
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'order_payments',
+        recordId: paymentId,
+        action: 'DELETE',
+        actionCode: 'ORDER_PAYMENT_DELETED',
+        module: 'ventas',
+        notes: 'Eliminación de cobro desde detalle de orden.',
+        oldData: paymentToDelete,
+      })
+
+      setPaymentToDelete(null)
+      show('Cobro eliminado correctamente', 'success')
+      await fetchOrder()
+    } catch (error) {
+      console.error('Error deleting payment:', error)
+      const rawMessage =
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null && 'message' in error
+            ? String((error as { message?: unknown }).message ?? '')
+            : ''
+      const message = rawMessage.toLowerCase().includes('row-level security')
+        ? 'No tienes permisos para eliminar este cobro en la organización actual.'
+        : rawMessage || 'No se pudo eliminar el cobro'
+      show(message, 'error')
+    } finally {
+      setCollecting(false)
+    }
+  }
+
   const getReturnedQuantity = (item: OrderItemWithProduct): number => {
     const value = Number(item.returned_quantity ?? 0)
     return Number.isFinite(value) ? value : 0
@@ -628,6 +1018,102 @@ export function AdminOrderDetail() {
   const displayTotal = isEditing
     ? editItems.reduce((sum, it) => sum + it.price * it.quantity, 0)
     : order.total
+  const totalPaid = orderPayments.reduce((sum, payment) => sum + Number(payment.amount || 0), 0)
+  const pendingAmount = Math.max(Number(order.total || 0) - totalPaid, 0)
+  const collectionStatus =
+    order.status === 'cancelled'
+      ? { label: 'Sin cobro (orden anulada)', color: 'bg-gray-100 text-gray-700' }
+      : totalPaid <= 0
+      ? { label: 'Pendiente de cobro', color: 'bg-amber-100 text-amber-800' }
+      : pendingAmount > 0
+      ? { label: 'Cobro parcial', color: 'bg-blue-100 text-blue-800' }
+      : { label: 'Cobrada', color: 'bg-green-100 text-green-800' }
+  const hasDiscount = Number(order.discount_total ?? 0) > 0
+  const discountStatusMessage =
+    order.status === 'cancelled'
+      ? 'Orden cancelada: no se permiten cambios de descuento.'
+      : hasDiscount
+      ? pendingAmount < 0.01
+        ? 'Descuento aplicado. La orden está totalmente cobrada.'
+        : `Descuento aplicado. Saldo pendiente: ${formatPrice(pendingAmount, settings)}.`
+      : 'No hay descuentos aplicados en esta orden.'
+
+  const handleExportInternalReceipt = () => {
+    const companyName = useOrganizationStore.getState().currentOrganization?.name || 'Mi negocio'
+    const openedAt = formatDateTime(order.created_at, settings)
+    const customerName = displayShipping.fullName || 'Cliente en tienda'
+    const safeRows = order.order_items.map((item) => {
+      const lineTotal = item.quantity * item.price
+      const variantName = item.variant?.name ? ` (${item.variant.name})` : ''
+      return `
+        <tr>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;">${capitalizeFirst(item.product.name)}${variantName}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:center;">${item.quantity}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatPrice(item.price, settings)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e5e7eb;text-align:right;">${formatPrice(lineTotal, settings)}</td>
+        </tr>
+      `
+    }).join('')
+
+    const printWindow = window.open('', '_blank', 'width=900,height=700')
+    if (!printWindow) {
+      show('No se pudo abrir la ventana de impresión. Habilitá popups para este sitio.', 'error')
+      return
+    }
+
+    const orderDisplayNumber = formatOrderDisplayNumber(order.id, order.order_number)
+    const html = `
+      <!doctype html>
+      <html>
+      <head>
+        <meta charset="utf-8" />
+        <title>Comprobante interno - ${orderDisplayNumber}</title>
+      </head>
+      <body style="font-family: Arial, sans-serif; margin: 24px; color:#111827;">
+        <h2 style="margin:0 0 8px 0;">${companyName}</h2>
+        <p style="margin:0 0 14px 0; font-size:12px; color:#4b5563;">Comprobante interno (no fiscal)</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb; margin:10px 0 16px;" />
+
+        <p style="margin:0 0 6px 0;"><strong>Orden:</strong> ${orderDisplayNumber}</p>
+        <p style="margin:0 0 6px 0;"><strong>Referencia interna:</strong> ${order.id}</p>
+        <p style="margin:0 0 6px 0;"><strong>Fecha:</strong> ${openedAt}</p>
+        <p style="margin:0 0 6px 0;"><strong>Cliente:</strong> ${customerName}</p>
+        <p style="margin:0 0 6px 0;"><strong>Estado:</strong> ${getStatusLabel(order.status)}</p>
+        <p style="margin:0 0 6px 0;"><strong>Estado de cobro:</strong> ${collectionStatus.label}</p>
+        <p style="margin:0 0 16px 0;"><strong>Método:</strong> ${paymentMethods.find((m) => m.key === order.payment_method)?.name ?? order.payment_method ?? 'Sin método'}</p>
+
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr style="background:#f9fafb;">
+              <th style="padding:8px; text-align:left; border-bottom:1px solid #d1d5db;">Producto</th>
+              <th style="padding:8px; text-align:center; border-bottom:1px solid #d1d5db;">Cant.</th>
+              <th style="padding:8px; text-align:right; border-bottom:1px solid #d1d5db;">Precio</th>
+              <th style="padding:8px; text-align:right; border-bottom:1px solid #d1d5db;">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${safeRows}
+          </tbody>
+        </table>
+
+        <div style="margin-top:16px; text-align:right;">
+          <p style="margin:0 0 6px 0;"><strong>Subtotal:</strong> ${formatPrice(Number(order.subtotal_before_discount ?? order.total), settings)}</p>
+          <p style="margin:0 0 6px 0;"><strong>Descuento:</strong> -${formatPrice(Number(order.discount_total ?? 0), settings)}</p>
+          <p style="margin:0 0 6px 0;"><strong>Impuestos:</strong> ${formatPrice(Number(order.tax_total ?? 0), settings)}</p>
+          <p style="margin:0 0 6px 0;"><strong>Total:</strong> ${formatPrice(order.total, settings)}</p>
+          <p style="margin:0 0 6px 0;"><strong>Cobrado:</strong> ${formatPrice(totalPaid, settings)}</p>
+          <p style="margin:0;"><strong>Saldo pendiente:</strong> ${formatPrice(pendingAmount, settings)}</p>
+        </div>
+      </body>
+      </html>
+    `
+
+    printWindow.document.open()
+    printWindow.document.write(html)
+    printWindow.document.close()
+    printWindow.focus()
+    printWindow.print()
+  }
 
   return (
     <div>
@@ -640,20 +1126,29 @@ export function AdminOrderDetail() {
             </Button>
           </Link>
           <h1 className="text-3xl font-bold text-gray-900">Detalle de Orden</h1>
-          <p className="text-gray-600 mt-2">ID: {order.id}</p>
+          <p className="text-gray-600 mt-2">
+            Orden {formatOrderDisplayNumber(order.id, order.order_number)}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">Ref. interna: {order.id}</p>
         </div>
         {!isEditing ? (
-          <Button onClick={() => setIsEditing(true)} variant="outline">
-            <Edit2 className="h-4 w-4 mr-2" />
-            Editar
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={handleExportInternalReceipt}>
+              <FileText className="h-4 w-4 mr-2" />
+              Comprobante interno
+            </Button>
+            <Button onClick={() => setIsEditing(true)} size="sm">
+              <Edit2 className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
+          </div>
         ) : (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsEditing(false)} disabled={saving}>
+            <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} disabled={saving}>
               <X className="h-4 w-4 mr-2" />
               Cancelar
             </Button>
-            <Button onClick={handleSaveEdit} disabled={saving}>
+            <Button onClick={handleSaveEdit} size="sm" disabled={saving}>
               <Save className="h-4 w-4 mr-2" />
               {saving ? 'Guardando...' : 'Guardar'}
             </Button>
@@ -690,7 +1185,26 @@ export function AdminOrderDetail() {
                     {formatPrice(displayTotal, settings)}
                   </p>
                 </div>
+                <div>
+                  <p className="text-sm text-gray-600">Estado de cobro</p>
+                  <div className="mt-1 space-y-1">
+                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${collectionStatus.color}`}>
+                      {collectionStatus.label}
+                    </span>
+                    <p className="text-xs text-gray-600">Cobrado: {formatPrice(totalPaid, settings)}</p>
+                    <p className="text-xs text-gray-600">Pendiente: {formatPrice(pendingAmount, settings)}</p>
+                  </div>
+                </div>
               </div>
+
+              {!isEditing && order.status !== 'cancelled' && pendingAmount > 0 && (
+                <div className="pt-2">
+                  <Button onClick={handleOpenCollectModal} size="sm" variant="secondary">
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    Registrar cobro
+                  </Button>
+                </div>
+              )}
 
               {isEditing ? (
                 <div className="space-y-3">
@@ -746,6 +1260,34 @@ export function AdminOrderDetail() {
                   ))}
                 </div>
               </div>
+
+              {!isEditing && orderPayments.length > 0 && (
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">Cobros registrados</p>
+                  <div className="space-y-1">
+                    {orderPayments.map((payment) => (
+                      <div key={payment.id} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
+                        <span className="text-gray-700">
+                          {paymentMethods.find((m) => m.key === (payment.payment_method ?? ''))?.name ?? payment.payment_method ?? 'Sin método'}
+                          {' · '}
+                          {formatDateTime(payment.created_at, settings)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{formatPrice(payment.amount, settings)}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => setPaymentToDelete(payment)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -851,21 +1393,46 @@ export function AdminOrderDetail() {
                             <p className="text-sm text-gray-600">
                               Cantidad: {item.quantity} × {formatPrice(item.price, settings)}
                             </p>
+                            {Number(item.discount_amount ?? 0) > 0 && (
+                              <p className="text-xs text-red-700">
+                                Descuento aplicado: {formatPrice(Number(item.discount_amount), settings)}
+                              </p>
+                            )}
                             {getReturnedQuantity(item) > 0 && (
                               <p className="text-xs text-amber-700">
                                 Devuelto: {getReturnedQuantity(item)} / {item.quantity}
                               </p>
                             )}
                             {order.status !== 'cancelled' && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handlePartialReturn(item)}
-                                disabled={Boolean(returningItemId) || getReturnedQuantity(item) >= item.quantity}
-                                className="mt-2"
-                              >
-                                {returningItemId === item.id ? 'Procesando...' : 'Registrar devolución parcial'}
-                              </Button>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => handlePartialReturn(item)}
+                                  disabled={Boolean(returningItemId) || getReturnedQuantity(item) >= item.quantity}
+                                >
+                                  <Package className="h-4 w-4 mr-2" />
+                                  {returningItemId === item.id ? 'Procesando...' : 'Registrar devolución parcial'}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleApplyItemDiscount(item)}
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Aplicar descuento item
+                                </Button>
+                                {Number(item.discount_amount ?? 0) > 0 && (
+                                  <Button
+                                    variant="danger"
+                                    size="sm"
+                                    onClick={() => handleRemoveItemDiscount(item)}
+                                  >
+                                    <X className="h-4 w-4 mr-2" />
+                                    Quitar descuento item
+                                  </Button>
+                                )}
+                              </div>
                             )}
                           </>
                         )}
@@ -878,10 +1445,64 @@ export function AdminOrderDetail() {
                 })}
               </div>
               <div className="border-t mt-4 pt-4">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
-                  <span>{formatPrice(displayTotal, settings)}</span>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Subtotal</span>
+                    <span>{formatPrice(Number(order.subtotal_before_discount ?? displayTotal), settings)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-red-700">
+                    <span>Descuento</span>
+                    <span>-{formatPrice(Number(order.discount_total ?? 0), settings)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-gray-700">
+                    <span>Impuestos</span>
+                    <span>{formatPrice(Number(order.tax_total ?? 0), settings)}</span>
+                  </div>
+                  <div className="flex justify-between text-lg font-bold border-t pt-2 mt-2">
+                    <span>Total</span>
+                    <span>{formatPrice(displayTotal, settings)}</span>
+                  </div>
                 </div>
+                {!isEditing && order.status !== 'cancelled' && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={handleApplyOrderDiscount}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Aplicar descuento orden
+                    </Button>
+                    {hasDiscount && (
+                      <Button variant="danger" size="sm" onClick={handleRemoveOrderDiscount}>
+                        <X className="h-4 w-4 mr-2" />
+                        Quitar descuento orden
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {order.discount_metadata && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Descuento activo:{' '}
+                    {String((order.discount_metadata as Record<string, unknown>)?.source ?? 'manual')} ·{' '}
+                    {String((order.discount_metadata as Record<string, unknown>)?.kind ?? '')}
+                  </p>
+                )}
+                {!isEditing && (
+                  <>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Total cobrado: {formatPrice(totalPaid, settings)} · Saldo pendiente:{' '}
+                      {formatPrice(pendingAmount, settings)}
+                    </p>
+                    <p
+                      className={`mt-1 text-xs ${
+                        order.status === 'cancelled'
+                          ? 'text-gray-500'
+                          : pendingAmount < 0.01
+                          ? 'text-green-700'
+                          : 'text-amber-700'
+                      }`}
+                    >
+                      {discountStatusMessage}
+                    </p>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -1017,6 +1638,88 @@ export function AdminOrderDetail() {
           </Card>
         </div>
       </div>
+
+      {isCollectModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl">Registrar cobro</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setIsCollectModalOpen(false)} disabled={collecting}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+              <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+                <p>Saldo pendiente: <span className="font-semibold">{formatPrice(pendingAmount, settings)}</span></p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Monto a cobrar *</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={collectAmount}
+                  onChange={(e) => setCollectAmount(e.target.value)}
+                  placeholder="0.00"
+                  disabled={collecting}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Método de cobro *</label>
+                <select
+                  value={collectMethod}
+                  onChange={(e) => setCollectMethod(e.target.value)}
+                  className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 bg-white"
+                  disabled={collecting}
+                >
+                  <option value="">Seleccionar método</option>
+                  {paymentMethods.map((m) => (
+                    <option key={m.id} value={m.key}>
+                      {m.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>
+                <Input
+                  value={collectNotes}
+                  onChange={(e) => setCollectNotes(e.target.value)}
+                  placeholder="Ej: Cobro parcial cuota 1"
+                  disabled={collecting}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setIsCollectModalOpen(false)} disabled={collecting}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={handleRegisterCollection} disabled={collecting}>
+                  {collecting ? 'Registrando...' : 'Registrar cobro'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={Boolean(paymentToDelete)}
+        title="Eliminar cobro"
+        message="Esta acción eliminará el cobro de la orden y ajustará la caja asociada si corresponde. ¿Deseas continuar?"
+        confirmLabel={collecting ? 'Eliminando...' : 'Eliminar cobro'}
+        cancelLabel="Cancelar"
+        variant="danger"
+        onConfirm={handleDeletePayment}
+        onCancel={() => {
+          if (!collecting) setPaymentToDelete(null)
+        }}
+      />
     </div>
   )
 }

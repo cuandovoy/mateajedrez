@@ -2,6 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Check } from 'lucide-react'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { useOrganizationStore } from '@/store/organizationStore'
+import { useLocation } from 'react-router-dom'
+import { useMemo } from 'react'
 
 const PLANS = [
   {
@@ -46,11 +49,17 @@ const PLANS = [
 
 export function AdminPlans() {
   const { tier } = usePlanLimits()
+  const currentOrganization = useOrganizationStore((s) => s.currentOrganization)
+  const location = useLocation()
+  const fromPath = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return params.get('from') || location.pathname
+  }, [location.pathname, location.search])
   const whatsappNumber = '59898257909'
 
   const handleChooseProfessional = () => {
     const message = encodeURIComponent(
-      'Hola, quiero activar el Plan Profesional para mi organización.'
+      `Hola, quiero activar el Plan Profesional.\nOrganización: ${currentOrganization?.name || 'N/A'}\nPlan actual: ${tier}\nPantalla origen: ${fromPath}`
     )
     window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank')
   }
@@ -62,6 +71,11 @@ export function AdminPlans() {
         <p className="text-gray-600 mt-2">
           Elegí el plan que mejor se adapte a tu negocio
         </p>
+        {fromPath && fromPath !== '/planes' && (
+          <p className="text-xs text-gray-500 mt-1">
+            Llegaste aquí desde: <span className="font-mono">{fromPath}</span>
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

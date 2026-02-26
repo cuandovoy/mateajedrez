@@ -14,7 +14,7 @@ const FEATURE_MESSAGES: Record<string, { title: string; description: string }> =
   },
   cash_register: {
     title: 'Caja y cierres',
-    description: 'El manejo de cajas y cierres está disponible en el plan Profesional.',
+    description: 'El manejo de cajas y cierres está disponible desde el plan Starter.',
   },
   advanced_reports: {
     title: 'Reportes avanzados',

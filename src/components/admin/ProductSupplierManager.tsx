@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { useCurrentOrganization } from '@/hooks/useCurrentOrganization'
 import { supabase } from '@/lib/supabase'
 import type { ProductSupplier, ProductSupplierInsert, Supplier } from '@/types'
 import { Package, Plus, Star, Trash2, X } from 'lucide-react'
@@ -28,6 +29,7 @@ export function ProductSupplierManager({ productId, onClose }: ProductSupplierMa
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [productSuppliers, setProductSuppliers] = useState<SupplierItem[]>([])
   const [loading, setLoading] = useState(true)
+  const { organization } = useCurrentOrganization();
   const [saving, setSaving] = useState(false)
   const [newSupplier, setNewSupplier] = useState({
     supplier_id: '',
@@ -49,12 +51,13 @@ export function ProductSupplierManager({ productId, onClose }: ProductSupplierMa
   const fetchData = async () => {
     try {
       setLoading(true)
-      
+      if (!organization) throw new Error('No se encontró la organización. Asegúrate de estar en el contexto correcto.')
       // Fetch all suppliers
       const { data: suppliersData, error: suppliersError } = await supabase
         .from('suppliers')
         .select('*')
         .eq('is_active', true)
+        .eq('organization_id', organization?.id) // Assuming productId is in format "orgId-productId"
         .order('name')
 
       if (suppliersError) throw suppliersError
@@ -122,12 +125,12 @@ export function ProductSupplierManager({ productId, onClose }: ProductSupplierMa
 
   const handleRemoveSupplier = (index: number) => {
     const newSuppliers = productSuppliers.filter((_, i) => i !== index)
-    
+
     // If we removed the primary, make the first one primary
     if (productSuppliers[index].is_primary && newSuppliers.length > 0) {
       newSuppliers[0].is_primary = true
     }
-    
+
     setProductSuppliers(newSuppliers)
   }
 
@@ -292,9 +295,8 @@ export function ProductSupplierManager({ productId, onClose }: ProductSupplierMa
                         title="Marcar como principal"
                       >
                         <Star
-                          className={`h-4 w-4 ${
-                            ps.is_primary ? 'fill-yellow-400 text-yellow-400' : ''
-                          }`}
+                          className={`h-4 w-4 ${ps.is_primary ? 'fill-yellow-400 text-yellow-400' : ''
+                            }`}
                         />
                       </button>
                       <button

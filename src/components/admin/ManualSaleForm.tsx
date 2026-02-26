@@ -39,11 +39,24 @@ interface SaleLine {
   is_editing_price?: boolean
 }
 
+type DiscountKind = 'percentage' | 'fixed_amount' | 'price_override'
+
+type SalesDiscountRule = {
+  id: string
+  name: string
+  scope: 'order' | 'item'
+  kind: DiscountKind
+  value: number
+  min_order_total: number | null
+  max_discount_amount: number | null
+}
+
 const manualSaleSchema = z.object({
   customer_name: z.string().optional(),
   customer_email: z.string().optional(),
   customer_phone: z.string().optional(),
-  payment_method: z.string().min(1, 'Selecciona un método de pago'),
+  sale_condition: z.enum(['contado', 'credito']),
+  payment_method: z.string().optional(),
   notes: z.string().optional(),
 })
 
@@ -68,12 +81,22 @@ export function ManualSaleForm({
   const [searchResults, setSearchResults] = useState<Product[]>([])
   const [showSearchResults, setShowSearchResults] = useState(false)
   const [saleLines, setSaleLines] = useState<SaleLine[]>([])
+  const [discountRules, setDiscountRules] = useState<SalesDiscountRule[]>([])
+  const [discountSource, setDiscountSource] = useState<'none' | 'manual' | 'rule'>('none')
+  const [manualDiscountKind, setManualDiscountKind] = useState<DiscountKind>('percentage')
+  const [manualDiscountValue, setManualDiscountValue] = useState('')
+  const [manualDiscountReason, setManualDiscountReason] = useState('')
+  const [selectedDiscountRuleId, setSelectedDiscountRuleId] = useState('')
   const [loading, setLoading] = useState(false)
   const [newLineDescription, setNewLineDescription] = useState('')
   const [newLinePrice, setNewLinePrice] = useState('')
   const [newLineQuantity, setNewLineQuantity] = useState('1')
   const searchInputRef = useRef<HTMLInputElement>(null)
   const searchResultsRef = useRef<HTMLDivElement>(null)
+  const organizations = useOrganizationStore((s) => s.organizations)
+  const currentOrganization = useOrganizationStore((s) => s.currentOrganization)
+  const currentMemberRole = organizations.find((o) => o.id === currentOrganization?.id)?.member?.role
+  const canApplyManualDiscount = currentMemberRole === 'admin' || currentMemberRole === 'manager'
 
   // Get current cash session for the selected branch
   const currentCashSession = openCashSessions?.find((s) => s.branch_id === branchId) || null
@@ -94,15 +117,19 @@ export function ManualSaleForm({
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
     reset,
     setValue,
   } = useForm<ManualSaleForm>({
     resolver: zodResolver(manualSaleSchema),
     defaultValues: {
+      sale_condition: 'contado',
       payment_method: defaultPaymentMethod,
     },
   })
+
+  const saleCondition = watch('sale_condition')
 
   // Update payment method default when cash session or payment methods change
   useEffect(() => {
@@ -119,6 +146,10 @@ export function ManualSaleForm({
 
   useEffect(() => {
     if (organizationId) fetchProducts()
+  }, [organizationId])
+
+  useEffect(() => {
+    if (organizationId) fetchOrderDiscountRules()
   }, [organizationId])
 
   // Close search results when clicking outside
@@ -154,6 +185,22 @@ export function ManualSaleForm({
       setProducts((data || []) as Product[])
     } catch (error) {
       console.error('Error fetching products:', error)
+    }
+  }
+
+  const fetchOrderDiscountRules = async () => {
+    if (!organizationId) return
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase.rpc as any)('list_active_sales_discount_rules', {
+        p_organization_id: organizationId,
+        p_scope: 'order',
+      })
+      if (error) throw error
+      setDiscountRules((Array.isArray(data) ? data : []) as SalesDiscountRule[])
+    } catch (error) {
+      console.error('Error fetching discount rules:', error)
+      setDiscountRules([])
     }
   }
 
@@ -362,17 +409,92 @@ export function ManualSaleForm({
       return
     }
 
+    const isCreditSale = data.sale_condition === 'credito'
+    if (!isCreditSale && !data.payment_method) {
+      show('Selecciona un método de pago para venta al contado', 'error')
+      return
+    }
+
     const selectedMethod = paymentMethods.find((m) => m.key === data.payment_method)
-    if (selectedMethod?.requires_cash_session && !currentCashSession) {
+    if (!isCreditSale && selectedMethod?.requires_cash_session && !currentCashSession) {
       show('No hay una sesión de caja abierta para esta sucursal', 'error')
       return
     }
 
+    const subtotalBeforeDiscount = saleLines.reduce((sum, line) => sum + line.price * line.quantity, 0)
+    const selectedRule = discountRules.find((rule) => rule.id === selectedDiscountRuleId)
+
+    const calculateDiscountAmount = (
+      kind: DiscountKind,
+      value: number,
+      baseAmount: number
+    ): number => {
+      if (!Number.isFinite(value) || value <= 0 || baseAmount <= 0) return 0
+      if (kind === 'percentage') return Math.max(0, Math.min(baseAmount, (baseAmount * value) / 100))
+      if (kind === 'fixed_amount') return Math.max(0, Math.min(baseAmount, value))
+      // price_override: value = final desired total
+      return Math.max(0, Math.min(baseAmount, baseAmount - value))
+    }
+
+    let discountTotal = 0
+    let discountMetadata: Record<string, unknown> | null = null
+
+    if (discountSource === 'manual') {
+      if (!canApplyManualDiscount) {
+        show('No tienes permisos para aplicar descuentos manuales.', 'error')
+        return
+      }
+      const value = Number(manualDiscountValue)
+      if (!Number.isFinite(value) || value <= 0) {
+        show('Ingresa un valor válido para el descuento manual.', 'error')
+        return
+      }
+      discountTotal = calculateDiscountAmount(manualDiscountKind, value, subtotalBeforeDiscount)
+      discountMetadata = {
+        source: 'manual',
+        kind: manualDiscountKind,
+        value,
+        reason: manualDiscountReason || null,
+      }
+    } else if (discountSource === 'rule') {
+      if (!selectedRule) {
+        show('Selecciona una regla de descuento válida.', 'error')
+        return
+      }
+      if (
+        selectedRule.min_order_total !== null &&
+        subtotalBeforeDiscount < Number(selectedRule.min_order_total)
+      ) {
+        show(
+          `La regla requiere un mínimo de ${formatPrice(Number(selectedRule.min_order_total), settings)}.`,
+          'error'
+        )
+        return
+      }
+
+      discountTotal = calculateDiscountAmount(selectedRule.kind, Number(selectedRule.value), subtotalBeforeDiscount)
+      if (
+        selectedRule.max_discount_amount !== null &&
+        discountTotal > Number(selectedRule.max_discount_amount)
+      ) {
+        discountTotal = Number(selectedRule.max_discount_amount)
+      }
+
+      discountMetadata = {
+        source: 'rule',
+        rule_id: selectedRule.id,
+        rule_name: selectedRule.name,
+        kind: selectedRule.kind,
+        value: selectedRule.value,
+        min_order_total: selectedRule.min_order_total,
+        max_discount_amount: selectedRule.max_discount_amount,
+      }
+    }
+
+    const total = Math.max(subtotalBeforeDiscount - discountTotal, 0)
     setLoading(true)
 
     try {
-      const total = saleLines.reduce((sum, line) => sum + line.price * line.quantity, 0)
-
       // Check if any product has insufficient stock - alert but allow
       const insufficientLines: { name: string; available: number; requested: number }[] = []
       for (const line of saleLines) {
@@ -414,7 +536,11 @@ export function ManualSaleForm({
         organization_id: organizationId,
         user_id: null,
         total,
-        status: 'pending',
+        subtotal_before_discount: subtotalBeforeDiscount,
+        discount_total: discountTotal,
+        tax_total: 0,
+        discount_metadata: (discountMetadata as any) ?? null,
+        status: 'delivered',
         shipping_address: {
           fullName: data.customer_name || 'Cliente en tienda',
           email: data.customer_email?.trim() || undefined,
@@ -425,7 +551,7 @@ export function ManualSaleForm({
           zipCode: '',
           country: '',
         },
-        payment_method: data.payment_method,
+        payment_method: data.payment_method ?? null,
         branch_id: branchId,
       }
 
@@ -446,7 +572,12 @@ export function ManualSaleForm({
         newData: {
           branch_id: branchId,
           total,
-          payment_method: data.payment_method,
+          subtotal_before_discount: subtotalBeforeDiscount,
+          discount_total: discountTotal,
+          discount_metadata: discountMetadata,
+          sale_condition: data.sale_condition,
+          payment_method: data.payment_method ?? null,
+          order_status: 'delivered',
           lines_count: saleLines.length,
           has_cash_session: Boolean(currentCashSession),
         },
@@ -478,76 +609,87 @@ export function ManualSaleForm({
         }
       }
 
-      // Create order_payment
-      const methodRequiresCash = paymentMethods.find((m) => m.key === data.payment_method)?.requires_cash_session
-      const cashSessionId = methodRequiresCash && currentCashSession ? currentCashSession.id : null
+      if (!isCreditSale) {
+        const methodRequiresCash = paymentMethods.find((m) => m.key === data.payment_method)?.requires_cash_session
+        const cashSessionId = methodRequiresCash && currentCashSession ? currentCashSession.id : null
 
-      const paymentData: OrderPaymentInsert = {
-        order_id: (order as { id: string }).id,
-        payment_method: data.payment_method,
-        amount: total,
-        cash_session_id: cashSessionId,
-        notes: data.notes || null,
-      }
-
-      const { error: paymentError } = await supabase.from('order_payments').insert(paymentData as any)
-
-      if (paymentError) {
-        console.error('Error creating order payment:', paymentError)
-      } else if (cashSessionId) {
-        // Update expected_amount for the cash session (sum all payments with requires_cash_session)
-        const cashMethodKeys = paymentMethods.filter((m) => m.requires_cash_session).map((m) => m.key)
-        const { data: sessionData } = await supabase
-          .from('cash_sessions')
-          .select('opening_amount')
-          .eq('id', cashSessionId)
-          .single()
-
-        const { data: paymentsData } =
-          cashMethodKeys.length > 0
-            ? await supabase
-                .from('order_payments')
-                .select('amount')
-                .eq('cash_session_id', cashSessionId)
-                .in('payment_method', cashMethodKeys)
-            : await supabase
-                .from('order_payments')
-                .select('amount')
-                .eq('cash_session_id', cashSessionId)
-                .eq('payment_method', data.payment_method)
-
-        if (sessionData && (sessionData as { opening_amount: number }).opening_amount !== undefined) {
-          const cashPaymentsTotal = (paymentsData || []).reduce((sum: number, p: { amount: number }) => sum + p.amount, 0)
-          const newExpectedAmount = ((sessionData as { opening_amount: number }).opening_amount || 0) + cashPaymentsTotal
-
-          await supabase
-            .from('cash_sessions')
-            .update({ expected_amount: newExpectedAmount } as never)
-            .eq('id', cashSessionId)
-        }
-      }
-
-      await trackAuditAction({
-        organizationId,
-        tableName: 'order_payments',
-        recordId: (order as { id: string }).id,
-        action: 'INSERT',
-        notes: 'Pago registrado para venta manual.',
-        newData: {
+        const paymentData: OrderPaymentInsert = {
           order_id: (order as { id: string }).id,
-          payment_method: data.payment_method,
+          payment_method: data.payment_method!,
           amount: total,
           cash_session_id: cashSessionId,
-        },
-      })
+          notes: data.notes || null,
+        }
 
-      show('Venta registrada exitosamente', 'success')
+        const { error: paymentError } = await supabase.from('order_payments').insert(paymentData as any)
+
+        if (paymentError) {
+          console.error('Error creating order payment:', paymentError)
+        } else if (cashSessionId) {
+          // Update expected_amount for the cash session (sum all payments with requires_cash_session)
+          const cashMethodKeys = paymentMethods.filter((m) => m.requires_cash_session).map((m) => m.key)
+          const { data: sessionData } = await supabase
+            .from('cash_sessions')
+            .select('opening_amount')
+            .eq('id', cashSessionId)
+            .single()
+
+          const { data: paymentsData } =
+            cashMethodKeys.length > 0
+              ? await supabase
+                  .from('order_payments')
+                  .select('amount')
+                  .eq('cash_session_id', cashSessionId)
+                  .in('payment_method', cashMethodKeys)
+              : await supabase
+                  .from('order_payments')
+                  .select('amount')
+                  .eq('cash_session_id', cashSessionId)
+                  .eq('payment_method', data.payment_method!)
+
+          if (sessionData && (sessionData as { opening_amount: number }).opening_amount !== undefined) {
+            const cashPaymentsTotal = (paymentsData || []).reduce((sum: number, p: { amount: number }) => sum + p.amount, 0)
+            const newExpectedAmount = ((sessionData as { opening_amount: number }).opening_amount || 0) + cashPaymentsTotal
+
+            await supabase
+              .from('cash_sessions')
+              .update({ expected_amount: newExpectedAmount } as never)
+              .eq('id', cashSessionId)
+          }
+        }
+
+        await trackAuditAction({
+          organizationId,
+          tableName: 'order_payments',
+          recordId: (order as { id: string }).id,
+          action: 'INSERT',
+          notes: 'Pago registrado para venta manual.',
+          newData: {
+            order_id: (order as { id: string }).id,
+            payment_method: data.payment_method!,
+            amount: total,
+            cash_session_id: cashSessionId,
+          },
+        })
+      }
+
+      show(
+        isCreditSale
+          ? 'Venta a crédito registrada como completada (cobro pendiente).'
+          : 'Venta al contado registrada exitosamente.',
+        'success'
+      )
       reset()
       setSaleLines([])
       setSearchTerm('')
       setNewLineDescription('')
       setNewLinePrice('')
       setNewLineQuantity('1')
+      setDiscountSource('none')
+      setManualDiscountKind('percentage')
+      setManualDiscountValue('')
+      setManualDiscountReason('')
+      setSelectedDiscountRuleId('')
       onSaleCreated()
       onClose()
     } catch (error) {
@@ -558,7 +700,30 @@ export function ManualSaleForm({
     }
   }
 
-  const total = saleLines.reduce((sum, line) => sum + line.price * line.quantity, 0)
+  const subtotalBeforeDiscount = saleLines.reduce((sum, line) => sum + line.price * line.quantity, 0)
+  const selectedRule = discountRules.find((rule) => rule.id === selectedDiscountRuleId)
+  const effectiveDiscountTotal = (() => {
+    if (discountSource === 'none') return 0
+    if (discountSource === 'manual') {
+      const value = Number(manualDiscountValue)
+      if (!Number.isFinite(value) || value <= 0) return 0
+      if (manualDiscountKind === 'percentage') return Math.max(0, Math.min(subtotalBeforeDiscount, (subtotalBeforeDiscount * value) / 100))
+      if (manualDiscountKind === 'fixed_amount') return Math.max(0, Math.min(subtotalBeforeDiscount, value))
+      return Math.max(0, Math.min(subtotalBeforeDiscount, subtotalBeforeDiscount - value))
+    }
+    if (!selectedRule) return 0
+    if (selectedRule.min_order_total !== null && subtotalBeforeDiscount < Number(selectedRule.min_order_total)) return 0
+    let amount = 0
+    if (selectedRule.kind === 'percentage') amount = (subtotalBeforeDiscount * Number(selectedRule.value)) / 100
+    else if (selectedRule.kind === 'fixed_amount') amount = Number(selectedRule.value)
+    else amount = subtotalBeforeDiscount - Number(selectedRule.value)
+    amount = Math.max(0, Math.min(subtotalBeforeDiscount, amount))
+    if (selectedRule.max_discount_amount !== null && amount > Number(selectedRule.max_discount_amount)) {
+      amount = Number(selectedRule.max_discount_amount)
+    }
+    return amount
+  })()
+  const total = Math.max(subtotalBeforeDiscount - effectiveDiscountTotal, 0)
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
@@ -574,8 +739,8 @@ export function ManualSaleForm({
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 overflow-hidden flex flex-col px-3 sm:px-6 py-4">
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col h-full min-h-0">
+        <CardContent className="flex-1 overflow-y-auto px-3 sm:px-6 py-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col min-h-0">
             {/* Branch Selection */}
             {branches && branches.length > 1 && onBranchChange && (
               <div className="mb-3">
@@ -715,7 +880,7 @@ export function ManualSaleForm({
             </div>
 
             {/* Sale Lines Table */}
-            <div className="flex-1 min-h-0 overflow-y-auto mb-3">
+            <div className="mb-3 min-h-[220px] max-h-[42vh] overflow-y-auto">
               {saleLines.length > 0 ? (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                   <div className="overflow-x-auto">
@@ -864,35 +1029,157 @@ export function ManualSaleForm({
 
             {/* Total and Payment Info */}
             <div className="flex-shrink-0 border-t pt-3 space-y-3">
-              <div className="flex items-center justify-between text-lg sm:text-xl font-bold text-gray-900">
-                <span>Total:</span>
-                <span className="text-xl sm:text-2xl text-admin-600">{formatPrice(total, settings)}</span>
+              <div className="rounded-lg border border-gray-200 p-3 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                      Descuento
+                    </label>
+                    <select
+                      value={discountSource}
+                      onChange={(event) => setDiscountSource(event.target.value as 'none' | 'manual' | 'rule')}
+                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                    >
+                      <option value="none">Sin descuento</option>
+                      <option value="manual" disabled={!canApplyManualDiscount}>
+                        Descuento manual {!canApplyManualDiscount ? '(solo admin/manager)' : ''}
+                      </option>
+                      <option value="rule">Regla de descuento</option>
+                    </select>
+                  </div>
+
+                  {discountSource === 'manual' && (
+                    <>
+                      <div>
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                          Tipo manual
+                        </label>
+                        <select
+                          value={manualDiscountKind}
+                          onChange={(event) => setManualDiscountKind(event.target.value as DiscountKind)}
+                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                        >
+                          <option value="percentage">Porcentaje (%)</option>
+                          <option value="fixed_amount">Monto fijo</option>
+                          <option value="price_override">Total final deseado</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                          Valor
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={manualDiscountValue}
+                          onChange={(event) => setManualDiscountValue(event.target.value)}
+                          placeholder={manualDiscountKind === 'percentage' ? 'Ej: 10' : 'Ej: 500'}
+                          className="text-sm py-1.5"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {discountSource === 'rule' && (
+                    <div className="sm:col-span-2">
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                        Regla
+                      </label>
+                      <select
+                        value={selectedDiscountRuleId}
+                        onChange={(event) => setSelectedDiscountRuleId(event.target.value)}
+                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      >
+                        <option value="">Seleccionar regla</option>
+                        {discountRules.map((rule) => (
+                          <option key={rule.id} value={rule.id}>
+                            {rule.name} · {rule.kind === 'percentage' ? `${rule.value}%` : formatPrice(rule.value, settings)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                {discountSource === 'manual' && (
+                  <div>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                      Motivo del descuento (opcional)
+                    </label>
+                    <Input
+                      value={manualDiscountReason}
+                      onChange={(event) => setManualDiscountReason(event.target.value)}
+                      placeholder="Ej: cliente frecuente, promo en caja..."
+                      className="text-sm py-1.5"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg bg-gray-50 p-3 text-sm space-y-1">
+                <div className="flex items-center justify-between">
+                  <span>Subtotal</span>
+                  <span>{formatPrice(subtotalBeforeDiscount, settings)}</span>
+                </div>
+                <div className="flex items-center justify-between text-red-700">
+                  <span>Descuento</span>
+                  <span>-{formatPrice(effectiveDiscountTotal, settings)}</span>
+                </div>
+                <div className="flex items-center justify-between text-lg sm:text-xl font-bold text-gray-900 border-t pt-1 mt-1">
+                  <span>Total</span>
+                  <span className="text-xl sm:text-2xl text-admin-600">{formatPrice(total, settings)}</span>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                    Método de Pago *
+                    Condición de pago *
+                  </label>
+                  <select
+                    {...register('sale_condition')}
+                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  >
+                    <option value="contado">Pago al contado</option>
+                    <option value="credito">Venta a crédito (cobro pendiente)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                    {saleCondition === 'credito' ? 'Método de cobro (referencia)' : 'Método de pago *'}
                   </label>
                   <select
                     {...register('payment_method')}
                     className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
                   >
+                    {saleCondition === 'credito' && (
+                      <option value="">Sin cobro inmediato</option>
+                    )}
                     {paymentMethods.map((m) => (
                       <option
                         key={m.id}
                         value={m.key}
-                        disabled={m.requires_cash_session && !currentCashSession}
+                        disabled={!saleCondition || (saleCondition === 'contado' && m.requires_cash_session && !currentCashSession)}
                       >
                         {m.name}
-                        {m.requires_cash_session && !currentCashSession && ' (Requiere sesión de caja abierta)'}
+                        {saleCondition === 'contado' && m.requires_cash_session && !currentCashSession && ' (Requiere sesión de caja abierta)'}
                       </option>
                     ))}
                   </select>
-                  {errors.payment_method && (
+                  {saleCondition === 'contado' && errors.payment_method && (
                     <p className="text-xs text-red-500 mt-1">{errors.payment_method.message}</p>
                   )}
                 </div>
+              </div>
+
+              {saleCondition === 'credito' && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                  Esta venta se registrará como <span className="font-semibold">completada</span> con cobro pendiente. No impacta la caja hasta registrar el pago.
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
                     Cliente (opcional)

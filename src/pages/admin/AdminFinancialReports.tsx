@@ -12,6 +12,10 @@ import { useEffect, useMemo, useState } from 'react'
 
 type Summary = {
   salesRevenue: number
+  grossSales: number
+  discountsGranted: number
+  netSales: number
+  collectedIncome: number
   salesOrders: number
   grossMargin: number
   accrualExpense: number
@@ -91,6 +95,10 @@ export function AdminFinancialReports() {
 
   const [summary, setSummary] = useState<Summary>({
     salesRevenue: 0,
+    grossSales: 0,
+    discountsGranted: 0,
+    netSales: 0,
+    collectedIncome: 0,
     salesOrders: 0,
     grossMargin: 0,
     accrualExpense: 0,
@@ -165,6 +173,10 @@ export function AdminFinancialReports() {
 
       setSummary({
         salesRevenue: asNumber(summaryPayload.sales_revenue),
+        grossSales: asNumber(summaryPayload.gross_sales),
+        discountsGranted: asNumber(summaryPayload.discounts_granted),
+        netSales: asNumber(summaryPayload.net_sales),
+        collectedIncome: asNumber(summaryPayload.collected_income),
         salesOrders: asNumber(summaryPayload.sales_orders),
         grossMargin: asNumber(summaryPayload.gross_margin),
         accrualExpense: asNumber(summaryPayload.accrual_expense),
@@ -287,7 +299,17 @@ export function AdminFinancialReports() {
       rows.push(['Fecha de corte de antigüedad', asOfDate])
       rows.push([])
       rows.push(['Resumen general'])
-      rows.push(['Ingresos por ventas', 'Egresos de caja', 'Flujo neto', 'Órdenes', 'Margen bruto', 'Egresos devengados'])
+      rows.push([
+        'Cobros',
+        'Egresos de caja',
+        'Flujo neto',
+        'Órdenes',
+        'Ventas brutas',
+        'Descuentos otorgados',
+        'Ventas netas',
+        'Margen bruto',
+        'Egresos devengados',
+      ])
       allRows
         .filter((row) => row.section === 'summary')
         .forEach((row) => {
@@ -297,14 +319,17 @@ export function AdminFinancialReports() {
             row.value_2,
             row.value_3,
             asNumber(extra.sales_orders),
+            asNumber(extra.gross_sales),
+            asNumber(extra.discounts_granted),
+            asNumber(extra.net_sales),
             asNumber(extra.gross_margin),
             asNumber(extra.accrual_expense),
           ])
         })
       rows.push([])
 
-      rows.push(['Ventas vs egresos diarios'])
-      rows.push(['Fecha', 'Ventas', 'Egresos', 'Neto'])
+      rows.push(['Cobros vs egresos diarios'])
+      rows.push(['Fecha', 'Cobros', 'Egresos', 'Neto'])
       allRows
         .filter((row) => row.section === 'daily_sales_vs_expenses')
         .forEach((row) => {
@@ -312,8 +337,8 @@ export function AdminFinancialReports() {
         })
       rows.push([])
 
-      rows.push(['Ventas vs egresos mensuales'])
-      rows.push(['Mes', 'Ventas', 'Egresos', 'Neto'])
+      rows.push(['Cobros vs egresos mensuales'])
+      rows.push(['Mes', 'Cobros', 'Egresos', 'Neto'])
       allRows
         .filter((row) => row.section === 'monthly_sales_vs_expenses')
         .forEach((row) => {
@@ -390,7 +415,7 @@ export function AdminFinancialReports() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Reporte Financiero</h1>
-        <p className="mt-1 text-gray-600">Ventas vs egresos, flujo neto y cuentas por pagar.</p>
+        <p className="mt-1 text-gray-600">Cobros vs egresos, flujo neto y cuentas por pagar.</p>
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
@@ -451,12 +476,26 @@ export function AdminFinancialReports() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <Card>
           <CardContent className="p-5">
             <p className="text-sm text-gray-500">Ventas</p>
-            <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.salesRevenue, settings)}</p>
-            <p className="text-xs text-gray-500">{summary.salesOrders} órdenes</p>
+            <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.netSales || summary.salesRevenue, settings)}</p>
+            <p className="text-xs text-gray-500">{summary.salesOrders} órdenes · Neto</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-gray-500">Descuentos otorgados</p>
+            <p className="text-2xl font-bold text-red-700">{formatPrice(summary.discountsGranted, settings)}</p>
+            <p className="text-xs text-gray-500">Sobre ventas brutas: {formatPrice(summary.grossSales, settings)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-gray-500">Cobros</p>
+            <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.collectedIncome, settings)}</p>
+            <p className="text-xs text-gray-500">No incluye ventas a crédito sin cobrar</p>
           </CardContent>
         </Card>
         <Card>
@@ -467,17 +506,11 @@ export function AdminFinancialReports() {
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-gray-500">Margen bruto</p>
-            <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.grossMargin, settings)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-500">Flujo neto</p>
                 <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.netCashflow, settings)}</p>
-                <p className="text-xs text-gray-500">{selectedBranch?.name || 'Todas las sucursales'}</p>
+                <p className="text-xs text-gray-500">Cobros - Egresos de caja · {selectedBranch?.name || 'Todas las sucursales'}</p>
               </div>
               {summary.netCashflow >= 0 ? (
                 <TrendingUp className="h-6 w-6 text-green-600" />
@@ -492,7 +525,7 @@ export function AdminFinancialReports() {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Ventas vs egresos diarios</CardTitle>
+            <CardTitle>Cobros vs egresos diarios</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -500,7 +533,7 @@ export function AdminFinancialReports() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Fecha</th>
-                    <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Ventas</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Cobros</th>
                     <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Egresos</th>
                     <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Neto</th>
                   </tr>
@@ -562,7 +595,7 @@ export function AdminFinancialReports() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wallet className="h-5 w-5" />
-            <span>Ventas vs egresos mensuales</span>
+            <span>Cobros vs egresos mensuales</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -571,7 +604,7 @@ export function AdminFinancialReports() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-2 text-left text-xs font-medium uppercase text-gray-500">Mes</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Ventas</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Cobros</th>
                   <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Egresos</th>
                   <th className="px-4 py-2 text-right text-xs font-medium uppercase text-gray-500">Neto</th>
                 </tr>
