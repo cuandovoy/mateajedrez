@@ -19,7 +19,7 @@ import { deleteImage, uploadProductImage } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
-import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, Supplier } from '@/types'
+import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, ProductVariant, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -62,6 +62,10 @@ interface ProductWithImages extends Product {
   inventory_stock?: number
 }
 
+interface ProductVariantWithInventory extends ProductVariant {
+  inventory_stock?: number
+}
+
 type ViewMode = 'grid' | 'list'
 type StatusFilterValue = 'all' | 'active' | 'inactive'
 type StockFilterValue = 'all' | 'in_stock' | 'low_stock' | 'out_of_stock'
@@ -87,6 +91,7 @@ function AdminProductsContent() {
   const { isAtLimit, productCount, limits, tier } = usePlanLimits()
   const maxProductImages = getMaxProductImages(tier)
   const [products, setProducts] = useState<ProductWithImages[]>([])
+  const [productVariantsByProduct, setProductVariantsByProduct] = useState<Record<string, ProductVariantWithInventory[]>>({})
   const [categories, setCategories] = useState<Category[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
@@ -145,6 +150,7 @@ function AdminProductsContent() {
         // If no products found for this supplier, return empty array
         if (supplierProductIds.length === 0) {
           setProducts([])
+          setProductVariantsByProduct({})
           setLoading(false)
           return
         }
@@ -206,8 +212,9 @@ function AdminProductsContent() {
 
       const loadedProductIds = productsData.map((p) => p.id)
       let inventoryStockByProduct = new Map<string, number>()
+      let variantsByProduct: Record<string, ProductVariantWithInventory[]> = {}
       if (loadedProductIds.length > 0) {
-        const [directStockRes, variantStockRes] = await Promise.all([
+        const [directStockRes, variantStockRes, variantsRes, variantInventoryRes] = await Promise.all([
           supabase
             .from('branch_inventory')
             .select('product_id, stock, branches!inner(organization_id)')
@@ -218,10 +225,22 @@ function AdminProductsContent() {
             .select('stock, product_variants!inner(product_id), branches!inner(organization_id)')
             .not('variant_id', 'is', null)
             .eq('branches.organization_id', organizationId),
+          supabase
+            .from('product_variants')
+            .select('id, product_id, name, sku, price, stock, is_active, low_stock_threshold, min_stock, image_url, attributes, unit, created_at, updated_at')
+            .in('product_id', loadedProductIds)
+            .order('name', { ascending: true }),
+          supabase
+            .from('branch_inventory')
+            .select('variant_id, stock, branches!inner(organization_id)')
+            .not('variant_id', 'is', null)
+            .eq('branches.organization_id', organizationId),
         ])
 
         if (directStockRes.error) throw directStockRes.error
         if (variantStockRes.error) throw variantStockRes.error
+        if (variantsRes.error) throw variantsRes.error
+        if (variantInventoryRes.error) throw variantInventoryRes.error
 
         inventoryStockByProduct = new Map<string, number>()
 
@@ -239,6 +258,25 @@ function AdminProductsContent() {
           const prev = inventoryStockByProduct.get(productId) || 0
           inventoryStockByProduct.set(productId, prev + (row.stock || 0))
         })
+
+        const inventoryStockByVariant = new Map<string, number>()
+        ;(variantInventoryRes.data || []).forEach((row: any) => {
+          const variantId = row.variant_id as string | null
+          if (!variantId) return
+          const prev = inventoryStockByVariant.get(variantId) || 0
+          inventoryStockByVariant.set(variantId, prev + (row.stock || 0))
+        })
+
+        ;(variantsRes.data || []).forEach((variant) => {
+          const variantWithInventory: ProductVariantWithInventory = {
+            ...(variant as ProductVariantWithInventory),
+            inventory_stock: inventoryStockByVariant.get(variant.id) ?? (variant.stock || 0),
+          }
+          if (!variantsByProduct[variant.product_id]) {
+            variantsByProduct[variant.product_id] = []
+          }
+          variantsByProduct[variant.product_id].push(variantWithInventory)
+        })
       }
 
       setProducts(
@@ -247,6 +285,7 @@ function AdminProductsContent() {
           inventory_stock: inventoryStockByProduct.get(product.id) ?? 0,
         }))
       )
+      setProductVariantsByProduct(variantsByProduct)
     } catch (error) {
       console.error('Error fetching products:', error)
     } finally {
@@ -1176,6 +1215,7 @@ function AdminProductsContent() {
           <CardContent className="p-0">
             <ProductTable
               products={paginatedProducts}
+              variantsByProduct={productVariantsByProduct}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onManageVariants={setVariantManagerProduct}
