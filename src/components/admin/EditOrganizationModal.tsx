@@ -89,6 +89,11 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   const [locale, setLocale] = useState((rawSettings.locale as string) ?? 'es-AR')
   const [timezone, setTimezone] = useState((rawSettings.timezone as string) ?? 'America/Argentina/Buenos_Aires')
   const [allowNegativeStock, setAllowNegativeStock] = useState((rawSettings.allow_negative_stock as boolean) !== false)
+  const [defaultLowStockThreshold, setDefaultLowStockThreshold] = useState(
+    Number.isFinite(rawSettings.default_low_stock_threshold as number)
+      ? Number(rawSettings.default_low_stock_threshold)
+      : 10
+  )
   const [notificationEmail, setNotificationEmail] = useState((rawSettings.notification_email as string) ?? '')
   const [newOrderNotify, setNewOrderNotify] = useState((rawSettings.new_order_notify as boolean) ?? false)
   const [lowStockNotify, setLowStockNotify] = useState((rawSettings.low_stock_notify as boolean) ?? false)
@@ -123,6 +128,11 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     setLocale((s.locale as string) ?? 'es-AR')
     setTimezone((s.timezone as string) ?? 'America/Argentina/Buenos_Aires')
     setAllowNegativeStock((s.allow_negative_stock as boolean) !== false)
+    setDefaultLowStockThreshold(
+      Number.isFinite(s.default_low_stock_threshold as number)
+        ? Number(s.default_low_stock_threshold)
+        : 10
+    )
     setNotificationEmail((s.notification_email as string) ?? '')
     setNewOrderNotify((s.new_order_notify as boolean) ?? false)
     setLowStockNotify((s.low_stock_notify as boolean) ?? false)
@@ -148,6 +158,10 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     locale !== (prevSettings.locale ?? 'es-AR') ||
     timezone !== (prevSettings.timezone ?? 'America/Argentina/Buenos_Aires') ||
     allowNegativeStock !== ((prevSettings.allow_negative_stock as boolean) !== false) ||
+    defaultLowStockThreshold !==
+      (Number.isFinite(prevSettings.default_low_stock_threshold as number)
+        ? Number(prevSettings.default_low_stock_threshold)
+        : 10) ||
     notificationEmail !== ((prevSettings.notification_email as string) ?? '') ||
     newOrderNotify !== ((prevSettings.new_order_notify as boolean) ?? false) ||
     lowStockNotify !== ((prevSettings.low_stock_notify as boolean) ?? false) ||
@@ -263,6 +277,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         locale: locale.trim() || 'es-AR',
         timezone: timezone.trim() || 'America/Argentina/Buenos_Aires',
         allow_negative_stock: allowNegativeStock,
+        default_low_stock_threshold: Math.max(0, Math.trunc(defaultLowStockThreshold || 0)),
         notification_email: notificationEmail.trim() || undefined,
         new_order_notify: newOrderNotify,
         low_stock_notify: lowStockNotify,
@@ -644,6 +659,21 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                   </label>
                   <p className="text-xs text-gray-500">
                     Si está desactivado, no se podrá completar una venta cuando falte stock.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Umbral por defecto de stock bajo
+                  </label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={defaultLowStockThreshold}
+                    onChange={(e) => setDefaultLowStockThreshold(Math.max(0, parseInt(e.target.value || '0', 10) || 0))}
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Se usa como valor inicial para nuevos registros de inventario de esta organización.
                   </p>
                 </div>
               </TabsContent>

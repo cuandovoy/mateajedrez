@@ -24,6 +24,7 @@ interface ProductTableProps {
   onManageVariants: (product: Product) => void
   onManageBarcodes?: (product: Product) => void
   onManageSuppliers?: (product: Product) => void
+  onAdjustInventory?: (product: Product) => void
   getPrimaryImage: (product: ProductWithCategory) => string | null
 }
 
@@ -35,6 +36,7 @@ export function ProductTable({
   onManageVariants,
   onManageBarcodes,
   onManageSuppliers,
+  onAdjustInventory,
   getPrimaryImage,
 }: ProductTableProps) {
   const settings = useOrgSettings()
@@ -144,6 +146,7 @@ export function ProductTable({
                     actions={[
                       ...(onManageBarcodes ? [{ label: 'Código de barras', icon: <ScanLine className="h-4 w-4" />, onClick: () => onManageBarcodes(product) }] : []),
                       ...(onManageSuppliers ? [{ label: 'Proveedores', icon: <Truck className="h-4 w-4" />, onClick: () => onManageSuppliers(product) }] : []),
+                      ...(onAdjustInventory ? [{ label: 'Ajustar inventario', icon: <Package className="h-4 w-4" />, onClick: () => onAdjustInventory(product) }] : []),
                       { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(product.id), variant: 'danger' as const },
                     ]}
                   />
@@ -291,6 +294,15 @@ export function ProductTable({
                                 label: 'Proveedores',
                                 icon: <Truck className="h-4 w-4" />,
                                 onClick: () => onManageSuppliers(product),
+                              },
+                            ]
+                          : []),
+                        ...(onAdjustInventory
+                          ? [
+                              {
+                                label: 'Ajustar inventario',
+                                icon: <Package className="h-4 w-4" />,
+                                onClick: () => onAdjustInventory(product),
                               },
                             ]
                           : []),

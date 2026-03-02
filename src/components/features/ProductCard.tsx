@@ -10,6 +10,8 @@ import { useState, useEffect } from 'react'
 
 interface ProductCardProps {
   product: Product & { product_images?: ProductImage[] }
+  stock?: number
+  hasVariants?: boolean
   noAddToCart?: boolean
   basePath?: string
 }
@@ -26,7 +28,13 @@ function isValidImageUrl(url: string | null | undefined): boolean {
   }
 }
 
-export function ProductCard({ product, noAddToCart = false, basePath = '' }: ProductCardProps) {
+export function ProductCard({
+  product,
+  stock: stockProp,
+  hasVariants = false,
+  noAddToCart = false,
+  basePath = '',
+}: ProductCardProps) {
   const settings = useOrgSettings()
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
@@ -75,6 +83,11 @@ export function ProductCard({ product, noAddToCart = false, basePath = '' }: Pro
 
   // Fetch stock from branch_inventory
   useEffect(() => {
+    if (typeof stockProp === 'number') {
+      setStock(stockProp)
+      return
+    }
+
     let cancelled = false
     getProductStock(product.id)
       .then((stockValue) => {
@@ -92,7 +105,7 @@ export function ProductCard({ product, noAddToCart = false, basePath = '' }: Pro
     return () => {
       cancelled = true
     }
-  }, [product.id])
+  }, [product.id, stockProp])
 
   const hasStock = stock !== null ? stock > 0 : false
 
@@ -154,13 +167,15 @@ export function ProductCard({ product, noAddToCart = false, basePath = '' }: Pro
             {stock === null ? (
               <span className="text-sm text-gray-400 font-medium">Cargando...</span>
             ) : hasStock ? (
-              <span className="text-sm text-green-600 font-medium">En stock</span>
+              <span className="text-sm text-green-600 font-medium">
+                {hasVariants ? 'En stock (variantes)' : 'En stock'}
+              </span>
             ) : (
               <span className="text-sm text-red-600 font-medium">Sin stock</span>
             )}
           </div>
         </div>
-        {!noAddToCart && (
+        {!noAddToCart && !hasVariants && (
           <Button
             variant="primary"
             className="w-full mt-auto hover:shadow-md transition-all duration-300 font-semibold"
@@ -171,6 +186,13 @@ export function ProductCard({ product, noAddToCart = false, basePath = '' }: Pro
             <ShoppingCart className="h-4 w-4 mr-2" />
             Agregar al carrito
           </Button>
+        )}
+        {!noAddToCart && hasVariants && (
+          <Link to={`${basePath}/product/${product.id}`} className="mt-auto">
+            <Button variant="outline" className="w-full font-semibold" disabled={!hasStock}>
+              {hasStock ? 'Ver opciones' : 'Sin stock'}
+            </Button>
+          </Link>
         )}
       </div>
     </div>

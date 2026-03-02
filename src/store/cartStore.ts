@@ -1,5 +1,6 @@
 import { capitalizeFirst } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { getProductStock } from '@/lib/stock'
 import type { CartItem, CartItemWithProduct, Product, ProductVariant } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
 import { create } from 'zustand'
@@ -225,7 +226,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         // Check variant stock
         const { data: variant, error: variantError } = await (supabase
           .from('product_variants') as any)
-          .select('id, name, stock, is_active, product:products(id, name, is_active)')
+          .select('id, name, is_active, product:products(id, name, is_active)')
           .eq('id', variantId)
           .single()
 
@@ -242,13 +243,13 @@ export const useCartStore = create<CartState>((set, get) => ({
           throw new Error('Product or variant is not active')
         }
 
-        availableStock = variant.stock
+        availableStock = await getProductStock(productId, variantId)
         productName = variant.name || product.name
       } else {
-        // Check product stock (backward compatibility)
+        // Check product active state.
         const { data: product, error: productError }: { data: Product | null, error: PostgrestError | null } = await supabase
           .from('products')
-          .select('id, name, stock, is_active')
+          .select('id, name, is_active')
           .eq('id', productId)
           .single()
 
@@ -259,7 +260,19 @@ export const useCartStore = create<CartState>((set, get) => ({
           throw new Error('Product is not active')
         }
 
-        availableStock = product.stock
+        // If product has active variants, force explicit variant selection.
+        const { count: variantsCount } = await supabase
+          .from('product_variants')
+          .select('id', { head: true, count: 'exact' })
+          .eq('product_id', productId)
+          .eq('is_active', true)
+
+        if ((variantsCount || 0) > 0) {
+          useToastStore.getState().show('Este producto tiene variantes. Selecciona una variante para agregar al carrito.', 'error')
+          throw new Error('Variant selection required')
+        }
+
+        availableStock = await getProductStock(productId, null)
         productName = product.name
       }
 

@@ -4,11 +4,12 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization'
+import { getProductsStock } from '@/lib/stock'
 import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
 import type { Category, Product } from '@/types'
 import { Filter, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 const DEFAULT_STORE_SLUG = 'default'
 
@@ -18,11 +19,18 @@ export function Products() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
   const [showFilters, setShowFilters] = useState(false)
   const [orgId, setOrgId] = useState<string | null>(null)
+  const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({})
+  const [hasVariantsByProduct, setHasVariantsByProduct] = useState<Record<string, boolean>>({})
+  const productsCacheRef = useRef<
+    Map<string, { products: Product[]; stockByProduct: Record<string, number>; hasVariantsByProduct: Record<string, boolean> }>
+  >(new Map())
 
   useEffect(() => {
     const loadOrg = async () => {
@@ -37,19 +45,51 @@ export function Products() {
   }, [organization, isPublicStore, fetchOrgBySlug])
 
   useEffect(() => {
-    if (orgId) {
-      fetchProducts()
-      fetchCategories()
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm.trim())
+    }, 350)
+
+    return () => {
+      window.clearTimeout(timeoutId)
     }
+  }, [searchTerm])
+
+  useEffect(() => {
+    if (!orgId) return
+    fetchCategories()
   }, [orgId])
 
   useEffect(() => {
-    if (orgId) fetchProducts()
-  }, [orgId, selectedCategory, priceRange.min, priceRange.max])
+    if (!orgId) return
+    fetchProducts()
+  }, [orgId, selectedCategory, priceRange.min, priceRange.max, debouncedSearchTerm])
 
   const fetchProducts = async () => {
     if (!orgId) return
+
+    const normalizedSearch = debouncedSearchTerm.toLowerCase()
+    const cacheKey = JSON.stringify({
+      orgId,
+      selectedCategory,
+      min: priceRange.min,
+      max: priceRange.max,
+      search: normalizedSearch,
+    })
+    const cachedResult = productsCacheRef.current.get(cacheKey)
+    if (cachedResult) {
+      setProducts(cachedResult.products)
+      setStockByProduct(cachedResult.stockByProduct)
+      setHasVariantsByProduct(cachedResult.hasVariantsByProduct)
+      setLoading(false)
+      setIsRefreshing(false)
+      return
+    }
+
+    const shouldBlockPage = loading && products.length === 0
     try {
+      if (!shouldBlockPage) {
+        setIsRefreshing(true)
+      }
       let query = supabase
         .from('products')
         .select(`
@@ -76,14 +116,49 @@ export function Products() {
         query = query.lte('price', parseFloat(priceRange.max))
       }
 
+      if (normalizedSearch) {
+        const safeTerm = normalizedSearch.replace(/[%]/g, '').replace(/,/g, ' ').trim()
+        if (safeTerm) {
+          query = query.or(`name.ilike.%${safeTerm}%,description.ilike.%${safeTerm}%,sku.ilike.%${safeTerm}%`)
+        }
+      }
+
       const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) throw error
-      setProducts(data || [])
+      const productsData = (data || []) as Product[]
+      const productIds = productsData.map((product) => product.id)
+      const [stocks, variantsResult] = await Promise.all([
+        getProductsStock(productIds, null, orgId),
+        productIds.length > 0
+          ? supabase
+              .from('product_variants')
+              .select('product_id')
+              .in('product_id', productIds)
+              .eq('is_active', true)
+          : Promise.resolve({ data: [], error: null }),
+      ])
+
+      const variantsMap: Record<string, boolean> = {}
+      if (!variantsResult.error && variantsResult.data) {
+        for (const row of variantsResult.data as Array<{ product_id: string }>) {
+          variantsMap[row.product_id] = true
+        }
+      }
+
+      productsCacheRef.current.set(cacheKey, {
+        products: productsData,
+        stockByProduct: stocks,
+        hasVariantsByProduct: variantsMap,
+      })
+      setProducts(productsData)
+      setStockByProduct(stocks)
+      setHasVariantsByProduct(variantsMap)
     } catch (error) {
       console.error('Error fetching products:', error)
     } finally {
       setLoading(false)
+      setIsRefreshing(false)
     }
   }
 
@@ -104,10 +179,7 @@ export function Products() {
     }
   }
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredProducts = useMemo(() => products, [products])
 
   const clearFilters = () => {
     setSelectedCategory('')
@@ -137,6 +209,11 @@ export function Products() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1"
           />
+          {isRefreshing && (
+            <div className="flex items-center text-sm text-gray-500 px-2">
+              Buscando...
+            </div>
+          )}
           <Button
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
@@ -290,6 +367,8 @@ export function Products() {
                   <ProductCard 
                     key={product.id} 
                     product={product} 
+                    stock={stockByProduct[product.id]}
+                    hasVariants={Boolean(hasVariantsByProduct[product.id])}
                     basePath={isPublicStore && slug ? `/${slug}` : ''}
                   />
                 ))}
@@ -298,7 +377,13 @@ export function Products() {
               {/* Vista Lista para desktop */}
               <div className="hidden lg:block space-y-4">
                 {filteredProducts.map((product) => (
-                  <ProductListItem key={product.id} product={product} basePath={isPublicStore && slug ? `/${slug}` : ''} />
+                  <ProductListItem
+                    key={product.id}
+                    product={product}
+                    stock={stockByProduct[product.id]}
+                    hasVariants={Boolean(hasVariantsByProduct[product.id])}
+                    basePath={isPublicStore && slug ? `/${slug}` : ''}
+                  />
                 ))}
               </div>
             </>

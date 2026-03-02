@@ -10,6 +10,8 @@ import { useState, useEffect } from 'react'
 
 interface ProductListItemProps {
   product: Product & { product_images?: ProductImage[] }
+  stock?: number
+  hasVariants?: boolean
   noAddToCart?: boolean
   basePath?: string
 }
@@ -26,7 +28,13 @@ function isValidImageUrl(url: string | null | undefined): boolean {
   }
 }
 
-export function ProductListItem({ product, noAddToCart = false, basePath = '' }: ProductListItemProps) {
+export function ProductListItem({
+  product,
+  stock: stockProp,
+  hasVariants = false,
+  noAddToCart = false,
+  basePath = '',
+}: ProductListItemProps) {
   const settings = useOrgSettings()
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
@@ -75,6 +83,11 @@ export function ProductListItem({ product, noAddToCart = false, basePath = '' }:
 
   // Fetch stock from branch_inventory
   useEffect(() => {
+    if (typeof stockProp === 'number') {
+      setStock(stockProp)
+      return
+    }
+
     let cancelled = false
     getProductStock(product.id)
       .then((stockValue) => {
@@ -92,7 +105,7 @@ export function ProductListItem({ product, noAddToCart = false, basePath = '' }:
     return () => {
       cancelled = true
     }
-  }, [product.id])
+  }, [product.id, stockProp])
 
   const hasStock = stock !== null ? stock > 0 : false
 
@@ -141,22 +154,33 @@ export function ProductListItem({ product, noAddToCart = false, basePath = '' }:
               {stock === null ? (
                 <span className="text-sm text-gray-400 font-medium">Cargando...</span>
               ) : hasStock ? (
-                <span className="text-sm text-green-600 font-medium">En stock</span>
+                <span className="text-sm text-green-600 font-medium">
+                  {hasVariants ? 'En stock (variantes)' : 'En stock'}
+                </span>
               ) : (
                 <span className="text-sm text-red-600 font-medium">Sin stock</span>
               )}
             </div>
           </div>
           <div className="md:w-48 flex-shrink-0">
-            {!noAddToCart && <Button
-              className="w-full bg-primary-600 text-white"
-              onClick={handleAddToCart}
-              disabled={!hasStock || isAdding}
-              isLoading={isAdding}
-            >
-              {!noAddToCart && <ShoppingCart className="h-4 w-4 mr-2" />}
-              Agregar al carrito
-            </Button>}
+            {!noAddToCart && !hasVariants && (
+              <Button
+                className="w-full bg-primary-600 text-white"
+                onClick={handleAddToCart}
+                disabled={!hasStock || isAdding}
+                isLoading={isAdding}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" />
+                Agregar al carrito
+              </Button>
+            )}
+            {!noAddToCart && hasVariants && (
+              <Link to={`${basePath}/product/${product.id}`}>
+                <Button className="w-full" variant="outline" disabled={!hasStock}>
+                  {hasStock ? 'Ver opciones' : 'Sin stock'}
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </div>

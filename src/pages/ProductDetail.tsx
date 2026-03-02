@@ -9,8 +9,11 @@ import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
 import type { Product, ProductWithCategory, ProductImage } from '@/types'
 import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
+
+const DEFAULT_PRODUCT_PLACEHOLDER =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800"><rect width="800" height="800" fill="%23f3f4f6"/><g fill="%239ca3af"><rect x="240" y="260" width="320" height="220" rx="24"/><circle cx="320" cy="330" r="28"/><path d="M270 450l95-95 62 62 48-48 55 81z"/></g><text x="50%25" y="560" text-anchor="middle" font-family="Arial,sans-serif" font-size="32" fill="%236b7280">Sin imagen</text></svg>'
 
 // Helper function to validate image URLs
 function isValidImageUrl(url: string | null | undefined): boolean {
@@ -35,9 +38,11 @@ export function ProductDetail() {
   const [quantity, setQuantity] = useState(1)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedVariant, setSelectedVariant] = useState<{ image_url?: string | null; price?: number | null; stock?: number; unit?: string | null } | null>(null)
+  const [hasActiveVariants, setHasActiveVariants] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [imageLoading, setImageLoading] = useState(true)
   const [fadeIn, setFadeIn] = useState(false)
+  const [allImagesFailed, setAllImagesFailed] = useState(false)
   const [productStock, setProductStock] = useState<number | null>(null)
   const [variantStock, setVariantStock] = useState<number | null>(null)
   const productRef = useRef<HTMLDivElement>(null)
@@ -85,6 +90,16 @@ export function ProductDetail() {
       setCurrentImageIndex(0) // Reset image index when product changes
       setImageLoading(true)
       setFadeIn(false)
+      setAllImagesFailed(false)
+
+      // Determine if product has active variants (to enforce selection flow)
+      const { count: activeVariantsCount } = await supabase
+        .from('product_variants')
+        .select('id', { head: true, count: 'exact' })
+        .eq('product_id', id)
+        .eq('is_active', true)
+
+      setHasActiveVariants((activeVariantsCount || 0) > 0)
       
       // Fetch product stock from branch_inventory
       if (data) {
@@ -139,6 +154,42 @@ export function ProductDetail() {
       setIsAdding(false)
     }
   }
+
+  const handleVariantChange = useCallback((variantId: string) => {
+    if (!product) return
+
+    setSelectedVariantId(variantId || null)
+    setCurrentImageIndex(0)
+    setImageLoading(true)
+    setFadeIn(false)
+    setAllImagesFailed(false)
+
+    if (variantId) {
+      supabase
+        .from('product_variants')
+        .select('*')
+        .eq('id', variantId)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            setSelectedVariant(data)
+            setQuantity(1)
+
+            getProductStock(product.id, variantId)
+              .then((stock) => setVariantStock(stock))
+              .catch((error) => {
+                console.error('Error fetching variant stock:', error)
+                setVariantStock(0)
+              })
+          }
+        })
+      return
+    }
+
+    setSelectedVariant(null)
+    setVariantStock(null)
+    setQuantity(1)
+  }, [product])
 
   if (loading) {
     return (
@@ -237,11 +288,13 @@ export function ProductDetail() {
               setFadeIn(true)
             }
             
-            if (!currentImageUrl) {
+            if (!currentImageUrl || allImagesFailed) {
               return (
-                <div className="w-full h-96 bg-gray-200 rounded-lg flex items-center justify-center text-gray-400">
-                  Sin imagen
-                </div>
+                <img
+                  src={DEFAULT_PRODUCT_PLACEHOLDER}
+                  alt={capitalizeFirst(product.name)}
+                  className="w-full h-96 object-cover rounded-lg"
+                />
               )
             }
             
@@ -250,7 +303,7 @@ export function ProductDetail() {
                 <div className="relative w-full overflow-hidden rounded-lg shadow-lg">
                   <div className="relative w-full" style={{ aspectRatio: '1 / 1', minHeight: '400px' }}>
                     <img
-                      key={currentImageIndex}
+                      key={`${selectedVariantId ?? 'base'}-${currentImageIndex}`}
                       src={currentImageUrl}
                       alt={capitalizeFirst(product.name)}
                       className={`w-full h-full object-cover transition-opacity duration-300 ${
@@ -265,7 +318,7 @@ export function ProductDetail() {
                           setCurrentImageIndex(currentImageIndex + 1)
                         } else {
                           // All images failed, show placeholder
-                          setCurrentImageIndex(-1)
+                          setAllImagesFailed(true)
                         }
                       }}
                     />
@@ -390,40 +443,7 @@ export function ProductDetail() {
             <VariantSelector
               product={product}
               selectedVariantId={selectedVariantId}
-              onVariantChange={(variantId) => {
-                setSelectedVariantId(variantId)
-                setCurrentImageIndex(0) // Reset image index when variant changes
-                setImageLoading(true)
-                setFadeIn(false)
-                // Fetch variant details to get price and image
-                if (variantId) {
-                  supabase
-                    .from('product_variants')
-                    .select('*')
-                    .eq('id', variantId)
-                    .single()
-                    .then(({ data }) => {
-                      if (data) {
-                        setSelectedVariant(data)
-                        // Reset quantity to 1 when variant changes
-                        setQuantity(1)
-                        
-                        // Fetch variant stock from branch_inventory
-                        getProductStock(product.id, variantId)
-                          .then((stock) => setVariantStock(stock))
-                          .catch((error) => {
-                            console.error('Error fetching variant stock:', error)
-                            setVariantStock(0)
-                          })
-                      }
-                    })
-                } else {
-                  setSelectedVariant(null)
-                  setVariantStock(null)
-                  // Reset quantity to 1 when variant is cleared
-                  setQuantity(1)
-                }
-              }}
+              onVariantChange={handleVariantChange}
             />
           </div>
 
@@ -436,7 +456,7 @@ export function ProductDetail() {
                     variant="outline"
                     size="sm"
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={quantity <= 1}
+                    disabled={quantity <= 1 || (hasActiveVariants && !selectedVariantId)}
                   >
                     -
                   </Button>
@@ -448,7 +468,10 @@ export function ProductDetail() {
                       const currentStock = selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)
                       setQuantity(Math.min(currentStock, quantity + 1))
                     }}
-                    disabled={quantity >= (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0))}
+                    disabled={
+                      (hasActiveVariants && !selectedVariantId) ||
+                      quantity >= (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0))
+                    }
                   >
                     +
                   </Button>
@@ -457,7 +480,9 @@ export function ProductDetail() {
               <div className="mb-4">
                 <p className="text-sm text-gray-600">
                   Stock disponible: <span className="font-semibold">
-                    {selectedVariantId 
+                    {hasActiveVariants && !selectedVariantId
+                      ? 'Selecciona una variante'
+                      : selectedVariantId
                       ? (variantStock !== null ? variantStock : 'Cargando...')
                       : (productStock !== null ? productStock : 'Cargando...')
                     } {selectedVariant?.unit || product.unit || 'unidad'}
@@ -468,14 +493,15 @@ export function ProductDetail() {
                 className="w-full"
                 onClick={handleAddToCart}
                 disabled={
-                  (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)) === 0 || 
+                  (hasActiveVariants && !selectedVariantId) ||
+                  (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)) === 0 ||
                   isAdding ||
                   (selectedVariantId ? variantStock === null : productStock === null)
                 }
                 isLoading={isAdding}
               >
                 <ShoppingCart className="h-4 w-4 mr-2" />
-                Agregar al carrito
+                {hasActiveVariants && !selectedVariantId ? 'Selecciona una variante' : 'Agregar al carrito'}
               </Button>
             </CardContent>
           </Card>

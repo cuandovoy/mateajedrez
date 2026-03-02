@@ -29,6 +29,7 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useToastStore } from '@/store/toastStore'
 import { z } from 'zod'
+import { useNavigate } from 'react-router-dom'
 
 const productSchema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
@@ -85,6 +86,7 @@ interface ProductFilters {
 }
 
 function AdminProductsContent() {
+  const navigate = useNavigate()
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const { show } = useToastStore()
@@ -282,7 +284,8 @@ function AdminProductsContent() {
       setProducts(
         productsData.map((product) => ({
           ...product,
-          inventory_stock: inventoryStockByProduct.get(product.id) ?? 0,
+          // Fallback to legacy/master stock when there is no branch_inventory row yet.
+          inventory_stock: inventoryStockByProduct.get(product.id) ?? (product.stock || 0),
         }))
       )
       setProductVariantsByProduct(variantsByProduct)
@@ -804,7 +807,7 @@ function AdminProductsContent() {
       setEditingProduct(null)
       setProductImages([])
       reset()
-      fetchProducts()
+      await fetchProducts()
     } catch (error) {
       console.error('Error saving product:', error)
       alert('Error al guardar el producto')
@@ -867,6 +870,11 @@ function AdminProductsContent() {
     setInitialBranchId('')
     reset()
     setIsModalOpen(true)
+  }
+
+  const goToInventoryAdjustment = (product: ProductWithImages | Product) => {
+    const query = encodeURIComponent((product.sku || product.name || '').trim())
+    navigate(`/inventory?search=${query}`)
   }
 
   const getPrimaryImage = (product: ProductWithImages): string | null => {
@@ -1160,6 +1168,11 @@ function AdminProductsContent() {
                           onClick: () => setSupplierManagerProduct(product),
                         },
                         {
+                          label: 'Ajustar inventario',
+                          icon: <Package className="h-4 w-4" />,
+                          onClick: () => goToInventoryAdjustment(product),
+                        },
+                        {
                           label: 'Editar',
                           icon: <Edit className="h-4 w-4" />,
                           onClick: () => handleEdit(product),
@@ -1221,6 +1234,7 @@ function AdminProductsContent() {
               onManageVariants={setVariantManagerProduct}
               onManageBarcodes={setBarcodeManagerProduct}
               onManageSuppliers={setSupplierManagerProduct}
+              onAdjustInventory={goToInventoryAdjustment}
               getPrimaryImage={getPrimaryImage}
             />
           </CardContent>
@@ -1321,12 +1335,36 @@ function AdminProductsContent() {
                     {...register('price', { valueAsNumber: true })}
                     error={errors.price?.message}
                   />
-                  <Input
-                    label="Stock"
-                    type="number"
-                    {...register('stock', { valueAsNumber: true })}
-                    error={errors.stock?.message}
-                  />
+                  {editingProduct ? (
+                    <div>
+                      <input type="hidden" {...register('stock', { valueAsNumber: true })} />
+                      <Input
+                        label="Stock total (solo lectura)"
+                        type="number"
+                        value={editingProduct.inventory_stock ?? 0}
+                        readOnly
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        El stock se gestiona por sucursal en Inventario.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => goToInventoryAdjustment(editingProduct)}
+                      >
+                        Ajustar en Inventario
+                      </Button>
+                    </div>
+                  ) : (
+                    <Input
+                      label="Stock inicial"
+                      type="number"
+                      {...register('stock', { valueAsNumber: true })}
+                      error={errors.stock?.message}
+                    />
+                  )}
                 </div>
                 {!editingProduct && branches.length > 0 && (
                   <div>

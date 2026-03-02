@@ -2,6 +2,7 @@ import { useOrganizationStore } from '@/store/organizationStore'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { getProductsStock } from '@/lib/stock'
 import { ProductCard } from '@/components/features/ProductCard'
 import { ProductListItem } from '@/components/features/ProductListItem'
 import { Input } from '@/components/ui/Input'
@@ -27,6 +28,7 @@ export function CategoryProducts() {
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([])
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
   const [showFilters, setShowFilters] = useState(false)
+  const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({})
 
   useEffect(() => {
     const loadOrg = async () => {
@@ -225,6 +227,25 @@ export function CategoryProducts() {
     (selectedSubcategories.length > 0 && selectedSubcategories.length < subcategories.length) ||
     priceRange.min ||
     priceRange.max
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadStocks = async () => {
+      if (products.length === 0) {
+        if (!cancelled) setStockByProduct({})
+        return
+      }
+      const productIds = products.map((p) => p.id)
+      const stocks = await getProductsStock(productIds, null, parentCategory?.organization_id || orgId)
+      if (!cancelled) setStockByProduct(stocks)
+    }
+
+    loadStocks()
+    return () => {
+      cancelled = true
+    }
+  }, [products])
 
   if (loading) {
     return (
@@ -479,14 +500,24 @@ export function CategoryProducts() {
               {/* Vista Cards para móvil y tablet */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-6">
                 {filteredProducts.map((product) => (
-                  <ProductCard key={product.id} product={product} basePath={slug ? `/${slug}` : ''} />
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    stock={stockByProduct[product.id]}
+                    basePath={slug ? `/${slug}` : ''}
+                  />
                 ))}
               </div>
 
               {/* Vista Lista para desktop */}
               <div className="hidden lg:block space-y-4">
                 {filteredProducts.map((product) => (
-                  <ProductListItem key={product.id} product={product} basePath={slug ? `/${slug}` : ''} />
+                  <ProductListItem
+                    key={product.id}
+                    product={product}
+                    stock={stockByProduct[product.id]}
+                    basePath={slug ? `/${slug}` : ''}
+                  />
                 ))}
               </div>
             </>

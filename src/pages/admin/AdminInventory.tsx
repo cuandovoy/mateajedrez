@@ -13,6 +13,7 @@ import { capitalizeFirst } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch } from '@/types'
+import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowRight,
@@ -67,6 +68,7 @@ const getPrimaryImageUrl = (images: ProductImageRef[] | null | undefined): strin
 }
 
 export function AdminInventory() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { organizationId, isAdmin } = useOrganization()
   const { show } = useToastStore()
   const { canUseFeature } = usePlanLimits()
@@ -93,6 +95,18 @@ export function AdminInventory() {
   const [totalCount, setTotalCount] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    const initialSearch = (searchParams.get('search') || '').trim()
+    if (initialSearch) {
+      setSearchInput(initialSearch)
+      setDebouncedSearch(initialSearch)
+      setPage(0)
+      const next = new URLSearchParams(searchParams)
+      next.delete('search')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   useEffect(() => {
     const t = setTimeout(() => {

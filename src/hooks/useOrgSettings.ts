@@ -26,6 +26,10 @@ export function useOrgSettings(): OrganizationSettings {
       timezone: (settings.timezone as string) ?? DEFAULT_SETTINGS.timezone,
       decimal_places: typeof settings.decimal_places === 'number' ? settings.decimal_places : DEFAULT_SETTINGS.decimal_places,
       allow_negative_stock: (settings.allow_negative_stock as boolean) !== false,
+      default_low_stock_threshold:
+        typeof settings.default_low_stock_threshold === 'number'
+          ? Math.max(0, Math.trunc(settings.default_low_stock_threshold))
+          : 10,
     }
   }, [currentOrganization?.id, currentOrganization?.settings])
 }

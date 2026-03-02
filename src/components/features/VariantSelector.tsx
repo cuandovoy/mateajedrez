@@ -6,6 +6,17 @@ import { getProductStock } from '@/lib/stock'
 import type { ProductVariant, Product } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
 
+function isValidImageUrl(url: unknown): url is string {
+  if (!url || typeof url !== 'string') return false
+  if (!url.trim()) return false
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 interface VariantSelectorProps {
   product: Product
   selectedVariantId: string | null
@@ -20,9 +31,15 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({})
   const [variantStocks, setVariantStocks] = useState<Record<string, number>>({}) // variant.id -> stock
   const [productStock, setProductStock] = useState<number | null>(null)
+  const [imageLoadFailed, setImageLoadFailed] = useState(false)
 
   useEffect(() => {
+    setSelectedAttributes({})
+    onVariantChange('')
     fetchVariants()
+    // Only reset selector when the product changes.
+    // onVariantChange comes from parent and can be a new function on rerenders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.id])
 
   useEffect(() => {
@@ -48,14 +65,18 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
   }, [variants])
 
   useEffect(() => {
-    // Auto-select first available variant if none selected
-    if (!selectedVariantId && variants.length > 0 && Object.keys(variantStocks).length > 0) {
-      const firstAvailable = variants.find((v) => v.is_active && (variantStocks[v.id] ?? 0) > 0)
-      if (firstAvailable) {
-        onVariantChange(firstAvailable.id)
+    if (variants.length === 1 && !selectedVariantId) {
+      const onlyVariant = variants[0]
+      const stock = variantStocks[onlyVariant.id] ?? 0
+      if (onlyVariant.is_active && stock > 0) {
+        onVariantChange(onlyVariant.id)
       }
     }
-  }, [variants, selectedVariantId, onVariantChange, variantStocks])
+  }, [variants, selectedVariantId, variantStocks, onVariantChange])
+
+  useEffect(() => {
+    setImageLoadFailed(false)
+  }, [selectedVariantId, product.id])
 
   const fetchVariants = async () => {
     setLoading(true)
@@ -98,10 +119,6 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
           setProductStock(0)
         })
       
-      // If only one variant, auto-select it
-      if (data && data.length === 1) {
-        onVariantChange(data[0].id)
-      }
     } catch (error) {
       console.error('Error fetching variants:', error)
     } finally {
@@ -145,7 +162,8 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
   const displayStock = selectedVariantId 
     ? (variantStocks[selectedVariantId] ?? null)
     : (productStock ?? null)
-  const displayImage = selectedVariant?.image_url ?? product.image_url
+  const variantImage = isValidImageUrl(selectedVariant?.image_url) ? selectedVariant.image_url : null
+  const showImage = Boolean(variantImage && !imageLoadFailed)
 
   if (loading) {
     return (
@@ -155,51 +173,100 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
     )
   }
 
-  // If no variants or only one variant, don't show selector
-  if (variants.length <= 1) {
+  // If no variants, don't show selector.
+  if (variants.length === 0) {
     return null
+  }
+
+  const hasAttributeOptions = Object.keys(attributes).length > 0
+
+  if (variants.length === 1) {
+    return (
+      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+        Variante única: <span className="font-medium">{variants[0].name || variants[0].sku}</span>
+      </div>
+    )
   }
 
   return (
     <div className="space-y-4">
-      {/* Attribute Selectors */}
-      {Object.entries(attributes).map(([key, values]) => (
-        <div key={key}>
-          <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
-            {key}
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {values.map((value) => {
-              const isSelected = selectedAttributes[key] === value
-              const variantWithThisValue = variants.find((v) => {
-                if (!v.attributes || typeof v.attributes !== 'object') return false
-                const attrs = v.attributes as Record<string, string>
-                return attrs[key] === value
-              })
-              const variantStock = variantWithThisValue ? (variantStocks[variantWithThisValue.id] ?? 0) : 0
-              const isAvailable = variantWithThisValue?.is_active && variantStock > 0
+      {hasAttributeOptions ? (
+        <>
+          {/* Attribute Selectors */}
+          {Object.entries(attributes).map(([key, values]) => (
+            <div key={key}>
+              <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
+                {key}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {values.map((value) => {
+                  const isSelected = selectedAttributes[key] === value
+                  const variantWithThisValue = variants.find((v) => {
+                    if (!v.attributes || typeof v.attributes !== 'object') return false
+                    const attrs = v.attributes as Record<string, string>
+                    return attrs[key] === value
+                  })
+                  const variantStock = variantWithThisValue ? (variantStocks[variantWithThisValue.id] ?? 0) : 0
+                  const isAvailable = variantWithThisValue?.is_active && variantStock > 0
 
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => handleAttributeChange(key, value)}
+                      disabled={!isAvailable}
+                      className={cn(
+                        'px-4 py-2 rounded-lg border-2 transition-colors',
+                        isSelected
+                          ? 'border-primary-600 bg-primary-50 text-primary-700 font-medium'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-primary-300',
+                        !isAvailable && 'opacity-50 cursor-not-allowed'
+                      )}
+                    >
+                      {value}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </>
+      ) : (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Variantes
+          </label>
+          <div className="space-y-2">
+            {variants.map((variant) => {
+              const variantStock = variantStocks[variant.id] ?? 0
+              const isAvailable = variant.is_active && variantStock > 0
+              const isSelected = selectedVariantId === variant.id
               return (
                 <button
-                  key={value}
+                  key={variant.id}
                   type="button"
-                  onClick={() => handleAttributeChange(key, value)}
+                  onClick={() => onVariantChange(isSelected ? '' : variant.id)}
                   disabled={!isAvailable}
                   className={cn(
-                    'px-4 py-2 rounded-lg border-2 transition-colors',
+                    'w-full rounded-lg border px-3 py-2 text-left transition-colors',
                     isSelected
-                      ? 'border-primary-600 bg-primary-50 text-primary-700 font-medium'
-                      : 'border-gray-300 bg-white text-gray-700 hover:border-primary-300',
+                      ? 'border-primary-600 bg-primary-50'
+                      : 'border-gray-300 bg-white hover:border-primary-300',
                     !isAvailable && 'opacity-50 cursor-not-allowed'
                   )}
                 >
-                  {value}
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-gray-800">{variant.name || variant.sku}</span>
+                    <span className={cn('text-xs', isAvailable ? 'text-green-600' : 'text-red-600')}>
+                      {isAvailable ? `${variantStock} en stock` : 'Sin stock'}
+                    </span>
+                  </div>
                 </button>
               )
             })}
           </div>
         </div>
-      ))}
+      )}
 
       {/* Selected Variant Info */}
       {selectedVariant && (
@@ -230,13 +297,18 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
       )}
 
       {/* Variant Image Preview */}
-      {displayImage && displayImage !== product.image_url && (
+      {selectedVariant && (
         <div className="mt-4">
-          <img
-            src={displayImage}
-            alt={capitalizeFirst(selectedVariant?.name || product.name)}
-            className="w-full h-64 object-cover rounded-lg"
-          />
+          {showImage && (
+            <img
+              src={variantImage as string}
+              alt={capitalizeFirst(selectedVariant?.name || product.name)}
+              className="w-full h-64 object-cover rounded-lg"
+              onError={() => {
+                setImageLoadFailed(true)
+              }}
+            />
+          )}
         </div>
       )}
     </div>

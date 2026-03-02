@@ -1967,6 +1967,7 @@ export type OrganizationSettings = {
   locale?: string | null
   timezone?: string | null
   decimal_places?: number | null
+  default_low_stock_threshold?: number | null
   [key: string]: unknown
 }
 

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { deleteImage, uploadProductImage } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useToastStore } from '@/store/toastStore'
 import type { Product, ProductVariant, ProductVariantInsert, ProductVariantUpdate } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -35,6 +36,11 @@ const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 
 export function VariantForm({ product, variant, onClose }: VariantFormProps) {
+  const settings = useOrgSettings()
+  const defaultLowStockThreshold =
+    typeof settings.default_low_stock_threshold === 'number'
+      ? Math.max(0, Math.trunc(settings.default_low_stock_threshold))
+      : 10
   const { show } = useToastStore()
   const [loading, setLoading] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -63,7 +69,7 @@ export function VariantForm({ product, variant, onClose }: VariantFormProps) {
           stock: variant.stock,
           unit: variant.unit || product.unit || 'unidad',
           min_stock: variant.min_stock || 0,
-          low_stock_threshold: variant.low_stock_threshold || 10,
+          low_stock_threshold: variant.low_stock_threshold || defaultLowStockThreshold,
           is_active: variant.is_active ?? true,
           image_url: variant.image_url || '',
         }
@@ -74,7 +80,7 @@ export function VariantForm({ product, variant, onClose }: VariantFormProps) {
           stock: 0,
           unit: product.unit || 'unidad',
           min_stock: 0,
-          low_stock_threshold: 10,
+          low_stock_threshold: defaultLowStockThreshold,
           is_active: true,
           image_url: '',
         },
@@ -167,7 +173,7 @@ export function VariantForm({ product, variant, onClose }: VariantFormProps) {
         stock: data.stock,
         unit: data.unit || null,
         min_stock: data.min_stock || 0,
-        low_stock_threshold: data.low_stock_threshold || 10,
+        low_stock_threshold: data.low_stock_threshold ?? defaultLowStockThreshold,
         is_active: data.is_active,
         image_url: imageUrl,
       }
