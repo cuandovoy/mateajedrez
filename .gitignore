@@ -23,7 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 
-# Environment variables
+# Environment variables (cada cliente tiene su .env.<nombre>)
 .env
 .env.local
-.env.production
+.env.*
+!.env.example
