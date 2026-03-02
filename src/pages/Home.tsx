@@ -89,7 +89,7 @@ export function Home() {
         <div className="relative w-full">
           <img
             src="/banner1.png"
-            alt="Banner Flormaria Soria González"
+            alt="Banner "
             className="w-full h-auto object-cover max-h-[50vh] md:max-h-[70vh] lg:max-h-[80vh]"
           />
           <Link 

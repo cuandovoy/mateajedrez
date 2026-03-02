@@ -110,7 +110,7 @@ export function Header() {
         <div className="hidden lg:flex items-center h-16 my-2">
           <div className="flex-1">
             <Link to="/" className="flex items-center space-x-3">
-              <img src="/logo.svg" alt="Flormaria Soria González" className="h-16 w-16" />
+              <img src="/logo.svg" className="h-16 w-16" />
             </Link>
           </div>
 
@@ -173,7 +173,7 @@ export function Header() {
           {/* Logo in center */}
           <div className="flex-1 flex justify-center">
             <Link to="/" className="flex items-center" onClick={() => setIsMobileMenuOpen(false)}>
-              <img src="/logo.svg" alt="Flormaria Soria González" className="h-12 w-12" />
+              <img src="/logo.svg" className="h-12 w-12" />
             </Link>
           </div>
 

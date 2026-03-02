@@ -43,7 +43,7 @@ export function Footer() {
       <div className="container-custom py-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
-            <h3 className="text-lg font-semibold mb-4">Flormaria Soria González</h3>
+            <h3 className="text-lg font-semibold mb-4"></h3>
             <p className="text-white">
               Tu tienda online de confianza con los mejores productos.
             </p>
@@ -70,16 +70,16 @@ export function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-4">Contacto</h3>
             <p className="text-white">
-              Email: flormaria.sogo@gmail.com
+              Email: 
             </p>
             <p className="text-white">
-              Teléfono: +598 98 257 909
+              Teléfono: 
             </p>
           </div>
         </div>
         <div className="border-t border-gray-300 mt-8 pt-8 text-center">
           <p className="text-white mb-2">
-            &copy; {new Date().getFullYear()} Flormaria Soria González. Todos los derechos reservados.
+            &copy; {new Date().getFullYear()}. Todos los derechos reservados.
           </p>
           <p className="text-gray-400 text-sm">
             Creado por{' '}
