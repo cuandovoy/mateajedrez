@@ -8,6 +8,7 @@ import { trackAuditAction } from '@/lib/audit'
 import { supabase } from '@/lib/supabase'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
+import { X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 type SupplierLite = { id: string; name: string }
@@ -1208,8 +1209,18 @@ export function AdminExpenses() {
       {createOrderModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <Card className="w-full max-w-2xl">
-            <CardHeader>
-              <CardTitle>Nueva orden de compra</CardTitle>
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle>Nueva orden de compra</CardTitle>
+                <button
+                  type="button"
+                  onClick={() => setCreateOrderModalOpen(false)}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <label className="block text-sm font-medium text-gray-700">Proveedor</label>
@@ -1273,8 +1284,18 @@ export function AdminExpenses() {
       {editOrderModalOpen && selectedPurchaseOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <Card className="w-full max-w-6xl max-h-[90vh] overflow-y-auto">
-            <CardHeader>
-              <CardTitle>Editar orden de compra #{selectedPurchaseOrder.po_number ?? '-'}</CardTitle>
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle>Editar orden de compra #{selectedPurchaseOrder.po_number ?? '-'}</CardTitle>
+                <button
+                  type="button"
+                  onClick={() => setEditOrderModalOpen(false)}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1511,8 +1532,18 @@ export function AdminExpenses() {
       {paymentModalInvoice && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <Card className="w-full max-w-xl">
-            <CardHeader>
-              <CardTitle>Registrar pago de factura</CardTitle>
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle>Registrar pago de factura</CardTitle>
+                <button
+                  type="button"
+                  onClick={closePaymentModal}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
@@ -1572,8 +1603,18 @@ export function AdminExpenses() {
       {ledgerDetailEntry && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <Card className="w-full max-w-lg">
-            <CardHeader>
-              <CardTitle>Detalle del registro de egreso</CardTitle>
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle>Detalle del registro de egreso</CardTitle>
+                <button
+                  type="button"
+                  onClick={() => setLedgerDetailEntry(null)}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-gray-700">
               <p><span className="font-medium">Fecha:</span> {formatDateShort(ledgerDetailEntry.occurred_at, settings)}</p>

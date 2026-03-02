@@ -21,7 +21,7 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, ProductVariant, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { getMaxProductImages } from '@/lib/planLimits'
@@ -1275,10 +1275,26 @@ function AdminProductsContent() {
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <CardHeader>
-              <CardTitle>
-                {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
-              </CardTitle>
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle>
+                  {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
+                </CardTitle>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsModalOpen(false)
+                    setEditingProduct(null)
+                    setProductImages([])
+                    setInitialBranchId('')
+                    reset()
+                  }}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
