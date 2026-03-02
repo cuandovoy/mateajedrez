@@ -1968,6 +1968,7 @@ export type OrganizationSettings = {
   timezone?: string | null
   decimal_places?: number | null
   default_low_stock_threshold?: number | null
+  transfer_contact_phone?: string | null
   [key: string]: unknown
 }
 

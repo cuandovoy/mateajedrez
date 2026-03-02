@@ -13,7 +13,7 @@ import type { Branch, CartItemWithProduct } from '@/types'
 import { BranchInventory, Customer } from '@/types/database.types'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 interface ShippingForm {
   fullName: string
@@ -28,6 +28,7 @@ interface ShippingForm {
 
 export function Checkout() {
   const navigate = useNavigate()
+  const { slug } = useParams<{ slug?: string }>()
   const settings = useOrgSettings()
   const { items, getTotal, clearCart } = useCartStore()
   const { user } = useAuthStore()
@@ -454,7 +455,11 @@ export function Checkout() {
       show('¡Orden creada exitosamente!', 'success')
       
       // Navigate to order confirmation
-      navigate(`/orders/${(order as { id: string }).id}`)
+      navigate(
+        slug
+          ? `/${slug}/order-confirmation/${(order as { id: string }).id}`
+          : `/orders/${(order as { id: string }).id}`
+      )
     } catch (error) {
       console.error('Error creating order:', error)
       show('Error al crear la orden. Por favor, intenta nuevamente.', 'error')
@@ -476,7 +481,7 @@ export function Checkout() {
     <div className="container-custom py-8">
       <Button
         variant="ghost"
-        onClick={() => navigate('/cart')}
+        onClick={() => navigate(slug ? `/${slug}/cart` : '/cart')}
         className="mb-6"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />

@@ -94,12 +94,17 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
       ? Number(rawSettings.default_low_stock_threshold)
       : 10
   )
+  const [transferContactPhone, setTransferContactPhone] = useState((rawSettings.transfer_contact_phone as string) ?? '')
   const [notificationEmail, setNotificationEmail] = useState((rawSettings.notification_email as string) ?? '')
   const [newOrderNotify, setNewOrderNotify] = useState((rawSettings.new_order_notify as boolean) ?? false)
   const [lowStockNotify, setLowStockNotify] = useState((rawSettings.low_stock_notify as boolean) ?? false)
   const [orderStatusNotifyCustomer, setOrderStatusNotifyCustomer] = useState(
     (rawSettings.order_status_notify_customer as boolean) ?? false
   )
+  const [transferMethodId, setTransferMethodId] = useState<string | null>(null)
+  const [transferMethodConfig, setTransferMethodConfig] = useState<Record<string, unknown>>({})
+  const [transferInstructions, setTransferInstructions] = useState('')
+  const [initialTransferInstructions, setInitialTransferInstructions] = useState('')
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(organization.logo_url ?? null)
   const [coverFile, setCoverFile] = useState<File | null>(null)
@@ -133,11 +138,51 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         ? Number(s.default_low_stock_threshold)
         : 10
     )
+    setTransferContactPhone((s.transfer_contact_phone as string) ?? '')
     setNotificationEmail((s.notification_email as string) ?? '')
     setNewOrderNotify((s.new_order_notify as boolean) ?? false)
     setLowStockNotify((s.low_stock_notify as boolean) ?? false)
     setOrderStatusNotifyCustomer((s.order_status_notify_customer as boolean) ?? false)
+    setTransferMethodId(null)
+    setTransferMethodConfig({})
+    setTransferInstructions('')
+    setInitialTransferInstructions('')
   }, [organization])
+
+  useEffect(() => {
+    let mounted = true
+    const fetchTransferConfig = async () => {
+      try {
+        const { data } = await supabase
+          .from('organization_payment_methods')
+          .select('id, config')
+          .eq('organization_id', organization.id)
+          .eq('key', 'transfer')
+          .limit(1)
+          .maybeSingle()
+
+        if (!mounted) return
+        const row = data as { id: string; config: Record<string, unknown> | null } | null
+        const config = row?.config ?? {}
+        const instructions = typeof config.transfer_instructions === 'string' ? config.transfer_instructions : ''
+        setTransferMethodId(row?.id ?? null)
+        setTransferMethodConfig(config)
+        setTransferInstructions(instructions)
+        setInitialTransferInstructions(instructions)
+      } catch {
+        if (!mounted) return
+        setTransferMethodId(null)
+        setTransferMethodConfig({})
+        setTransferInstructions('')
+        setInitialTransferInstructions('')
+      }
+    }
+
+    fetchTransferConfig()
+    return () => {
+      mounted = false
+    }
+  }, [organization.id])
 
   const prevSettings = (organization.settings as Record<string, unknown>) ?? {}
   const isDirty =
@@ -162,6 +207,8 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
       (Number.isFinite(prevSettings.default_low_stock_threshold as number)
         ? Number(prevSettings.default_low_stock_threshold)
         : 10) ||
+    transferContactPhone !== ((prevSettings.transfer_contact_phone as string) ?? '') ||
+    transferInstructions !== initialTransferInstructions ||
     notificationEmail !== ((prevSettings.notification_email as string) ?? '') ||
     newOrderNotify !== ((prevSettings.new_order_notify as boolean) ?? false) ||
     lowStockNotify !== ((prevSettings.low_stock_notify as boolean) ?? false) ||
@@ -278,6 +325,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         timezone: timezone.trim() || 'America/Argentina/Buenos_Aires',
         allow_negative_stock: allowNegativeStock,
         default_low_stock_threshold: Math.max(0, Math.trunc(defaultLowStockThreshold || 0)),
+        transfer_contact_phone: transferContactPhone.trim() || undefined,
         notification_email: notificationEmail.trim() || undefined,
         new_order_notify: newOrderNotify,
         low_stock_notify: lowStockNotify,
@@ -308,6 +356,32 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
           throw new Error('Ya existe una organización con ese slug. Elige otro.')
         }
         throw updateError
+      }
+
+      const nextTransferConfig: Record<string, unknown> = {
+        ...transferMethodConfig,
+        transfer_instructions: transferInstructions.trim(),
+      }
+
+      if (transferMethodId) {
+        const { error: transferUpdateError } = await supabase
+          .from('organization_payment_methods')
+          .update({ config: nextTransferConfig } as never)
+          .eq('id', transferMethodId)
+        if (transferUpdateError) throw transferUpdateError
+      } else if (transferInstructions.trim()) {
+        const { error: transferInsertError } = await supabase
+          .from('organization_payment_methods')
+          .insert({
+            organization_id: organization.id,
+            key: 'transfer',
+            name: 'Transferencia Bancaria',
+            requires_cash_session: false,
+            is_active: true,
+            display_order: 0,
+            config: nextTransferConfig,
+          } as never)
+        if (transferInsertError) throw transferInsertError
       }
 
       show('Organización actualizada correctamente', 'success')
@@ -679,7 +753,29 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
               </TabsContent>
 
               <TabsContent value="pagos" className="mt-6 flex-1 min-h-0">
-                <PaymentMethodsManager organizationId={organization.id} />
+                <div className="space-y-4">
+                  <Input
+                    label="Teléfono / WhatsApp para comprobantes"
+                    value={transferContactPhone}
+                    onChange={(e) => setTransferContactPhone(e.target.value)}
+                    placeholder="+59898257909"
+                  />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Datos de Transferencia Bancaria
+                    </label>
+                    <textarea
+                      value={transferInstructions}
+                      onChange={(e) => setTransferInstructions(e.target.value)}
+                      className="w-full min-h-[140px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      placeholder={'Ej:\nBanco: ...\nTipo de Cuenta: ...\nNúmero de Cuenta: ...\nTitular: ...\nWhatsApp comprobante: ...'}
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Este texto se mostrará en la confirmación de orden cuando el método sea Transferencia.
+                    </p>
+                  </div>
+                  <PaymentMethodsManager organizationId={organization.id} />
+                </div>
               </TabsContent>
 
               <TabsContent value="notificaciones" className="mt-6 flex-1 min-h-0">

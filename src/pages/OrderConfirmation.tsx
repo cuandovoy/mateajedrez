@@ -21,6 +21,9 @@ const getStatusLabel = (status: string | null): string => {
 
 interface OrderWithItems extends Order {
   payment_method: 'transfer' | 'mercadopago' | 'cash'
+  organization?: {
+    settings?: Record<string, unknown> | null
+  } | null
   order_items: Array<OrderItem & { 
     product: { name: string; image_url: string | null }
     variant?: { 
@@ -34,16 +37,19 @@ interface OrderWithItems extends Order {
 }
 
 export function OrderConfirmation() {
-  const { id } = useParams<{ id: string }>()
+  const { slug, orderId } = useParams<{ slug?: string; orderId: string }>()
   const settings = useOrgSettings()
+  const primaryColor = 'var(--org-primary-color, #6366f1)'
   const [order, setOrder] = useState<OrderWithItems | null>(null)
+  const [transferInstructions, setTransferInstructions] = useState<string>('')
+  const [transferContactPhone, setTransferContactPhone] = useState<string>('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (id) {
+    if (orderId) {
       fetchOrder()
     }
-  }, [id])
+  }, [orderId])
 
   const fetchOrder = async () => {
     try {
@@ -51,6 +57,9 @@ export function OrderConfirmation() {
         .from('orders')
         .select(`
           *,
+          organization:organizations (
+            settings
+          ),
           order_items (
             *,
             product:products (
@@ -66,11 +75,39 @@ export function OrderConfirmation() {
             )
           )
         `)
-        .eq('id', id as string)
+        .eq('id', orderId as string)
         .single()
 
       if (error) throw error
-      setOrder(data as OrderWithItems)
+      const orderData = data as OrderWithItems
+      setOrder(orderData)
+
+      if (orderData.payment_method === 'transfer' && orderData.organization_id) {
+        const { data: transferMethodData } = await supabase
+          .from('organization_payment_methods')
+          .select('config')
+          .eq('organization_id', orderData.organization_id)
+          .eq('key', 'transfer')
+          .limit(1)
+          .maybeSingle()
+
+        const transferConfig = (transferMethodData as { config?: Record<string, unknown> } | null)?.config
+        const instructions =
+          transferConfig && typeof transferConfig.transfer_instructions === 'string'
+            ? transferConfig.transfer_instructions
+            : ''
+        setTransferInstructions(instructions)
+
+        const orgSettings = (orderData.organization?.settings || {}) as Record<string, unknown>
+        const contactPhone =
+          typeof orgSettings.transfer_contact_phone === 'string'
+            ? orgSettings.transfer_contact_phone.trim()
+            : ''
+        setTransferContactPhone(contactPhone)
+      } else {
+        setTransferInstructions('')
+        setTransferContactPhone('')
+      }
     } catch (error) {
       console.error('Error fetching order:', error)
     } finally {
@@ -78,10 +115,16 @@ export function OrderConfirmation() {
     }
   }
 
+  const whatsappDigits = transferContactPhone.replace(/\D/g, '')
+  const whatsappHref = whatsappDigits ? `https://wa.me/${whatsappDigits}` : ''
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-200"></div>
+        <div
+          className="animate-spin rounded-full h-12 w-12 border-b-2"
+          style={{ borderColor: primaryColor }}
+        />
       </div>
     )
   }
@@ -90,7 +133,7 @@ export function OrderConfirmation() {
     return (
       <div className="container-custom py-8 text-center">
         <p className="text-gray-600 text-lg mb-4">Orden no encontrada</p>
-        <Link to="/">
+        <Link to={slug ? `/${slug}` : '/'}>
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver al inicio
@@ -130,7 +173,7 @@ export function OrderConfirmation() {
               </div>
               <div>
                 <p className="text-sm text-gray-600">Total</p>
-                <p className="font-semibold text-lg text-primary-200">
+                <p className="font-semibold text-lg" style={{ color: primaryColor }}>
                   {formatPrice(order.total, settings)}
                 </p>
               </div>
@@ -227,7 +270,7 @@ export function OrderConfirmation() {
 
         {/* Transfer Details - Only show if payment method is transfer */}
         {order.payment_method === 'transfer' && (
-          <Card className="mb-6 border-2 border-primary-200">
+          <Card className="mb-6 border-2" style={{ borderColor: `color-mix(in srgb, ${primaryColor} 40%, white)` }}>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <CreditCard className="h-5 w-5" />
@@ -235,28 +278,19 @@ export function OrderConfirmation() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="bg-primary-50 p-4 rounded-lg">
+              <div className="p-4 rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${primaryColor} 10%, white)` }}>
                 <p className="text-sm font-medium text-gray-700 mb-3">
                   Realiza la transferencia por el monto total de la orden:
                 </p>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Banco:</span>
-                    <span className="font-semibold text-gray-900">BROU</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Tipo de Cuenta:</span>
-                    <span className="font-semibold text-gray-900">Caja de ahorro</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Número de Cuenta:</span>
-                    <span className="font-semibold text-gray-900">001913212-00001</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Titular:</span>
-                    <span className="font-semibold text-gray-900">Flormaria Soria González</span>
-                  </div>
-                </div>
+                {transferInstructions.trim() ? (
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap font-sans leading-6">
+                    {transferInstructions}
+                  </pre>
+                ) : (
+                  <p className="text-sm text-gray-600">
+                    Esta organización no configuró aún los datos bancarios de transferencia.
+                  </p>
+                )}
               </div>
               <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
                 <div className="flex items-start space-x-3">
@@ -265,17 +299,32 @@ export function OrderConfirmation() {
                     <p className="text-sm font-medium text-yellow-900 mb-1">
                       Envía el comprobante de transferencia
                     </p>
-                    <p className="text-sm text-yellow-800">
-                      Por favor, envía una foto del comprobante de transferencia al siguiente número:
-                    </p>
-                    <a
-                      href="https://wa.me/59898257909"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm font-semibold text-primary-200 hover:underline mt-2 inline-block"
-                    >
-                      +598 98 257 909
-                    </a>
+                    {transferContactPhone ? (
+                      <>
+                        <p className="text-sm text-yellow-800">
+                          Por favor, envía una foto del comprobante de transferencia al siguiente número:
+                        </p>
+                        {whatsappHref ? (
+                          <a
+                            href={whatsappHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-semibold hover:underline mt-2 inline-block"
+                            style={{ color: primaryColor }}
+                          >
+                            {transferContactPhone}
+                          </a>
+                        ) : (
+                          <p className="text-sm font-semibold mt-2" style={{ color: primaryColor }}>
+                            {transferContactPhone}
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-sm text-yellow-800">
+                        Esta organización no configuró un teléfono de contacto para comprobantes.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -287,8 +336,12 @@ export function OrderConfirmation() {
         )}
 
         <div className="mt-8 flex justify-center space-x-4">
-          <Link to="/">
-            <Button variant="outline" className='bg-primary-400 text-white'>
+          <Link to={slug ? `/${slug}` : '/'}>
+            <Button
+              variant="outline"
+              className="text-white"
+              style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Continuar Comprando
             </Button>

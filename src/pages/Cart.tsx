@@ -10,10 +10,11 @@ import { Branch, Product, ProductImage } from '@/types'
 import { BranchInventory, ProductVariant } from '@/types/database.types'
 import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 function CartContent() {
   const navigate = useNavigate()
+  const { slug } = useParams<{ slug?: string }>()
   const settings = useOrgSettings()
   const { items, loading, fetchCart, updateQuantity, removeFromCart, getTotal } = useCartStore()
   const { user } = useAuthStore()
@@ -163,7 +164,7 @@ function CartContent() {
   }
 
   const handleCheckout = () => {
-    navigate('/checkout')
+    navigate(slug ? `/${slug}/checkout` : '/checkout')
   }
 
   if (loading) {
@@ -180,7 +181,7 @@ function CartContent() {
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-gray-600 text-lg mb-4">Tu carrito está vacío</p>
-            <Button onClick={() => navigate('/')} className='bg-primary-400 text-white'>
+            <Button onClick={() => navigate(slug ? `/${slug}` : '/')} className='bg-primary-400 text-white'>
               Continuar Comprando
             </Button>
           </CardContent>
