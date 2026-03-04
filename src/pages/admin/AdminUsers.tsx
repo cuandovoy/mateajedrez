@@ -17,6 +17,9 @@ import { useNavigate } from 'react-router-dom'
 interface UserProfileWithEmail extends UserProfile {
   email?: string | null
   isGuest?: boolean
+  organization_role_id?: string | null
+  role_name?: string | null
+  base_role_key?: string | null
 }
 
 type UserRole = 'user' | 'admin' | 'manager' | 'viewer'
@@ -27,6 +30,13 @@ interface NewUserFormData {
   fullName: string
   phone: string
   role: UserRole
+}
+
+type OrganizationRoleOption = {
+  id: string
+  name: string
+  base_role_key: string
+  is_system: boolean
 }
 
 const ITEMS_PER_PAGE = 10
@@ -64,6 +74,7 @@ export function AdminUsers() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [updatingRole, setUpdatingRole] = useState<string | null>(null)
+  const [organizationRoles, setOrganizationRoles] = useState<OrganizationRoleOption[]>([])
   const [creatingUser, setCreatingUser] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newUserForm, setNewUserForm] = useState<NewUserFormData>({
@@ -83,17 +94,53 @@ export function AdminUsers() {
       navigate('/')
       return
     }
-    if (organizationId) fetchUsers()
+    if (organizationId) {
+      fetchOrganizationRoles()
+      fetchUsers()
+    }
   }, [isAdmin, organizationId, currentPage, roleFilter, searchTerm, navigate])
+
+  const fetchOrganizationRoles = async () => {
+    if (!organizationId) return
+    try {
+      const sb = supabase as any
+      const { data, error } = await sb
+        .from('organization_roles')
+        .select('id, name, base_role_key, is_system')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('is_system', { ascending: false })
+        .order('name', { ascending: true })
+
+      if (error) throw error
+      setOrganizationRoles((data || []) as OrganizationRoleOption[])
+    } catch (error) {
+      console.error('Error fetching organization roles:', error)
+    }
+  }
 
   const fetchUsers = async () => {
     if (!organizationId) return
     setLoading(true)
     try {
+      const sb = supabase as any
+      let rolesForMapping = organizationRoles
+      if (!rolesForMapping.length) {
+        const { data: rolesData, error: rolesError } = await sb
+          .from('organization_roles')
+          .select('id, name, base_role_key, is_system')
+          .eq('organization_id', organizationId)
+          .eq('is_active', true)
+        if (!rolesError && rolesData) {
+          rolesForMapping = rolesData as OrganizationRoleOption[]
+          setOrganizationRoles(rolesForMapping)
+        }
+      }
+
       // Fetch org members (role is per-org)
-      const { data: membersData, error: membersError } = await supabase
+      const { data: membersData, error: membersError } = await sb
         .from('organization_members')
-        .select('user_id, role')
+        .select('user_id, role, organization_role_id')
         .eq('organization_id', organizationId)
 
       if (membersError) throw membersError
@@ -116,14 +163,24 @@ export function AdminUsers() {
 
       if (profilesError) throw profilesError
 
-      const memberByUserId = new Map(members.map((m: { user_id: string; role: string }) => [m.user_id, m.role]))
+      const roleById = new Map(rolesForMapping.map((r) => [r.id, r]))
+      const memberByUserId = new Map(
+        members.map((m: { user_id: string; role: string; organization_role_id: string | null }) => [m.user_id, m])
+      )
 
       // Merge: profile + org role (role from organization_members)
       let processedUsers: UserProfileWithEmail[] = (profilesData || []).map((profile: UserProfileWithEmail) => {
-        const orgRole = (memberByUserId.get(profile.user_id ?? '') ?? 'user') as UserRole
+        const member = memberByUserId.get(profile.user_id ?? '') as
+          | { role: string; organization_role_id: string | null }
+          | undefined
+        const legacyRole = ((member?.role as UserRole | undefined) ?? 'user') as UserRole
+        const orgRole = member?.organization_role_id ? roleById.get(member.organization_role_id) : null
         return {
           ...profile,
-          role: orgRole,
+          role: (orgRole?.base_role_key as UserRole | undefined) ?? legacyRole,
+          organization_role_id: member?.organization_role_id ?? null,
+          role_name: orgRole?.name ?? getRoleLabel(legacyRole),
+          base_role_key: orgRole?.base_role_key ?? legacyRole,
           isGuest: profile.user_id === null,
         }
       })
@@ -168,14 +225,26 @@ export function AdminUsers() {
     setCurrentPage(1)
   }
 
-  const handleRoleChange = async (userOrProfileId: string, role: UserRole) => {
+  const handleRoleChange = async (userOrProfileId: string, organizationRoleId: string) => {
     const user = users.find((u) => u.id === userOrProfileId || u.user_id === userOrProfileId)
     const userId = user?.user_id ?? userOrProfileId
+    const selectedOrgRole = organizationRoles.find((r) => r.id === organizationRoleId)
+    if (!selectedOrgRole) {
+      show('Rol inválido', 'error')
+      return
+    }
+
+    const legacyRole = (selectedOrgRole.base_role_key || 'user') as UserRole
+
     setUpdatingRole(userId)
     try {
-      const { error } = await supabase
+      const sb = supabase as any
+      const { error } = await sb
         .from('organization_members')
-        .update({ role } as never)
+        .update({
+          role: legacyRole,
+          organization_role_id: selectedOrgRole.id,
+        } as never)
         .eq('organization_id', organizationId!)
         .eq('user_id', userId)
 
@@ -183,10 +252,18 @@ export function AdminUsers() {
 
       setUsers((prevUsers) =>
         prevUsers.map((user) =>
-          user.user_id === userId ? { ...user, role } : user
+          user.user_id === userId
+            ? {
+                ...user,
+                role: legacyRole,
+                organization_role_id: selectedOrgRole.id,
+                role_name: selectedOrgRole.name,
+                base_role_key: selectedOrgRole.base_role_key,
+              }
+            : user
         )
       )
-      show(`Rol actualizado a ${getRoleLabel(role)}`, 'success')
+      show(`Rol actualizado a ${selectedOrgRole.name}`, 'success')
     } catch (error) {
       console.error('Error updating user role:', error)
       show('Error al actualizar el rol', 'error')
@@ -474,24 +551,25 @@ export function AdminUsers() {
                             <span
                               className={cn(
                                 'px-2 py-1 rounded-full text-xs font-medium',
-                                getRoleColor(user.role)
+                                getRoleColor(user.base_role_key || user.role)
                               )}
                             >
-                              {getRoleLabel(user.role)}
+                              {user.role_name || getRoleLabel(user.role)}
                             </span>
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex items-center space-x-2">
                               <select
-                                value={user.role ?? 'user'}
-                                onChange={(e) => handleRoleChange(user.user_id ?? user.id, e.target.value as UserRole)}
+                                value={user.organization_role_id ?? ''}
+                                onChange={(e) => handleRoleChange(user.user_id ?? user.id, e.target.value)}
                                 disabled={updatingRole === (user.user_id ?? user.id) || user.user_id === authUser?.id}
                                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-200 disabled:bg-gray-100 disabled:text-gray-500"
                               >
-                                <option value="user">Usuario</option>
-                                <option value="viewer">Visualizador</option>
-                                <option value="manager">Gerente</option>
-                                <option value="admin">Administrador</option>
+                                {organizationRoles.map((roleOption) => (
+                                  <option key={roleOption.id} value={roleOption.id}>
+                                    {roleOption.name}
+                                  </option>
+                                ))}
                               </select>
                               {updatingRole === user.id && (
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-admin-600"></div>

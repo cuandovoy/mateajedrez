@@ -125,10 +125,24 @@ export function useUserManagement() {
     // Add user to organization (role is per-org in organization_members)
     const orgId = input.organizationId
     if (orgId) {
+      const sb = supabase as any
+      const { data: orgRoleData } = await sb
+        .from('organization_roles')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('key', role)
+        .limit(1)
+        .maybeSingle()
+
       const { error: memberError } = await supabase
         .from('organization_members')
         .upsert(
-          { organization_id: orgId, user_id: createdUser.id, role } as never,
+          {
+            organization_id: orgId,
+            user_id: createdUser.id,
+            role,
+            organization_role_id: orgRoleData?.id ?? null,
+          } as never,
           { onConflict: 'organization_id,user_id' }
         )
 
