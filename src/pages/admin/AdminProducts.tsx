@@ -21,7 +21,7 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, ProductVariant, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { getMaxProductImages } from '@/lib/planLimits'
@@ -109,6 +109,7 @@ function AdminProductsContent() {
   const [initialBranchId, setInitialBranchId] = useState<string>('')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [filtersCollapsed, setFiltersCollapsed] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [filters, setFilters] = useState<ProductFilters>({
@@ -918,6 +919,102 @@ function AdminProductsContent() {
     )
   }, [filters, appliedSearch])
 
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;')
+
+  const exportProductsPdf = async () => {
+    const rowsToExport = filteredProducts
+    if (rowsToExport.length === 0) {
+      show('No hay productos para exportar.', 'info')
+      return
+    }
+
+    try {
+      setExportingPdf(true)
+
+      const printWindow = window.open('', '_blank', 'width=1200,height=900')
+      if (!printWindow) {
+        show('No se pudo abrir la ventana de impresión. Habilita popups e inténtalo de nuevo.', 'error')
+        return
+      }
+
+      const generatedAt = new Date().toLocaleString('es-UY')
+      const filtersSummary = hasActiveFilters ? 'Sí' : 'No'
+      const htmlRows = rowsToExport
+        .map((product) => {
+          const category = product.category?.name || 'Sin categoría'
+          const stock = product.inventory_stock ?? 0
+          const status = product.is_active ? 'Activo' : 'Inactivo'
+          return `
+            <tr>
+              <td>${escapeHtml(product.name)}</td>
+              <td>${escapeHtml(product.sku || '-')}</td>
+              <td>${escapeHtml(category)}</td>
+              <td class="number">${escapeHtml(formatPrice(product.price, settings))}</td>
+              <td class="number">${stock}</td>
+              <td>${status}</td>
+            </tr>
+          `
+        })
+        .join('')
+
+      const html = `
+        <!doctype html>
+        <html lang="es">
+          <head>
+            <meta charset="UTF-8" />
+            <title>Listado de Productos</title>
+            <style>
+              @page { size: A4 landscape; margin: 12mm; }
+              body { font-family: Arial, sans-serif; color: #111827; }
+              h1 { margin: 0 0 6px; font-size: 22px; }
+              .meta { margin: 0 0 14px; font-size: 12px; color: #4b5563; }
+              table { width: 100%; border-collapse: collapse; font-size: 11px; }
+              th, td { border: 1px solid #d1d5db; padding: 6px 8px; vertical-align: top; }
+              th { background: #f3f4f6; text-align: left; }
+              .number { text-align: right; white-space: nowrap; }
+            </style>
+          </head>
+          <body>
+            <h1>Listado de Productos</h1>
+            <p class="meta">Generado: ${escapeHtml(generatedAt)} | Productos: ${rowsToExport.length} | Filtros aplicados: ${filtersSummary}</p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>SKU</th>
+                  <th>Categoría</th>
+                  <th>Precio</th>
+                  <th>Stock</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${htmlRows}
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `
+
+      printWindow.document.open()
+      printWindow.document.write(html)
+      printWindow.document.close()
+      printWindow.focus()
+      printWindow.print()
+    } catch (error) {
+      console.error('Error exporting products PDF:', error)
+      show('No se pudo exportar el PDF.', 'error')
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
   if (loading) {
     return (
       <div>
@@ -969,10 +1066,20 @@ function AdminProductsContent() {
             <Grid3x3 className="h-4 w-4" />
           </button>
         </div>
-        <Button onClick={handleNew} disabled={isAtLimit('products')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Producto
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={exportProductsPdf}
+            disabled={exportingPdf || filteredProducts.length === 0}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {exportingPdf ? 'Exportando...' : 'Exportar PDF'}
+          </Button>
+          <Button onClick={handleNew} disabled={isAtLimit('products')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Producto
+          </Button>
+        </div>
       </div>
 
       {/* Filters Panel */}

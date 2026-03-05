@@ -31,7 +31,7 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const DEFAULT_PAGE_SIZE = 25
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
@@ -95,6 +95,7 @@ export function AdminInventory() {
   const [totalCount, setTotalCount] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const fetchInventoryRequestId = useRef(0)
 
   useEffect(() => {
     const initialSearch = (searchParams.get('search') || '').trim()
@@ -119,7 +120,6 @@ export function AdminInventory() {
   useEffect(() => {
     if (organizationId) {
       fetchBranches()
-      fetchProducts()
       checkMissingProducts()
     }
   }, [organizationId])
@@ -138,10 +138,71 @@ export function AdminInventory() {
 
   const fetchInventory = useCallback(async () => {
     if (!organizationId) return
+    const requestId = ++fetchInventoryRequestId.current
     try {
       setLoading(true)
       const from = page * pageSize
       const to = from + pageSize - 1
+      const hasSearch = debouncedSearch.length > 0
+
+      const resolveSearchMatches = async (term: string) => {
+        const likeTerm = `%${term}%`
+        const [
+          productsByNameResult,
+          productsBySkuResult,
+          variantsByNameResult,
+          variantsBySkuResult,
+        ] = await Promise.all([
+          supabase
+            .from('products')
+            .select('id')
+            .eq('organization_id', organizationId)
+            .ilike('name', likeTerm),
+          supabase
+            .from('products')
+            .select('id')
+            .eq('organization_id', organizationId)
+            .ilike('sku', likeTerm),
+          supabase
+            .from('product_variants')
+            .select('id, product_id, products!inner(organization_id)')
+            .eq('products.organization_id', organizationId)
+            .ilike('name', likeTerm),
+          supabase
+            .from('product_variants')
+            .select('id, product_id, products!inner(organization_id)')
+            .eq('products.organization_id', organizationId)
+            .ilike('sku', likeTerm),
+        ])
+
+        if (productsByNameResult.error) throw productsByNameResult.error
+        if (productsBySkuResult.error) throw productsBySkuResult.error
+        if (variantsByNameResult.error) throw variantsByNameResult.error
+        if (variantsBySkuResult.error) throw variantsBySkuResult.error
+
+        const productIds = new Set<string>()
+        const variantIds = new Set<string>()
+
+        for (const row of productsByNameResult.data || []) productIds.add(row.id)
+        for (const row of productsBySkuResult.data || []) productIds.add(row.id)
+        for (const row of variantsByNameResult.data || []) variantIds.add(row.id)
+        for (const row of variantsBySkuResult.data || []) variantIds.add(row.id)
+
+        if (productIds.size > 0) {
+          const { data: variantsFromMatchedProducts, error: variantsFromMatchedProductsError } = await supabase
+            .from('product_variants')
+            .select('id')
+            .in('product_id', Array.from(productIds))
+
+          if (variantsFromMatchedProductsError) throw variantsFromMatchedProductsError
+          for (const row of variantsFromMatchedProducts || []) variantIds.add(row.id)
+        }
+
+        return {
+          productIds: Array.from(productIds),
+          variantIds: Array.from(variantIds),
+        }
+      }
 
       let query = supabase
         .from('branch_inventory')
@@ -199,16 +260,29 @@ export function AdminInventory() {
         query = query.eq('branch_id', selectedBranch)
       }
 
-      // Avoid PostgREST parser issues in `or(...)` with related fields + spaces.
-      // When searching, fetch the branch scope and filter in memory, then paginate.
-      const hasSearch = debouncedSearch.length > 0
-      if (!hasSearch) {
-        query = query.range(from, to)
+      if (hasSearch) {
+        const { productIds, variantIds } = await resolveSearchMatches(debouncedSearch)
+        if (productIds.length === 0 && variantIds.length === 0) {
+          if (requestId !== fetchInventoryRequestId.current) return
+          setInventory([])
+          setTotalCount(0)
+          return
+        }
+        if (productIds.length > 0 && variantIds.length > 0) {
+          query = query.or(`product_id.in.(${productIds.join(',')}),variant_id.in.(${variantIds.join(',')})`)
+        } else if (productIds.length > 0) {
+          query = query.in('product_id', productIds)
+        } else {
+          query = query.in('variant_id', variantIds)
+        }
       }
+
+      query = query.range(from, to)
 
       const { data, error, count } = await query
 
       if (error) throw error
+      if (requestId !== fetchInventoryRequestId.current) return
       const rawItems = (data || []).map((item: Record<string, unknown>) => {
         const branch = item.branches as { id: string; name: string } | null
         const product = item.product_id
@@ -262,24 +336,16 @@ export function AdminInventory() {
           return sanitized
         })
 
-      if (hasSearch) {
-        const searchLower = debouncedSearch.toLowerCase()
-        const filteredItems = inventoryItems.filter((item) => {
-          const haystack = `${item.product_name} ${item.variant_name || ''} ${item.sku || ''}`.toLowerCase()
-          return haystack.includes(searchLower)
-        })
-        const pagedItems = filteredItems.slice(from, from + pageSize)
-        setInventory(pagedItems)
-        setTotalCount(filteredItems.length)
-      } else {
-        setInventory(inventoryItems)
-        setTotalCount(count ?? 0)
-      }
+      setInventory(inventoryItems)
+      setTotalCount(count ?? 0)
     } catch (err) {
+      if (requestId !== fetchInventoryRequestId.current) return
       console.error('Error fetching inventory:', err)
       show('Error al cargar el inventario', 'error')
     } finally {
-      setLoading(false)
+      if (requestId === fetchInventoryRequestId.current) {
+        setLoading(false)
+      }
     }
   }, [organizationId, page, pageSize, selectedBranch, debouncedSearch, sortDirection, show])
 
@@ -305,22 +371,6 @@ export function AdminInventory() {
       }
     } catch (error) {
       console.error('Error fetching branches:', error)
-    }
-  }
-
-  const fetchProducts = async () => {
-    if (!organizationId) return
-    try {
-      const { error } = await supabase
-        .from('products')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name')
-
-      if (error) throw error
-    } catch (error) {
-      console.error('Error fetching products:', error)
     }
   }
 
@@ -368,12 +418,7 @@ export function AdminInventory() {
       if (productsError) throw productsError
 
       // Count active variants without inventory entries (via products of org)
-      const { data: productsForVariants } = await supabase
-        .from('products')
-        .select('id')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-      const ids = (productsForVariants || []).map((p: { id: string }) => p.id)
+      const ids = (productsData || []).map((p: { id: string }) => p.id)
       let variantsData: { id: string }[] = []
       if (ids.length > 0) {
         const { data: vData, error: vErr } = await supabase
@@ -741,6 +786,7 @@ export function AdminInventory() {
     }
   }
 
+  console.log(inventory);
   const lowStockCount = inventory.filter((item) => item.is_low_stock).length
   const fromItem = totalCount === 0 ? 0 : page * pageSize + 1
   const toItem = Math.min((page + 1) * pageSize, totalCount)
@@ -748,6 +794,8 @@ export function AdminInventory() {
   const hasPrev = page > 0
   const hasNext = page < totalPages - 1
 
+  console.log(inventory);
+  
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
