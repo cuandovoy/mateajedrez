@@ -18,6 +18,7 @@ const formatOrderDisplayNumber = (order: { id: string; order_number?: number | n
 
 const getStatusLabel = (status: string | null): string => {
   const statusMap: Record<string, string> = {
+    pending_allocation: 'Pendiente de asignación',
     pending: 'Pendiente',
     processing: 'En Proceso',
     shipped: 'Enviado',
@@ -29,6 +30,7 @@ const getStatusLabel = (status: string | null): string => {
 
 const getStatusColor = (status: string | null): string => {
   const colorMap: Record<string, string> = {
+    pending_allocation: 'bg-orange-100 text-orange-800',
     pending: 'bg-yellow-100 text-yellow-800',
     processing: 'bg-blue-100 text-blue-800',
     shipped: 'bg-purple-100 text-purple-800',
@@ -38,7 +40,7 @@ const getStatusColor = (status: string | null): string => {
   return (status && colorMap[status]) || 'bg-gray-100 text-gray-800'
 }
 
-type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
+type OrderStatus = 'pending_allocation' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
 type OrderPaymentLite = {
   id: string
   amount: number
@@ -80,7 +82,7 @@ export function AdminOrders() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(
-    statusFromUrl && ['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(statusFromUrl)
+    statusFromUrl && ['pending_allocation', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(statusFromUrl)
       ? statusFromUrl
       : 'all'
   )
@@ -316,6 +318,7 @@ export function AdminOrders() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
               >
                 <option value="all">Todos</option>
+                <option value="pending_allocation">Pend. asignación</option>
                 <option value="pending">Pendiente</option>
                 <option value="processing">En Proceso</option>
                 <option value="shipped">Enviado</option>

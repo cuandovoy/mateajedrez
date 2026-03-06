@@ -269,9 +269,10 @@ export function AdminExpenses() {
     }
   }, [selectedPurchaseOrderId])
 
-  const fetchPageData = async () => {
+  const fetchPageData = async (options?: { silent?: boolean }) => {
     if (!organizationId) return
-    setLoading(true)
+    const silent = options?.silent ?? false
+    if (!silent) setLoading(true)
     try {
       const [suppliersResult, branchesResult, productsResult, purchaseOrdersResult, supplierInvoicesResult] = await Promise.all([
         fromAny('suppliers').select('id, name').eq('organization_id', organizationId).order('name'),
@@ -309,7 +310,7 @@ export function AdminExpenses() {
       console.error('Error loading purchases and expenses page:', error)
       show('No se pudieron cargar los datos de compras y egresos.', 'error')
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
@@ -406,7 +407,7 @@ export function AdminExpenses() {
 
       setCreateOrderForm({ supplier_id: '', branch_id: '', status: 'submitted', notes: '' })
       setCreateOrderModalOpen(false)
-      await fetchPageData()
+      await fetchPageData({ silent: true })
       if (data?.id) {
         setSelectedPurchaseOrderId(data.id)
         setEditOrderModalOpen(true)
@@ -458,7 +459,7 @@ export function AdminExpenses() {
           notes: editOrderForm.notes || null,
         },
       })
-      await fetchPageData()
+      await fetchPageData({ silent: true })
       show('Orden de compra actualizada correctamente.', 'success')
     } catch (error) {
       console.error('Error updating purchase order:', error)
@@ -543,7 +544,7 @@ export function AdminExpenses() {
         description: '',
       })
 
-      await fetchPageData()
+      await fetchPageData({ silent: true })
       await fetchPurchaseOrderItems(selectedPurchaseOrder.id)
       show('Producto agregado a la orden de compra.', 'success')
     } catch (error) {
@@ -571,7 +572,7 @@ export function AdminExpenses() {
         notes: 'Producto eliminado de una orden de compra.',
         oldData: existingItem || null,
       })
-      await fetchPageData()
+      await fetchPageData({ silent: true })
       await fetchPurchaseOrderItems(selectedPurchaseOrder.id)
       show('Producto eliminado de la orden de compra.', 'success')
     } catch (error) {
@@ -642,7 +643,7 @@ export function AdminExpenses() {
         },
       })
 
-      await fetchPageData()
+      await fetchPageData({ silent: true })
       await fetchPurchaseOrderItems(selectedPurchaseOrder.id)
       await fetchExpenseLedger()
       show('Recepcion creada y confirmada correctamente.', 'success')
@@ -718,7 +719,7 @@ export function AdminExpenses() {
         issue_immediately: true,
       })
 
-      await fetchPageData()
+      await fetchPageData({ silent: true })
       await fetchExpenseLedger()
       show('Factura creada correctamente.', 'success')
     } catch (error) {
@@ -776,7 +777,7 @@ export function AdminExpenses() {
         notes: '',
       })
 
-      await fetchPageData()
+      await fetchPageData({ silent: true })
       await fetchExpenseLedger()
       setPaymentModalInvoice(null)
       show('Pago registrado correctamente.', 'success')
@@ -833,7 +834,7 @@ export function AdminExpenses() {
         },
       })
 
-      await fetchPageData()
+      await fetchPageData({ silent: true })
       await fetchExpenseLedger()
       show(`Pago revertido correctamente para la factura ${invoice.invoice_number}.`, 'success')
     } catch (error) {

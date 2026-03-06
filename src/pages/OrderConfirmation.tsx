@@ -10,6 +10,7 @@ import type { Order, OrderItem } from '@/types'
 
 const getStatusLabel = (status: string | null): string => {
   const statusMap: Record<string, string> = {
+    pending_allocation: 'Pendiente de asignación',
     pending: 'Pendiente',
     processing: 'En Proceso',
     shipped: 'Enviado',

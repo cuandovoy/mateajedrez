@@ -140,13 +140,18 @@ export type Database = {
       branches: {
         Row: {
           address: string | null
+          can_dispatch: boolean
+          can_receive: boolean
+          can_sell: boolean
           city: string | null
           code: string | null
           country: string | null
           created_at: string | null
           email: string | null
           id: string
+          is_isolated_warehouse: boolean
           is_active: boolean | null
+          kind: string
           name: string
           notes: string | null
           organization_id: string
@@ -156,13 +161,18 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          can_dispatch?: boolean
+          can_receive?: boolean
+          can_sell?: boolean
           city?: string | null
           code?: string | null
           country?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
+          is_isolated_warehouse?: boolean
           is_active?: boolean | null
+          kind?: string
           name: string
           notes?: string | null
           organization_id: string
@@ -172,13 +182,18 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          can_dispatch?: boolean
+          can_receive?: boolean
+          can_sell?: boolean
           city?: string | null
           code?: string | null
           country?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
+          is_isolated_warehouse?: boolean
           is_active?: boolean | null
+          kind?: string
           name?: string
           notes?: string | null
           organization_id?: string
@@ -484,6 +499,7 @@ export type Database = {
           quantity: number
           status: string
           to_branch_id: string
+          transfer_type: string
           variant_id: string | null
         }
         Insert: {
@@ -498,6 +514,7 @@ export type Database = {
           quantity: number
           status?: string
           to_branch_id: string
+          transfer_type?: string
           variant_id?: string | null
         }
         Update: {
@@ -512,6 +529,7 @@ export type Database = {
           quantity?: number
           status?: string
           to_branch_id?: string
+          transfer_type?: string
           variant_id?: string | null
         }
         Relationships: [
@@ -1749,6 +1767,7 @@ export type Database = {
         | "OTHER"
       order_status:
         | "pending"
+        | "pending_allocation"
         | "processing"
         | "shipped"
         | "delivered"
@@ -1894,6 +1913,7 @@ export const Constants = {
       ],
       order_status: [
         "pending",
+        "pending_allocation",
         "processing",
         "shipped",
         "delivered",
@@ -1969,6 +1989,13 @@ export type OrganizationSettings = {
   decimal_places?: number | null
   default_low_stock_threshold?: number | null
   transfer_contact_phone?: string | null
+  consignment_enabled?: boolean | null
+  consignment_allow_seller_to_seller?: boolean | null
+  consignment_default_warehouse_branch_id?: string | null
+  checkout_fulfillment_mode?: 'auto' | 'main' | null
+  checkout_exclude_isolated_warehouses?: boolean | null
+  checkout_stock_allocation_mode?: 'immediate' | 'manual' | null
+  inventory_transfer_completion_mode?: 'manual' | 'automatic' | null
   [key: string]: unknown
 }
 

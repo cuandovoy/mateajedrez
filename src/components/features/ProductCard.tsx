@@ -89,7 +89,7 @@ export function ProductCard({
     }
 
     let cancelled = false
-    getProductStock(product.id)
+    getProductStock(product.id, null, null, product.organization_id || null)
       .then((stockValue) => {
         if (!cancelled) {
           setStock(stockValue)
@@ -105,7 +105,7 @@ export function ProductCard({
     return () => {
       cancelled = true
     }
-  }, [product.id, stockProp])
+  }, [product.id, product.organization_id, stockProp])
 
   const hasStock = stock !== null ? stock > 0 : false
 

@@ -18,6 +18,7 @@ function CartContent() {
   const settings = useOrgSettings()
   const { items, loading, fetchCart, updateQuantity, removeFromCart, getTotal } = useCartStore()
   const { user } = useAuthStore()
+  const organizationId = items[0]?.product?.organization_id || null
   const [stockWarnings, setStockWarnings] = useState<Record<string, { available: number; requested: number }>>({})
   const [mainBranchId, setMainBranchId] = useState<string | null>(null)
   const [itemStocks, setItemStocks] = useState<Record<string, number>>({}) // item.id -> stock
@@ -26,15 +27,22 @@ function CartContent() {
     fetchCart()
   }, [user, fetchCart])
 
-  // Fetch main branch on mount
+  // Fetch operational branch for this cart organization (excluding isolated warehouses)
   useEffect(() => {
     const fetchMainBranch = async () => {
+      if (!organizationId) {
+        setMainBranchId(null)
+        return
+      }
+
       try {
         const { data, error }: { data: Branch | null, error: Error | null } = await supabase
           .from('branches')
           .select('id')
+          .eq('organization_id', organizationId)
           .eq('code', 'MAIN')
           .eq('is_active', true)
+          .eq('is_isolated_warehouse', false)
           .single()
 
         if (error) throw error
@@ -47,7 +55,9 @@ function CartContent() {
         const { data }: { data: {id: string} | null, error: Error | null } = await supabase
           .from('branches')
           .select('id')
+          .eq('organization_id', organizationId)
           .eq('is_active', true)
+          .eq('is_isolated_warehouse', false)
           .limit(1)
           .single()
 
@@ -58,7 +68,7 @@ function CartContent() {
     }
 
     fetchMainBranch()
-  }, [])
+  }, [organizationId])
 
   useEffect(() => {
     // Validate stock when items change and branch is loaded

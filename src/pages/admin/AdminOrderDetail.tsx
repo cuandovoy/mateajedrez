@@ -9,7 +9,7 @@ import { trackAuditAction } from '@/lib/audit'
 import { capitalizeFirst, formatDateTime, formatPrice } from '@/lib/utils'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
-import type { Order, OrderItem } from '@/types'
+import type { Branch, Order, OrderItem } from '@/types'
 import type { OrderPayment } from '@/types/database.types'
 import { ArrowLeft, Calendar, DollarSign, Edit2, FileText, MapPin, Minus, Package, Phone, Plus, Save, Trash2, User, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
@@ -17,6 +17,7 @@ import { Link, useParams } from 'react-router-dom'
 
 const getStatusLabel = (status: string | null): string => {
   const statusMap: Record<string, string> = {
+    pending_allocation: 'Pendiente de asignación',
     pending: 'Pendiente',
     processing: 'En Proceso',
     shipped: 'Enviado',
@@ -28,6 +29,7 @@ const getStatusLabel = (status: string | null): string => {
 
 const getStatusColor = (status: string | null): string => {
   const colorMap: Record<string, string> = {
+    pending_allocation: 'bg-orange-100 text-orange-800',
     pending: 'bg-yellow-100 text-yellow-800',
     processing: 'bg-blue-100 text-blue-800',
     shipped: 'bg-purple-100 text-purple-800',
@@ -95,6 +97,7 @@ export function AdminOrderDetail() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [savingBranch, setSavingBranch] = useState(false)
   const [collecting, setCollecting] = useState(false)
   const [isCollectModalOpen, setIsCollectModalOpen] = useState(false)
   const [collectAmount, setCollectAmount] = useState('')
@@ -114,6 +117,8 @@ export function AdminOrderDetail() {
   >([])
   const [productSearch, setProductSearch] = useState('')
   const [showProductSearch, setShowProductSearch] = useState(false)
+  const [orgBranches, setOrgBranches] = useState<Branch[]>([])
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('')
 
   const [editShipping, setEditShipping] = useState<ShippingAddress>({
     fullName: '',
@@ -164,6 +169,7 @@ export function AdminOrderDetail() {
       })
       setEditPaymentMethod(ord.payment_method ?? '')
       setEditItems(ord.order_items ?? [])
+      setSelectedBranchId(ord.branch_id ?? '')
 
       const { data: paymentsData } = await supabase
         .from('order_payments')
@@ -259,6 +265,20 @@ export function AdminOrderDetail() {
         })
     }
   }, [organizationId, isEditing])
+
+  useEffect(() => {
+    if (!organizationId) return
+
+    supabase
+      .from('branches')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => {
+        setOrgBranches((data || []) as Branch[])
+      })
+  }, [organizationId])
 
   useEffect(() => {
     if (!organizationId) return
@@ -417,6 +437,21 @@ export function AdminOrderDetail() {
 
   const handleStatusUpdate = async (newStatus: Order['status']) => {
     if (!order || !id) return
+    if (
+      order.status === 'pending_allocation'
+      && newStatus !== 'pending_allocation'
+      && newStatus !== 'cancelled'
+    ) {
+      if (!order.branch_id) {
+        show('Debes asignar una sucursal antes de confirmar la orden.', 'error')
+        return
+      }
+      if (selectedBranchId && selectedBranchId !== order.branch_id) {
+        show('Guardá primero la sucursal seleccionada antes de cambiar el estado.', 'error')
+        return
+      }
+    }
+
     const previousStatus = order.status
     setUpdating(true)
     try {
@@ -478,6 +513,39 @@ export function AdminOrderDetail() {
       show('Error al actualizar el estado', 'error')
     } finally {
       setUpdating(false)
+    }
+  }
+
+  const handleBranchAssignmentSave = async () => {
+    if (!order || !id || !selectedBranchId || selectedBranchId === order.branch_id) return
+
+    setSavingBranch(true)
+    try {
+      const previousBranchId = order.branch_id
+      const { error } = await supabase
+        .from('orders')
+        .update({ branch_id: selectedBranchId } as never)
+        .eq('id', id)
+
+      if (error) throw error
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'orders',
+        recordId: id,
+        action: 'UPDATE',
+        notes: 'Reasignación de sucursal de orden desde detalle.',
+        oldData: { branch_id: previousBranchId },
+        newData: { branch_id: selectedBranchId },
+      })
+
+      setOrder({ ...order, branch_id: selectedBranchId })
+      show('Sucursal de la orden actualizada.', 'success')
+    } catch (error) {
+      console.error('Error updating order branch:', error)
+      show('No se pudo actualizar la sucursal de la orden.', 'error')
+    } finally {
+      setSavingBranch(false)
     }
   }
 
@@ -1029,6 +1097,14 @@ export function AdminOrderDetail() {
       ? { label: 'Cobro parcial', color: 'bg-blue-100 text-blue-800' }
       : { label: 'Cobrada', color: 'bg-green-100 text-green-800' }
   const hasDiscount = Number(order.discount_total ?? 0) > 0
+  const assignableBranches = (settings.checkout_exclude_isolated_warehouses !== false
+    ? orgBranches.filter((branch) => !branch.is_isolated_warehouse)
+    : orgBranches)
+    .filter((branch) => branch.is_active !== false)
+  const statusOptions =
+    order.status === 'pending_allocation'
+      ? (['pending_allocation', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const)
+      : (['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const)
   const discountStatusMessage =
     order.status === 'cancelled'
       ? 'Orden cancelada: no se permiten cambios de descuento.'
@@ -1245,9 +1321,40 @@ export function AdminOrderDetail() {
               )}
 
               <div>
+                {order.status === 'pending_allocation' && (
+                  <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-3">
+                    <p className="text-sm font-medium text-orange-900 mb-2">Asignar sucursal para reservar stock</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        value={selectedBranchId}
+                        onChange={(e) => setSelectedBranchId(e.target.value)}
+                        className="min-w-[240px] px-3 py-2 border border-orange-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        disabled={savingBranch}
+                      >
+                        <option value="">Seleccionar sucursal...</option>
+                        {assignableBranches.map((branch) => (
+                          <option key={branch.id} value={branch.id}>
+                            {branch.name}
+                            {branch.code ? ` (${branch.code})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        size="sm"
+                        onClick={handleBranchAssignmentSave}
+                        disabled={savingBranch || !selectedBranchId || selectedBranchId === (order.branch_id ?? '')}
+                      >
+                        {savingBranch ? 'Guardando...' : 'Guardar sucursal'}
+                      </Button>
+                    </div>
+                    <p className="mt-2 text-xs text-orange-800">
+                      Al pasar de "Pendiente de asignación" a un estado operativo, se descontará stock de esta sucursal.
+                    </p>
+                  </div>
+                )}
                 <p className="text-sm text-gray-600 mb-2">Actualizar Estado</p>
                 <div className="flex flex-wrap gap-2">
-                  {(['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const).map((status) => (
+                  {statusOptions.map((status) => (
                     <Button
                       key={status}
                       variant={order.status === status ? 'primary' : 'outline'}

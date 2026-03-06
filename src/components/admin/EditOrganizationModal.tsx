@@ -94,7 +94,29 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
       ? Number(rawSettings.default_low_stock_threshold)
       : 10
   )
+  const [checkoutFulfillmentMode, setCheckoutFulfillmentMode] = useState<'auto' | 'main'>(
+    (rawSettings.checkout_fulfillment_mode as string) === 'main' ? 'main' : 'auto'
+  )
+  const [checkoutExcludeIsolatedWarehouses, setCheckoutExcludeIsolatedWarehouses] = useState(
+    (rawSettings.checkout_exclude_isolated_warehouses as boolean) !== false
+  )
+  const [checkoutStockAllocationMode, setCheckoutStockAllocationMode] = useState<'immediate' | 'manual'>(
+    (rawSettings.checkout_stock_allocation_mode as string) === 'manual' ? 'manual' : 'immediate'
+  )
+  const [inventoryTransferCompletionMode, setInventoryTransferCompletionMode] = useState<'manual' | 'automatic'>(
+    (rawSettings.inventory_transfer_completion_mode as string) === 'automatic' ? 'automatic' : 'manual'
+  )
+  const [consignmentEnabled, setConsignmentEnabled] = useState((rawSettings.consignment_enabled as boolean) ?? false)
+  const [consignmentAllowSellerToSeller, setConsignmentAllowSellerToSeller] = useState(
+    (rawSettings.consignment_allow_seller_to_seller as boolean) ?? false
+  )
+  const [consignmentDefaultWarehouseBranchId, setConsignmentDefaultWarehouseBranchId] = useState(
+    (rawSettings.consignment_default_warehouse_branch_id as string) ?? ''
+  )
   const [transferContactPhone, setTransferContactPhone] = useState((rawSettings.transfer_contact_phone as string) ?? '')
+  const [orgBranches, setOrgBranches] = useState<
+    Array<{ id: string; name: string; kind: string; is_active: boolean | null; is_isolated_warehouse: boolean }>
+  >([])
   const [notificationEmail, setNotificationEmail] = useState((rawSettings.notification_email as string) ?? '')
   const [newOrderNotify, setNewOrderNotify] = useState((rawSettings.new_order_notify as boolean) ?? false)
   const [lowStockNotify, setLowStockNotify] = useState((rawSettings.low_stock_notify as boolean) ?? false)
@@ -138,6 +160,15 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         ? Number(s.default_low_stock_threshold)
         : 10
     )
+    setCheckoutFulfillmentMode((s.checkout_fulfillment_mode as string) === 'main' ? 'main' : 'auto')
+    setCheckoutExcludeIsolatedWarehouses((s.checkout_exclude_isolated_warehouses as boolean) !== false)
+    setCheckoutStockAllocationMode((s.checkout_stock_allocation_mode as string) === 'manual' ? 'manual' : 'immediate')
+    setInventoryTransferCompletionMode(
+      (s.inventory_transfer_completion_mode as string) === 'automatic' ? 'automatic' : 'manual'
+    )
+    setConsignmentEnabled((s.consignment_enabled as boolean) ?? false)
+    setConsignmentAllowSellerToSeller((s.consignment_allow_seller_to_seller as boolean) ?? false)
+    setConsignmentDefaultWarehouseBranchId((s.consignment_default_warehouse_branch_id as string) ?? '')
     setTransferContactPhone((s.transfer_contact_phone as string) ?? '')
     setNotificationEmail((s.notification_email as string) ?? '')
     setNewOrderNotify((s.new_order_notify as boolean) ?? false)
@@ -184,7 +215,29 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     }
   }, [organization.id])
 
+  useEffect(() => {
+    let mounted = true
+    const fetchOrganizationBranches = async () => {
+      const { data } = await supabase
+        .from('branches')
+        .select('id, name, kind, is_active, is_isolated_warehouse')
+        .eq('organization_id', organization.id)
+        .order('name')
+
+      if (!mounted) return
+      setOrgBranches(
+        ((data || []) as Array<{ id: string; name: string; kind: string; is_active: boolean | null; is_isolated_warehouse: boolean }>)
+      )
+    }
+
+    fetchOrganizationBranches()
+    return () => {
+      mounted = false
+    }
+  }, [organization.id])
+
   const prevSettings = (organization.settings as Record<string, unknown>) ?? {}
+  const warehouseBranches = orgBranches.filter((branch) => branch.is_active && branch.kind === 'warehouse')
   const isDirty =
     name !== organization.name ||
     slug !== organization.slug ||
@@ -207,6 +260,14 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
       (Number.isFinite(prevSettings.default_low_stock_threshold as number)
         ? Number(prevSettings.default_low_stock_threshold)
         : 10) ||
+    checkoutFulfillmentMode !== (((prevSettings.checkout_fulfillment_mode as string) === 'main' ? 'main' : 'auto')) ||
+    checkoutExcludeIsolatedWarehouses !== ((prevSettings.checkout_exclude_isolated_warehouses as boolean) !== false) ||
+    checkoutStockAllocationMode !== (((prevSettings.checkout_stock_allocation_mode as string) === 'manual' ? 'manual' : 'immediate')) ||
+    inventoryTransferCompletionMode !==
+      (((prevSettings.inventory_transfer_completion_mode as string) === 'automatic' ? 'automatic' : 'manual')) ||
+    consignmentEnabled !== ((prevSettings.consignment_enabled as boolean) ?? false) ||
+    consignmentAllowSellerToSeller !== ((prevSettings.consignment_allow_seller_to_seller as boolean) ?? false) ||
+    consignmentDefaultWarehouseBranchId !== ((prevSettings.consignment_default_warehouse_branch_id as string) ?? '') ||
     transferContactPhone !== ((prevSettings.transfer_contact_phone as string) ?? '') ||
     transferInstructions !== initialTransferInstructions ||
     notificationEmail !== ((prevSettings.notification_email as string) ?? '') ||
@@ -218,6 +279,13 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     setHasUnsavedChanges(Boolean(isDirty))
     return () => setHasUnsavedChanges(false)
   }, [isDirty, setHasUnsavedChanges])
+
+  useEffect(() => {
+    if (!consignmentEnabled) {
+      setConsignmentAllowSellerToSeller(false)
+      setConsignmentDefaultWarehouseBranchId('')
+    }
+  }, [consignmentEnabled])
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -290,8 +358,6 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
             await deleteImage(organization.logo_url, 'organization-logos')
           }
           finalLogoUrl = await uploadOrganizationLogo(logoFile, organization.id)
-        } catch (uploadErr) {
-          throw uploadErr
         } finally {
           setUploadingLogo(false)
         }
@@ -308,8 +374,6 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
             await deleteImage(organization.cover_image_url, 'organization-logos')
           }
           finalCoverUrl = await uploadOrganizationCover(coverFile, organization.id)
-        } catch (uploadErr) {
-          throw uploadErr
         } finally {
           setUploadingCover(false)
         }
@@ -325,6 +389,16 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         timezone: timezone.trim() || 'America/Argentina/Buenos_Aires',
         allow_negative_stock: allowNegativeStock,
         default_low_stock_threshold: Math.max(0, Math.trunc(defaultLowStockThreshold || 0)),
+        checkout_fulfillment_mode: checkoutFulfillmentMode,
+        checkout_exclude_isolated_warehouses: checkoutExcludeIsolatedWarehouses,
+        checkout_stock_allocation_mode: checkoutStockAllocationMode,
+        inventory_transfer_completion_mode: inventoryTransferCompletionMode,
+        consignment_enabled: consignmentEnabled,
+        consignment_allow_seller_to_seller: consignmentEnabled ? consignmentAllowSellerToSeller : false,
+        consignment_default_warehouse_branch_id:
+          consignmentEnabled && consignmentDefaultWarehouseBranchId
+            ? consignmentDefaultWarehouseBranchId
+            : null,
         transfer_contact_phone: transferContactPhone.trim() || undefined,
         notification_email: notificationEmail.trim() || undefined,
         new_order_notify: newOrderNotify,
@@ -749,6 +823,126 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                   <p className="mt-1 text-xs text-gray-500">
                     Se usa como valor inicial para nuevos registros de inventario de esta organización.
                   </p>
+                </div>
+                <div className="space-y-3 border-t pt-4">
+                  <p className="text-sm font-medium text-gray-700">Checkout eCommerce</p>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Estrategia de asignación de sucursal
+                    </label>
+                    <select
+                      value={checkoutFulfillmentMode}
+                      onChange={(e) => setCheckoutFulfillmentMode(e.target.value === 'main' ? 'main' : 'auto')}
+                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                    >
+                      <option value="auto">Automática (recomendada)</option>
+                      <option value="main">Sucursal principal (MAIN)</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Automática busca una sucursal operativa con stock suficiente para toda la orden.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Momento de descuento de stock
+                    </label>
+                    <select
+                      value={checkoutStockAllocationMode}
+                      onChange={(e) =>
+                        setCheckoutStockAllocationMode(e.target.value === 'manual' ? 'manual' : 'immediate')
+                      }
+                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                    >
+                      <option value="immediate">Inmediato (al crear orden)</option>
+                      <option value="manual">Manual (al confirmar en backoffice)</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Manual crea la orden en espera de asignación de stock y se confirma luego desde administración.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checkoutExcludeIsolatedWarehouses}
+                      onChange={(e) => setCheckoutExcludeIsolatedWarehouses(e.target.checked)}
+                      className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Excluir depósitos aislados en checkout
+                    </span>
+                  </label>
+                </div>
+                <div className="space-y-3 border-t pt-4">
+                  <p className="text-sm font-medium text-gray-700">Transferencias de inventario</p>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Confirmación de recepción
+                    </label>
+                    <select
+                      value={inventoryTransferCompletionMode}
+                      onChange={(e) =>
+                        setInventoryTransferCompletionMode(e.target.value === 'automatic' ? 'automatic' : 'manual')
+                      }
+                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                    >
+                      <option value="manual">Manual (pendiente + confirmar recepción)</option>
+                      <option value="automatic">Automática (se completa al crear)</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Define si la sucursal destino debe confirmar la recepción o si se acredita automáticamente.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-3 border-t pt-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={consignmentEnabled}
+                      onChange={(e) => setConsignmentEnabled(e.target.checked)}
+                      className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">
+                      Habilitar módulo de consignación (vendedoras/depósito)
+                    </span>
+                  </label>
+                  <p className="text-xs text-gray-500">
+                    Activa flujos de retiro/rendición entre sucursales tipo depósito y vendedora.
+                  </p>
+
+                  {consignmentEnabled && (
+                    <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={consignmentAllowSellerToSeller}
+                          onChange={(e) => setConsignmentAllowSellerToSeller(e.target.checked)}
+                          className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                        />
+                        <span className="text-sm text-gray-700">Permitir transferencias entre vendedoras</span>
+                      </label>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Depósito por defecto
+                        </label>
+                        <select
+                          value={consignmentDefaultWarehouseBranchId}
+                          onChange={(e) => setConsignmentDefaultWarehouseBranchId(e.target.value)}
+                          className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                        >
+                          <option value="">Sin depósito por defecto</option>
+                          {warehouseBranches.map((branch) => (
+                            <option key={branch.id} value={branch.id}>
+                              {branch.name}
+                              {branch.is_isolated_warehouse ? ' (Aislado)' : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Se usará como destino sugerido para rendiciones de vendedoras.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </TabsContent>
 

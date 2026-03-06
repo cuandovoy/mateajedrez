@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { X, ArrowRight } from 'lucide-react'
 import { useOrganization } from '@/hooks/useOrganization'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch } from '@/types'
 
@@ -32,13 +33,25 @@ export function InventoryTransferModal({
   onSuccess,
 }: InventoryTransferModalProps) {
   const { organizationId } = useOrganization()
+  const settings = useOrgSettings()
   const { show } = useToastStore()
   const [toBranchId, setToBranchId] = useState('')
   const [quantity, setQuantity] = useState('')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
+  const isAutomaticTransferCompletion = settings.inventory_transfer_completion_mode === 'automatic'
 
-  const availableBranches = branches.filter((b) => b.id !== inventoryItem.branch_id && b.is_active)
+  const sourceBranch = branches.find((b) => b.id === inventoryItem.branch_id)
+  const availableBranches = branches.filter(
+    (b) => b.id !== inventoryItem.branch_id && b.is_active && (b.can_receive ?? true)
+  )
+
+  const resolveTransferType = (fromKind?: string | null, toKind?: string | null): string => {
+    if (fromKind === 'seller' && toKind === 'seller') return 'seller_handoff'
+    if (fromKind === 'seller' && (toKind === 'warehouse' || toKind === 'store')) return 'seller_return'
+    if ((fromKind === 'warehouse' || fromKind === 'store') && toKind === 'seller') return 'seller_withdrawal'
+    return 'regular'
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,6 +72,20 @@ export function InventoryTransferModal({
       return
     }
 
+    if (sourceBranch && sourceBranch.can_dispatch === false) {
+      show('La sucursal origen no tiene permitido despachar inventario.', 'error')
+      return
+    }
+
+    const destinationBranch = branches.find((b) => b.id === toBranchId)
+    const transferType = resolveTransferType(sourceBranch?.kind, destinationBranch?.kind)
+    const consignmentEnabled = Boolean(settings.consignment_enabled)
+
+    if (!consignmentEnabled && transferType !== 'regular') {
+      show('El módulo de consignación no está habilitado para esta organización.', 'error')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -71,6 +98,7 @@ export function InventoryTransferModal({
         p_product_id: inventoryItem.product_id || null,
         p_variant_id: inventoryItem.variant_id || null,
         p_notes: notes || null,
+        p_transfer_type: transferType,
       })
 
       if (error) throw error
@@ -87,16 +115,22 @@ export function InventoryTransferModal({
           quantity: qty,
           product_id: inventoryItem.product_id,
           variant_id: inventoryItem.variant_id,
+          transfer_type: transferType,
           notes: notes || null,
         },
       })
 
-      show(`Transferencia creada: ${qty} unidades a ${branches.find((b) => b.id === toBranchId)?.name}`, 'success')
+      const destinationName = branches.find((b) => b.id === toBranchId)?.name
+      const successMessage = isAutomaticTransferCompletion
+        ? `Transferencia completada: ${qty} unidades a ${destinationName}`
+        : `Transferencia creada: ${qty} unidades a ${destinationName}`
+      show(successMessage, 'success')
       onSuccess()
       onClose()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating transfer:', error)
-      show(error.message || 'Error al crear la transferencia', 'error')
+      const message = error instanceof Error ? error.message : 'Error al crear la transferencia'
+      show(message, 'error')
     } finally {
       setLoading(false)
     }
@@ -146,6 +180,8 @@ export function InventoryTransferModal({
                 {availableBranches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
                     {branch.name}
+                    {branch.kind === 'warehouse' ? ' · Depósito' : branch.kind === 'seller' ? ' · Vendedor' : ''}
+                    {branch.is_isolated_warehouse ? ' · Aislado' : ''}
                   </option>
                 ))}
               </select>
@@ -184,8 +220,10 @@ export function InventoryTransferModal({
 
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-xs text-blue-800">
-                <strong>Nota:</strong> El stock se descontará inmediatamente de la sucursal origen.
-                La sucursal destino deberá confirmar la recepción para completar la transferencia.
+                <strong>Nota:</strong>{' '}
+                {isAutomaticTransferCompletion
+                  ? 'El stock se descontará en origen y se acreditará automáticamente en destino.'
+                  : 'El stock se descontará inmediatamente de la sucursal origen. La sucursal destino deberá confirmar la recepción para completar la transferencia.'}
               </p>
             </div>
 

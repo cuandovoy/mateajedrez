@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 
 const NETWORK_RETRIES = 1
 const RETRY_DELAY_MS = 250
+const cachedNonIsolatedBranchIdsByOrg = new Map<string, string[]>()
 
 function isNetworkFetchError(error: unknown): boolean {
   const message =
@@ -20,12 +21,17 @@ function sleep(ms: number): Promise<void> {
 async function getStockFallback(
   productId: string,
   variantId?: string | null,
-  branchId?: string | null
+  branchId?: string | null,
+  organizationId?: string | null
 ): Promise<number> {
   let query = supabase.from('branch_inventory').select('stock')
 
   if (branchId) {
     query = query.eq('branch_id', branchId)
+  } else if (organizationId) {
+    const branchIds = await getNonIsolatedBranchIds(organizationId)
+    if (branchIds.length === 0) return 0
+    query = query.in('branch_id', branchIds)
   }
 
   if (variantId) {
@@ -41,6 +47,154 @@ async function getStockFallback(
   return rows.reduce((sum, row) => sum + Number(row.stock || 0), 0)
 }
 
+async function getNonIsolatedBranchIds(organizationId?: string | null): Promise<string[]> {
+  if (!organizationId) return []
+
+  const cacheKey = organizationId
+  if (cachedNonIsolatedBranchIdsByOrg.has(cacheKey)) {
+    return cachedNonIsolatedBranchIdsByOrg.get(cacheKey) || []
+  }
+
+  const { data, error } = await supabase
+    .from('branches')
+    .select('id')
+    .eq('organization_id', organizationId)
+    .eq('is_active', true)
+    .eq('is_isolated_warehouse', false)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+
+  const branchIds = ((data || []) as Array<{ id: string }>).map((row) => row.id)
+  cachedNonIsolatedBranchIdsByOrg.set(cacheKey, branchIds)
+  return branchIds
+}
+
+async function getProductStockAcrossNonIsolatedBranches(
+  productId: string,
+  variantId?: string | null,
+  organizationId?: string | null
+): Promise<number> {
+  const branchIds = await getNonIsolatedBranchIds(organizationId)
+  if (branchIds.length === 0) return 0
+
+  if (variantId) {
+    const { data, error } = await supabase
+      .from('branch_inventory')
+      .select('stock')
+      .in('branch_id', branchIds)
+      .eq('variant_id', variantId)
+      .is('product_id', null)
+
+    if (error) throw error
+    return ((data || []) as Array<{ stock: number | null }>).reduce((sum, row) => sum + Number(row.stock || 0), 0)
+  }
+
+  // Keep same behavior as get_product_stock RPC:
+  // use DEFAULT variant when present, otherwise product-level stock when product has no active variants.
+  const { data: defaultVariant, error: defaultVariantError } = await supabase
+    .from('product_variants')
+    .select('id')
+    .eq('product_id', productId)
+    .like('sku', '%-DEFAULT')
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle()
+
+  if (defaultVariantError) throw defaultVariantError
+
+  if (defaultVariant?.id) {
+    const { data, error } = await supabase
+      .from('branch_inventory')
+      .select('stock')
+      .in('branch_id', branchIds)
+      .eq('variant_id', defaultVariant.id)
+      .is('product_id', null)
+
+    if (error) throw error
+    return ((data || []) as Array<{ stock: number | null }>).reduce((sum, row) => sum + Number(row.stock || 0), 0)
+  }
+
+  const { count: activeVariantsCount, error: activeVariantsError } = await supabase
+    .from('product_variants')
+    .select('id', { head: true, count: 'exact' })
+    .eq('product_id', productId)
+    .eq('is_active', true)
+
+  if (activeVariantsError) throw activeVariantsError
+  if ((activeVariantsCount || 0) > 0) return 0
+
+  const { data, error } = await supabase
+    .from('branch_inventory')
+    .select('stock')
+    .in('branch_id', branchIds)
+    .eq('product_id', productId)
+    .is('variant_id', null)
+
+  if (error) throw error
+  return ((data || []) as Array<{ stock: number | null }>).reduce((sum, row) => sum + Number(row.stock || 0), 0)
+}
+
+async function getProductsStockAcrossNonIsolatedBranches(
+  productIds: string[],
+  organizationId?: string | null
+): Promise<Record<string, number>> {
+  const branchIds = await getNonIsolatedBranchIds(organizationId)
+  if (branchIds.length === 0) return {}
+
+  const stockMap: Record<string, number> = {}
+
+  const { data: productInventoryData, error: productInventoryError } = await supabase
+    .from('branch_inventory')
+    .select('product_id, stock')
+    .in('branch_id', branchIds)
+    .in('product_id', productIds)
+    .is('variant_id', null)
+
+  if (productInventoryError) throw productInventoryError
+
+  for (const row of (productInventoryData || []) as Array<{ product_id: string | null; stock: number | null }>) {
+    if (!row.product_id) continue
+    stockMap[row.product_id] = (stockMap[row.product_id] || 0) + Number(row.stock || 0)
+  }
+
+  const { data: variantsData, error: variantsError } = await supabase
+    .from('product_variants')
+    .select('id, product_id')
+    .in('product_id', productIds)
+    .eq('is_active', true)
+
+  if (variantsError) throw variantsError
+
+  if (variantsData && variantsData.length > 0) {
+    const variantIds = variantsData.map((variant) => variant.id)
+    const productIdByVariant = new Map<string, string>()
+
+    variantsData.forEach((variant) => {
+      productIdByVariant.set(variant.id, variant.product_id)
+    })
+
+    const { data: variantInventoryData, error: variantInventoryError } = await supabase
+      .from('branch_inventory')
+      .select('variant_id, stock')
+      .in('branch_id', branchIds)
+      .in('variant_id', variantIds)
+      .not('variant_id', 'is', null)
+
+    if (variantInventoryError) throw variantInventoryError
+
+    for (const row of (variantInventoryData || []) as Array<{ variant_id: string | null; stock: number | null }>) {
+      const variantId = row.variant_id
+      if (!variantId) continue
+      const productId = productIdByVariant.get(variantId)
+      if (!productId) continue
+      stockMap[productId] = (stockMap[productId] || 0) + Number(row.stock || 0)
+    }
+  }
+
+  return stockMap
+}
+
 /**
  * Gets stock for a product from branch_inventory
  * Handles variants automatically (checks for default variant or product-level inventory)
@@ -48,10 +202,15 @@ async function getStockFallback(
 export async function getProductStock(
   productId: string,
   variantId?: string | null,
-  branchId?: string | null
+  branchId?: string | null,
+  organizationId?: string | null
 ): Promise<number> {
   for (let attempt = 0; attempt <= NETWORK_RETRIES; attempt++) {
     try {
+      if (!branchId && organizationId) {
+        return await getProductStockAcrossNonIsolatedBranches(productId, variantId, organizationId)
+      }
+
       // Type assertion needed because PostgREST types may not be updated after migration 027
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase.rpc as any)('get_product_stock', {
@@ -66,7 +225,7 @@ export async function getProductStock(
           continue
         }
         // Fallback when RPC fails (network/schema cache/RLS edge cases)
-        return await getStockFallback(productId, variantId, branchId)
+        return await getStockFallback(productId, variantId, branchId, organizationId)
       }
 
       return Number(data || 0)
@@ -76,7 +235,7 @@ export async function getProductStock(
         continue
       }
       try {
-        return await getStockFallback(productId, variantId, branchId)
+        return await getStockFallback(productId, variantId, branchId, organizationId)
       } catch (fallbackError) {
         console.error('Error getting product stock (rpc + fallback):', {
           rpcError: error,
@@ -84,6 +243,7 @@ export async function getProductStock(
           productId,
           variantId,
           branchId,
+          organizationId,
         })
         return 0
       }
@@ -104,6 +264,10 @@ export async function getProductsStock(
 
   for (let attempt = 0; attempt <= NETWORK_RETRIES; attempt++) {
     try {
+      if (!branchId && organizationId) {
+        return await getProductsStockAcrossNonIsolatedBranches(productIds, organizationId)
+      }
+
       const effectiveBranchId = branchId || (await getMainBranchId(organizationId))
 
       // Type assertion needed because PostgREST types may not be updated after migration 027
@@ -200,6 +364,7 @@ export async function getMainBranchId(organizationId?: string | null): Promise<s
       .select('id')
       .eq('code', 'MAIN')
       .eq('is_active', true)
+      .eq('is_isolated_warehouse', false)
       .order('created_at', { ascending: true })
       .limit(1)
 
@@ -222,6 +387,7 @@ export async function getMainBranchId(organizationId?: string | null): Promise<s
       .from('branches')
       .select('id')
       .eq('is_active', true)
+      .eq('is_isolated_warehouse', false)
       .order('created_at', { ascending: true })
       .limit(1)
 

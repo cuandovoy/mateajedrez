@@ -11,6 +11,7 @@ import { SearchFilter } from '@/components/filters'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { useOrgFeature } from '@/hooks/useOrgFeature'
 import { useToastStore } from '@/store/toastStore'
 import {
   Building2,
@@ -39,6 +40,11 @@ const branchSchema = z.object({
   phone: z.string().optional(),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   is_active: z.boolean().default(true),
+  kind: z.enum(['store', 'warehouse', 'seller']).default('store'),
+  can_dispatch: z.boolean().default(true),
+  can_receive: z.boolean().default(true),
+  can_sell: z.boolean().default(true),
+  is_isolated_warehouse: z.boolean().default(false),
   notes: z.string().optional(),
 })
 
@@ -48,6 +54,7 @@ function AdminBranchesContent() {
   const { organizationId } = useOrganization()
   const { show } = useToastStore()
   const { isAtLimit } = usePlanLimits()
+  const consignmentEnabled = useOrgFeature('consignment_enabled')
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -59,14 +66,28 @@ function AdminBranchesContent() {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<BranchForm>({
     resolver: zodResolver(branchSchema),
     defaultValues: {
       country: 'Uruguay',
       is_active: true,
+      kind: 'store',
+      can_dispatch: true,
+      can_receive: true,
+      can_sell: true,
+      is_isolated_warehouse: false,
     },
   })
+
+  const selectedKind = watch('kind')
+
+  const getBranchKindLabel = (kind: string | null | undefined) => {
+    if (kind === 'warehouse') return 'Depósito'
+    if (kind === 'seller') return 'Vendedor'
+    return 'Tienda'
+  }
 
   useEffect(() => {
     if (organizationId) fetchBranches()
@@ -100,6 +121,7 @@ function AdminBranchesContent() {
     return branches.filter(
       (branch) =>
         branch.name.toLowerCase().includes(searchLower) ||
+        (branch.kind || '').toLowerCase().includes(searchLower) ||
         branch.code?.toLowerCase().includes(searchLower) ||
         branch.email?.toLowerCase().includes(searchLower) ||
         branch.phone?.toLowerCase().includes(searchLower) ||
@@ -117,6 +139,12 @@ function AdminBranchesContent() {
     try {
       const baseData = {
         ...data,
+        kind: consignmentEnabled ? data.kind : 'store',
+        can_dispatch: consignmentEnabled ? data.can_dispatch : true,
+        can_receive: consignmentEnabled ? data.can_receive : true,
+        can_sell: consignmentEnabled ? data.can_sell : true,
+        is_isolated_warehouse:
+          consignmentEnabled && data.kind === 'warehouse' ? data.is_isolated_warehouse : false,
         code: data.code || null,
         email: data.email || null,
         address: data.address || null,
@@ -153,6 +181,11 @@ function AdminBranchesContent() {
         postal_code: '',
         phone: '',
         email: '',
+        kind: 'store',
+        can_dispatch: true,
+        can_receive: true,
+        can_sell: true,
+        is_isolated_warehouse: false,
         notes: '',
         is_active: true,
       })
@@ -174,6 +207,11 @@ function AdminBranchesContent() {
       postal_code: branch.postal_code || '',
       phone: branch.phone || '',
       email: branch.email || '',
+      kind: (branch.kind as 'store' | 'warehouse' | 'seller') || 'store',
+      can_dispatch: branch.can_dispatch ?? true,
+      can_receive: branch.can_receive ?? true,
+      can_sell: branch.can_sell ?? true,
+      is_isolated_warehouse: branch.is_isolated_warehouse ?? false,
       notes: branch.notes || '',
       is_active: branch.is_active ?? true,
     })
@@ -211,6 +249,11 @@ function AdminBranchesContent() {
       postal_code: '',
       phone: '',
       email: '',
+      kind: 'store',
+      can_dispatch: true,
+      can_receive: true,
+      can_sell: true,
+      is_isolated_warehouse: false,
       notes: '',
       is_active: true,
     })
@@ -328,6 +371,10 @@ function AdminBranchesContent() {
                   {branch.code && (
                     <p className="text-sm text-gray-600 mb-2">Código: {branch.code}</p>
                   )}
+                  <p className="text-xs text-gray-500 mb-2">
+                    Tipo: {getBranchKindLabel(branch.kind)}
+                    {branch.is_isolated_warehouse ? ' · Depósito aislado' : ''}
+                  </p>
                   <div className="space-y-2 text-sm">
                     {branch.email && (
                       <div className="flex items-center text-gray-600">
@@ -423,6 +470,11 @@ function AdminBranchesContent() {
                       postal_code: '',
                       phone: '',
                       email: '',
+                      kind: 'store',
+                      can_dispatch: true,
+                      can_receive: true,
+                      can_sell: true,
+                      is_isolated_warehouse: false,
                       notes: '',
                       is_active: true,
                     })
@@ -463,6 +515,63 @@ function AdminBranchesContent() {
                     </div>
                   </div>
                 </section>
+
+                {consignmentEnabled && (
+                  <section>
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">
+                      Operación logística
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de sucursal</label>
+                        <select
+                          {...register('kind')}
+                          className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
+                        >
+                          <option value="store">Tienda</option>
+                          <option value="warehouse">Depósito</option>
+                          <option value="seller">Vendedor</option>
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer rounded-lg border border-gray-200 px-3 py-2 bg-gray-50">
+                          <input
+                            type="checkbox"
+                            {...register('can_dispatch')}
+                            className="h-4 w-4 text-admin-600 focus:ring-admin-500 border-gray-300 rounded"
+                          />
+                          <span className="text-sm text-gray-700">Puede despachar</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer rounded-lg border border-gray-200 px-3 py-2 bg-gray-50">
+                          <input
+                            type="checkbox"
+                            {...register('can_receive')}
+                            className="h-4 w-4 text-admin-600 focus:ring-admin-500 border-gray-300 rounded"
+                          />
+                          <span className="text-sm text-gray-700">Puede recibir</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer rounded-lg border border-gray-200 px-3 py-2 bg-gray-50">
+                          <input
+                            type="checkbox"
+                            {...register('can_sell')}
+                            className="h-4 w-4 text-admin-600 focus:ring-admin-500 border-gray-300 rounded"
+                          />
+                          <span className="text-sm text-gray-700">Puede vender</span>
+                        </label>
+                      </div>
+                      {selectedKind === 'warehouse' && (
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            {...register('is_isolated_warehouse')}
+                            className="h-4 w-4 text-admin-600 focus:ring-admin-500 border-gray-300 rounded"
+                          />
+                          <span className="text-sm text-gray-700">Marcar como depósito aislado</span>
+                        </label>
+                      )}
+                    </div>
+                  </section>
+                )}
 
                 <section>
                   <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-4">

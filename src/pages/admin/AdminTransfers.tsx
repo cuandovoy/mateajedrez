@@ -18,6 +18,19 @@ interface TransferWithDetails extends InventoryTransfer {
   variant_name: string | null
 }
 
+const getTransferTypeLabel = (type: string | null) => {
+  switch (type) {
+    case 'seller_withdrawal':
+      return 'Retiro vendedora'
+    case 'seller_return':
+      return 'Rendición a depósito'
+    case 'seller_handoff':
+      return 'Pase entre vendedoras'
+    default:
+      return 'Transferencia regular'
+  }
+}
+
 export function AdminTransfers() {
   const { show } = useToastStore()
   const settings = useOrgSettings()
@@ -47,7 +60,16 @@ export function AdminTransfers() {
 
       if (error) throw error
 
-      const transfersWithDetails: TransferWithDetails[] = (data || []).map((t: any) => ({
+      const transferRows = (data || []) as Array<
+        InventoryTransfer & {
+          from_branch?: { name?: string } | null
+          to_branch?: { name?: string } | null
+          product?: { name?: string } | null
+          variant?: { name?: string } | null
+        }
+      >
+
+      const transfersWithDetails: TransferWithDetails[] = transferRows.map((t) => ({
         ...t,
         from_branch_name: t.from_branch?.name || 'N/A',
         to_branch_name: t.to_branch?.name || 'N/A',
@@ -80,9 +102,10 @@ export function AdminTransfers() {
 
       show('Transferencia completada exitosamente', 'success')
       fetchTransfers()
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error completing transfer:', error)
-      show(error.message || 'Error al completar la transferencia', 'error')
+      const message = error instanceof Error ? error.message : 'Error al completar la transferencia'
+      show(message, 'error')
     }
   }
 
@@ -214,6 +237,7 @@ export function AdminTransfers() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Producto</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Desde</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Hacia</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Tipo</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Cantidad</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Estado</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Fecha</th>
@@ -238,6 +262,9 @@ export function AdminTransfers() {
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-sm text-gray-900">{transfer.to_branch_name}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-sm text-gray-700">{getTransferTypeLabel(transfer.transfer_type)}</p>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="text-sm font-semibold text-gray-900">{transfer.quantity}</span>

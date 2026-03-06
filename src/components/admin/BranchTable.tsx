@@ -9,6 +9,12 @@ interface BranchTableProps {
 }
 
 export function BranchTable({ branches, onEdit, onDelete }: BranchTableProps) {
+  const getBranchKindLabel = (kind: string | null | undefined) => {
+    if (kind === 'warehouse') return 'Depósito'
+    if (kind === 'seller') return 'Vendedor'
+    return 'Tienda'
+  }
+
   if (branches.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
@@ -27,6 +33,9 @@ export function BranchTable({ branches, onEdit, onDelete }: BranchTableProps) {
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Contacto
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Tipo
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Ubicación
@@ -69,6 +78,14 @@ export function BranchTable({ branches, onEdit, onDelete }: BranchTableProps) {
                   )}
                   {!branch.email && !branch.phone && (
                     <span className="text-sm text-gray-400">—</span>
+                  )}
+                </div>
+              </td>
+              <td className="px-6 py-4">
+                <div className="space-y-1">
+                  <span className="text-sm text-gray-700">{getBranchKindLabel(branch.kind)}</span>
+                  {branch.is_isolated_warehouse && (
+                    <div className="text-xs text-gray-500">Aislado</div>
                   )}
                 </div>
               </td>

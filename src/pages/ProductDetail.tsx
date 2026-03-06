@@ -104,7 +104,7 @@ export function ProductDetail() {
       // Fetch product stock from branch_inventory
       if (data) {
         const productData = data as ProductWithCategory & { product_images?: ProductImage[] }
-        getProductStock(productData.id as string)
+        getProductStock(productData.id as string, null, null, productData.organization_id || null)
           .then((stock) => setProductStock(stock))
           .catch((error) => {
             console.error('Error fetching product stock:', error)
@@ -175,7 +175,7 @@ export function ProductDetail() {
             setSelectedVariant(data)
             setQuantity(1)
 
-            getProductStock(product.id, variantId)
+            getProductStock(product.id, variantId, null, product.organization_id || null)
               .then((stock) => setVariantStock(stock))
               .catch((error) => {
                 console.error('Error fetching variant stock:', error)

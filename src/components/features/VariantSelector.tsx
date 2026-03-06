@@ -95,7 +95,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
       if (data && data.length > 0) {
         const stockPromises = data.map(async (variant) => {
           try {
-            const stock = await getProductStock(product.id, variant.id)
+            const stock = await getProductStock(product.id, variant.id, null, product.organization_id || null)
             return { variantId: variant.id, stock }
           } catch (error) {
             console.error('Error fetching stock for variant:', variant.id, error)
@@ -112,7 +112,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
       }
       
       // Fetch product stock (for products without variants)
-      getProductStock(product.id)
+      getProductStock(product.id, null, null, product.organization_id || null)
         .then((stock) => setProductStock(stock))
         .catch((error) => {
           console.error('Error fetching product stock:', error)

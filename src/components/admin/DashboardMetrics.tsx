@@ -97,7 +97,7 @@ export function DashboardMetrics() {
           .from('orders')
           .select('id')
           .eq('organization_id', organizationId)
-          .eq('status', 'pending'),
+          .in('status', ['pending', 'pending_allocation']),
         // Ingresos de hoy (por org)
         supabase
           .from('orders')

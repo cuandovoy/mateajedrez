@@ -252,7 +252,7 @@ export function AdminCustomerReports() {
         .from('orders')
         .select('id, customer_id, branch_id, created_at, total, subtotal_before_discount, discount_total, shipping_address')
         .eq('organization_id', organizationId)
-        .in('status', ['pending', 'processing', 'shipped', 'delivered'])
+        .in('status', ['pending_allocation', 'pending', 'processing', 'shipped', 'delivered'])
 
       if (selectedBranchId) {
         ordersQuery = ordersQuery.eq('branch_id', selectedBranchId)
