@@ -8,11 +8,28 @@ import type { Product, Category } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { ArrowRight } from 'lucide-react'
 
+const STORE_COVER_IMAGES_KEY = 'store_cover_image_urls'
+const HERO_SLIDE_INTERVAL_MS = 7000
+
 export function PublicStore() {
   const { organization, slug } = usePublicStore()
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [currentCoverIndex, setCurrentCoverIndex] = useState(0)
   const [loading, setLoading] = useState(true)
+
+  const settings = (organization.settings as Record<string, unknown>) ?? {}
+  const settingsCoverImages = Array.isArray(settings[STORE_COVER_IMAGES_KEY])
+    ? (settings[STORE_COVER_IMAGES_KEY] as unknown[]).filter(
+      (value): value is string => typeof value === 'string' && value.trim().length > 0
+    )
+    : []
+  const coverImages = settingsCoverImages.length > 0
+    ? settingsCoverImages
+    : organization.cover_image_url
+      ? [organization.cover_image_url]
+      : []
+  const hasCoverImages = coverImages.length > 0
 
   useEffect(() => {
     const isMounted = { current: true }
@@ -69,6 +86,18 @@ export function PublicStore() {
     }
   }, [organization.id])
 
+  useEffect(() => {
+    setCurrentCoverIndex(0)
+  }, [coverImages.join('|')])
+
+  useEffect(() => {
+    if (coverImages.length <= 1) return
+    const interval = window.setInterval(() => {
+      setCurrentCoverIndex((prev) => (prev + 1) % coverImages.length)
+    }, HERO_SLIDE_INTERVAL_MS)
+    return () => window.clearInterval(interval)
+  }, [coverImages.length])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -84,23 +113,32 @@ export function PublicStore() {
     <div className="bg-white">
       {/* Hero Banner Section */}
       <section className="relative w-full mb-0">
-        <div
-          className="relative w-full py-16 md:py-24 bg-cover bg-center bg-no-repeat"
-          style={
-            organization.cover_image_url
-              ? {
-                  backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0.35), rgba(0,0,0,0.4)), url(${organization.cover_image_url})`,
-                }
-              : { background: 'linear-gradient(to bottom right, rgb(243 244 246), rgb(229 231 235))' }
-          }
-        >
+        <div className="relative w-full py-16 md:py-24 overflow-hidden">
+          {hasCoverImages ? (
+            <div className="absolute inset-0">
+              {coverImages.map((imageUrl, index) => (
+                <div
+                  key={`${imageUrl}-${index}`}
+                  className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-[1800ms]"
+                  style={{
+                    backgroundImage: `url(${imageUrl})`,
+                    opacity: index === currentCoverIndex ? 1 : 0,
+                  }}
+                />
+              ))}
+              <div className="absolute inset-0 bg-black/25" />
+            </div>
+          ) : (
+            <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200" />
+          )}
+
           <div className="container-custom text-center relative z-10">
             <h1
               className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4"
               style={{
-                color: organization.cover_image_url ? 'white' : `var(--org-primary-color, #6366f1)`,
+                color: hasCoverImages ? 'white' : `var(--org-primary-color, #6366f1)`,
                 fontFamily: `var(--org-font-heading, var(--org-font-family, Poppins))`,
-                textShadow: organization.cover_image_url ? '0 1px 2px rgba(0,0,0,0.5)' : undefined,
+                textShadow: hasCoverImages ? '0 1px 2px rgba(0,0,0,0.5)' : undefined,
               }}
             >
               {organization.name}
@@ -108,8 +146,8 @@ export function PublicStore() {
             <p
               className="text-lg md:text-xl mb-8"
               style={{
-                color: organization.cover_image_url ? 'rgba(255,255,255,0.95)' : 'rgb(75 85 99)',
-                textShadow: organization.cover_image_url ? '0 1px 2px rgba(0,0,0,0.4)' : undefined,
+                color: hasCoverImages ? 'rgba(255,255,255,0.95)' : 'rgb(75 85 99)',
+                textShadow: hasCoverImages ? '0 1px 2px rgba(0,0,0,0.4)' : undefined,
               }}
             >
               Bienvenido a nuestra tienda
@@ -127,6 +165,19 @@ export function PublicStore() {
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
             </Link>
+
+            {coverImages.length > 1 && (
+              <div className="mt-6 flex items-center justify-center gap-2">
+                {coverImages.map((_, index) => (
+                  <span
+                    key={`indicator-${index}`}
+                    className={`h-2 w-2 rounded-full transition-colors ${
+                      index === currentCoverIndex ? 'bg-white' : 'bg-white/45'
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>

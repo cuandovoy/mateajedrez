@@ -12,13 +12,50 @@ import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Tables } from '@/types/database.types'
 import { Bell, Building2, CreditCard, Globe, Upload, X } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 type Organization = Tables<'organizations'>
 export type OrganizationSettings = Record<string, unknown>
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 const MAX_FILE_SIZE_MB = 5
+const STORE_LOGO_MINIMAL_KEY = 'store_logo_minimal_url'
+const STORE_COVER_IMAGES_KEY = 'store_cover_image_urls'
+
+type CoverImageItem = {
+  id: string
+  previewUrl: string
+  sourceUrl: string | null
+  file: File | null
+}
+
+const buildInitialCoverUrls = (
+  settings: Record<string, unknown>,
+  fallbackCoverUrl: string | null
+): string[] => {
+  const settingsCoverImages = settings[STORE_COVER_IMAGES_KEY]
+  if (Array.isArray(settingsCoverImages)) {
+    const parsed = settingsCoverImages.filter(
+      (value): value is string => typeof value === 'string' && value.trim().length > 0
+    )
+    if (parsed.length > 0) return parsed
+  }
+  return fallbackCoverUrl ? [fallbackCoverUrl] : []
+}
+
+const makeCoverItem = (url: string): CoverImageItem => ({
+  id: `cover-existing-${url}`,
+  previewUrl: url,
+  sourceUrl: url,
+  file: null,
+})
+
+const createCoverFileItem = (file: File): CoverImageItem => ({
+  id: `cover-new-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+  previewUrl: URL.createObjectURL(file),
+  sourceUrl: null,
+  file,
+})
 
 const CURRENCIES = [
   { value: 'ARS', label: 'ARS - Peso argentino' },
@@ -129,9 +166,16 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   const [initialTransferInstructions, setInitialTransferInstructions] = useState('')
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [logoPreview, setLogoPreview] = useState<string | null>(organization.logo_url ?? null)
-  const [coverFile, setCoverFile] = useState<File | null>(null)
-  const [coverPreview, setCoverPreview] = useState<string | null>(organization.cover_image_url ?? null)
+  const [minimalLogoFile, setMinimalLogoFile] = useState<File | null>(null)
+  const [minimalLogoPreview, setMinimalLogoPreview] = useState<string | null>(
+    typeof rawSettings[STORE_LOGO_MINIMAL_KEY] === 'string' ? (rawSettings[STORE_LOGO_MINIMAL_KEY] as string) : null
+  )
+  const [coverItems, setCoverItems] = useState<CoverImageItem[]>(
+    buildInitialCoverUrls(rawSettings, organization.cover_image_url ?? null).map(makeCoverItem)
+  )
+  const coverItemsRef = useRef<CoverImageItem[]>(coverItems)
   const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingMinimalLogo, setUploadingMinimalLogo] = useState(false)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -140,8 +184,12 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     setName(organization.name)
     setSlug(organization.slug)
     setLogoPreview(organization.logo_url ?? null)
-    setCoverPreview(organization.cover_image_url ?? null)
-    setCoverFile(null)
+    setMinimalLogoPreview(
+      typeof ((organization.settings as Record<string, unknown>)?.[STORE_LOGO_MINIMAL_KEY]) === 'string'
+        ? ((organization.settings as Record<string, unknown>)[STORE_LOGO_MINIMAL_KEY] as string)
+        : null
+    )
+    setMinimalLogoFile(null)
     setPrimaryColor(organization.primary_color ?? '')
     setSecondaryColor(organization.secondary_color ?? '')
     setAccentColor(organization.accent_color ?? '')
@@ -150,6 +198,17 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     setBorderRadius(organization.border_radius ?? 'rounded-lg')
     setButtonStyle(organization.button_style ?? 'rounded')
     setLogoFile(null)
+    setCoverItems((prev) => {
+      prev.forEach((item) => {
+        if (item.file && item.previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(item.previewUrl)
+        }
+      })
+      return buildInitialCoverUrls(
+        (organization.settings as Record<string, unknown>) ?? {},
+        organization.cover_image_url ?? null
+      ).map(makeCoverItem)
+    })
     const s = (organization.settings as Record<string, unknown>) ?? {}
     setCurrency((s.currency as string) ?? 'ARS')
     setLocale((s.locale as string) ?? 'es-AR')
@@ -179,6 +238,20 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     setTransferInstructions('')
     setInitialTransferInstructions('')
   }, [organization])
+
+  useEffect(() => {
+    coverItemsRef.current = coverItems
+  }, [coverItems])
+
+  useEffect(() => {
+    return () => {
+      coverItemsRef.current.forEach((item) => {
+        if (item.file && item.previewUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(item.previewUrl)
+        }
+      })
+    }
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -237,6 +310,14 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   }, [organization.id])
 
   const prevSettings = (organization.settings as Record<string, unknown>) ?? {}
+  const prevMinimalLogoUrl =
+    typeof prevSettings[STORE_LOGO_MINIMAL_KEY] === 'string' ? (prevSettings[STORE_LOGO_MINIMAL_KEY] as string) : null
+  const prevCoverUrls = buildInitialCoverUrls(prevSettings, organization.cover_image_url ?? null)
+  const persistedCoverUrls = coverItems
+    .filter((item) => item.sourceUrl)
+    .map((item) => item.sourceUrl as string)
+  const hasNewCoverUploads = coverItems.some((item) => item.file !== null)
+  const didRemoveCoverImage = prevCoverUrls.some((url) => !persistedCoverUrls.includes(url))
   const warehouseBranches = orgBranches.filter((branch) => branch.is_active && branch.kind === 'warehouse')
   const isDirty =
     name !== organization.name ||
@@ -250,8 +331,10 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     buttonStyle !== (organization.button_style ?? 'rounded') ||
     logoFile !== null ||
     (logoPreview === null && organization.logo_url) ||
-    coverFile !== null ||
-    (coverPreview === null && organization.cover_image_url) ||
+    minimalLogoFile !== null ||
+    minimalLogoPreview !== prevMinimalLogoUrl ||
+    hasNewCoverUploads ||
+    didRemoveCoverImage ||
     currency !== (prevSettings.currency ?? 'ARS') ||
     locale !== (prevSettings.locale ?? 'es-AR') ||
     timezone !== (prevSettings.timezone ?? 'America/Argentina/Buenos_Aires') ||
@@ -298,16 +381,22 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
       show(`La imagen es demasiado grande. Máximo ${MAX_FILE_SIZE_MB}MB`, 'error')
       return
     }
+    if (logoFile && logoPreview?.startsWith('blob:')) {
+      URL.revokeObjectURL(logoPreview)
+    }
     setLogoFile(file)
     setLogoPreview(URL.createObjectURL(file))
   }
 
   const removeLogo = () => {
+    if (logoFile && logoPreview?.startsWith('blob:')) {
+      URL.revokeObjectURL(logoPreview)
+    }
     setLogoFile(null)
     setLogoPreview(null)
   }
 
-  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleMinimalLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -318,13 +407,51 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
       show(`La imagen es demasiado grande. Máximo ${MAX_FILE_SIZE_MB}MB`, 'error')
       return
     }
-    setCoverFile(file)
-    setCoverPreview(URL.createObjectURL(file))
+    if (minimalLogoFile && minimalLogoPreview?.startsWith('blob:')) {
+      URL.revokeObjectURL(minimalLogoPreview)
+    }
+    setMinimalLogoFile(file)
+    setMinimalLogoPreview(URL.createObjectURL(file))
   }
 
-  const removeCover = () => {
-    setCoverFile(null)
-    setCoverPreview(null)
+  const removeMinimalLogo = () => {
+    if (minimalLogoFile && minimalLogoPreview?.startsWith('blob:')) {
+      URL.revokeObjectURL(minimalLogoPreview)
+    }
+    setMinimalLogoFile(null)
+    setMinimalLogoPreview(null)
+  }
+
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const acceptedFiles: File[] = []
+    files.forEach((file) => {
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        show(`"${file.name}" no es válido. Usa JPG, PNG o WEBP`, 'error')
+        return
+      }
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        show(`"${file.name}" supera ${MAX_FILE_SIZE_MB}MB`, 'error')
+        return
+      }
+      acceptedFiles.push(file)
+    })
+
+    if (acceptedFiles.length === 0) return
+    setCoverItems((prev) => [...prev, ...acceptedFiles.map((file) => createCoverFileItem(file))])
+    e.target.value = ''
+  }
+
+  const removeCoverItem = (itemId: string) => {
+    setCoverItems((prev) => {
+      const itemToRemove = prev.find((item) => item.id === itemId)
+      if (itemToRemove?.file && itemToRemove.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(itemToRemove.previewUrl)
+      }
+      return prev.filter((item) => item.id !== itemId)
+    })
   }
 
   const handleNameChange = (value: string) => {
@@ -366,23 +493,58 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         await deleteImage(organization.logo_url, 'organization-logos')
       }
 
-      let finalCoverUrl: string | null = coverPreview && !coverFile ? coverPreview : null
-      if (coverFile) {
+      const existingSettings = (organization.settings as Record<string, unknown>) ?? {}
+      const previousMinimalLogoUrl =
+        typeof existingSettings[STORE_LOGO_MINIMAL_KEY] === 'string'
+          ? (existingSettings[STORE_LOGO_MINIMAL_KEY] as string)
+          : null
+
+      let finalMinimalLogoUrl: string | null =
+        minimalLogoPreview && !minimalLogoFile ? minimalLogoPreview : null
+
+      if (minimalLogoFile) {
+        setUploadingMinimalLogo(true)
+        try {
+          if (previousMinimalLogoUrl?.includes('organization-logos')) {
+            await deleteImage(previousMinimalLogoUrl, 'organization-logos')
+          }
+          finalMinimalLogoUrl = await uploadOrganizationLogo(minimalLogoFile, organization.id)
+        } finally {
+          setUploadingMinimalLogo(false)
+        }
+      } else if (!minimalLogoPreview && previousMinimalLogoUrl?.includes('organization-logos')) {
+        finalMinimalLogoUrl = null
+        await deleteImage(previousMinimalLogoUrl, 'organization-logos')
+      }
+
+      const previousCoverUrls = buildInitialCoverUrls(existingSettings, organization.cover_image_url ?? null)
+      const existingCoverUrls = coverItems
+        .filter((item) => item.sourceUrl)
+        .map((item) => item.sourceUrl as string)
+      const newCoverItems = coverItems.filter((item) => item.file)
+
+      let uploadedCoverUrls: string[] = []
+      if (newCoverItems.length > 0) {
         setUploadingCover(true)
         try {
-          if (organization.cover_image_url?.includes('organization-logos')) {
-            await deleteImage(organization.cover_image_url, 'organization-logos')
-          }
-          finalCoverUrl = await uploadOrganizationCover(coverFile, organization.id)
+          uploadedCoverUrls = await Promise.all(
+            newCoverItems.map((item) => uploadOrganizationCover(item.file as File, organization.id))
+          )
         } finally {
           setUploadingCover(false)
         }
-      } else if (!coverPreview && organization.cover_image_url?.includes('organization-logos')) {
-        finalCoverUrl = null
-        await deleteImage(organization.cover_image_url, 'organization-logos')
       }
 
-      const existingSettings = (organization.settings as Record<string, unknown>) ?? {}
+      const finalCoverUrls = [...existingCoverUrls, ...uploadedCoverUrls]
+      const finalCoverUrl = finalCoverUrls[0] ?? null
+
+      const removedCoverUrls = previousCoverUrls.filter((url) => !existingCoverUrls.includes(url))
+      for (const removedCoverUrl of removedCoverUrls) {
+        if (removedCoverUrl.includes('organization-logos')) {
+          await deleteImage(removedCoverUrl, 'organization-logos')
+        }
+      }
+
       const settingsUpdate: OrganizationSettings = {
         currency: currency.trim() || 'ARS',
         locale: locale.trim() || 'es-AR',
@@ -404,6 +566,8 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         new_order_notify: newOrderNotify,
         low_stock_notify: lowStockNotify,
         order_status_notify_customer: orderStatusNotifyCustomer,
+        [STORE_LOGO_MINIMAL_KEY]: finalMinimalLogoUrl,
+        [STORE_COVER_IMAGES_KEY]: finalCoverUrls,
       }
       const { data, error: updateError } = await supabase
         .from('organizations')
@@ -534,41 +698,80 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                   />
                   <p className="mt-1 text-xs text-gray-500">Se usa en la URL. Solo letras, números y guiones.</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Logo de la organización</label>
-                  {logoPreview && (
-                    <div className="relative inline-block mb-3">
-                      <img
-                        src={logoPreview}
-                        alt="Logo"
-                        className="w-24 h-24 object-contain rounded-lg border-2 border-gray-200 bg-gray-50"
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Logo completo (desktop)</label>
+                    {logoPreview && (
+                      <div className="relative inline-block mb-3">
+                        <img
+                          src={logoPreview}
+                          alt="Logo completo"
+                          className="w-24 h-24 object-contain rounded-lg border-2 border-gray-200 bg-gray-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeLogo}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-lg"
+                          aria-label="Eliminar logo completo"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                    <label className="cursor-pointer block">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={handleLogoChange}
+                        className="hidden"
                       />
-                      <button
-                        type="button"
-                        onClick={removeLogo}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-lg"
-                        aria-label="Eliminar logo"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                  <label className="cursor-pointer block">
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/jpg,image/png,image/webp"
-                      onChange={handleLogoChange}
-                      className="hidden"
-                    />
-                    <div className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-admin-500 hover:bg-admin-50 transition-colors">
-                      <Upload className="h-5 w-5 mr-2 text-gray-400" />
-                      <span className="text-sm text-gray-700 font-medium">
-                        {logoFile ? 'Cambiar imagen' : 'Seleccionar logo'}
-                      </span>
-                    </div>
-                  </label>
-                  <p className="mt-1 text-xs text-gray-500">Formatos: JPG, PNG, WEBP. Máximo {MAX_FILE_SIZE_MB}MB</p>
+                      <div className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-admin-500 hover:bg-admin-50 transition-colors">
+                        <Upload className="h-5 w-5 mr-2 text-gray-400" />
+                        <span className="text-sm text-gray-700 font-medium">
+                          {logoFile ? 'Cambiar logo completo' : 'Seleccionar logo completo'}
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Logo mínimo (mobile)</label>
+                    {minimalLogoPreview && (
+                      <div className="relative inline-block mb-3">
+                        <img
+                          src={minimalLogoPreview}
+                          alt="Logo mínimo"
+                          className="w-20 h-20 object-contain rounded-lg border-2 border-gray-200 bg-gray-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={removeMinimalLogo}
+                          className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-lg"
+                          aria-label="Eliminar logo mínimo"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                    <label className="cursor-pointer block">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={handleMinimalLogoChange}
+                        className="hidden"
+                      />
+                      <div className="flex items-center justify-center px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-admin-500 hover:bg-admin-50 transition-colors">
+                        <Upload className="h-5 w-5 mr-2 text-gray-400" />
+                        <span className="text-sm text-gray-700 font-medium">
+                          {minimalLogoFile ? 'Cambiar logo mínimo' : 'Seleccionar logo mínimo'}
+                        </span>
+                      </div>
+                    </label>
+                  </div>
                 </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Formatos: JPG, PNG, WEBP. Máximo {MAX_FILE_SIZE_MB}MB por imagen.
+                </p>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Color primario</label>
                   <div className="flex items-center gap-3">
@@ -594,27 +797,35 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 <p className="text-sm text-gray-600">Personaliza la apariencia de tu tienda pública.</p>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Imagen de portada (hero)</label>
-                  {coverPreview && (
-                    <div className="relative inline-block mb-3">
-                      <img
-                        src={coverPreview}
-                        alt="Portada"
-                        className="max-w-full h-32 w-full object-cover rounded-lg border-2 border-gray-200 bg-gray-50"
-                      />
-                      <button
-                        type="button"
-                        onClick={removeCover}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-lg"
-                        aria-label="Eliminar portada"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Imágenes de portada (hero/carrusel)</label>
+                  {coverItems.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                      {coverItems.map((item, index) => (
+                        <div key={item.id} className="relative">
+                          <img
+                            src={item.previewUrl}
+                            alt={`Portada ${index + 1}`}
+                            className="h-28 w-full object-cover rounded-lg border-2 border-gray-200 bg-gray-50"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeCoverItem(item.id)}
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors shadow-lg"
+                            aria-label={`Eliminar portada ${index + 1}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                          <span className="absolute bottom-2 left-2 rounded bg-black/50 px-2 py-0.5 text-[11px] text-white">
+                            {index === 0 ? 'Principal' : `Slide ${index + 1}`}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   )}
                   <label className="cursor-pointer block">
                     <input
                       type="file"
+                      multiple
                       accept="image/jpeg,image/jpg,image/png,image/webp"
                       onChange={handleCoverChange}
                       className="hidden"
@@ -622,12 +833,12 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                     <div className="flex items-center justify-center px-4 py-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-admin-500 hover:bg-admin-50 transition-colors">
                       <Upload className="h-5 w-5 mr-2 text-gray-400" />
                       <span className="text-sm text-gray-700 font-medium">
-                        {coverFile ? 'Cambiar imagen de portada' : 'Seleccionar imagen de portada'}
+                        Agregar imagen{coverItems.length === 1 ? '' : 'es'} de portada
                       </span>
                     </div>
                   </label>
                   <p className="mt-1 text-xs text-gray-500">
-                    Se muestra como fondo del banner principal de la tienda. JPG, PNG o WEBP. Máximo {MAX_FILE_SIZE_MB}MB. Se recomienda 1920×600 px (relación 16:5) para mejor resultado.
+                    Puedes subir una o varias imágenes para carrusel. La primera será la portada principal. JPG, PNG o WEBP. Máximo {MAX_FILE_SIZE_MB}MB por imagen. Se recomienda 1920×600 px (16:5).
                   </p>
                 </div>
 
@@ -1028,8 +1239,8 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
               <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg shrink-0">{error}</p>
             )}
             <div className="flex gap-4 pt-5 border-t shrink-0">
-              <Button type="submit" disabled={loading || uploadingLogo || uploadingCover} className="flex-1">
-                {loading || uploadingLogo || uploadingCover ? 'Guardando...' : 'Guardar'}
+              <Button type="submit" disabled={loading || uploadingLogo || uploadingMinimalLogo || uploadingCover} className="flex-1">
+                {loading || uploadingLogo || uploadingMinimalLogo || uploadingCover ? 'Guardando...' : 'Guardar'}
               </Button>
               <Button type="button" variant="outline" onClick={onClose} className="flex-1">
                 Cancelar

@@ -99,6 +99,11 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
     }
   }
 
+  const settings = (organization.settings as Record<string, unknown>) ?? {}
+  const minimalLogoUrl =
+    typeof settings.store_logo_minimal_url === 'string' ? (settings.store_logo_minimal_url as string) : null
+  const desktopLogoUrl = organization.logo_url || null
+  const mobileLogoUrl = minimalLogoUrl || desktopLogoUrl
   const primaryColor = organization.primary_color || '#6366f1'
 
   return (
@@ -114,9 +119,9 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
         <div className="hidden lg:flex items-center h-16 my-2">
           <div className="flex-1">
             <Link to={`/${slug}`} className="flex items-center space-x-3">
-              {organization.logo_url ? (
+              {desktopLogoUrl ? (
                 <img
-                  src={organization.logo_url}
+                  src={desktopLogoUrl}
                   alt={organization.name}
                   className="h-16 w-16 object-contain"
                 />
@@ -176,9 +181,9 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
 
           <div className="flex-1 flex justify-center">
             <Link to={`/${slug}`} className="flex items-center space-x-2" onClick={() => setIsMobileMenuOpen(false)}>
-              {organization.logo_url ? (
+              {mobileLogoUrl ? (
                 <img
-                  src={organization.logo_url}
+                  src={mobileLogoUrl}
                   alt={organization.name}
                   className="h-12 w-12 object-contain"
                 />
