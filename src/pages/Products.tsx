@@ -9,9 +9,17 @@ import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
 import type { Category, Product } from '@/types'
 import { Filter, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const DEFAULT_STORE_SLUG = 'default'
+const PRODUCTS_PAGE_SIZE = 24
+
+type CachedProductsPage = {
+  products: Product[]
+  stockByProduct: Record<string, number>
+  hasVariantsByProduct: Record<string, boolean>
+  hasMore: boolean
+}
 
 export function Products() {
   const { organization, isPublicStore, slug } = useCurrentOrganization()
@@ -28,9 +36,10 @@ export function Products() {
   const [orgId, setOrgId] = useState<string | null>(null)
   const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({})
   const [hasVariantsByProduct, setHasVariantsByProduct] = useState<Record<string, boolean>>({})
-  const productsCacheRef = useRef<
-    Map<string, { products: Product[]; stockByProduct: Record<string, number>; hasVariantsByProduct: Record<string, boolean> }>
-  >(new Map())
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const productsCacheRef = useRef<Map<string, CachedProductsPage>>(new Map())
 
   useEffect(() => {
     const loadOrg = async () => {
@@ -61,35 +70,55 @@ export function Products() {
 
   useEffect(() => {
     if (!orgId) return
-    fetchProducts()
+    fetchProducts(1, true)
   }, [orgId, selectedCategory, priceRange.min, priceRange.max, debouncedSearchTerm])
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (page: number, replace: boolean) => {
     if (!orgId) return
 
     const normalizedSearch = debouncedSearchTerm.toLowerCase()
-    const cacheKey = JSON.stringify({
+    const baseCacheKey = JSON.stringify({
       orgId,
       selectedCategory,
       min: priceRange.min,
       max: priceRange.max,
       search: normalizedSearch,
     })
+    const cacheKey = `${baseCacheKey}::page:${page}`
     const cachedResult = productsCacheRef.current.get(cacheKey)
     if (cachedResult) {
-      setProducts(cachedResult.products)
-      setStockByProduct(cachedResult.stockByProduct)
-      setHasVariantsByProduct(cachedResult.hasVariantsByProduct)
+      if (replace) {
+        setProducts(cachedResult.products)
+        setStockByProduct(cachedResult.stockByProduct)
+        setHasVariantsByProduct(cachedResult.hasVariantsByProduct)
+      } else {
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map((product) => product.id))
+          const nextProducts = cachedResult.products.filter((product) => !existingIds.has(product.id))
+          return [...prev, ...nextProducts]
+        })
+        setStockByProduct((prev) => ({ ...prev, ...cachedResult.stockByProduct }))
+        setHasVariantsByProduct((prev) => ({ ...prev, ...cachedResult.hasVariantsByProduct }))
+      }
+      setCurrentPage(page)
+      setHasMore(cachedResult.hasMore)
       setLoading(false)
       setIsRefreshing(false)
+      setIsLoadingMore(false)
       return
     }
 
-    const shouldBlockPage = loading && products.length === 0
+    const shouldBlockPage = replace && loading && products.length === 0
     try {
-      if (!shouldBlockPage) {
+      if (!replace) {
+        setIsLoadingMore(true)
+      } else if (!shouldBlockPage) {
         setIsRefreshing(true)
       }
+
+      const from = (page - 1) * PRODUCTS_PAGE_SIZE
+      const to = from + PRODUCTS_PAGE_SIZE
+
       let query = supabase
         .from('products')
         .select(`
@@ -103,6 +132,8 @@ export function Products() {
         `)
         .eq('organization_id', orgId)
         .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .range(from, to)
 
       if (selectedCategory) {
         query = query.eq('category_id', selectedCategory)
@@ -123,10 +154,12 @@ export function Products() {
         }
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false })
+      const { data, error } = await query
 
       if (error) throw error
-      const productsData = (data || []) as Product[]
+      const rows = (data || []) as Product[]
+      const hasMoreRows = rows.length > PRODUCTS_PAGE_SIZE
+      const productsData = hasMoreRows ? rows.slice(0, PRODUCTS_PAGE_SIZE) : rows
       const productIds = productsData.map((product) => product.id)
       const [stocks, variantsResult] = await Promise.all([
         getProductsStock(productIds, null, orgId),
@@ -150,15 +183,29 @@ export function Products() {
         products: productsData,
         stockByProduct: stocks,
         hasVariantsByProduct: variantsMap,
+        hasMore: hasMoreRows,
       })
-      setProducts(productsData)
-      setStockByProduct(stocks)
-      setHasVariantsByProduct(variantsMap)
+      if (replace) {
+        setProducts(productsData)
+        setStockByProduct(stocks)
+        setHasVariantsByProduct(variantsMap)
+      } else {
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map((product) => product.id))
+          const nextProducts = productsData.filter((product) => !existingIds.has(product.id))
+          return [...prev, ...nextProducts]
+        })
+        setStockByProduct((prev) => ({ ...prev, ...stocks }))
+        setHasVariantsByProduct((prev) => ({ ...prev, ...variantsMap }))
+      }
+      setCurrentPage(page)
+      setHasMore(hasMoreRows)
     } catch (error) {
       console.error('Error fetching products:', error)
     } finally {
       setLoading(false)
       setIsRefreshing(false)
+      setIsLoadingMore(false)
     }
   }
 
@@ -178,8 +225,6 @@ export function Products() {
       console.error('Error fetching categories:', error)
     }
   }
-
-  const filteredProducts = useMemo(() => products, [products])
 
   const clearFilters = () => {
     setSelectedCategory('')
@@ -346,7 +391,7 @@ export function Products() {
 
         {/* Lista de productos */}
         <div className="flex-1">
-          {filteredProducts.length === 0 ? (
+          {products.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-600 text-lg">
                 {searchTerm || hasActiveFilters
@@ -363,7 +408,7 @@ export function Products() {
             <>
               {/* Vista Cards para móvil y tablet */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-6">
-                {filteredProducts.map((product) => (
+                {products.map((product) => (
                   <ProductCard 
                     key={product.id} 
                     product={product} 
@@ -376,7 +421,7 @@ export function Products() {
 
               {/* Vista Lista para desktop */}
               <div className="hidden lg:block space-y-4">
-                {filteredProducts.map((product) => (
+                {products.map((product) => (
                   <ProductListItem
                     key={product.id}
                     product={product}
@@ -386,6 +431,18 @@ export function Products() {
                   />
                 ))}
               </div>
+
+              {(hasMore || isLoadingMore) && (
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => fetchProducts(currentPage + 1, false)}
+                    disabled={isLoadingMore}
+                  >
+                    {isLoadingMore ? 'Cargando...' : 'Cargar más'}
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </div>
