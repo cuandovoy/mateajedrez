@@ -22,6 +22,7 @@ import {
   ChevronUp,
   ChevronLeft,
   ChevronRight,
+  Download,
   Edit,
   History,
   Package,
@@ -35,6 +36,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 const DEFAULT_PAGE_SIZE = 25
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
+const EXPORT_BATCH_SIZE = 1000
 
 interface InventoryItem {
   id: string
@@ -67,6 +69,16 @@ const getPrimaryImageUrl = (images: ProductImageRef[] | null | undefined): strin
   return ordered[0]?.image_url || null
 }
 
+const escapeCsv = (value: string | number): string => {
+  const str = String(value)
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`
+  }
+  return str
+}
+
+const toDateStamp = (date: Date): string => date.toISOString().split('T')[0].replace(/-/g, '')
+
 export function AdminInventory() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { organizationId, isAdmin } = useOrganization()
@@ -81,6 +93,7 @@ export function AdminInventory() {
   const [syncing, setSyncing] = useState(false)
   const [syncingItemId, setSyncingItemId] = useState<string | null>(null)
   const [syncingAll, setSyncingAll] = useState(false)
+  const [exportingAll, setExportingAll] = useState(false)
   const [unsyncedCount, setUnsyncedCount] = useState<number | null>(null)
   const [missingProductsCount, setMissingProductsCount] = useState<number | null>(null)
   const [receiptModalItem, setReceiptModalItem] = useState<InventoryItem | null>(null)
@@ -786,15 +799,192 @@ export function AdminInventory() {
     }
   }
 
-  console.log(inventory);
+  const mapInventoryRow = (item: Record<string, unknown>): InventoryItem & { source_org_id?: string | null } => {
+    const branch = item.branches as { id: string; name: string } | null
+    const product = item.product_id
+      ? (item.products as Record<string, unknown> | null)
+      : ((item.product_variants as { products?: Record<string, unknown> } | null)?.products ?? null)
+    const variant = item.variant_id ? (item.product_variants as Record<string, unknown> | null) : null
+    const productPrimaryImage = getPrimaryImageUrl(
+      (product as { product_images?: ProductImageRef[] } | null)?.product_images
+    )
+
+    return {
+      id: item.id as string,
+      branch_id: item.branch_id as string,
+      branch_name: branch?.name || 'N/A',
+      product_id: item.product_id as string | null,
+      variant_id: item.variant_id as string | null,
+      product_name:
+        (product as { name?: string } | null)?.name ||
+        (variant as { name?: string } | null)?.name ||
+        'N/A',
+      variant_name: (variant as { name?: string } | null)?.name ?? null,
+      sku:
+        (variant as { sku?: string } | null)?.sku ??
+        (product as { sku?: string } | null)?.sku ??
+        null,
+      thumbnail_url:
+        (variant as { image_url?: string } | null)?.image_url ||
+        productPrimaryImage ||
+        (product as { image_url?: string } | null)?.image_url ||
+        null,
+      stock: item.stock as number,
+      min_stock: item.min_stock as number,
+      low_stock_threshold: item.low_stock_threshold as number,
+      is_low_stock: (item.stock as number) <= (item.low_stock_threshold as number),
+      source_stock:
+        (variant as { stock?: number } | null)?.stock ??
+        (product as { stock?: number } | null)?.stock ??
+        null,
+      source_org_id: (product as { organization_id?: string } | null)?.organization_id ?? null,
+    }
+  }
+
+  const fetchAllInventoryForExport = async (): Promise<InventoryItem[]> => {
+    if (!organizationId) return []
+
+    const allRows: (InventoryItem & { source_org_id?: string | null })[] = []
+    let from = 0
+
+    while (true) {
+      const to = from + EXPORT_BATCH_SIZE - 1
+      const { data, error } = await supabase
+        .from('branch_inventory')
+        .select(
+          `
+          id,
+          branch_id,
+          product_id,
+          variant_id,
+          stock,
+          min_stock,
+          low_stock_threshold,
+          branches!inner(id, name, organization_id),
+          products(
+            id,
+            organization_id,
+            name,
+            sku,
+            stock,
+            image_url,
+            product_images (
+              image_url,
+              is_primary,
+              display_order
+            )
+          ),
+          product_variants(
+            id,
+            name,
+            sku,
+            image_url,
+            product_id,
+            stock,
+            products!inner(
+              id,
+              organization_id,
+              name,
+              sku,
+              stock,
+              image_url,
+              product_images (
+                image_url,
+                is_primary,
+                display_order
+              )
+            )
+          )
+        `
+        )
+        .eq('branches.organization_id', organizationId)
+        .order('id', { ascending: true })
+        .range(from, to)
+
+      if (error) throw error
+
+      const batch = (data || []).map((row: Record<string, unknown>) => mapInventoryRow(row))
+      allRows.push(...batch)
+
+      if (batch.length < EXPORT_BATCH_SIZE) {
+        break
+      }
+      from += EXPORT_BATCH_SIZE
+    }
+
+    return allRows
+      .filter((item) => !item.source_org_id || item.source_org_id === organizationId)
+      .map((item) => {
+        const sanitized = { ...(item as InventoryItem & { source_org_id?: string | null }) }
+        delete (sanitized as { source_org_id?: string | null }).source_org_id
+        return sanitized
+      })
+  }
+
+  const handleExportAllInventory = async () => {
+    if (!organizationId) return
+
+    try {
+      setExportingAll(true)
+      const allInventory = await fetchAllInventoryForExport()
+
+      if (allInventory.length === 0) {
+        show('No hay inventario para exportar.', 'info')
+        return
+      }
+
+      const rows: Array<Array<string | number>> = [
+        [
+          'N°',
+          'Sucursal',
+          'Producto',
+          'Variante',
+          'SKU',
+          'Stock',
+          'Stock minimo',
+          'Umbral stock bajo',
+          'Estado stock',
+        ],
+      ]
+
+      allInventory.forEach((item, index) => {
+        rows.push([
+          index + 1,
+          item.branch_name,
+          capitalizeFirst(item.product_name),
+          item.variant_name ? capitalizeFirst(item.variant_name) : '',
+          item.sku || '',
+          item.stock,
+          item.min_stock,
+          item.low_stock_threshold,
+          item.is_low_stock ? 'Bajo' : 'Normal',
+        ])
+      })
+
+      const csv = rows.map((row) => row.map(escapeCsv).join(',')).join('\n')
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `inventario_completo_${toDateStamp(new Date())}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+
+      show(`Inventario exportado (${allInventory.length} filas).`, 'success')
+    } catch (error: any) {
+      console.error('Error exporting inventory:', error)
+      show(error?.message || 'Error al exportar inventario.', 'error')
+    } finally {
+      setExportingAll(false)
+    }
+  }
+
   const lowStockCount = inventory.filter((item) => item.is_low_stock).length
   const fromItem = totalCount === 0 ? 0 : page * pageSize + 1
   const toItem = Math.min((page + 1) * pageSize, totalCount)
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   const hasPrev = page > 0
   const hasNext = page < totalPages - 1
-
-  console.log(inventory);
   
   return (
     <div className="space-y-6">
@@ -804,6 +994,15 @@ export function AdminInventory() {
           <p className="text-gray-600 mt-1">Administra el stock por sucursal</p>
         </div>
         <div className="flex items-center space-x-3">
+          <Button
+            variant="outline"
+            onClick={handleExportAllInventory}
+            disabled={exportingAll}
+            className="shrink-0"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            {exportingAll ? 'Exportando...' : 'Exportar todo (Excel)'}
+          </Button>
           {missingProductsCount !== null && missingProductsCount > 0 && (
             <div className="flex items-center space-x-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
               <AlertTriangle className="h-5 w-5 text-blue-600" />
