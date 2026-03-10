@@ -1,22 +1,109 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { ProductCard } from '@/components/features/ProductCard'
 import { CategoryCard } from '@/components/features/CategoryCard'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
-import type { Product, Category } from '@/types'
+import type { Product, Category, ProductImage } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { ArrowRight } from 'lucide-react'
 
 const STORE_COVER_IMAGES_KEY = 'store_cover_image_urls'
 const HERO_SLIDE_INTERVAL_MS = 7000
 
+type ProductWithImages = Product & { product_images?: ProductImage[] }
+
+function isValidImageUrl(url: string | null | undefined): url is string {
+  if (!url || typeof url !== 'string' || url.trim().length === 0) return false
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function getOrderedProductImageUrls(product: ProductWithImages): string[] {
+  const urls: string[] = []
+
+  if (product.product_images && product.product_images.length > 0) {
+    const sorted = [...product.product_images]
+      .filter((image) => isValidImageUrl(image.image_url))
+      .sort((a, b) => {
+        if (a.is_primary && !b.is_primary) return -1
+        if (!a.is_primary && b.is_primary) return 1
+        return a.display_order - b.display_order
+      })
+
+    sorted.forEach((image) => {
+      if (image.image_url && !urls.includes(image.image_url)) {
+        urls.push(image.image_url)
+      }
+    })
+  }
+
+  if (isValidImageUrl(product.image_url) && !urls.includes(product.image_url)) {
+    urls.push(product.image_url)
+  }
+
+  return urls
+}
+
 export function PublicStore() {
   const { organization, slug } = usePublicStore()
-  const [products, setProducts] = useState<Product[]>([])
+  const [products, setProducts] = useState<ProductWithImages[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [allCategories, setAllCategories] = useState<Category[]>([])
   const [currentCoverIndex, setCurrentCoverIndex] = useState(0)
   const [loading, setLoading] = useState(true)
+
+  const categoryFallbackImages = useMemo(() => {
+    if (products.length === 0 || allCategories.length === 0) {
+      return new Map<string, string[]>()
+    }
+
+    const parentByCategoryId = new Map<string, string | null>(
+      allCategories.map((category) => [category.id, category.parent_id])
+    )
+
+    const resolveTopCategoryId = (categoryId: string): string => {
+      let currentId = categoryId
+      const visited = new Set<string>()
+
+      while (true) {
+        if (visited.has(currentId)) return currentId
+        visited.add(currentId)
+
+        const parentId = parentByCategoryId.get(currentId)
+        if (!parentId) return currentId
+        currentId = parentId
+      }
+    }
+
+    const fallbackByCategory = new Map<string, string[]>()
+
+    products.forEach((product) => {
+      if (!product.category_id) return
+
+      const topCategoryId = resolveTopCategoryId(product.category_id)
+      const images = getOrderedProductImageUrls(product)
+      if (images.length === 0) return
+
+      const currentFallback = fallbackByCategory.get(topCategoryId) ?? []
+      for (const imageUrl of images) {
+        if (currentFallback.length >= 3) break
+        if (!currentFallback.includes(imageUrl)) {
+          currentFallback.push(imageUrl)
+        }
+      }
+
+      if (currentFallback.length > 0) {
+        fallbackByCategory.set(topCategoryId, currentFallback)
+      }
+    })
+
+    return fallbackByCategory
+  }, [allCategories, products])
 
   const settings = (organization.settings as Record<string, unknown>) ?? {}
   const settingsCoverImages = Array.isArray(settings[STORE_COVER_IMAGES_KEY])
@@ -49,7 +136,10 @@ export function PublicStore() {
               id,
               image_url,
               display_order,
-              is_primary
+              is_primary,
+              product_id,
+              created_at,
+              updated_at
             )
           `)
           .eq('organization_id', organization.id)
@@ -62,14 +152,15 @@ export function PublicStore() {
           .from('categories')
           .select('*')
           .eq('organization_id', organization.id)
-          .is('parent_id', null)
           .order('name')
 
         if (categoriesError) throw categoriesError
 
         if (isMounted.current) {
           setProducts(productsData || [])
-          setCategories(categoriesData || [])
+          const availableCategories = categoriesData || []
+          setAllCategories(availableCategories)
+          setCategories(availableCategories.filter((category) => !category.parent_id))
         }
       } catch (error) {
         if ((error instanceof Error && error.name !== 'AbortError') || !(error instanceof Error)) {
@@ -202,7 +293,11 @@ export function PublicStore() {
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-6 md:gap-8 lg:gap-12">
                   {categories.map((category) => (
                     <div key={category.id} className="w-full sm:w-[400px] md:w-[450px] lg:w-[500px]">
-                      <CategoryCard category={category} basePath={`/${slug}`} />
+                      <CategoryCard
+                        category={category}
+                        basePath={`/${slug}`}
+                        fallbackImages={categoryFallbackImages.get(category.id) ?? []}
+                      />
                     </div>
                   ))}
                 </div>
@@ -210,7 +305,11 @@ export function PublicStore() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
                   {categories.map((category) => (
                     <div key={category.id} className="w-full">
-                      <CategoryCard category={category} basePath={`/${slug}`} />
+                      <CategoryCard
+                        category={category}
+                        basePath={`/${slug}`}
+                        fallbackImages={categoryFallbackImages.get(category.id) ?? []}
+                      />
                     </div>
                   ))}
                 </div>
@@ -218,7 +317,11 @@ export function PublicStore() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
                   {categories.map((category) => (
                     <div key={category.id} className="w-full">
-                      <CategoryCard category={category} basePath={`/${slug}`} />
+                      <CategoryCard
+                        category={category}
+                        basePath={`/${slug}`}
+                        fallbackImages={categoryFallbackImages.get(category.id) ?? []}
+                      />
                     </div>
                   ))}
                 </div>
