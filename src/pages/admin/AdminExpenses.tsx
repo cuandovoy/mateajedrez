@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 type SupplierLite = { id: string; name: string }
 type BranchLite = { id: string; name: string }
 type ProductLite = { id: string; name: string }
+type VariantLite = { id: string; name: string | null; sku: string }
 
 type PurchaseOrderLite = {
   id: string
@@ -30,6 +31,7 @@ type PurchaseOrderItemLite = {
   id: string
   line_number: number
   product_id: string
+  variant_id: string | null
   quantity_ordered: number
   quantity_received: number
   unit_cost: number
@@ -42,6 +44,7 @@ type SupplierInvoiceLite = {
   id: string
   invoice_number: string
   supplier_id: string
+  purchase_order_id: string | null
   status: string
   total_amount: number
   outstanding_amount: number
@@ -140,6 +143,8 @@ export function AdminExpenses() {
   const [suppliers, setSuppliers] = useState<SupplierLite[]>([])
   const [branches, setBranches] = useState<BranchLite[]>([])
   const [products, setProducts] = useState<ProductLite[]>([])
+  const [variantsByProduct, setVariantsByProduct] = useState<Map<string, VariantLite[]>>(new Map())
+  const [loadingVariants, setLoadingVariants] = useState(false)
 
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderLite[]>([])
   const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState<string>('')
@@ -187,6 +192,18 @@ export function AdminExpenses() {
 
   const [newOrderItemForm, setNewOrderItemForm] = useState({
     product_id: '',
+    variant_id: '',
+    quantity_ordered: '1',
+    unit_cost: '0',
+    tax_amount: '0',
+    discount_amount: '0',
+    description: '',
+  })
+
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editItemForm, setEditItemForm] = useState({
+    product_id: '',
+    variant_id: '',
     quantity_ordered: '1',
     unit_cost: '0',
     tax_amount: '0',
@@ -209,6 +226,28 @@ export function AdminExpenses() {
   })
 
   const fromAny = (table: string) => (supabase.from as any)(table)
+
+  const loadVariantsForProduct = async (productId: string) => {
+    if (!productId || variantsByProduct.has(productId)) return
+    setLoadingVariants(true)
+    try {
+      const { data, error } = await fromAny('product_variants')
+        .select('id, name, sku')
+        .eq('product_id', productId)
+        .eq('is_active', true)
+        .order('name')
+      if (!error && data) {
+        setVariantsByProduct((prev) => new Map(prev).set(productId, data as VariantLite[]))
+      }
+    } finally {
+      setLoadingVariants(false)
+    }
+  }
+
+  const handleNewItemProductChange = (productId: string) => {
+    setNewOrderItemForm((prev) => ({ ...prev, product_id: productId, variant_id: '' }))
+    if (productId) loadVariantsForProduct(productId)
+  }
 
   const supplierNameById = useMemo(() => new Map(suppliers.map((s) => [s.id, s.name])), [suppliers])
   const branchNameById = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches])
@@ -284,7 +323,7 @@ export function AdminExpenses() {
           .order('created_at', { ascending: false })
           .limit(100),
         fromAny('supplier_invoices')
-          .select('id, invoice_number, supplier_id, status, total_amount, outstanding_amount')
+          .select('id, invoice_number, supplier_id, purchase_order_id, status, total_amount, outstanding_amount')
           .eq('organization_id', organizationId)
           .order('created_at', { ascending: false })
           .limit(100),
@@ -355,12 +394,16 @@ export function AdminExpenses() {
   const fetchPurchaseOrderItems = async (purchaseOrderId: string) => {
     try {
       const { data, error } = await fromAny('purchase_order_items')
-        .select('id, line_number, product_id, quantity_ordered, quantity_received, unit_cost, tax_amount, discount_amount, description')
+        .select('id, line_number, product_id, variant_id, quantity_ordered, quantity_received, unit_cost, tax_amount, discount_amount, description')
         .eq('purchase_order_id', purchaseOrderId)
         .order('line_number', { ascending: true })
 
       if (error) throw error
-      setPurchaseOrderItems((data || []) as PurchaseOrderItemLite[])
+      const items = (data || []) as PurchaseOrderItemLite[]
+      setPurchaseOrderItems(items)
+      // Pre-cargar variantes de los productos que aparecen en los items
+      const uniqueProductIds = [...new Set(items.map((i) => i.product_id))]
+      uniqueProductIds.forEach((pid) => loadVariantsForProduct(pid))
     } catch (error) {
       console.error('Error loading purchase order items:', error)
       show('No se pudieron cargar los productos de la orden de compra.', 'error')
@@ -506,6 +549,7 @@ export function AdminExpenses() {
         purchase_order_id: selectedPurchaseOrder.id,
         line_number: lineNumber,
         product_id: newOrderItemForm.product_id,
+        variant_id: newOrderItemForm.variant_id || null,
         quantity_ordered: quantityOrdered,
         unit_cost: unitCost,
         tax_amount: taxAmount,
@@ -537,6 +581,7 @@ export function AdminExpenses() {
 
       setNewOrderItemForm({
         product_id: '',
+        variant_id: '',
         quantity_ordered: '1',
         unit_cost: '0',
         tax_amount: '0',
@@ -578,6 +623,117 @@ export function AdminExpenses() {
     } catch (error) {
       console.error('Error removing purchase order item:', error)
       show('No se pudo eliminar el producto de la orden de compra.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const startEditingItem = (item: PurchaseOrderItemLite) => {
+    if (!selectedPurchaseOrder) return
+
+    const status = selectedPurchaseOrder.status
+
+    if (status === 'received' || status === 'cancelled') {
+      show(
+        status === 'cancelled'
+          ? 'No se pueden editar ítems de una orden cancelada.'
+          : 'No se pueden editar ítems de una orden ya recibida. El inventario ya fue actualizado.',
+        'error'
+      )
+      return
+    }
+
+    if (status === 'partially_received' && item.quantity_received > 0) {
+      show(
+        `Este ítem ya tiene ${item.quantity_received} unidades recibidas. Podés editar solo el costo y la descripción — el producto, variante y cantidad están bloqueados por movimientos de inventario existentes.`,
+        'error'
+      )
+      return
+    }
+
+    setEditingItemId(item.id)
+    setEditItemForm({
+      product_id: item.product_id,
+      variant_id: item.variant_id ?? '',
+      quantity_ordered: String(item.quantity_ordered),
+      unit_cost: String(item.unit_cost),
+      tax_amount: String(item.tax_amount),
+      discount_amount: String(item.discount_amount),
+      description: item.description ?? '',
+    })
+    loadVariantsForProduct(item.product_id)
+  }
+
+  const cancelEditingItem = () => setEditingItemId(null)
+
+  const saveEditingItem = async () => {
+    if (!selectedPurchaseOrder || !editingItemId) return
+
+    const quantityOrdered = Number(editItemForm.quantity_ordered)
+    const unitCost = Number(editItemForm.unit_cost)
+    const taxAmount = Number(editItemForm.tax_amount)
+    const discountAmount = Number(editItemForm.discount_amount)
+
+    if (!editItemForm.product_id) {
+      show('Selecciona un producto.', 'error')
+      return
+    }
+    if (!Number.isFinite(quantityOrdered) || quantityOrdered <= 0) {
+      show('La cantidad debe ser mayor que cero.', 'error')
+      return
+    }
+    if (
+      !Number.isFinite(unitCost) || unitCost < 0 ||
+      !Number.isFinite(taxAmount) || taxAmount < 0 ||
+      !Number.isFinite(discountAmount) || discountAmount < 0
+    ) {
+      show('Los montos deben ser valores válidos.', 'error')
+      return
+    }
+
+    const existingItem = purchaseOrderItems.find((i) => i.id === editingItemId)
+
+    try {
+      setSaving(true)
+      const { error } = await fromAny('purchase_order_items')
+        .update({
+          product_id: editItemForm.product_id,
+          variant_id: editItemForm.variant_id || null,
+          quantity_ordered: quantityOrdered,
+          unit_cost: unitCost,
+          tax_amount: taxAmount,
+          discount_amount: discountAmount,
+          description: editItemForm.description || null,
+        })
+        .eq('id', editingItemId)
+
+      if (error) throw error
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'purchase_order_items',
+        recordId: editingItemId,
+        action: 'UPDATE',
+        notes: 'Ítem de orden de compra editado manualmente.',
+        oldData: existingItem ?? null,
+        newData: {
+          product_id: editItemForm.product_id,
+          variant_id: editItemForm.variant_id || null,
+          quantity_ordered: quantityOrdered,
+          unit_cost: unitCost,
+          tax_amount: taxAmount,
+          discount_amount: discountAmount,
+          description: editItemForm.description || null,
+        },
+      })
+
+      setEditingItemId(null)
+      await fetchPageData({ silent: true })
+      await fetchPurchaseOrderItems(selectedPurchaseOrder.id)
+      show('Ítem actualizado correctamente.', 'success')
+    } catch (error) {
+      console.error('Error updating purchase order item:', error)
+      show('No se pudo actualizar el ítem.', 'error')
     } finally {
       setSaving(false)
     }
@@ -1299,6 +1455,30 @@ export function AdminExpenses() {
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
+              {/* Banners de estado */}
+              {selectedPurchaseOrder.status === 'received' && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  <strong>Orden recibida.</strong> El inventario ya fue actualizado con esta orden. No se pueden editar los ítems para evitar inconsistencias contables.
+                </div>
+              )}
+              {selectedPurchaseOrder.status === 'cancelled' && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                  <strong>Orden cancelada.</strong> No se pueden modificar los ítems de una orden cancelada.
+                </div>
+              )}
+              {selectedPurchaseOrder.status === 'partially_received' && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                  <strong>Recepción parcial.</strong> Los ítems con unidades ya recibidas no pueden editarse. Solo podés editar ítems que aún no tienen recepciones registradas.
+                </div>
+              )}
+              {supplierInvoices.some(
+                (inv) => inv.purchase_order_id === selectedPurchaseOrder.id && inv.status !== 'cancelled'
+              ) && (
+                <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+                  <strong>Factura emitida asociada.</strong> Esta orden tiene una factura de proveedor activa. Si editás costos, el total de la orden cambiará pero la factura ya emitida <strong>no se actualizará automáticamente</strong> — revisá la factura manualmente.
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor</label>
@@ -1367,6 +1547,7 @@ export function AdminExpenses() {
                     <tr className="border-b border-gray-200">
                       <th className="text-left py-2 px-2 text-xs uppercase text-gray-500">Linea</th>
                       <th className="text-left py-2 px-2 text-xs uppercase text-gray-500">Producto</th>
+                      <th className="text-left py-2 px-2 text-xs uppercase text-gray-500">Variante</th>
                         <th className="text-right py-2 px-2 text-xs uppercase text-gray-500">Cantidad</th>
                         <th className="text-right py-2 px-2 text-xs uppercase text-gray-500">Recibida</th>
                         <th className="text-right py-2 px-2 text-xs uppercase text-gray-500">Costo unitario</th>
@@ -1377,16 +1558,146 @@ export function AdminExpenses() {
                     <tbody>
                       {purchaseOrderItems.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="text-center py-6 text-sm text-gray-500">Esta orden no tiene productos cargados.</td>
+                          <td colSpan={8} className="text-center py-6 text-sm text-gray-500">Esta orden no tiene productos cargados.</td>
                         </tr>
                       )}
 
                       {purchaseOrderItems.map((item) => {
+                        const isEditing = editingItemId === item.id
                         const lineSubtotal = Number(item.quantity_ordered) * Number(item.unit_cost)
+
+                        if (isEditing) {
+                          const editVariants = variantsByProduct.get(editItemForm.product_id) ?? []
+                          return (
+                            <tr key={item.id} className="border-b border-blue-100 bg-blue-50">
+                              <td colSpan={8} className="px-3 py-3">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-600">Editando línea {item.line_number}</p>
+                                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium text-gray-600">Producto</label>
+                                    <select
+                                      className="w-full min-h-[36px] rounded-md border border-gray-300 px-2 text-sm"
+                                      value={editItemForm.product_id}
+                                      onChange={(e) => {
+                                        const pid = e.target.value
+                                        setEditItemForm((p) => ({ ...p, product_id: pid, variant_id: '' }))
+                                        if (pid) loadVariantsForProduct(pid)
+                                      }}
+                                    >
+                                      <option value="">Seleccionar</option>
+                                      {products.map((p) => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium text-gray-600">Variante</label>
+                                    <select
+                                      className="w-full min-h-[36px] rounded-md border border-gray-300 px-2 text-sm"
+                                      value={editItemForm.variant_id}
+                                      onChange={(e) => setEditItemForm((p) => ({ ...p, variant_id: e.target.value }))}
+                                      disabled={!editItemForm.product_id}
+                                    >
+                                      <option value="">Sin variante</option>
+                                      {editVariants.map((v) => (
+                                        <option key={v.id} value={v.id}>{v.name ?? v.sku} — {v.sku}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium text-gray-600">Cantidad</label>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      className="w-full min-h-[36px] rounded-md border border-gray-300 px-2 text-sm"
+                                      value={editItemForm.quantity_ordered}
+                                      onChange={(e) => setEditItemForm((p) => ({ ...p, quantity_ordered: e.target.value }))}
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium text-gray-600">Costo unitario</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.0001"
+                                      className="w-full min-h-[36px] rounded-md border border-gray-300 px-2 text-sm"
+                                      value={editItemForm.unit_cost}
+                                      onChange={(e) => setEditItemForm((p) => ({ ...p, unit_cost: e.target.value }))}
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium text-gray-600">Impuestos</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      className="w-full min-h-[36px] rounded-md border border-gray-300 px-2 text-sm"
+                                      value={editItemForm.tax_amount}
+                                      onChange={(e) => setEditItemForm((p) => ({ ...p, tax_amount: e.target.value }))}
+                                    />
+                                  </div>
+
+                                  <div>
+                                    <label className="mb-1 block text-xs font-medium text-gray-600">Descuentos</label>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      className="w-full min-h-[36px] rounded-md border border-gray-300 px-2 text-sm"
+                                      value={editItemForm.discount_amount}
+                                      onChange={(e) => setEditItemForm((p) => ({ ...p, discount_amount: e.target.value }))}
+                                    />
+                                  </div>
+
+                                  <div className="md:col-span-2">
+                                    <label className="mb-1 block text-xs font-medium text-gray-600">Descripción (opcional)</label>
+                                    <input
+                                      type="text"
+                                      className="w-full min-h-[36px] rounded-md border border-gray-300 px-2 text-sm"
+                                      value={editItemForm.description}
+                                      onChange={(e) => setEditItemForm((p) => ({ ...p, description: e.target.value }))}
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="mt-3 flex items-center gap-2">
+                                  <button
+                                    onClick={saveEditingItem}
+                                    disabled={saving}
+                                    className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-50 transition-colors"
+                                  >
+                                    Guardar cambios
+                                  </button>
+                                  <button
+                                    onClick={cancelEditingItem}
+                                    disabled={saving}
+                                    className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                                  >
+                                    Cancelar
+                                  </button>
+                                  {item.quantity_received > 0 && (
+                                    <span className="text-xs text-amber-600">⚠ Este ítem ya tiene {item.quantity_received} unidades recibidas</span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        }
+
                         return (
-                          <tr key={item.id} className="border-b border-gray-100">
+                          <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
                             <td className="py-2 px-2 text-sm text-gray-700">{item.line_number}</td>
                             <td className="py-2 px-2 text-sm text-gray-700">{productNameById.get(item.product_id) || 'Producto'}</td>
+                            <td className="py-2 px-2 text-sm text-gray-500">
+                              {item.variant_id
+                                ? (variantsByProduct.get(item.product_id)?.find((v) => v.id === item.variant_id)?.name ?? item.variant_id.slice(0, 8) + '…')
+                                : <span className="text-gray-300">—</span>}
+                            </td>
                             <td className="py-2 px-2 text-sm text-gray-700 text-right">{item.quantity_ordered}</td>
                             <td className="py-2 px-2 text-sm text-gray-700 text-right">{item.quantity_received}</td>
                             <td className="py-2 px-2 text-sm text-gray-700 text-right">{formatPrice(Number(item.unit_cost), settings)}</td>
@@ -1394,6 +1705,10 @@ export function AdminExpenses() {
                             <td className="py-2 px-2 text-right">
                               <ActionsMenu
                                 actions={[
+                                  {
+                                    label: 'Editar ítem',
+                                    onClick: () => startEditingItem(item),
+                                  },
                                   {
                                     label: 'Eliminar producto',
                                     onClick: () => removeItemFromSelectedPurchaseOrder(item.id),
@@ -1415,7 +1730,7 @@ export function AdminExpenses() {
                     <select
                       className="w-full min-h-[44px] px-3 border border-gray-300 rounded-lg"
                       value={newOrderItemForm.product_id}
-                      onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, product_id: event.target.value }))}
+                      onChange={(event) => handleNewItemProductChange(event.target.value)}
                     >
                       <option value="">Seleccionar producto</option>
                       {products.map((product) => (
@@ -1423,6 +1738,24 @@ export function AdminExpenses() {
                       ))}
                     </select>
                   </div>
+
+                  {newOrderItemForm.product_id && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Variante {loadingVariants && <span className="text-xs text-gray-400">(cargando...)</span>}
+                      </label>
+                      <select
+                        className="w-full min-h-[44px] px-3 border border-gray-300 rounded-lg"
+                        value={newOrderItemForm.variant_id}
+                        onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, variant_id: event.target.value }))}
+                      >
+                        <option value="">Sin variante específica</option>
+                        {(variantsByProduct.get(newOrderItemForm.product_id) ?? []).map((v) => (
+                          <option key={v.id} value={v.id}>{v.name ?? v.sku} — {v.sku}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
