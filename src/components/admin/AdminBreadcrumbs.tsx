@@ -16,7 +16,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/branches': 'Sucursales',
   '/inventory': 'Inventario',
   '/transfers': 'Transferencias',
-  '/cash-register': 'Caja',
+  '/cash-register': 'Punto de Venta',
   '/organizations': 'Organizaciones',
   '/users': 'Usuarios',
   '/roles-permissions': 'Roles y Permisos',

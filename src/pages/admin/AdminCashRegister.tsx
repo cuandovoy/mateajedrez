@@ -10,22 +10,14 @@ import { CashSessionTable } from '@/components/admin/CashSessionTable'
 import { CashSessionPayments } from '@/components/admin/CashSessionPayments'
 import { ManualSaleForm } from '@/components/admin/ManualSaleForm'
 import { SearchFilter } from '@/components/filters'
-import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import {
   DollarSign,
-  Edit,
-  Filter,
-  Grid3x3,
-  List,
   Plus,
-  Trash2,
   X,
   Building2,
   Calendar,
-  TrendingUp,
-  TrendingDown,
-  Receipt,
   ShoppingCart,
+  Clock,
 } from 'lucide-react'
 import { PlanGate } from '@/components/features/PlanGate'
 import { useOrganization } from '@/hooks/useOrganization'
@@ -36,7 +28,6 @@ import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import type { CashSession, CashSessionInsert, CashSessionUpdate, Branch } from '@/types'
 
-type ViewMode = 'grid' | 'list'
 
 const cashSessionSchema = z.object({
   branch_id: z.string().min(1, 'La sucursal es requerida'),
@@ -63,7 +54,6 @@ function AdminCashRegisterContent() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
   const [editingSession, setEditingSession] = useState<CashSession | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [search, setSearch] = useState('')
   const [selectedBranchFilter, setSelectedBranchFilter] = useState<string>('')
   const [viewingPaymentsSessionId, setViewingPaymentsSessionId] = useState<string | null>(null)
@@ -175,37 +165,31 @@ function AdminCashRegisterContent() {
     }
   }
 
-  const filteredSessions = useMemo(() => {
-    let filtered = sessions
+  // Open sessions: always all, no filters
+  const openSessions = useMemo(() => sessions.filter((s) => !s.closed_at), [sessions])
+
+  // Closed sessions: apply search + branch filter for the history section
+  const closedSessions = useMemo(() => {
+    let filtered = sessions.filter((s) => s.closed_at)
 
     if (selectedBranchFilter) {
-      filtered = filtered.filter((session) => session.branch_id === selectedBranchFilter)
+      filtered = filtered.filter((s) => s.branch_id === selectedBranchFilter)
     }
 
     if (search.trim()) {
       const searchLower = search.toLowerCase()
-      filtered = filtered.filter((session) => {
-        const branch = branches.find((b) => b.id === session.branch_id)
+      filtered = filtered.filter((s) => {
+        const branch = branches.find((b) => b.id === s.branch_id)
         return (
           branch?.name.toLowerCase().includes(searchLower) ||
           branch?.code?.toLowerCase().includes(searchLower) ||
-          session.notes?.toLowerCase().includes(searchLower)
+          s.notes?.toLowerCase().includes(searchLower)
         )
       })
     }
 
     return filtered
   }, [sessions, search, selectedBranchFilter, branches])
-
-  const openSessions = useMemo(
-    () => filteredSessions.filter((s) => !s.closed_at),
-    [filteredSessions]
-  )
-
-  const closedSessions = useMemo(
-    () => filteredSessions.filter((s) => s.closed_at),
-    [filteredSessions]
-  )
 
   const onSubmitOpen = async (data: CashSessionForm) => {
     try {
@@ -346,19 +330,6 @@ function AdminCashRegisterContent() {
     setIsModalOpen(true)
   }
 
-  // Calculate totals
-  const totals = useMemo(() => {
-    const openTotal = openSessions.reduce((sum, s) => sum + s.opening_amount, 0)
-    const closedTotal = closedSessions.reduce((sum, s) => sum + (s.closing_amount || 0), 0)
-    const differenceTotal = closedSessions.reduce((sum, s) => sum + (s.difference || 0), 0)
-
-    return {
-      openTotal,
-      closedTotal,
-      differenceTotal,
-    }
-  }, [openSessions, closedSessions])
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -368,317 +339,254 @@ function AdminCashRegisterContent() {
   }
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
+    <div className="space-y-8">
+      {/* ── Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Caja</h1>
-          <p className="text-gray-600 mt-2">Gestiona las sesiones de caja por sucursal</p>
+          <h1 className="text-3xl font-bold text-gray-900">Punto de Venta</h1>
+          <p className="text-gray-500 mt-1 text-sm">Gestiona las cajas abiertas y el historial de sesiones</p>
         </div>
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 ${
-                viewMode === 'list'
-                  ? 'bg-admin-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-              title="Vista de lista"
-            >
-              <List className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 ${
-                viewMode === 'grid'
-                  ? 'bg-admin-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
-              title="Vista de grilla"
-            >
-              <Grid3x3 className="h-4 w-4" />
-            </button>
+        <Button onClick={handleNew} size="sm">
+          <Plus className="h-4 w-4 mr-2" />
+          Abrir Caja
+        </Button>
+      </div>
+
+      {/* ── Cajas abiertas ahora ── */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+          </span>
+          <h2 className="text-lg font-semibold text-gray-800">
+            Cajas abiertas ahora
+          </h2>
+          {openSessions.length > 0 && (
+            <span className="ml-1 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+              {openSessions.length}
+            </span>
+          )}
+        </div>
+
+        {openSessions.length === 0 ? (
+          <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-12 text-center">
+            <DollarSign className="mx-auto h-10 w-10 text-gray-300 mb-3" />
+            <p className="text-gray-500 font-medium">No hay cajas abiertas en este momento</p>
+            <p className="text-gray-400 text-sm mt-1">Abrí una caja para comenzar a registrar ventas</p>
+            <Button className="mt-4" onClick={handleNew} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Abrir Caja
+            </Button>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (branches.length === 0) {
-                alert('No hay sucursales disponibles')
-                return
-              }
-              if (branches.length === 1) {
-                setSelectedBranchForSale(branches[0].id)
-                setIsManualSaleOpen(true)
-              } else {
-                // Show simple selection - use first branch with open session, or first branch
-                const branchWithOpenSession = branches.find((b) =>
-                  openSessions.some((s) => s.branch_id === b.id)
-                )
-                setSelectedBranchForSale(branchWithOpenSession?.id || branches[0].id)
-                setIsManualSaleOpen(true)
-              }
-            }}
-          >
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            Nueva Venta
-          </Button>
-          <Button onClick={handleNew}>
-            <Plus className="h-4 w-4 mr-2" />
-            Abrir Caja
-          </Button>
-        </div>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Sesiones Abiertas</p>
-                <p className="text-2xl font-bold text-gray-900">{openSessions.length}</p>
-              </div>
-              <div className="bg-blue-50 p-3 rounded-lg">
-                <DollarSign className="h-6 w-6 text-blue-600" />
-              </div>
-            </div>
-            <div className="mt-4">
-              <p className="text-xs text-gray-500">Suma de aperturas de sesiones abiertas</p>
-              <p className="text-lg font-semibold text-blue-600">{formatPrice(totals.openTotal, settings)}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Sesiones Cerradas</p>
-                <p className="text-2xl font-bold text-gray-900">{closedSessions.length}</p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <Calendar className="h-6 w-6 text-gray-600" />
-              </div>
-            </div>
-            <div className="mt-4">
-              <p className="text-xs text-gray-500">Total cerrado</p>
-              <p className="text-lg font-semibold text-gray-700">{formatPrice(totals.closedTotal, settings)}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Diferencia Total</p>
-                <p
-                  className={`text-2xl font-bold ${
-                    totals.differenceTotal >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {openSessions.map((session) => {
+              const branch = branches.find((b) => b.id === session.branch_id)
+              return (
+                <div
+                  key={session.id}
+                  className="rounded-xl border-2 border-green-200 bg-white shadow-sm hover:shadow-md transition-shadow"
                 >
-                  {totals.differenceTotal >= 0 ? (
-                    <TrendingUp className="h-6 w-6 inline mr-1" />
-                  ) : (
-                    <TrendingDown className="h-6 w-6 inline mr-1" />
-                  )}
-                  {formatPrice(Math.abs(totals.differenceTotal), settings)}
-                </p>
-              </div>
-              <div
-                className={`p-3 rounded-lg ${
-                  totals.differenceTotal >= 0 ? 'bg-green-50' : 'bg-red-50'
-                }`}
-              >
-                {totals.differenceTotal >= 0 ? (
-                  <TrendingUp className="h-6 w-6 text-green-600" />
-                ) : (
-                  <TrendingDown className="h-6 w-6 text-red-600" />
-                )}
-              </div>
-            </div>
-            <div className="mt-4">
-              <p className="text-xs text-gray-500">
-                {totals.differenceTotal >= 0 ? 'Sobrante' : 'Faltante'}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                  {/* Card header */}
+                  <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-green-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex-shrink-0 bg-green-100 p-2 rounded-lg">
+                        <Building2 className="h-5 w-5 text-green-700" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">
+                          {branch?.name || 'Sucursal'}
+                        </p>
+                        {branch?.code && (
+                          <p className="text-xs text-gray-400">{branch.code}</p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="flex-shrink-0 inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold text-green-700">
+                      Abierta
+                    </span>
+                  </div>
 
-      {/* Filters Panel */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filtros</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Card body */}
+                  <div className="px-5 py-4 space-y-3">
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Clock className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                      <span>Apertura: {formatDateShort(session.opened_at, settings)}</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-lg bg-gray-50 p-3">
+                        <p className="text-xs text-gray-500 mb-0.5">Fondo inicial</p>
+                        <p className="text-sm font-semibold text-gray-800">
+                          {formatPrice(session.opening_amount, settings)}
+                        </p>
+                      </div>
+                      <div className="rounded-lg bg-blue-50 p-3">
+                        <p className="text-xs text-blue-600 mb-0.5">Esperado en caja</p>
+                        <p className="text-sm font-semibold text-blue-700">
+                          {session.expected_amount !== null
+                            ? formatPrice(session.expected_amount, settings)
+                            : '—'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card actions */}
+                  <div className="px-5 pb-5 flex flex-col gap-2">
+                    <Button
+                      className="w-full"
+                      onClick={() => {
+                        setSelectedBranchForSale(session.branch_id)
+                        setIsManualSaleOpen(true)
+                      }}
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Nueva Venta
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 text-sm"
+                        onClick={() => handleCloseSession(session)}
+                      >
+                        Cerrar Caja
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => setViewingPaymentsSessionId(session.id)}
+                        className="flex-1 text-sm text-admin-600 hover:text-admin-700 font-medium hover:underline"
+                      >
+                        Ver ventas
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ── Historial de sesiones cerradas ── */}
+      <section>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+          <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-gray-500" />
+            Historial de sesiones
+          </h2>
+          {/* Inline filters */}
+          <div className="flex flex-col sm:flex-row gap-2">
             <SearchFilter
               value={search}
               onChange={setSearch}
               placeholder="Buscar sesiones..."
             />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sucursal</label>
-              <select
-                value={selectedBranchFilter}
-                onChange={(e) => setSelectedBranchFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+            <select
+              value={selectedBranchFilter}
+              onChange={(e) => setSelectedBranchFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 bg-white"
+            >
+              <option value="">Todas las sucursales</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+            {(search || selectedBranchFilter) && (
+              <button
+                type="button"
+                onClick={() => { setSearch(''); setSelectedBranchFilter('') }}
+                className="text-sm text-gray-500 hover:text-gray-700 underline self-center"
               >
-                <option value="">Todas las sucursales</option>
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+                Limpiar
+              </button>
+            )}
           </div>
-          {(search || selectedBranchFilter) && (
-            <div className="mt-4">
-              <Button variant="outline" onClick={() => {
-                setSearch('')
-                setSelectedBranchFilter('')
-              }}>
-                Limpiar Filtros
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Results count */}
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-600">
-          Mostrando {filteredSessions.length} de {sessions.length} sesiones
-        </p>
-      </div>
-
-      {/* Sessions Display */}
-      {viewMode === 'list' ? (
-        <Card>
-          <CardContent className="p-0">
-            <CashSessionTable
-              sessions={filteredSessions}
-              branches={branches}
-              onEdit={handleCloseSession}
-              onDelete={handleDelete}
-              onViewPayments={setViewingPaymentsSessionId}
-            />
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSessions.map((session) => {
-            const isOpen = !session.closed_at
-            const difference = session.difference || 0
-            const branch = branches.find((b) => b.id === session.branch_id)
-
-            return (
-              <Card key={session.id} className="relative">
-                <CardContent className="p-6">
-                  <div className="absolute top-4 right-4">
-                    <ActionsMenu
-                      actions={[
-                        {
-                          label: 'Ver Ventas',
-                          icon: <Receipt className="h-4 w-4" />,
-                          onClick: () => setViewingPaymentsSessionId(session.id),
-                        },
-                        {
-                          label: isOpen ? 'Cerrar Sesión' : 'Ver Detalles',
-                          icon: <Edit className="h-4 w-4" />,
-                          onClick: () => (isOpen ? handleCloseSession(session) : handleCloseSession(session)),
-                        },
-                        {
-                          label: 'Eliminar',
-                          icon: <Trash2 className="h-4 w-4" />,
-                          onClick: () => handleDelete(session.id),
-                          variant: 'danger',
-                        },
-                      ]}
-                    />
-                  </div>
-                  <div className="pr-8">
-                    <div className="flex items-center space-x-2 mb-3">
-                      <Building2 className="h-5 w-5 text-admin-600" />
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        {branch?.name || 'Sucursal desconocida'}
-                      </h3>
-                    </div>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center text-gray-600">
-                        <Calendar className="h-4 w-4 mr-2 text-gray-400" />
-                        {formatDateShort(session.opened_at, settings)}
-                      </div>
-                      <div className="flex items-center text-gray-600">
-                        <DollarSign className="h-4 w-4 mr-2 text-gray-400" />
-                        Apertura: {formatPrice(session.opening_amount, settings)}
-                      </div>
-                      {session.closed_at && (
-                        <>
-                          {session.expected_amount !== null && (
-                            <div className="text-xs text-gray-500">
-                              Esperado: {formatPrice(session.expected_amount, settings)}
-                            </div>
-                          )}
-                          {session.closing_amount !== null && (
-                            <div className="text-sm font-medium text-gray-700">
-                              Cierre: {formatPrice(session.closing_amount, settings)}
-                            </div>
-                          )}
-                          {difference !== 0 && (
-                            <div
-                              className={`text-sm font-semibold ${
-                                difference > 0 ? 'text-green-600' : 'text-red-600'
-                              }`}
-                            >
-                              Diferencia: {difference > 0 ? '+' : ''}
-                              {formatPrice(difference, settings)}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    <div className="mt-4">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          isOpen
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {isOpen ? 'Abierta' : 'Cerrada'}
-                      </span>
-                    </div>
-                  </div>
+        {closedSessions.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 py-10 text-center text-gray-400 text-sm">
+            {search || selectedBranchFilter
+              ? 'No se encontraron sesiones con esos filtros'
+              : 'Aún no hay sesiones cerradas'}
+          </div>
+        ) : (
+          <>
+            {/* Desktop: tabla */}
+            <div className="hidden md:block">
+              <Card>
+                <CardContent className="p-0">
+                  <CashSessionTable
+                    sessions={closedSessions}
+                    branches={branches}
+                    onEdit={handleCloseSession}
+                    onDelete={handleDelete}
+                    onViewPayments={setViewingPaymentsSessionId}
+                  />
                 </CardContent>
               </Card>
-            )
-          })}
-        </div>
-      )}
+            </div>
 
-      {filteredSessions.length === 0 && !loading && (
-        <div className="text-center py-12">
-          <p className="text-gray-600 text-lg mb-4">
-            {search || selectedBranchFilter
-              ? 'No se encontraron sesiones con los filtros aplicados'
-              : 'No hay sesiones de caja disponibles'}
-          </p>
-          {(search || selectedBranchFilter) && (
-            <Button variant="outline" onClick={() => {
-              setSearch('')
-              setSelectedBranchFilter('')
-            }}>
-              Limpiar búsqueda
-            </Button>
-          )}
-        </div>
-      )}
+            {/* Mobile: mini-cards */}
+            <div className="md:hidden space-y-3">
+              {closedSessions.map((session) => {
+                const branch = branches.find((b) => b.id === session.branch_id)
+                const difference = session.difference || 0
+                return (
+                  <div key={session.id} className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-gray-400" />
+                        <span className="font-medium text-gray-900 text-sm">
+                          {branch?.name || 'Sucursal'}
+                        </span>
+                      </div>
+                      <span className="text-xs text-gray-400">{formatDateShort(session.opened_at, settings)}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      <div>
+                        <p className="text-gray-400">Apertura</p>
+                        <p className="font-semibold text-gray-700">{formatPrice(session.opening_amount, settings)}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Cierre</p>
+                        <p className="font-semibold text-gray-700">
+                          {session.closing_amount !== null ? formatPrice(session.closing_amount, settings) : '—'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400">Diferencia</p>
+                        <p className={`font-semibold ${difference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {difference >= 0 ? '+' : ''}{formatPrice(difference, settings)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => setViewingPaymentsSessionId(session.id)}
+                        className="text-xs text-admin-600 hover:underline"
+                      >
+                        Ver ventas
+                      </button>
+                      <span className="text-gray-300">·</span>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(session.id)}
+                        className="text-xs text-red-500 hover:underline"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </section>
 
       {/* Open Session Modal */}
       {isModalOpen && (

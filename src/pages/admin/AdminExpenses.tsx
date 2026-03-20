@@ -60,14 +60,42 @@ type ExpenseLedgerEntry = {
   source_table: string
 }
 
-type ExpenseView = 'purchase_orders' | 'supplier_invoices' | 'expense_ledger'
+type ExpenseView = 'purchase_orders' | 'supplier_invoices' | 'expense_ledger' | 'direct_expenses'
 type ExpenseLedgerFilters = {
   dateFrom: string
   dateTo: string
   supplierId: string
   entryKind: '' | 'accrual' | 'cash'
-  eventType: '' | 'invoice' | 'payment' | 'payment_reversal' | 'manual_adjustment'
+  eventType: '' | 'invoice' | 'payment' | 'payment_reversal' | 'manual_adjustment' | 'direct_expense'
 }
+
+type DirectExpense = {
+  id: string
+  occurred_at: string
+  category: string
+  description: string | null
+  amount: number
+  payment_method: string
+  branch_id: string | null
+  notes: string | null
+  created_at: string
+}
+
+const EXPENSE_CATEGORIES: { value: string; label: string }[] = [
+  { value: 'combustible', label: 'Combustible / Nafta' },
+  { value: 'transporte', label: 'Transporte' },
+  { value: 'alimentacion', label: 'Alimentación' },
+  { value: 'papeleria', label: 'Papelería / Oficina' },
+  { value: 'servicios', label: 'Servicios (luz, agua, internet)' },
+  { value: 'alquiler', label: 'Alquiler' },
+  { value: 'mantenimiento', label: 'Mantenimiento' },
+  { value: 'marketing', label: 'Marketing / Publicidad' },
+  { value: 'varios', label: 'Varios / Otros' },
+]
+
+const EXPENSE_CATEGORY_LABEL: Record<string, string> = Object.fromEntries(
+  EXPENSE_CATEGORIES.map((c) => [c.value, c.label])
+)
 
 const PAGE_SIZE = 20
 
@@ -99,6 +127,7 @@ function formatLedgerEventType(eventType: string): string {
     payment: 'Pago',
     payment_reversal: 'Reversion de pago',
     manual_adjustment: 'Ajuste manual',
+    direct_expense: 'Gasto directo',
   }
   return labels[eventType] || eventType
 }
@@ -112,6 +141,7 @@ function formatLedgerSource(sourceTable: string): string {
     supplier_invoices: 'Facturas de proveedor',
     supplier_payments: 'Pagos a proveedor',
     manual_adjustments: 'Ajustes manuales',
+    direct_expenses: 'Gastos directos',
   }
   return labels[sourceTable] || sourceTable
 }
@@ -153,6 +183,18 @@ export function AdminExpenses() {
   const [supplierInvoices, setSupplierInvoices] = useState<SupplierInvoiceLite[]>([])
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<SupplierInvoiceLite | null>(null)
   const [activeView, setActiveView] = useState<ExpenseView>('purchase_orders')
+
+  const [directExpenses, setDirectExpenses] = useState<DirectExpense[]>([])
+  const [directExpenseForm, setDirectExpenseForm] = useState({
+    occurred_at: new Date().toISOString().slice(0, 10),
+    category: 'varios',
+    description: '',
+    amount: '',
+    payment_method: 'cash',
+    branch_id: '',
+    notes: '',
+  })
+  const [loadingDirectExpenses, setLoadingDirectExpenses] = useState(false)
   const [createOrderModalOpen, setCreateOrderModalOpen] = useState(false)
   const [editOrderModalOpen, setEditOrderModalOpen] = useState(false)
   const [ledgerDetailEntry, setLedgerDetailEntry] = useState<ExpenseLedgerEntry | null>(null)
@@ -307,6 +349,13 @@ export function AdminExpenses() {
       setPurchaseOrderItems([])
     }
   }, [selectedPurchaseOrderId])
+
+  useEffect(() => {
+    if (organizationId && activeView === 'direct_expenses') {
+      fetchDirectExpenses()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, activeView])
 
   const fetchPageData = async (options?: { silent?: boolean }) => {
     if (!organizationId) return
@@ -1001,6 +1050,112 @@ export function AdminExpenses() {
     }
   }
 
+  const fetchDirectExpenses = async () => {
+    if (!organizationId) return
+    setLoadingDirectExpenses(true)
+    try {
+      const { data, error } = await fromAny('direct_expenses')
+        .select('id, occurred_at, category, description, amount, payment_method, branch_id, notes, created_at')
+        .eq('organization_id', organizationId)
+        .order('occurred_at', { ascending: false })
+        .limit(200)
+      if (error) throw error
+      setDirectExpenses((data || []) as DirectExpense[])
+    } catch (error) {
+      console.error('Error loading direct expenses:', error)
+      show('No se pudieron cargar los gastos directos.', 'error')
+    } finally {
+      setLoadingDirectExpenses(false)
+    }
+  }
+
+  const createDirectExpense = async () => {
+    if (!organizationId) return
+    const amount = Number(directExpenseForm.amount)
+    if (!amount || amount <= 0) {
+      show('El monto debe ser mayor a cero.', 'error')
+      return
+    }
+    if (!directExpenseForm.occurred_at) {
+      show('Seleccioná una fecha.', 'error')
+      return
+    }
+    try {
+      setSaving(true)
+      const { data: authData } = await supabase.auth.getUser()
+      const { data, error } = await fromAny('direct_expenses')
+        .insert({
+          organization_id: organizationId,
+          branch_id: directExpenseForm.branch_id || null,
+          occurred_at: directExpenseForm.occurred_at,
+          category: directExpenseForm.category,
+          description: directExpenseForm.description || null,
+          amount,
+          payment_method: directExpenseForm.payment_method,
+          notes: directExpenseForm.notes || null,
+          created_by: authData.user?.id || null,
+        })
+        .select('id')
+        .single()
+      if (error) throw error
+      await trackAuditAction({
+        organizationId,
+        tableName: 'direct_expenses',
+        recordId: data.id,
+        action: 'INSERT',
+        notes: 'Gasto directo registrado.',
+        newData: {
+          category: directExpenseForm.category,
+          description: directExpenseForm.description || null,
+          amount,
+          payment_method: directExpenseForm.payment_method,
+          occurred_at: directExpenseForm.occurred_at,
+        },
+      })
+      setDirectExpenseForm({
+        occurred_at: new Date().toISOString().slice(0, 10),
+        category: 'varios',
+        description: '',
+        amount: '',
+        payment_method: 'cash',
+        branch_id: '',
+        notes: '',
+      })
+      await fetchDirectExpenses()
+      show('Gasto registrado correctamente.', 'success')
+    } catch (error) {
+      console.error('Error creating direct expense:', error)
+      show('No se pudo registrar el gasto.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteDirectExpense = async (id: string) => {
+    if (!confirm('¿Eliminar este gasto? Se cancelará también su entrada en el libro de egresos.')) return
+    const existing = directExpenses.find((e) => e.id === id)
+    try {
+      setSaving(true)
+      const { error } = await fromAny('direct_expenses').delete().eq('id', id)
+      if (error) throw error
+      await trackAuditAction({
+        organizationId,
+        tableName: 'direct_expenses',
+        recordId: id,
+        action: 'DELETE',
+        notes: 'Gasto directo eliminado.',
+        oldData: existing || null,
+      })
+      await fetchDirectExpenses()
+      show('Gasto eliminado correctamente.', 'success')
+    } catch (error) {
+      console.error('Error deleting direct expense:', error)
+      show('No se pudo eliminar el gasto.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const openPurchaseOrderEditor = (purchaseOrderId: string) => {
     setSelectedPurchaseOrderId(purchaseOrderId)
     setEditOrderModalOpen(true)
@@ -1059,6 +1214,9 @@ export function AdminExpenses() {
         </Button>
         <Button variant={activeView === 'expense_ledger' ? 'primary' : 'outline'} onClick={() => setActiveView('expense_ledger')}>
           Libro de egresos
+        </Button>
+        <Button variant={activeView === 'direct_expenses' ? 'primary' : 'outline'} onClick={() => setActiveView('direct_expenses')}>
+          Gastos directos
         </Button>
       </div>
 
@@ -1289,6 +1447,7 @@ export function AdminExpenses() {
                   <option value="payment">Pago</option>
                   <option value="payment_reversal">Reversion de pago</option>
                   <option value="manual_adjustment">Ajuste manual</option>
+                  <option value="direct_expense">Gasto directo</option>
                 </select>
               </div>
               <div className="flex items-end gap-2">
@@ -1361,6 +1520,200 @@ export function AdminExpenses() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {activeView === 'direct_expenses' && (
+        <div className="space-y-6">
+          {/* Form */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Registrar gasto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Fecha</label>
+                  <Input
+                    type="date"
+                    value={directExpenseForm.occurred_at}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, occurred_at: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Categoría</label>
+                  <select
+                    className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3"
+                    value={directExpenseForm.category}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
+                  >
+                    {EXPENSE_CATEGORIES.map((cat) => (
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Monto</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={directExpenseForm.amount}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Descripción (opcional)</label>
+                  <Input
+                    placeholder="Ej: Nafta viaje a Montevideo"
+                    value={directExpenseForm.description}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Método de pago</label>
+                  <select
+                    className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3"
+                    value={directExpenseForm.payment_method}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, payment_method: e.target.value }))}
+                  >
+                    <option value="cash">Efectivo</option>
+                    <option value="transfer">Transferencia</option>
+                    <option value="mercadopago">Mercado Pago</option>
+                    <option value="card">Tarjeta</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Sucursal (opcional)</label>
+                  <select
+                    className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3"
+                    value={directExpenseForm.branch_id}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, branch_id: e.target.value }))}
+                  >
+                    <option value="">Sin sucursal</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>{branch.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Notas (opcional)</label>
+                  <Input
+                    placeholder="Notas adicionales"
+                    value={directExpenseForm.notes}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <Button onClick={createDirectExpense} disabled={saving}>
+                  {saving ? 'Guardando…' : 'Registrar gasto'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* History */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Historial de gastos</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loadingDirectExpenses ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600" />
+                </div>
+              ) : (
+                <>
+                  {/* Desktop table */}
+                  <div className="hidden overflow-x-auto md:block">
+                    <table className="w-full min-w-[640px]">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="px-2 py-2 text-left text-xs uppercase text-gray-500">Fecha</th>
+                          <th className="px-2 py-2 text-left text-xs uppercase text-gray-500">Categoría</th>
+                          <th className="px-2 py-2 text-left text-xs uppercase text-gray-500">Descripción</th>
+                          <th className="px-2 py-2 text-left text-xs uppercase text-gray-500">Método</th>
+                          <th className="px-2 py-2 text-left text-xs uppercase text-gray-500">Sucursal</th>
+                          <th className="px-2 py-2 text-right text-xs uppercase text-gray-500">Monto</th>
+                          <th className="px-2 py-2 text-right text-xs uppercase text-gray-500">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {directExpenses.map((expense) => (
+                          <tr key={expense.id} className="border-b border-gray-100">
+                            <td className="px-2 py-2 text-sm text-gray-700">{formatDateShort(expense.occurred_at, settings)}</td>
+                            <td className="px-2 py-2 text-sm text-gray-700">{EXPENSE_CATEGORY_LABEL[expense.category] ?? expense.category}</td>
+                            <td className="px-2 py-2 text-sm text-gray-600">{expense.description ?? '—'}</td>
+                            <td className="px-2 py-2 text-sm text-gray-600 capitalize">{expense.payment_method}</td>
+                            <td className="px-2 py-2 text-sm text-gray-600">{expense.branch_id ? (branchNameById.get(expense.branch_id) ?? '—') : '—'}</td>
+                            <td className="px-2 py-2 text-right text-sm font-semibold text-gray-900">{formatPrice(Number(expense.amount), settings)}</td>
+                            <td className="px-2 py-2 text-right">
+                              <button
+                                type="button"
+                                onClick={() => deleteDirectExpense(expense.id)}
+                                className="rounded p-1 text-red-500 hover:bg-red-50 transition-colors"
+                                aria-label="Eliminar"
+                                disabled={saving}
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                        {directExpenses.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="py-8 text-center text-sm text-gray-500">
+                              No hay gastos registrados todavía.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="space-y-3 md:hidden">
+                    {directExpenses.length === 0 && (
+                      <p className="py-6 text-center text-sm text-gray-500">No hay gastos registrados todavía.</p>
+                    )}
+                    {directExpenses.map((expense) => (
+                      <div key={expense.id} className="rounded-lg border border-gray-200 bg-white p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-0.5">
+                            <p className="text-sm font-semibold text-gray-900">{EXPENSE_CATEGORY_LABEL[expense.category] ?? expense.category}</p>
+                            {expense.description && <p className="text-xs text-gray-600">{expense.description}</p>}
+                            <p className="text-xs text-gray-500">{formatDateShort(expense.occurred_at, settings)} · {expense.payment_method}</p>
+                            {expense.branch_id && <p className="text-xs text-gray-500">{branchNameById.get(expense.branch_id)}</p>}
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-sm font-bold text-gray-900">{formatPrice(Number(expense.amount), settings)}</span>
+                            <button
+                              type="button"
+                              onClick={() => deleteDirectExpense(expense.id)}
+                              className="rounded p-1 text-red-500 hover:bg-red-50 transition-colors"
+                              aria-label="Eliminar"
+                              disabled={saving}
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       {createOrderModalOpen && (

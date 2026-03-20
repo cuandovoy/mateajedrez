@@ -23,7 +23,8 @@ import {
   X,
   Users2,
   CreditCard,
-  Store
+  Store,
+  StoreIcon
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AdminBreadcrumbs } from '@/components/admin/AdminBreadcrumbs'
@@ -118,7 +119,7 @@ export function AdminLayout() {
         { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
         { path: '/expenses', label: 'Compras y Egresos', icon: Wallet },
         { path: '/customers', label: 'Clientes', icon: Users2, permission: 'customers:view' },
-        { path: '/cash-register', label: 'Caja', icon: Wallet, planFeature: 'cash_register' },
+        { path: '/cash-register', label: 'Punto de Venta', icon: StoreIcon, planFeature: 'cash_register' },
         { path: '/transfers', label: 'Transferencias', icon: ArrowRight, planFeature: 'transfers' },
       ],
     },

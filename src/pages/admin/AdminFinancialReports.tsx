@@ -57,6 +57,8 @@ type FinancialExportRow = {
 }
 
 const toDateKey = (date: Date): string => date.toISOString().slice(0, 10)
+const toLocalDateKey = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 const asNumber = (value: unknown): number => (Number.isFinite(Number(value)) ? Number(value) : 0)
 const asString = (value: unknown): string => (typeof value === 'string' ? value : '')
 const asObject = (value: unknown): Record<string, unknown> =>
@@ -83,10 +85,10 @@ export function AdminFinancialReports() {
   const [startDate, setStartDate] = useState(() => {
     const date = new Date()
     date.setDate(1)
-    return toDateKey(date)
+    return toLocalDateKey(date)
   })
-  const [endDate, setEndDate] = useState(() => toDateKey(new Date()))
-  const [asOfDate, setAsOfDate] = useState(() => toDateKey(new Date()))
+  const [endDate, setEndDate] = useState(() => toLocalDateKey(new Date()))
+  const [asOfDate, setAsOfDate] = useState(() => toLocalDateKey(new Date()))
 
   const [draftBranchId, setDraftBranchId] = useState(selectedBranchId)
   const [draftStartDate, setDraftStartDate] = useState(startDate)

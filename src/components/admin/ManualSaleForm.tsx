@@ -174,6 +174,15 @@ export function ManualSaleForm({
     if (organizationId) fetchOrderDiscountRules()
   }, [organizationId])
 
+  // Close modal on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   // Close search results when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -922,647 +931,548 @@ export function ManualSaleForm({
   const total = Math.max(subtotalBeforeDiscount - effectiveDiscountTotal, 0)
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-      <Card className="w-full max-w-6xl h-[98vh] sm:h-[95vh] flex flex-col shadow-2xl">
-        <CardHeader className="pb-3 border-b flex-shrink-0 px-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl sm:text-2xl flex items-center space-x-2">
-              <ShoppingCart className="h-5 w-5 sm:h-6 sm:w-6 text-admin-600" />
-              <span>Nueva Venta</span>
-            </CardTitle>
-            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-              <X className="h-4 w-4 sm:h-5 sm:w-5" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="flex-1 overflow-y-auto px-3 sm:px-6 py-4">
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col min-h-0">
-            {/* Branch Selection */}
-            {branches && branches.length > 1 && onBranchChange && (
-              <div className="mb-3">
-                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Sucursal *</label>
-                <select
-                  value={branchId}
-                  onChange={(e) => {
-                    const newBranchId = e.target.value
-                    setBranchId(newBranchId)
-                    onBranchChange(newBranchId)
-                    if (saleLines.length > 0) {
-                      if (confirm('¿Cambiar de sucursal? Se limpiarán las líneas de venta.')) {
-                        setSaleLines([])
-                      } else {
-                        setBranchId(branchId)
-                        return
-                      }
+    <div className="fixed inset-0 z-50 flex flex-col bg-white border-2 border-admin-300 ring-4 ring-admin-100">
+      {/* ── Top bar ── */}
+      <header className="flex-shrink-0 flex items-center justify-between px-4 sm:px-6 h-14 border-b border-admin-200 bg-admin-50 shadow-sm">
+        <div className="flex items-center gap-3 min-w-0">
+          <ShoppingCart className="h-5 w-5 text-admin-600 flex-shrink-0" />
+          <span className="font-semibold text-gray-900 text-lg">Nueva Venta</span>
+          {branches && branches.length > 1 && onBranchChange && (
+            <select
+              value={branchId}
+              onChange={(e) => {
+                const newBranchId = e.target.value
+                setBranchId(newBranchId)
+                onBranchChange(newBranchId)
+                if (saleLines.length > 0) {
+                  if (confirm('¿Cambiar de sucursal? Se limpiarán las líneas de venta.')) {
+                    setSaleLines([])
+                  } else {
+                    setBranchId(branchId)
+                  }
+                }
+              }}
+              className="ml-2 text-sm border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-admin-500 hidden sm:block"
+            >
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>{branch.name}</option>
+              ))}
+            </select>
+          )}
+          {currentCashSession && (
+            <span className="hidden sm:inline-flex items-center gap-1 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">
+              <DollarSign className="h-3 w-3" />
+              Caja abierta
+            </span>
+          )}
+        </div>
+        <Button variant="ghost" size="sm" onClick={onClose} className="h-10 w-10 p-0 flex-shrink-0 hover:bg-admin-100 rounded-xl">
+          <X className="h-6 w-6 text-gray-500" />
+        </Button>
+      </header>
+
+      {/* ── Body ── */}
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden min-h-0"
+      >
+        {/* ── LEFT: product area ── */}
+        <div className="flex-shrink-0 md:flex-1 md:flex md:flex-col md:overflow-hidden md:min-h-0 p-4 space-y-3">
+
+          {/* Branch selector on mobile */}
+          {branches && branches.length > 1 && onBranchChange && (
+            <div className="sm:hidden">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Sucursal</label>
+              <select
+                value={branchId}
+                onChange={(e) => {
+                  const newBranchId = e.target.value
+                  setBranchId(newBranchId)
+                  onBranchChange(newBranchId)
+                  if (saleLines.length > 0) {
+                    if (confirm('¿Cambiar de sucursal? Se limpiarán las líneas de venta.')) {
+                      setSaleLines([])
+                    } else {
+                      setBranchId(branchId)
                     }
-                  }}
-                  className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  }
+                }}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+              >
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Product Search */}
+          <div className="flex-shrink-0">
+            <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+              Buscar producto
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                ref={searchInputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true) }}
+                placeholder="Escribe para buscar productos..."
+                className="pl-9"
+              />
+              {showSearchResults && searchResults.length > 0 && (
+                <div
+                  ref={searchResultsRef}
+                  className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-52 overflow-y-auto"
                 >
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
+                  {searchResults.map((product) => (
+                    <button
+                      key={product.id}
+                      type="button"
+                      onClick={() => handleAddProduct(product)}
+                      className="w-full px-4 py-2.5 text-left hover:bg-admin-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm">{capitalizeFirst(product.name)}</p>
+                          <p className="text-xs text-gray-500">{formatPrice(product.price, settings)}</p>
+                        </div>
+                        <Plus className="h-4 w-4 text-admin-600 flex-shrink-0" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Manual Line */}
+          <div className="flex-shrink-0 rounded-xl border border-gray-200 bg-gray-50 p-3">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Línea manual</p>
+            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
+              <Input
+                type="text"
+                value={newLineDescription}
+                onChange={(e) => setNewLineDescription(e.target.value)}
+                placeholder="Descripción del ítem"
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddManualLine() } }}
+                className="flex-1 min-w-0 text-sm py-1.5"
+              />
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={newLinePrice}
+                onChange={(e) => setNewLinePrice(e.target.value)}
+                placeholder="Precio"
+                className="w-28 text-sm py-1.5"
+              />
+              <Input
+                type="number"
+                step="1"
+                min="1"
+                value={newLineQuantity}
+                onChange={(e) => setNewLineQuantity(e.target.value)}
+                placeholder="Cant."
+                className="w-20 text-sm py-1.5"
+              />
+              <Button type="button" onClick={handleAddManualLine} size="sm" className="whitespace-nowrap">
+                <Plus className="h-3.5 w-3.5 mr-1" />
+                Agregar
+              </Button>
+            </div>
+          </div>
+
+          {/* Sale Lines Table */}
+          <div className="flex-shrink-0 md:flex-1 md:overflow-y-auto min-h-[200px] max-h-[38vh] md:max-h-none rounded-xl border border-gray-200 overflow-hidden">
+            {saleLines.length > 0 ? (
+              <div className="overflow-x-auto h-full">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+                    <tr>
+                      <th className="px-3 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                        Producto
+                      </th>
+                      <th className="px-3 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide w-28">
+                        Cantidad
+                      </th>
+                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide w-28">
+                        Precio
+                      </th>
+                      <th className="px-3 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide w-28">
+                        Subtotal
+                      </th>
+                      <th className="px-3 py-2.5 w-12" />
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {saleLines.map((line) => {
+                      const hasNoStock =
+                        line.type === 'product' &&
+                        line.available_stock !== undefined &&
+                        (line.available_stock === 0 || line.quantity > line.available_stock)
+                      return (
+                        <tr
+                          key={line.id}
+                          className={hasNoStock ? 'bg-red-50 border-l-4 border-l-red-400' : 'hover:bg-gray-50'}
+                        >
+                          <td className="px-3 py-2.5">
+                            <p className="font-medium text-gray-900">{line.product_name}</p>
+                            {line.variant_name && (
+                              <p className="text-xs text-gray-500">{line.variant_name}</p>
+                            )}
+                            {line.type === 'product' && line.available_stock !== undefined && (
+                              <p className={
+                                line.available_stock === 0 || line.quantity > line.available_stock
+                                  ? 'text-xs font-medium text-red-600'
+                                  : 'text-xs text-gray-400'
+                              }>
+                                Stock disponible: {line.available_stock}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              <Button
+                                type="button" variant="ghost" size="sm"
+                                onClick={() => handleUpdateQuantity(line.id, line.quantity - 1)}
+                                disabled={line.quantity <= 1}
+                                className="h-7 w-7 p-0 rounded-full"
+                              >
+                                <Minus className="h-3 w-3" />
+                              </Button>
+                              <span className="w-8 text-center font-semibold">{line.quantity}</span>
+                              <Button
+                                type="button" variant="ghost" size="sm"
+                                onClick={() => handleUpdateQuantity(line.id, line.quantity + 1)}
+                                className="h-7 w-7 p-0 rounded-full"
+                              >
+                                <Plus className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            {line.is_editing_price ? (
+                              <Input
+                                type="number" step="0.01" min="0"
+                                defaultValue={line.price}
+                                onBlur={(e) => handleEditPrice(line.id, parseFloat(e.target.value) || line.price)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') handleEditPrice(line.id, parseFloat((e.target as HTMLInputElement).value) || line.price)
+                                  else if (e.key === 'Escape') handleCancelEditPrice(line.id)
+                                }}
+                                className="w-24 text-right text-sm py-1 ml-auto"
+                                autoFocus
+                              />
+                            ) : (
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="font-medium">{formatPrice(line.price, settings)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditPrice(line.id)}
+                                  className="text-gray-300 hover:text-admin-600 transition-colors"
+                                  title="Editar precio"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 text-right">
+                            <span className="font-semibold text-gray-900">{formatPrice(line.price * line.quantity, settings)}</span>
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveLine(line.id)}
+                              className="text-gray-300 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center py-12 text-gray-400">
+                <ShoppingCart className="h-12 w-12 mb-3 text-gray-200" />
+                <p className="text-sm">Buscá un producto o agregá una línea manual</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── RIGHT: order panel ── */}
+        <aside className="flex-shrink-0 md:w-80 xl:w-96 md:border-l md:flex md:flex-col md:overflow-hidden bg-gray-50">
+          <div className="md:flex-1 md:overflow-y-auto p-4 space-y-4">
+
+            {/* Cash session badge (mobile) */}
+            {currentCashSession && (
+              <div className="sm:hidden flex items-center gap-2 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 text-xs text-blue-800">
+                <DollarSign className="h-3.5 w-3.5 flex-shrink-0" />
+                Sesión de caja abierta — efectivo vinculado automáticamente
+              </div>
+            )}
+
+            {/* Totals */}
+            <div className="rounded-xl bg-white border border-gray-200 p-4 space-y-2">
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Subtotal</span>
+                <span>{formatPrice(subtotalBeforeDiscount, settings)}</span>
+              </div>
+              {effectiveDiscountTotal > 0 && (
+                <div className="flex justify-between text-sm text-red-600">
+                  <span>Descuento</span>
+                  <span>−{formatPrice(effectiveDiscountTotal, settings)}</span>
+                </div>
+              )}
+              <div className="flex justify-between items-center font-bold text-gray-900 border-t pt-2 mt-1">
+                <span className="text-base">Total</span>
+                <span className="text-2xl text-admin-600">{formatPrice(total, settings)}</span>
+              </div>
+            </div>
+
+            {/* Discount */}
+            <div className="rounded-xl bg-white border border-gray-200 p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Descuento</p>
+              <select
+                value={discountSource}
+                onChange={(e) => setDiscountSource(e.target.value as 'none' | 'manual' | 'rule')}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+              >
+                <option value="none">Sin descuento</option>
+                <option value="manual" disabled={!canApplyManualDiscount}>
+                  Manual {!canApplyManualDiscount ? '(solo admin/manager)' : ''}
+                </option>
+                <option value="rule">Regla de descuento</option>
+              </select>
+
+              {discountSource === 'manual' && (
+                <div className="space-y-2">
+                  <select
+                    value={manualDiscountKind}
+                    onChange={(e) => setManualDiscountKind(e.target.value as DiscountKind)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  >
+                    <option value="percentage">Porcentaje (%)</option>
+                    <option value="fixed_amount">Monto fijo</option>
+                    <option value="price_override">Total final deseado</option>
+                  </select>
+                  <Input
+                    type="number" step="0.01" min="0"
+                    value={manualDiscountValue}
+                    onChange={(e) => setManualDiscountValue(e.target.value)}
+                    placeholder={manualDiscountKind === 'percentage' ? 'Ej: 10 (%)' : 'Ej: 500'}
+                    className="text-sm"
+                  />
+                  <Input
+                    value={manualDiscountReason}
+                    onChange={(e) => setManualDiscountReason(e.target.value)}
+                    placeholder="Motivo (opcional)"
+                    className="text-sm"
+                  />
+                </div>
+              )}
+
+              {discountSource === 'rule' && (
+                <select
+                  value={selectedDiscountRuleId}
+                  onChange={(e) => setSelectedDiscountRuleId(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                >
+                  <option value="">Seleccionar regla</option>
+                  {discountRules.map((rule) => (
+                    <option key={rule.id} value={rule.id}>
+                      {rule.name} · {rule.kind === 'percentage' ? `${rule.value}%` : formatPrice(rule.value, settings)}
                     </option>
                   ))}
                 </select>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Cash Session Info */}
-            {currentCashSession && (
-              <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center space-x-2">
-                  <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 flex-shrink-0" />
-                  <p className="text-xs sm:text-sm text-blue-900">
-                    Sesión de caja abierta - Las ventas en efectivo se vincularán automáticamente
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Product Search */}
-            <div className="mb-3 flex-shrink-0">
-              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                Buscar Producto
-              </label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  ref={searchInputRef}
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onFocus={() => {
-                    if (searchResults.length > 0) {
-                      setShowSearchResults(true)
-                    }
-                  }}
-                  placeholder="Escribe para buscar productos..."
-                  className="pl-9 text-sm py-2"
-                />
-                {showSearchResults && searchResults.length > 0 && (
-                  <div
-                    ref={searchResultsRef}
-                    className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto"
-                  >
-                    {searchResults.map((product) => (
-                      <button
-                        key={product.id}
-                        type="button"
-                        onClick={() => handleAddProduct(product)}
-                        className="w-full px-3 py-2 text-left hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors text-sm"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium text-gray-900 text-sm">{capitalizeFirst(product.name)}</p>
-                            <p className="text-xs text-gray-600">{formatPrice(product.price, settings)}</p>
-                          </div>
-                          <Plus className="h-4 w-4 text-admin-600 flex-shrink-0" />
-                        </div>
-                      </button>
-                    ))}
-                  </div>
+            {/* Payment */}
+            <div className="rounded-xl bg-white border border-gray-200 p-4 space-y-3">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Pago</p>
+              <div className="space-y-2">
+                <select
+                  {...register('sale_condition')}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                >
+                  <option value="contado">Al contado</option>
+                  <option value="credito">A crédito (cobro pendiente)</option>
+                </select>
+                <select
+                  {...register('payment_method')}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                >
+                  {saleCondition === 'credito' && (
+                    <option value="">Sin cobro inmediato</option>
+                  )}
+                  {paymentMethods.map((m) => (
+                    <option
+                      key={m.id} value={m.key}
+                      disabled={saleCondition === 'contado' && m.requires_cash_session && !currentCashSession}
+                    >
+                      {m.name}
+                      {saleCondition === 'contado' && m.requires_cash_session && !currentCashSession
+                        ? ' (requiere caja abierta)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {saleCondition === 'contado' && errors.payment_method && (
+                  <p className="text-xs text-red-500">{errors.payment_method.message}</p>
                 )}
               </div>
+              {saleCondition === 'credito' && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Se registrará como <span className="font-semibold">completada</span> con cobro pendiente.
+                </div>
+              )}
             </div>
 
-            {/* Manual Line Form */}
-            <div className="mb-3 p-3 bg-gray-50 rounded-lg flex-shrink-0">
-              <h3 className="text-xs sm:text-sm font-medium text-gray-700 mb-2">Agregar Línea Manual</h3>
-              <div className="grid grid-cols-12 gap-2">
-                <div className="col-span-12 sm:col-span-5">
-                  <Input
-                    type="text"
-                    value={newLineDescription}
-                    onChange={(e) => setNewLineDescription(e.target.value)}
-                    placeholder="Descripción"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        handleAddManualLine()
-                      }
-                    }}
-                    className="text-sm py-1.5"
-                  />
-                </div>
-                <div className="col-span-6 sm:col-span-3">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={newLinePrice}
-                    onChange={(e) => setNewLinePrice(e.target.value)}
-                    placeholder="Precio"
-                    className="text-sm py-1.5"
-                  />
-                </div>
-                <div className="col-span-6 sm:col-span-2">
-                  <Input
-                    type="number"
-                    step="1"
-                    min="1"
-                    value={newLineQuantity}
-                    onChange={(e) => setNewLineQuantity(e.target.value)}
-                    placeholder="Cant."
-                    className="text-sm py-1.5"
-                  />
-                </div>
-                <div className="col-span-12 sm:col-span-2">
-                  <Button type="button" onClick={handleAddManualLine} className="w-full text-sm py-1.5 h-auto">
-                    <Plus className="h-3 w-3 mr-1" />
-                    Agregar
+            {/* Customer */}
+            <div className="rounded-xl bg-white border border-gray-200 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cliente</p>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={() => void openCustomerPicker()} className="h-7 text-xs px-2">
+                    <Users className="h-3.5 w-3.5 mr-1" />
+                    Elegir
                   </Button>
+                  {linkedCustomer && (
+                    <Button
+                      type="button" variant="outline"
+                      onClick={() => {
+                        setLinkedCustomer(null)
+                        setValue('customer_name', '')
+                        setValue('customer_email', '')
+                        setValue('customer_phone', '')
+                        setValue('customer_rut', '')
+                      }}
+                      className="h-7 text-xs px-2"
+                    >
+                      Quitar
+                    </Button>
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Sale Lines Table */}
-            <div className="mb-3 min-h-[220px] max-h-[42vh] overflow-y-auto">
-              {saleLines.length > 0 ? (
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b border-gray-200 sticky top-0">
-                        <tr>
-                          <th className="px-2 sm:px-3 py-2 text-left text-xs font-medium text-gray-700 uppercase">
-                            Descripción
-                          </th>
-                          <th className="px-2 sm:px-3 py-2 text-center text-xs font-medium text-gray-700 uppercase w-20 sm:w-24">
-                            Cantidad
-                          </th>
-                          <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase w-24 sm:w-32">
-                            Precio Unit.
-                          </th>
-                          <th className="px-2 sm:px-3 py-2 text-right text-xs font-medium text-gray-700 uppercase w-24 sm:w-32">
-                            Subtotal
-                          </th>
-                          <th className="px-2 sm:px-3 py-2 text-center text-xs font-medium text-gray-700 uppercase w-16 sm:w-20">
-                            Acciones
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {saleLines.map((line) => {
-                          const hasNoStock =
-                            line.type === 'product' &&
-                            line.available_stock !== undefined &&
-                            (line.available_stock === 0 || line.quantity > line.available_stock)
-                          return (
-                          <tr
-                            key={line.id}
-                            className={hasNoStock ? 'bg-red-50 hover:bg-red-100 border-l-4 border-l-red-400' : 'hover:bg-gray-50'}
-                          >
-                            <td className="px-2 sm:px-3 py-2">
-                              <div>
-                                <p className="font-medium text-gray-900 text-xs sm:text-sm">{line.product_name}</p>
-                                {line.variant_name && (
-                                  <p className="text-xs text-gray-500">Variante: {line.variant_name}</p>
-                                )}
-                                {line.type === 'product' && line.available_stock !== undefined && (
-                                  <p
-                                    className={
-                                      line.available_stock === 0 || line.quantity > line.available_stock
-                                        ? 'text-xs font-medium text-red-600'
-                                        : 'text-xs text-gray-400'
-                                    }
-                                  >
-                                    Stock: {line.available_stock}
-                                  </p>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-2 sm:px-3 py-2 text-center">
-                              <div className="flex items-center justify-center space-x-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleUpdateQuantity(line.id, line.quantity - 1)}
-                                  disabled={line.quantity <= 1}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <span className="w-8 sm:w-10 text-center font-medium text-xs sm:text-sm">{line.quantity}</span>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleUpdateQuantity(line.id, line.quantity + 1)}
-                                  className="h-6 w-6 p-0"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </td>
-                            <td className="px-2 sm:px-3 py-2 text-right">
-                              {line.is_editing_price ? (
-                                <div className="flex items-center justify-end space-x-1">
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    defaultValue={line.price}
-                                    onBlur={(e) => {
-                                      const newPrice = parseFloat(e.target.value) || line.price
-                                      handleEditPrice(line.id, newPrice)
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') {
-                                        const newPrice = parseFloat((e.target as HTMLInputElement).value) || line.price
-                                        handleEditPrice(line.id, newPrice)
-                                      } else if (e.key === 'Escape') {
-                                        handleCancelEditPrice(line.id)
-                                      }
-                                    }}
-                                    className="w-20 sm:w-24 text-right text-xs sm:text-sm py-1"
-                                    autoFocus
-                                  />
-                                </div>
-                              ) : (
-                                <div className="flex items-center justify-end space-x-1">
-                                  <span className="font-medium text-xs sm:text-sm">{formatPrice(line.price, settings)}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleStartEditPrice(line.id)}
-                                    className="text-gray-400 hover:text-admin-600 transition-colors"
-                                    title="Editar precio"
-                                  >
-                                    <Edit2 className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-2 sm:px-3 py-2 text-right">
-                              <span className="font-semibold text-gray-900 text-xs sm:text-sm">
-                                {formatPrice(line.price * line.quantity, settings)}
-                              </span>
-                            </td>
-                            <td className="px-2 sm:px-3 py-2 text-center">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleRemoveLine(line.id)}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-6 w-6 p-0"
-                              >
-                                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                              </Button>
-                            </td>
-                          </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+              {linkedCustomer ? (
+                <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2">
+                  <p className="text-sm font-medium text-emerald-800">{linkedCustomer.full_name}</p>
+                  <p className="text-xs text-emerald-600">
+                    {[linkedCustomer.phone, linkedCustomer.rut ? `RUT ${linkedCustomer.rut}` : ''].filter(Boolean).join(' · ')}
+                  </p>
                 </div>
               ) : (
-                <div className="text-center py-8 sm:py-12 text-gray-500">
-                  <ShoppingCart className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 sm:mb-4 text-gray-300" />
-                  <p className="text-xs sm:text-sm">No hay líneas de venta. Busca productos o agrega líneas manuales.</p>
+                <p className="text-xs text-gray-400">Venta mostrador (sin cliente asignado)</p>
+              )}
+
+              <Button
+                type="button" variant="outline"
+                onClick={() => setShowOptionalCustomerData((prev) => !prev)}
+                className="h-7 text-xs w-full"
+              >
+                {showOptionalCustomerData ? (
+                  <><ChevronUp className="h-3.5 w-3.5 mr-1" />Ocultar datos opcionales</>
+                ) : (
+                  <><ChevronDown className="h-3.5 w-3.5 mr-1" />Ingresar datos manualmente</>
+                )}
+              </Button>
+
+              {showOptionalCustomerData && (
+                <div className="space-y-2 pt-1">
+                  <Input {...register('customer_name')} placeholder="Nombre" className="text-sm py-1.5" />
+                  <Input {...register('customer_phone')} placeholder="Teléfono" className="text-sm py-1.5" />
+                  <Input {...register('customer_email')} type="email" placeholder="Email" className="text-sm py-1.5" />
+                  <Input {...register('customer_rut')} placeholder="RUT / documento fiscal" className="text-sm py-1.5" />
+                  <Input {...register('notes')} placeholder="Notas" className="text-sm py-1.5" />
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Total and Payment Info */}
-            <div className="flex-shrink-0 border-t pt-3 space-y-3">
-              <div className="rounded-lg border border-gray-200 p-3 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                      Descuento
-                    </label>
-                    <select
-                      value={discountSource}
-                      onChange={(event) => setDiscountSource(event.target.value as 'none' | 'manual' | 'rule')}
-                      className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+          {/* Submit buttons */}
+          <div className="flex-shrink-0 border-t bg-white p-4 space-y-2">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={loading || saleLines.length === 0}
+            >
+              {loading ? 'Registrando...' : `Registrar Venta · ${formatPrice(total, settings)}`}
+            </Button>
+            <Button type="button" variant="outline" onClick={onClose} className="w-full" disabled={loading}>
+              Cancelar
+            </Button>
+          </div>
+        </aside>
+      </form>
+
+      {/* Customer picker modal */}
+      {isCustomerPickerOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-3">
+          <Card className="w-full max-w-2xl max-h-[85vh] flex flex-col">
+            <CardHeader className="border-b pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <UserCheck className="h-5 w-5 text-admin-600" />
+                  Elegir cliente
+                </CardTitle>
+                <Button type="button" variant="ghost" size="sm" className="h-8 w-8 p-0"
+                  onClick={() => setIsCustomerPickerOpen(false)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">Buscar por nombre, teléfono, email o RUT.</p>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto space-y-3 pt-4">
+              <div className="flex gap-2">
+                <Input
+                  value={customerPickerSearch}
+                  onChange={(e) => setCustomerPickerSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') { e.preventDefault(); void searchCustomersForPicker(customerPickerSearch) }
+                  }}
+                  placeholder="Ej: Juan, 099..., cliente@mail.com..."
+                  className="text-sm"
+                />
+                <Button type="button" variant="outline" onClick={() => void searchCustomersForPicker(customerPickerSearch)}>
+                  <Search className="h-4 w-4 mr-1" />
+                  Buscar
+                </Button>
+              </div>
+              {customerPickerLoading ? (
+                <div className="py-10 text-center text-sm text-gray-500">Cargando clientes...</div>
+              ) : customerPickerResults.length === 0 ? (
+                <div className="py-10 text-center text-sm text-gray-500">No se encontraron clientes.</div>
+              ) : (
+                <div className="space-y-2">
+                  {customerPickerResults.map((customer) => (
+                    <button
+                      key={customer.id} type="button"
+                      onClick={() => handleSelectCustomer(customer)}
+                      className="w-full rounded-lg border border-gray-200 p-3 text-left hover:border-admin-300 hover:bg-admin-50 transition-colors"
                     >
-                      <option value="none">Sin descuento</option>
-                      <option value="manual" disabled={!canApplyManualDiscount}>
-                        Descuento manual {!canApplyManualDiscount ? '(solo admin/manager)' : ''}
-                      </option>
-                      <option value="rule">Regla de descuento</option>
-                    </select>
-                  </div>
-
-                  {discountSource === 'manual' && (
-                    <>
-                      <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                          Tipo manual
-                        </label>
-                        <select
-                          value={manualDiscountKind}
-                          onChange={(event) => setManualDiscountKind(event.target.value as DiscountKind)}
-                          className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                        >
-                          <option value="percentage">Porcentaje (%)</option>
-                          <option value="fixed_amount">Monto fijo</option>
-                          <option value="price_override">Total final deseado</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                          Valor
-                        </label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={manualDiscountValue}
-                          onChange={(event) => setManualDiscountValue(event.target.value)}
-                          placeholder={manualDiscountKind === 'percentage' ? 'Ej: 10' : 'Ej: 500'}
-                          className="text-sm py-1.5"
-                        />
-                      </div>
-                    </>
-                  )}
-
-                  {discountSource === 'rule' && (
-                    <div className="sm:col-span-2">
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                        Regla
-                      </label>
-                      <select
-                        value={selectedDiscountRuleId}
-                        onChange={(event) => setSelectedDiscountRuleId(event.target.value)}
-                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                      >
-                        <option value="">Seleccionar regla</option>
-                        {discountRules.map((rule) => (
-                          <option key={rule.id} value={rule.id}>
-                            {rule.name} · {rule.kind === 'percentage' ? `${rule.value}%` : formatPrice(rule.value, settings)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-
-                {discountSource === 'manual' && (
-                  <div>
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                      Motivo del descuento (opcional)
-                    </label>
-                    <Input
-                      value={manualDiscountReason}
-                      onChange={(event) => setManualDiscountReason(event.target.value)}
-                      placeholder="Ej: cliente frecuente, promo en caja..."
-                      className="text-sm py-1.5"
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-lg bg-gray-50 p-3 text-sm space-y-1">
-                <div className="flex items-center justify-between">
-                  <span>Subtotal</span>
-                  <span>{formatPrice(subtotalBeforeDiscount, settings)}</span>
-                </div>
-                <div className="flex items-center justify-between text-red-700">
-                  <span>Descuento</span>
-                  <span>-{formatPrice(effectiveDiscountTotal, settings)}</span>
-                </div>
-                <div className="flex items-center justify-between text-lg sm:text-xl font-bold text-gray-900 border-t pt-1 mt-1">
-                  <span>Total</span>
-                  <span className="text-xl sm:text-2xl text-admin-600">{formatPrice(total, settings)}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                    Condición de pago *
-                  </label>
-                  <select
-                    {...register('sale_condition')}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                  >
-                    <option value="contado">Pago al contado</option>
-                    <option value="credito">Venta a crédito (cobro pendiente)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                    {saleCondition === 'credito' ? 'Método de cobro (referencia)' : 'Método de pago *'}
-                  </label>
-                  <select
-                    {...register('payment_method')}
-                    className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                  >
-                    {saleCondition === 'credito' && (
-                      <option value="">Sin cobro inmediato</option>
-                    )}
-                    {paymentMethods.map((m) => (
-                      <option
-                        key={m.id}
-                        value={m.key}
-                        disabled={!saleCondition || (saleCondition === 'contado' && m.requires_cash_session && !currentCashSession)}
-                      >
-                        {m.name}
-                        {saleCondition === 'contado' && m.requires_cash_session && !currentCashSession && ' (Requiere sesión de caja abierta)'}
-                      </option>
-                    ))}
-                  </select>
-                  {saleCondition === 'contado' && errors.payment_method && (
-                    <p className="text-xs text-red-500 mt-1">{errors.payment_method.message}</p>
-                  )}
-                </div>
-              </div>
-
-              {saleCondition === 'credito' && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
-                  Esta venta se registrará como <span className="font-semibold">completada</span> con cobro pendiente. No impacta la caja hasta registrar el pago.
-                </div>
-              )}
-
-              <div className="rounded-lg border border-gray-200 p-3 space-y-3">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-sm">
-                    <p className="font-medium text-gray-800">Cliente de la venta</p>
-                    {linkedCustomer ? (
-                      <p className="text-xs text-emerald-700">
-                        Vinculado: {linkedCustomer.full_name} ({linkedCustomer.phone})
-                        {linkedCustomer.rut ? ` · RUT ${linkedCustomer.rut}` : ''}
+                      <p className="text-sm font-semibold text-gray-900">{customer.full_name}</p>
+                      <p className="text-xs text-gray-600">
+                        {[customer.phone, customer.email, customer.rut ? `RUT ${customer.rut}` : ''].filter(Boolean).join(' · ') || 'Sin contacto'}
                       </p>
-                    ) : (
-                      <p className="text-xs text-gray-500">Sin cliente seleccionado (venta mostrador)</p>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={() => void openCustomerPicker()} className="h-8 text-xs">
-                      <Users className="h-3.5 w-3.5 mr-1" />
-                      Elegir cliente
-                    </Button>
-                    {linkedCustomer && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setLinkedCustomer(null)
-                          setValue('customer_name', '')
-                          setValue('customer_email', '')
-                          setValue('customer_phone', '')
-                          setValue('customer_rut', '')
-                        }}
-                        className="h-8 text-xs"
-                      >
-                        Quitar
-                      </Button>
-                    )}
-                  </div>
+                      {customer.notes && (
+                        <p className="mt-1 text-xs text-gray-500 line-clamp-1">{customer.notes}</p>
+                      )}
+                    </button>
+                  ))}
                 </div>
-
-                <div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowOptionalCustomerData((prev) => !prev)}
-                    className="h-8 text-xs"
-                  >
-                    {showOptionalCustomerData ? (
-                      <>
-                        <ChevronUp className="h-3.5 w-3.5 mr-1" />
-                        Ocultar datos opcionales
-                      </>
-                    ) : (
-                      <>
-                        <ChevronDown className="h-3.5 w-3.5 mr-1" />
-                        Cargar datos opcionales
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {showOptionalCustomerData && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                        Nombre cliente (opcional)
-                      </label>
-                      <Input {...register('customer_name')} placeholder="Nombre del cliente" className="text-sm py-1.5" />
-                    </div>
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                        Email (opcional)
-                      </label>
-                      <Input
-                        {...register('customer_email')}
-                        type="email"
-                        placeholder="cliente@email.com"
-                        className="text-sm py-1.5"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                        Teléfono (opcional)
-                      </label>
-                      <Input {...register('customer_phone')} placeholder="Teléfono" className="text-sm py-1.5" />
-                    </div>
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                        RUT (opcional)
-                      </label>
-                      <Input {...register('customer_rut')} placeholder="RUT / documento fiscal" className="text-sm py-1.5" />
-                    </div>
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
-                        Notas (opcional)
-                      </label>
-                      <Input {...register('notes')} placeholder="Notas adicionales..." className="text-sm py-1.5" />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex space-x-3 pt-2">
-                <Button type="submit" className="flex-1 text-sm py-2" disabled={loading || saleLines.length === 0}>
-                  {loading ? 'Registrando...' : 'Registrar Venta'}
-                </Button>
-                <Button type="button" variant="outline" onClick={onClose} className="flex-1 text-sm py-2" disabled={loading}>
-                  Cancelar
-                </Button>
-              </div>
-            </div>
-          </form>
-
-          {isCustomerPickerOpen && (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-3">
-              <Card className="w-full max-w-2xl max-h-[85vh] flex flex-col">
-                <CardHeader className="border-b pb-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <UserCheck className="h-5 w-5 text-admin-600" />
-                      Elegir cliente
-                    </CardTitle>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0"
-                      onClick={() => setIsCustomerPickerOpen(false)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    Buscar por nombre, teléfono, email o RUT.
-                  </p>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-y-auto space-y-3 pt-4">
-                  <div className="flex gap-2">
-                    <Input
-                      value={customerPickerSearch}
-                      onChange={(event) => setCustomerPickerSearch(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') {
-                          event.preventDefault()
-                          void searchCustomersForPicker(customerPickerSearch)
-                        }
-                      }}
-                      placeholder="Ej: Juan, 099..., cliente@mail.com, 2145..."
-                      className="text-sm"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void searchCustomersForPicker(customerPickerSearch)}
-                    >
-                      <Search className="h-4 w-4 mr-1" />
-                      Buscar
-                    </Button>
-                  </div>
-
-                  {customerPickerLoading ? (
-                    <div className="py-10 text-center text-sm text-gray-500">Cargando clientes...</div>
-                  ) : customerPickerResults.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-gray-500">No se encontraron clientes.</div>
-                  ) : (
-                    <div className="space-y-2">
-                      {customerPickerResults.map((customer) => (
-                        <button
-                          key={customer.id}
-                          type="button"
-                          onClick={() => handleSelectCustomer(customer)}
-                          className="w-full rounded-lg border border-gray-200 p-3 text-left hover:border-admin-300 hover:bg-admin-50 transition-colors"
-                        >
-                          <p className="text-sm font-semibold text-gray-900">{customer.full_name}</p>
-                          <p className="text-xs text-gray-600">
-                            {[customer.phone, customer.email, customer.rut ? `RUT ${customer.rut}` : ''].filter(Boolean).join(' · ') || 'Sin contacto'}
-                          </p>
-                          {customer.notes && (
-                            <p className="mt-1 text-xs text-gray-500 line-clamp-1">{customer.notes}</p>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
