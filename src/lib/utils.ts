@@ -18,7 +18,7 @@ const DEFAULT_CURRENCY = 'ARS'
 export function formatPrice(price: number, settings?: OrganizationSettings | null): string {
   const locale = settings?.locale ?? DEFAULT_LOCALE
   const currency = settings?.currency ?? DEFAULT_CURRENCY
-  const decimals = settings?.decimal_places ?? 2
+  const decimals = settings?.decimal_places ?? 0
   return new Intl.NumberFormat(locale, {
     style: 'currency',
     currency,

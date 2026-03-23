@@ -42,6 +42,15 @@ export function ProductDetail() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [imageLoading, setImageLoading] = useState(true)
   const [fadeIn, setFadeIn] = useState(false)
+
+  // Cuando el browser tiene la imagen cacheada, onLoad dispara antes de que React
+  // adjunte el handler. Este callback ref la detecta verificando img.complete.
+  const handleImgRef = useCallback((node: HTMLImageElement | null) => {
+    if (node?.complete && node.naturalWidth > 0) {
+      setImageLoading(false)
+      setFadeIn(true)
+    }
+  }, [])
   const [allImagesFailed, setAllImagesFailed] = useState(false)
   const [productStock, setProductStock] = useState<number | null>(null)
   const [variantStock, setVariantStock] = useState<number | null>(null)
@@ -55,15 +64,9 @@ export function ProductDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
-  // Scroll to product when page loads
   useEffect(() => {
-    if (!loading && product && productRef.current) {
-      // Small delay to ensure DOM is fully rendered
-      setTimeout(() => {
-        productRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }, 100)
-    }
-  }, [loading, product])
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [id])
 
   const fetchProduct = async () => {
     if (!id) return
@@ -304,6 +307,7 @@ export function ProductDetail() {
                   <div className="relative w-full" style={{ aspectRatio: '1 / 1', minHeight: '400px' }}>
                     <img
                       key={`${selectedVariantId ?? 'base'}-${currentImageIndex}`}
+                      ref={handleImgRef}
                       src={currentImageUrl}
                       alt={capitalizeFirst(product.name)}
                       className={`w-full h-full object-cover transition-opacity duration-300 ${

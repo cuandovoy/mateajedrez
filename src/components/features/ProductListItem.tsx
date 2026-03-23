@@ -112,8 +112,8 @@ export function ProductListItem({
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow">
       <div className="flex flex-col md:flex-row">
-        <Link to={`${basePath}/product/${product.id}`} className="md:w-64 flex-shrink-0">
-          <div className="w-full h-48 md:h-full bg-gray-200">
+        <Link to={`${basePath}/product/${product.id}`} className="md:w-48 flex-shrink-0">
+          <div className="w-full h-48 bg-gray-200">
             {currentImageUrl ? (
               <img
                 key={currentImageIndex}

@@ -4,42 +4,30 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization'
-import { getProductsStock } from '@/lib/stock'
-import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
-import type { Category, Product } from '@/types'
+import { usePublicCategories } from '@/hooks/usePublicCategories'
+import { useFilteredProducts } from '@/hooks/usePublicProducts'
+import type { Product } from '@/types'
 import { Filter, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const DEFAULT_STORE_SLUG = 'default'
-const PRODUCTS_PAGE_SIZE = 24
-
-type CachedProductsPage = {
-  products: Product[]
-  stockByProduct: Record<string, number>
-  hasVariantsByProduct: Record<string, boolean>
-  hasMore: boolean
-}
 
 export function Products() {
   const { organization, isPublicStore, slug } = useCurrentOrganization()
   const fetchOrgBySlug = useOrganizationStore((s) => s.fetchOrgBySlug)
-  const [products, setProducts] = useState<Product[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
   const [showFilters, setShowFilters] = useState(false)
   const [orgId, setOrgId] = useState<string | null>(null)
-  const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({})
-  const [hasVariantsByProduct, setHasVariantsByProduct] = useState<Record<string, boolean>>({})
   const [currentPage, setCurrentPage] = useState(1)
-  const [hasMore, setHasMore] = useState(false)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const productsCacheRef = useRef<Map<string, CachedProductsPage>>(new Map())
+
+  // Productos acumulados para "cargar más"
+  const [allProducts, setAllProducts] = useState<Product[]>([])
+  const [allStock, setAllStock] = useState<Record<string, number>>({})
+  const [allVariants, setAllVariants] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const loadOrg = async () => {
@@ -57,174 +45,44 @@ export function Products() {
     const timeoutId = window.setTimeout(() => {
       setDebouncedSearchTerm(searchTerm.trim())
     }, 350)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
+    return () => window.clearTimeout(timeoutId)
   }, [searchTerm])
 
+  // Resetear a página 1 cuando cambian los filtros
   useEffect(() => {
-    if (!orgId) return
-    fetchCategories()
-  }, [orgId])
-
-  useEffect(() => {
-    if (!orgId) return
-    fetchProducts(1, true)
+    setCurrentPage(1)
+    setAllProducts([])
+    setAllStock({})
+    setAllVariants({})
   }, [orgId, selectedCategory, priceRange.min, priceRange.max, debouncedSearchTerm])
 
-  const fetchProducts = async (page: number, replace: boolean) => {
-    if (!orgId) return
+  const { data: categoriesData } = usePublicCategories(orgId ?? '')
+  const categories = (categoriesData ?? []).filter((cat) => !cat.parent_id)
 
-    const normalizedSearch = debouncedSearchTerm.toLowerCase()
-    const baseCacheKey = JSON.stringify({
-      orgId,
-      selectedCategory,
-      min: priceRange.min,
-      max: priceRange.max,
-      search: normalizedSearch,
-    })
-    const cacheKey = `${baseCacheKey}::page:${page}`
-    const cachedResult = productsCacheRef.current.get(cacheKey)
-    if (cachedResult) {
-      if (replace) {
-        setProducts(cachedResult.products)
-        setStockByProduct(cachedResult.stockByProduct)
-        setHasVariantsByProduct(cachedResult.hasVariantsByProduct)
-      } else {
-        setProducts((prev) => {
-          const existingIds = new Set(prev.map((product) => product.id))
-          const nextProducts = cachedResult.products.filter((product) => !existingIds.has(product.id))
-          return [...prev, ...nextProducts]
-        })
-        setStockByProduct((prev) => ({ ...prev, ...cachedResult.stockByProduct }))
-        setHasVariantsByProduct((prev) => ({ ...prev, ...cachedResult.hasVariantsByProduct }))
-      }
-      setCurrentPage(page)
-      setHasMore(cachedResult.hasMore)
-      setLoading(false)
-      setIsRefreshing(false)
-      setIsLoadingMore(false)
-      return
-    }
+  const { data: pageData, isFetching, isLoading } = useFilteredProducts(orgId, {
+    categoryId: selectedCategory,
+    minPrice: priceRange.min,
+    maxPrice: priceRange.max,
+    search: debouncedSearchTerm,
+    page: currentPage,
+  })
 
-    const shouldBlockPage = replace && loading && products.length === 0
-    try {
-      if (!replace) {
-        setIsLoadingMore(true)
-      } else if (!shouldBlockPage) {
-        setIsRefreshing(true)
-      }
-
-      const from = (page - 1) * PRODUCTS_PAGE_SIZE
-      const to = from + PRODUCTS_PAGE_SIZE
-
-      let query = supabase
-        .from('products')
-        .select(`
-          *,
-          product_images (
-            id,
-            image_url,
-            display_order,
-            is_primary
-          )
-        `)
-        .eq('organization_id', orgId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .range(from, to)
-
-      if (selectedCategory) {
-        query = query.eq('category_id', selectedCategory)
-      }
-
-      if (priceRange.min) {
-        query = query.gte('price', parseFloat(priceRange.min))
-      }
-
-      if (priceRange.max) {
-        query = query.lte('price', parseFloat(priceRange.max))
-      }
-
-      if (normalizedSearch) {
-        const safeTerm = normalizedSearch.replace(/[%]/g, '').replace(/,/g, ' ').trim()
-        if (safeTerm) {
-          query = query.or(`name.ilike.%${safeTerm}%,description.ilike.%${safeTerm}%,sku.ilike.%${safeTerm}%`)
-        }
-      }
-
-      const { data, error } = await query
-
-      if (error) throw error
-      const rows = (data || []) as Product[]
-      const hasMoreRows = rows.length > PRODUCTS_PAGE_SIZE
-      const productsData = hasMoreRows ? rows.slice(0, PRODUCTS_PAGE_SIZE) : rows
-      const productIds = productsData.map((product) => product.id)
-      const [stocks, variantsResult] = await Promise.all([
-        getProductsStock(productIds, null, orgId),
-        productIds.length > 0
-          ? supabase
-              .from('product_variants')
-              .select('product_id')
-              .in('product_id', productIds)
-              .eq('is_active', true)
-          : Promise.resolve({ data: [], error: null }),
-      ])
-
-      const variantsMap: Record<string, boolean> = {}
-      if (!variantsResult.error && variantsResult.data) {
-        for (const row of variantsResult.data as Array<{ product_id: string }>) {
-          variantsMap[row.product_id] = true
-        }
-      }
-
-      productsCacheRef.current.set(cacheKey, {
-        products: productsData,
-        stockByProduct: stocks,
-        hasVariantsByProduct: variantsMap,
-        hasMore: hasMoreRows,
+  // Acumular productos al llegar datos de cada página
+  useEffect(() => {
+    if (!pageData) return
+    if (currentPage === 1) {
+      setAllProducts(pageData.products)
+      setAllStock(pageData.stockByProduct)
+      setAllVariants(pageData.hasVariantsByProduct)
+    } else {
+      setAllProducts((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id))
+        return [...prev, ...pageData.products.filter((p) => !existingIds.has(p.id))]
       })
-      if (replace) {
-        setProducts(productsData)
-        setStockByProduct(stocks)
-        setHasVariantsByProduct(variantsMap)
-      } else {
-        setProducts((prev) => {
-          const existingIds = new Set(prev.map((product) => product.id))
-          const nextProducts = productsData.filter((product) => !existingIds.has(product.id))
-          return [...prev, ...nextProducts]
-        })
-        setStockByProduct((prev) => ({ ...prev, ...stocks }))
-        setHasVariantsByProduct((prev) => ({ ...prev, ...variantsMap }))
-      }
-      setCurrentPage(page)
-      setHasMore(hasMoreRows)
-    } catch (error) {
-      console.error('Error fetching products:', error)
-    } finally {
-      setLoading(false)
-      setIsRefreshing(false)
-      setIsLoadingMore(false)
+      setAllStock((prev) => ({ ...prev, ...pageData.stockByProduct }))
+      setAllVariants((prev) => ({ ...prev, ...pageData.hasVariantsByProduct }))
     }
-  }
-
-  const fetchCategories = async () => {
-    if (!orgId) return
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('organization_id', orgId)
-        .is('parent_id', null)
-        .order('name')
-
-      if (error) throw error
-      setCategories(data || [])
-    } catch (error) {
-      console.error('Error fetching categories:', error)
-    }
-  }
+  }, [pageData, currentPage])
 
   const clearFilters = () => {
     setSelectedCategory('')
@@ -233,8 +91,11 @@ export function Products() {
   }
 
   const hasActiveFilters = selectedCategory || priceRange.min || priceRange.max
+  const isLoadingMore = isFetching && currentPage > 1
+  const isRefreshing = isFetching && currentPage === 1 && allProducts.length > 0
+  const hasMore = pageData?.hasMore ?? false
 
-  if (loading) {
+  if (isLoading && allProducts.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-200"></div>
@@ -391,7 +252,7 @@ export function Products() {
 
         {/* Lista de productos */}
         <div className="flex-1">
-          {products.length === 0 ? (
+          {allProducts.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-600 text-lg">
                 {searchTerm || hasActiveFilters
@@ -408,12 +269,12 @@ export function Products() {
             <>
               {/* Vista Cards para móvil y tablet */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-6">
-                {products.map((product) => (
-                  <ProductCard 
-                    key={product.id} 
-                    product={product} 
-                    stock={stockByProduct[product.id]}
-                    hasVariants={Boolean(hasVariantsByProduct[product.id])}
+                {allProducts.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    stock={allStock[product.id]}
+                    hasVariants={Boolean(allVariants[product.id])}
                     basePath={isPublicStore && slug ? `/${slug}` : ''}
                   />
                 ))}
@@ -421,12 +282,12 @@ export function Products() {
 
               {/* Vista Lista para desktop */}
               <div className="hidden lg:block space-y-4">
-                {products.map((product) => (
+                {allProducts.map((product) => (
                   <ProductListItem
                     key={product.id}
                     product={product}
-                    stock={stockByProduct[product.id]}
-                    hasVariants={Boolean(hasVariantsByProduct[product.id])}
+                    stock={allStock[product.id]}
+                    hasVariants={Boolean(allVariants[product.id])}
                     basePath={isPublicStore && slug ? `/${slug}` : ''}
                   />
                 ))}
@@ -436,7 +297,7 @@ export function Products() {
                 <div className="mt-8 flex justify-center">
                   <Button
                     variant="outline"
-                    onClick={() => fetchProducts(currentPage + 1, false)}
+                    onClick={() => setCurrentPage((p) => p + 1)}
                     disabled={isLoadingMore}
                   >
                     {isLoadingMore ? 'Cargando...' : 'Cargar más'}

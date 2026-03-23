@@ -1,18 +1,11 @@
 import { Button } from '@/components/ui/Button'
 import { Dropdown } from '@/components/ui/Dropdown'
-import { supabase } from '@/lib/supabase'
 import { useCartStore } from '@/store/cartStore'
-import type { Category } from '@/types'
 import { Organization } from '@/types/database.types'
+import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
 import { Menu, ShoppingCart, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-
-interface CategoryWithSubcategories {
-  value: string
-  label: string
-  subcategories?: Array<{ value: string; label: string }>
-}
 
 interface PublicStoreHeaderProps {
   organization: Organization
@@ -22,74 +15,14 @@ interface PublicStoreHeaderProps {
 export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps) {
   const { getItemCount, fetchCart } = useCartStore()
   const navigate = useNavigate()
-  const [categoriesWithSubs, setCategoriesWithSubs] = useState<CategoryWithSubcategories[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+
+  const { categoriesWithSubs } = usePublicCategoriesForMenu(organization.id)
 
   useEffect(() => {
     fetchCart()
   }, [fetchCart])
-
-  useEffect(() => {
-    let isMounted = true
-
-    const fetchCategories = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('categories')
-          .select('*')
-          .eq('organization_id', organization.id)
-          .order('name')
-
-        if (error) throw error
-        if (isMounted && data) {
-          const categoriesData: Category[] = data as Category[]
-
-          const parentCategories = categoriesData.filter((cat) => !cat.parent_id)
-          const subcategoriesMap = new Map<string, Category[]>()
-
-          categoriesData.forEach((cat) => {
-            if (cat.parent_id) {
-              if (!subcategoriesMap.has(cat.parent_id)) {
-                subcategoriesMap.set(cat.parent_id, [])
-              }
-              subcategoriesMap.get(cat.parent_id)!.push(cat)
-            }
-          })
-
-          const options: CategoryWithSubcategories[] = parentCategories.map((parent) => {
-            const subcategories = subcategoriesMap.get(parent.id) || []
-            return {
-              value: parent.slug,
-              label: parent.name,
-              subcategories: subcategories.length > 0
-                ? subcategories.map((sub) => ({
-                  value: sub.slug,
-                  label: sub.name,
-                }))
-                : undefined,
-            }
-          })
-
-          setCategoriesWithSubs(options)
-        }
-      } catch (error) {
-        if ((error instanceof Error && error.name !== 'AbortError') || !(error instanceof Error)) {
-          if (isMounted) {
-            console.error('Error fetching categories:', error)
-          }
-        }
-      }
-    }
-
-    if (organization.id) {
-      fetchCategories()
-    }
-
-    return () => {
-      isMounted = false
-    }
-  }, [organization.id])
 
   const handleCategoryChange = (categorySlug: string) => {
     if (categorySlug) {

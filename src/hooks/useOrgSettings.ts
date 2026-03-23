@@ -6,7 +6,7 @@ const DEFAULT_SETTINGS: Required<Pick<OrganizationSettings, 'currency' | 'locale
   currency: 'ARS',
   locale: 'es-AR',
   timezone: 'America/Argentina/Buenos_Aires',
-  decimal_places: 2,
+  decimal_places: 0,
 }
 
 /**

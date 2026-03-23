@@ -1,8 +1,7 @@
-import { useOrganizationStore } from '@/store/organizationStore'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { getProductsStock } from '@/lib/stock'
+import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { ProductCard } from '@/components/features/ProductCard'
 import { ProductListItem } from '@/components/features/ProductListItem'
 import { Input } from '@/components/ui/Input'
@@ -12,31 +11,30 @@ import { ArrowLeft, Filter, X } from 'lucide-react'
 import type { Product, Category } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
 
-const DEFAULT_STORE_SLUG = 'default'
+const PAGE_SIZE = 20
 
 export function CategoryProducts() {
   const { slug, categorySlug } = useParams<{ slug?: string; categorySlug: string }>()
-  const currentOrg = useOrganizationStore((s) => s.currentOrganization)
-  const fetchOrgBySlug = useOrganizationStore((s) => s.fetchOrgBySlug)
-  const [orgId, setOrgId] = useState<string | null>(null)
+  const { organization } = usePublicStore()
+  const orgId = organization.id
   const [products, setProducts] = useState<Product[]>([])
   const [parentCategory, setParentCategory] = useState<Category | null>(null)
-  const [currentCategory, setCurrentCategory] = useState<Category | null>(null) // The category being viewed (could be parent or subcategory)
+  const [currentCategory, setCurrentCategory] = useState<Category | null>(null)
   const [subcategories, setSubcategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([])
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
   const [showFilters, setShowFilters] = useState(false)
-  const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({})
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
+
 
   useEffect(() => {
-    const loadOrg = async () => {
-      const id = currentOrg?.id ?? (await fetchOrgBySlug(DEFAULT_STORE_SLUG))?.id
-      setOrgId(id ?? null)
-    }
-    loadOrg()
-  }, [currentOrg?.id, fetchOrgBySlug])
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [categorySlug])
 
   useEffect(() => {
     if (categorySlug && orgId) {
@@ -47,12 +45,26 @@ export function CategoryProducts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categorySlug, orgId])
 
+  // Debounce search term
   useEffect(() => {
-    if (parentCategory || selectedSubcategories.length > 0 || priceRange.min || priceRange.max) {
-      fetchProducts()
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Resetear página cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1)
+    setProducts([])
+  }, [selectedSubcategories, priceRange.min, priceRange.max, debouncedSearchTerm])
+
+  useEffect(() => {
+    if (parentCategory || selectedSubcategories.length > 0 || priceRange.min || priceRange.max || debouncedSearchTerm) {
+      fetchProducts(1)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parentCategory, selectedSubcategories, priceRange.min, priceRange.max])
+  }, [parentCategory, selectedSubcategories, priceRange.min, priceRange.max, debouncedSearchTerm])
 
   const fetchCategoryAndProducts = async () => {
     if (!categorySlug || !orgId) return
@@ -130,13 +142,15 @@ export function CategoryProducts() {
     }
   }
 
-  const fetchProductsForCategory = async (parentId: string, subcats: Category[], organizationId?: string) => {
+  const fetchProductsForCategory = async (parentId: string, subcats: Category[], organizationId?: string, page = 1, append = false) => {
     try {
-      // Build category IDs array (parent + all subcategories)
       const allCategoryIds = [parentId]
       if (subcats.length > 0) {
         allCategoryIds.push(...subcats.map((cat) => cat.id as string))
       }
+
+      const from = (page - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE // uno extra para detectar si hay más
 
       let query = supabase
         .from('products')
@@ -150,52 +164,55 @@ export function CategoryProducts() {
           )
         `)
         .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .range(from, to)
 
-      if (organizationId) {
-        query = query.eq('organization_id', organizationId)
-      }
+      if (organizationId) query = query.eq('organization_id', organizationId)
 
-      // Filter by selected subcategories
       if (subcats.length === 0) {
-        // Si no hay subcategorías, mostrar solo productos de la categoría padre
         query = query.eq('category_id', parentId as string)
-      } else if (
-        selectedSubcategories.length === 0 ||
-        selectedSubcategories.length === subcats.length
-      ) {
-        // Si todas están seleccionadas o ninguna, mostrar todas (parent + subcategories)
+      } else if (selectedSubcategories.length === 0 || selectedSubcategories.length === subcats.length) {
         query = query.in('category_id', allCategoryIds)
       } else {
-        // Si hay algunas seleccionadas, filtrar solo por las seleccionadas
         query = query.in('category_id', selectedSubcategories as string[])
       }
 
-      if (priceRange.min) {
-        query = query.gte('price', parseFloat(priceRange.min))
+      if (priceRange.min) query = query.gte('price', parseFloat(priceRange.min))
+      if (priceRange.max) query = query.lte('price', parseFloat(priceRange.max))
+
+      if (debouncedSearchTerm.trim()) {
+        const term = `%${debouncedSearchTerm.trim()}%`
+        query = query.or(`name.ilike.${term},description.ilike.${term},sku.ilike.${term}`)
       }
 
-      if (priceRange.max) {
-        query = query.lte('price', parseFloat(priceRange.max))
-      }
-
-      const { data, error } = await query.order('created_at', { ascending: false })
-
+      const { data, error } = await query
       if (error) throw error
-      setProducts(data || [])
+
+      const rows = data ?? []
+      const more = rows.length > PAGE_SIZE
+      const pageProducts = more ? rows.slice(0, PAGE_SIZE) : rows
+
+      setProducts((prev) => append ? [...prev, ...pageProducts] : pageProducts)
+      setHasMore(more)
+      setCurrentPage(page)
     } catch (error) {
       console.error('Error fetching products:', error)
+    } finally {
+      setIsLoadingMore(false)
     }
   }
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (page = 1, append = false) => {
     if (!parentCategory) return
-    await fetchProductsForCategory(parentCategory.id, subcategories, parentCategory.organization_id)
+    await fetchProductsForCategory(parentCategory.id, subcategories, parentCategory.organization_id, page, append)
   }
 
-  const filteredProducts = products.filter((product) =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const handleLoadMore = () => {
+    setIsLoadingMore(true)
+    fetchProducts(currentPage + 1, true)
+  }
+
+  const filteredProducts = products
 
   const handleSubcategoryToggle = (subcategoryId: string) => {
     setSelectedSubcategories((prev) => {
@@ -227,25 +244,6 @@ export function CategoryProducts() {
     (selectedSubcategories.length > 0 && selectedSubcategories.length < subcategories.length) ||
     priceRange.min ||
     priceRange.max
-
-  useEffect(() => {
-    let cancelled = false
-
-    const loadStocks = async () => {
-      if (products.length === 0) {
-        if (!cancelled) setStockByProduct({})
-        return
-      }
-      const productIds = products.map((p) => p.id)
-      const stocks = await getProductsStock(productIds, null, parentCategory?.organization_id || orgId)
-      if (!cancelled) setStockByProduct(stocks)
-    }
-
-    loadStocks()
-    return () => {
-      cancelled = true
-    }
-  }, [products])
 
   if (loading) {
     return (
@@ -503,7 +501,7 @@ export function CategoryProducts() {
                   <ProductCard
                     key={product.id}
                     product={product}
-                    stock={stockByProduct[product.id]}
+                    stock={product.stock ?? 0}
                     basePath={slug ? `/${slug}` : ''}
                   />
                 ))}
@@ -515,11 +513,23 @@ export function CategoryProducts() {
                   <ProductListItem
                     key={product.id}
                     product={product}
-                    stock={stockByProduct[product.id]}
+                    stock={product.stock ?? 0}
                     basePath={slug ? `/${slug}` : ''}
                   />
                 ))}
               </div>
+
+              {(hasMore || isLoadingMore) && (
+                <div className="mt-8 flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={handleLoadMore}
+                    disabled={isLoadingMore}
+                  >
+                    {isLoadingMore ? 'Cargando...' : 'Cargar más'}
+                  </Button>
+                </div>
+              )}
             </>
           )}
         </div>

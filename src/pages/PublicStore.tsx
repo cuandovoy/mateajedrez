@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
 import { ProductCard } from '@/components/features/ProductCard'
 import { CategoryCard } from '@/components/features/CategoryCard'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
+import { usePublicCategories } from '@/hooks/usePublicCategories'
+import { useStoreProducts } from '@/hooks/usePublicProducts'
 import type { Product, Category, ProductImage } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { ArrowRight } from 'lucide-react'
@@ -51,11 +52,11 @@ function getOrderedProductImageUrls(product: ProductWithImages): string[] {
 
 export function PublicStore() {
   const { organization, slug } = usePublicStore()
-  const [products, setProducts] = useState<ProductWithImages[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [allCategories, setAllCategories] = useState<Category[]>([])
   const [currentCoverIndex, setCurrentCoverIndex] = useState(0)
-  const [loading, setLoading] = useState(true)
+
+  const { data: allCategories = [] } = usePublicCategories(organization.id)
+  const { data: products = [], isLoading: loading } = useStoreProducts(organization.id)
+  const categories = allCategories.filter((cat: Category) => !cat.parent_id)
 
   const categoryFallbackImages = useMemo(() => {
     if (products.length === 0 || allCategories.length === 0) {
@@ -117,65 +118,6 @@ export function PublicStore() {
       ? [organization.cover_image_url]
       : []
   const hasCoverImages = coverImages.length > 0
-
-  useEffect(() => {
-    const isMounted = { current: true }
-
-    const fetchData = async () => {
-      try {
-        if (!organization.id) {
-          setLoading(false)
-          return
-        }
-
-        const { data: productsData, error: productsError } = await supabase
-          .from('products')
-          .select(`
-            *,
-            product_images (
-              id,
-              image_url,
-              display_order,
-              is_primary,
-              product_id,
-              created_at,
-              updated_at
-            )
-          `)
-          .eq('organization_id', organization.id)
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-
-        if (productsError) throw productsError
-
-        const { data: categoriesData, error: categoriesError } = await supabase
-          .from('categories')
-          .select('*')
-          .eq('organization_id', organization.id)
-          .order('name')
-
-        if (categoriesError) throw categoriesError
-
-        if (isMounted.current) {
-          setProducts(productsData || [])
-          const availableCategories = categoriesData || []
-          setAllCategories(availableCategories)
-          setCategories(availableCategories.filter((category) => !category.parent_id))
-        }
-      } catch (error) {
-        if ((error instanceof Error && error.name !== 'AbortError') || !(error instanceof Error)) {
-          console.error('Error fetching store data:', error)
-        }
-      } finally {
-        if (isMounted.current) setLoading(false)
-      }
-    }
-
-    fetchData()
-    return () => {
-      isMounted.current = false
-    }
-  }, [organization.id])
 
   useEffect(() => {
     setCurrentCoverIndex(0)

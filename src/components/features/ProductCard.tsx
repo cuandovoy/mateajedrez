@@ -126,6 +126,7 @@ export function ProductCard({
               key={currentImageIndex}
               src={currentImageUrl}
               alt={capitalizeFirst(product.name)}
+              loading="lazy"
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
               style={{ aspectRatio: '16/9' }}
               onError={() => {
