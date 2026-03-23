@@ -4,11 +4,12 @@ import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { ManualSaleForm } from '@/components/admin/ManualSaleForm'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatDateShort, formatPrice } from '@/lib/utils'
-import { Search, Calendar, Filter, ChevronLeft, ChevronRight, Eye } from 'lucide-react'
-import type { Order } from '@/types'
+import { Search, Calendar, Filter, ChevronLeft, ChevronRight, Eye, Plus } from 'lucide-react'
+import type { Order, CashSession, Branch } from '@/types'
 import { cn } from '@/lib/utils'
 
 const formatOrderDisplayNumber = (order: { id: string; order_number?: number | null }): string => {
@@ -88,6 +89,10 @@ export function AdminOrders() {
   )
   const [discountFilter, setDiscountFilter] = useState<'all' | 'with_discount' | 'without_discount'>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [isManualSaleOpen, setIsManualSaleOpen] = useState(false)
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [openCashSessions, setOpenCashSessions] = useState<CashSession[]>([])
+  const [saleBranchId, setSaleBranchId] = useState('')
 
   // Update URL when status filter changes
   useEffect(() => {
@@ -99,8 +104,34 @@ export function AdminOrders() {
   }, [statusFilter, setSearchParams])
 
   useEffect(() => {
-    if (organizationId) fetchOrders()
+    if (organizationId) {
+      fetchOrders()
+      fetchBranches()
+      fetchOpenCashSessions()
+    }
   }, [organizationId, currentPage, startDate, endDate, statusFilter, discountFilter, searchTerm])
+
+  const fetchBranches = async () => {
+    if (!organizationId) return
+    const { data } = await supabase
+      .from('branches')
+      .select('id, name, code')
+      .eq('organization_id', organizationId)
+      .eq('is_active', true)
+      .order('name')
+    const list = (data || []) as Branch[]
+    setBranches(list)
+    if (list.length > 0 && !saleBranchId) setSaleBranchId(list[0].id)
+  }
+
+  const fetchOpenCashSessions = async () => {
+    if (!organizationId) return
+    const { data } = await supabase
+      .from('cash_sessions')
+      .select('*')
+      .is('closed_at', null)
+    setOpenCashSessions((data || []) as CashSession[])
+  }
 
   const fetchOrders = async () => {
     if (!organizationId) return
@@ -231,9 +262,18 @@ export function AdminOrders() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Órdenes</h1>
-        <p className="text-gray-600 mt-2">Gestiona todas las órdenes de la tienda</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Órdenes</h1>
+          <p className="text-gray-600 mt-1">Gestiona todas las órdenes de la tienda</p>
+        </div>
+        <Button
+          onClick={() => setIsManualSaleOpen(true)}
+          disabled={branches.length === 0}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Nueva orden
+        </Button>
       </div>
 
       {/* Filters */}
@@ -510,6 +550,21 @@ export function AdminOrders() {
           )}
         </CardContent>
       </Card>
+
+      {isManualSaleOpen && saleBranchId && (
+        <ManualSaleForm
+          branchId={saleBranchId}
+          openCashSession={openCashSessions.find((s) => s.branch_id === saleBranchId) || null}
+          openCashSessions={openCashSessions}
+          branches={branches}
+          onClose={() => setIsManualSaleOpen(false)}
+          onSaleCreated={() => {
+            setIsManualSaleOpen(false)
+            fetchOrders()
+          }}
+          onBranchChange={(newBranchId) => setSaleBranchId(newBranchId)}
+        />
+      )}
     </div>
   )
 }
