@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ArrowLeft, Filter, X } from 'lucide-react'
 import type { Product, Category } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
+import { getProductsStock } from '@/lib/stock'
 
 const PAGE_SIZE = 20
 
@@ -30,6 +31,7 @@ export function CategoryProducts() {
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
+  const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({})
 
 
   useEffect(() => {
@@ -233,6 +235,16 @@ export function CategoryProducts() {
       setSelectedSubcategories(subcategories.map((cat) => cat.id as string))
     }
   }
+
+  useEffect(() => {
+    if (products.length === 0) { setStockByProduct({}); return }
+    let cancelled = false
+    const orgId = parentCategory?.organization_id || organization.id
+    getProductsStock(products.map((p) => p.id), null, orgId)
+      .then((stocks) => { if (!cancelled) setStockByProduct(stocks) })
+      .catch(() => { if (!cancelled) setStockByProduct({}) })
+    return () => { cancelled = true }
+  }, [products])
 
   const clearFilters = () => {
     setSelectedSubcategories(subcategories.map((cat) => cat.id as string))
@@ -501,7 +513,7 @@ export function CategoryProducts() {
                   <ProductCard
                     key={product.id}
                     product={product}
-                    stock={product.stock ?? 0}
+                    stock={stockByProduct[product.id]}
                     basePath={slug ? `/${slug}` : ''}
                   />
                 ))}
@@ -513,7 +525,7 @@ export function CategoryProducts() {
                   <ProductListItem
                     key={product.id}
                     product={product}
-                    stock={product.stock ?? 0}
+                    stock={stockByProduct[product.id]}
                     basePath={slug ? `/${slug}` : ''}
                   />
                 ))}

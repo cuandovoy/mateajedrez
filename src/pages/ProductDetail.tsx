@@ -104,15 +104,11 @@ export function ProductDetail() {
 
       setHasActiveVariants((activeVariantsCount || 0) > 0)
       
-      // Fetch product stock from branch_inventory
       if (data) {
         const productData = data as ProductWithCategory & { product_images?: ProductImage[] }
         getProductStock(productData.id as string, null, null, productData.organization_id || null)
           .then((stock) => setProductStock(stock))
-          .catch((error) => {
-            console.error('Error fetching product stock:', error)
-            setProductStock(0)
-          })
+          .catch(() => setProductStock(0))
       }
 
       // Fetch related products
@@ -177,13 +173,10 @@ export function ProductDetail() {
           if (data) {
             setSelectedVariant(data)
             setQuantity(1)
-
+            // Use denormalized stock from product_variants (works for anonymous users)
             getProductStock(product.id, variantId, null, product.organization_id || null)
               .then((stock) => setVariantStock(stock))
-              .catch((error) => {
-                console.error('Error fetching variant stock:', error)
-                setVariantStock(0)
-              })
+              .catch(() => setVariantStock(0))
           }
         })
       return

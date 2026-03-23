@@ -81,30 +81,16 @@ export function ProductCard({
 
   const currentImageUrl = imageUrls[currentImageIndex]
 
-  // Fetch stock from branch_inventory
   useEffect(() => {
     if (typeof stockProp === 'number') {
       setStock(stockProp)
       return
     }
-
     let cancelled = false
     getProductStock(product.id, null, null, product.organization_id || null)
-      .then((stockValue) => {
-        if (!cancelled) {
-          setStock(stockValue)
-        }
-      })
-      .catch((error) => {
-        console.error('Error fetching stock for product:', product.id, error)
-        if (!cancelled) {
-          setStock(0) // Default to 0 on error
-        }
-      })
-
-    return () => {
-      cancelled = true
-    }
+      .then((v) => { if (!cancelled) setStock(v) })
+      .catch(() => { if (!cancelled) setStock(0) })
+    return () => { cancelled = true }
   }, [product.id, product.organization_id, stockProp])
 
   const hasStock = stock !== null ? stock > 0 : false
