@@ -12,7 +12,7 @@ const ROUTE_LABELS: Record<string, string> = {
   '/reports/sales': 'Ventas',
   '/reports/audit-logs': 'Logs de Auditoría',
   '/reports/customers': 'Reporte de Clientes',
-  '/reports/inventory': 'Reporte de Inventario',
+  // '/reports/inventory': 'Reporte de Inventario',
   '/branches': 'Sucursales',
   '/inventory': 'Inventario',
   '/transfers': 'Transferencias',
