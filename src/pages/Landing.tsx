@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import {
   ArrowRight,
   BarChart3,
@@ -15,12 +14,12 @@ import {
   ShieldCheck,
   ShoppingBag,
   ShoppingCart,
-  Star,
   Users,
   Wallet,
   X,
-  Zap,
+  Zap
 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 const modules = [
@@ -160,27 +159,6 @@ const clientProfiles = [
     icon: Shield,
     iconBg: 'bg-red-100',
     iconColor: 'text-red-600',
-  },
-]
-
-const testimonials = [
-  {
-    name: 'María González',
-    role: 'Dueña de tienda de indumentaria',
-    text: 'Antes manejaba todo en Excel y siempre había errores de stock. Con Axios tengo todo en un lugar y mi equipo trabaja mucho más ordenado.',
-    stars: 5,
-  },
-  {
-    name: 'Carlos Martínez',
-    role: 'Gerente de distribuidora',
-    text: 'La gestión multi sucursal es exactamente lo que necesitábamos. Podemos transferir stock entre depósitos y ver todo en tiempo real.',
-    stars: 5,
-  },
-  {
-    name: 'Laura Fernández',
-    role: 'Emprendedora online',
-    text: 'Empecé con el plan Starter y en tres meses ya superé mis expectativas de ventas. La tienda online se configura muy fácil.',
-    stars: 5,
   },
 ]
 
