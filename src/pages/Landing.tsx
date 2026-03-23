@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import {
   ArrowRight,
   BarChart3,
@@ -188,20 +189,75 @@ function ImagePlaceholder({
   className = '',
   label = 'Imagen de pantalla',
   aspectRatio = 'aspect-video',
+  url,
 }: {
   className?: string
   label?: string
   aspectRatio?: string
+  url?: string
 }) {
   return (
     <div
-      className={`relative flex items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-zinc-300 bg-zinc-100 ${aspectRatio} ${className}`}
+      className={`relative overflow-hidden rounded-xl border-2 border-  border-[1px] border-zinc-300 bg-zinc-100 ${aspectRatio} ${className}`}
     >
-      <div className="flex flex-col items-center gap-2 text-center text-zinc-400">
-        <ImageIcon className="h-8 w-8" />
-        <span className="text-xs font-medium">{label}</span>
-        <span className="text-[10px] text-zinc-300">Recomendado: 1280×720px</span>
-      </div>
+      {url ? (
+        <img src={url} alt={label} className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center text-zinc-400">
+          <ImageIcon className="h-6 w-6" />
+          <span className="text-xs font-medium">{label}</span>
+          <span className="text-[10px] text-zinc-300">Recomendado: 1280×720px</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Carousel component for multiple images with smooth crossfade
+function ImageCarousel({
+  className = '',
+  urls,
+  aspectRatio = 'aspect-video',
+  interval = 3500,
+}: {
+  className?: string
+  urls: string[]
+  aspectRatio?: string
+  interval?: number
+}) {
+  const [current, setCurrent] = useState(0)
+
+  useEffect(() => {
+    if (urls.length <= 1) return
+    const timer = window.setInterval(() => {
+      setCurrent((prev) => (prev + 1) % urls.length)
+    }, interval)
+    return () => window.clearInterval(timer)
+  }, [urls.length, interval])
+
+  return (
+    <div className={`relative overflow-hidden rounded-xl ${aspectRatio} ${className}`}>
+      {urls.map((url, index) => (
+        <img
+          key={url}
+          src={url}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover transition-opacity duration-[1200ms]"
+          style={{ opacity: index === current ? 1 : 0 }}
+        />
+      ))}
+      {urls.length > 1 && (
+        <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1.5">
+          {urls.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => setCurrent(index)}
+              className={`h-1.5 rounded-full transition-all duration-300 ${index === current ? 'w-4 bg-white' : 'w-1.5 bg-white/50'
+                }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -287,13 +343,15 @@ export function Landing() {
                 Tienda online, inventario multi sucursal, caja, órdenes, clientes y reportes. Todo conectado para que vendas más y operes sin caos.
               </p>
               <div className="mt-8 flex flex-wrap gap-4">
-                <Link
-                  to="/planes"
+                <a
+                  href="https://wa.me/59898157459?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20Axios"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3.5 text-sm font-bold text-white hover:bg-red-500 transition-colors shadow-lg shadow-red-600/25"
                 >
                   Probar 14 días gratis
                   <ArrowRight className="h-4 w-4" />
-                </Link>
+                </a>
                 <Link
                   to="/login"
                   className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/60 px-6 py-3.5 text-sm font-bold text-zinc-200 hover:bg-zinc-700 transition-colors"
@@ -326,10 +384,11 @@ export function Landing() {
             <div className="relative">
               <div className="absolute -inset-4 rounded-3xl bg-red-600/5 blur-2xl" />
               <div className="relative">
-                <ImagePlaceholder
-                  label="Screenshot del panel de administración"
-                  aspectRatio="aspect-[4/3]"
-                  className="border-zinc-700 bg-zinc-800/60 shadow-2xl shadow-black/40"
+
+                <ImageCarousel
+                  urls={['/adminPanel3.png']}
+                  aspectRatio="aspect-video"
+                  interval={3500}
                 />
                 {/* Badge flotante */}
                 <div className="absolute -bottom-4 -left-4 flex items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 shadow-xl">
@@ -386,6 +445,8 @@ export function Landing() {
                 <ImagePlaceholder
                   label="Imagen: caos sin sistema / antes vs después"
                   aspectRatio="aspect-[16/7]"
+                  
+                  url='/papervsadmin.png'
                 />
               </div>
             </div>
@@ -458,24 +519,30 @@ export function Landing() {
                   </li>
                 ))}
               </ul>
-              <Link to="/products" className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 hover:text-red-500 transition-colors">
+              <a href="https://axiostock.com/minegocio" target="_blank" rel="noopener noreferrer" className="mt-6 inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 hover:text-red-500 transition-colors">
                 Ver tienda demo <ArrowRight className="h-4 w-4" />
-              </Link>
+              </a>
             </div>
-            <ImagePlaceholder
-              label="Screenshot: Tienda online / catálogo público"
-              aspectRatio="aspect-[4/3]"
-              className="shadow-lg"
-            />
+  
+                <ImageCarousel
+                  aspectRatio="aspect-video"
+                  urls={['/homeFerreteria.png', '/productosFerreteria.png', '/cartFerreteria.png']}
+                  interval={3500}
+                />
           </div>
 
           {/* Feature highlight 2: inventario */}
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-center">
-            <ImagePlaceholder
-              label="Screenshot: Panel de inventario multi sucursal"
-              aspectRatio="aspect-[4/3]"
-              className="shadow-lg md:order-1"
-            />
+            <div className="relative overflow-hidden rounded-xl shadow-lg aspect-[4/3] md:order-1">
+              <video
+                src="/inventoryLanding.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            </div>
             <div className="md:order-2">
               <span className="inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
                 Inventario
@@ -518,8 +585,8 @@ export function Landing() {
                 ))}
               </ul>
             </div>
-            <ImagePlaceholder
-              label="Screenshot: Dashboard de reportes y analítica"
+            <ImageCarousel
+              urls={['/reporteClientes.png', '/reporteVentas.png', '/reporteFinanzas.png']}
               aspectRatio="aspect-[4/3]"
               className="shadow-lg"
             />
@@ -592,9 +659,9 @@ export function Landing() {
           </div>
 
           {/* Video del flujo */}
-          <div className="mt-14 mx-auto max-w-3xl">
+          {/* <div className="mt-14 mx-auto max-w-3xl">
             <VideoPlaceholder label="Video: recorrido del flujo completo de ventas" />
-          </div>
+          </div> */}
         </div>
       </section>
 
@@ -617,11 +684,6 @@ export function Landing() {
                 key={profile.title}
                 className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
               >
-                <ImagePlaceholder
-                  label={`Imagen: ${profile.title}`}
-                  aspectRatio="aspect-[16/7]"
-                  className="rounded-none border-0 border-b"
-                />
                 <div className="p-6">
                   <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${profile.iconBg}`}>
                     <Icon className={`h-5 w-5 ${profile.iconColor}`} />
@@ -635,8 +697,46 @@ export function Landing() {
         </div>
       </section>
 
+      {/* MODULES VISUAL */}
+      <section className="bg-zinc-50 border-y border-zinc-200 py-16 md:py-24">
+        <div className="container-custom">
+          <div className="mb-12 text-center">
+            <p className="text-sm font-bold uppercase tracking-widest text-red-600">Todo en uno</p>
+            <h2 className="mt-3 text-3xl font-bold text-zinc-900 md:text-4xl">
+              Tres módulos, una sola plataforma
+            </h2>
+            <p className="mt-4 text-zinc-500 max-w-xl mx-auto">
+              Configurá tu negocio, gestioná desde el panel administrativo y vendé en tu tienda online.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+            <div className="flex flex-col items-center rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
+              <img src="/undrawSettings.svg" alt="Configuración" className="h-40 w-auto object-contain mb-6" />
+              <h3 className="text-lg font-semibold text-zinc-900">Configuración</h3>
+              <p className="mt-2 text-sm text-zinc-500 leading-relaxed">
+                Personalizá tu tienda, métodos de pago, sucursales y permisos de usuarios en minutos.
+              </p>
+            </div>
+            <div className="flex flex-col items-center rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
+              <img src="/undrowAdminPanel.svg" alt="Panel administrativo" className="h-40 w-auto object-contain mb-6" />
+              <h3 className="text-lg font-semibold text-zinc-900">Panel administrativo</h3>
+              <p className="mt-2 text-sm text-zinc-500 leading-relaxed">
+                Controlá órdenes, inventario, reportes financieros y punto de venta desde un solo lugar.
+              </p>
+            </div>
+            <div className="flex flex-col items-center rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm text-center">
+              <img src="/undrowStore.svg" alt="Tienda online" className="h-40 w-auto object-contain mb-6" />
+              <h3 className="text-lg font-semibold text-zinc-900">Tienda online</h3>
+              <p className="mt-2 text-sm text-zinc-500 leading-relaxed">
+                Tu catálogo disponible 24/7 con carrito, checkout y gestión de pedidos automática.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* TESTIMONIALS */}
-      <section id="testimonials" className="bg-zinc-50 border-y border-zinc-200">
+      {/* <section id="testimonials" className="bg-zinc-50 border-y border-zinc-200">
         <div className="container-custom py-16 md:py-24">
           <div className="mb-12 text-center">
             <p className="text-sm font-bold uppercase tracking-widest text-red-600">Testimonios</p>
@@ -655,7 +755,7 @@ export function Landing() {
                 </div>
                 <p className="mt-4 text-sm text-zinc-600 leading-relaxed italic">"{t.text}"</p>
                 <div className="mt-5 flex items-center gap-3">
-                  {/* Avatar placeholder */}
+                  
                   <div className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-zinc-100">
                     <Users className="h-4 w-4 text-zinc-400" />
                   </div>
@@ -668,7 +768,6 @@ export function Landing() {
             ))}
           </div>
 
-          {/* Logos de clientes placeholder */}
           <div className="mt-14">
             <p className="text-center text-xs font-semibold uppercase tracking-widest text-zinc-400 mb-6">
               Empresas que confían en Axios
@@ -685,7 +784,7 @@ export function Landing() {
             </div>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* PLANS */}
       <section id="plans" className="container-custom py-16 md:py-24">
@@ -723,12 +822,14 @@ export function Landing() {
                 </li>
               ))}
             </ul>
-            <Link
-              to="/login"
+            <a
+              href="https://wa.me/59898157459?text=Hola%2C%20quiero%20empezar%20con%20el%20plan%20Starter"
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-8 inline-flex w-full items-center justify-center rounded-lg border border-zinc-300 bg-white px-6 py-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 transition-colors"
             >
               Comenzar con Starter
-            </Link>
+            </a>
           </div>
 
           {/* PROFESIONAL */}
@@ -751,12 +852,14 @@ export function Landing() {
                 </li>
               ))}
             </ul>
-            <Link
-              to="/login"
+            <a
+              href="https://wa.me/59898157459?text=Hola%2C%20quiero%20empezar%20con%20el%20plan%20Profesional"
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-8 inline-flex w-full items-center justify-center rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white hover:bg-red-500 transition-colors shadow-md shadow-red-600/30"
             >
               Comenzar con Profesional
-            </Link>
+            </a>
           </div>
         </div>
       </section>
@@ -766,9 +869,6 @@ export function Landing() {
         <div className="container-custom py-20 md:py-28 text-center">
           <div className="mx-auto max-w-2xl">
             {/* Logo centrado */}
-            <div className="mb-6 flex justify-center">
-              <img src="/logo1.png" alt="Axios" className="h-16 w-auto brightness-0 invert opacity-80" />
-            </div>
             <h2 className="text-3xl font-extrabold md:text-5xl leading-tight">
               Tu negocio merece operar{' '}
               <span className="text-red-500">con orden y datos reales</span>
@@ -778,18 +878,22 @@ export function Landing() {
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <Link
-                to="/products"
+                to="https://axiostock.com/minegocio"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-7 py-3.5 text-sm font-bold text-white hover:bg-red-500 transition-colors shadow-lg shadow-red-600/25"
               >
                 Ver la tienda demo
                 <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link
-                to="/login"
+              <a
+                href="https://wa.me/59898157459?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20Axios"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/60 px-7 py-3.5 text-sm font-bold text-zinc-200 hover:bg-zinc-700 transition-colors"
               >
-                Acceder al panel
-              </Link>
+                Contactar por WhatsApp
+              </a>
             </div>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-xs text-zinc-500">
               {['Sin tarjeta requerida', 'Configuración en minutos', 'Soporte incluido'].map((item) => (
@@ -838,12 +942,18 @@ export function Landing() {
                 ))}
               </ul>
             </div>
-            {/* Contact placeholder */}
+            {/* Contact */}
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-zinc-600 mb-4">Contacto</p>
-              <div className="space-y-2 rounded-xl border border-dashed border-zinc-700 p-4">
-                <p className="text-xs text-zinc-500">Agregá aquí tu email, WhatsApp o redes sociales</p>
-                <p className="text-xs text-zinc-600">Ej: hola@axios.com.ar</p>
+              <div className="space-y-2">
+                <a
+                  href="https://wa.me/59898157459?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20Axios"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors"
+                >
+                  WhatsApp: +598 98 157 459
+                </a>
               </div>
             </div>
           </div>

@@ -55,7 +55,7 @@ export function AdminPlans() {
     const params = new URLSearchParams(location.search)
     return params.get('from') || location.pathname
   }, [location.pathname, location.search])
-  const whatsappNumber = '59898257909'
+  const whatsappNumber = '59898157459'
 
   const handleChooseProfessional = () => {
     const message = encodeURIComponent(

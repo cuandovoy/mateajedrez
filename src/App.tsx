@@ -35,6 +35,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { Landing } from './pages/Landing'
 
 function ReportsRouteGuard({ children }: { children: JSX.Element }) {
   const { canUseFeature } = usePlanLimits()
@@ -69,6 +70,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/landing/app" element={<Landing />} />
 
         {/* Rutas públicas de tienda por slug */}
         <Route element={<PublicStoreWrapper />}>
