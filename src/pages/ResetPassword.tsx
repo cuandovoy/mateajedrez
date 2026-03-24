@@ -20,15 +20,6 @@ const resetSchema = z
 
 type ResetForm = z.infer<typeof resetSchema>
 
-function getHashParams(): Record<string, string> {
-  const hash = window.location.hash?.slice(1) || ''
-  return hash.split('&').reduce((acc, pair) => {
-    const [k, v] = pair.split('=')
-    if (k && v) acc[decodeURIComponent(k)] = decodeURIComponent(v)
-    return acc
-  }, {} as Record<string, string>)
-}
-
 export function ResetPassword() {
   const navigate = useNavigate()
   const [hasValidRecovery, setHasValidRecovery] = useState<boolean | null>(null)
@@ -39,9 +30,23 @@ export function ResetPassword() {
   }, [])
 
   useEffect(() => {
-    const params = getHashParams()
-    const type = params.type
-    setHasValidRecovery(type === 'recovery')
+    // Escuchar el evento PASSWORD_RECOVERY que Supabase dispara
+    // automáticamente al detectar y procesar el token en la URL (flujo PKCE o implicit)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setHasValidRecovery(true)
+      }
+    })
+
+    // Fallback: si tras 3 segundos no hubo evento, el enlace es inválido/expirado
+    const timeout = setTimeout(() => {
+      setHasValidRecovery((prev) => (prev === null ? false : prev))
+    }, 3000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
   }, [])
 
   const {
