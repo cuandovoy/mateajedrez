@@ -115,9 +115,9 @@ const starterFeatures = [
   { text: 'Gestión de órdenes', included: true },
   { text: 'Caja registradora', included: true },
   { text: 'Gestión de clientes', included: true },
+  { text: 'Config. de notificaciones', included: true },
   { text: 'Transferencias entre sucursales', included: false },
   { text: 'Reportes avanzados', included: false },
-  { text: 'Config. de notificaciones', included: false },
 ]
 
 const proFeatures = [
@@ -129,7 +129,6 @@ const proFeatures = [
   { text: 'Gestión de clientes', included: true },
   { text: 'Transferencias entre sucursales', included: true },
   { text: 'Reportes avanzados', included: true },
-  { text: 'Config. de notificaciones', included: true },
 ]
 
 const clientProfiles = [
@@ -418,10 +417,10 @@ export function Landing() {
               </p>
               <div className="mt-6">
                 <ImagePlaceholder
-                  label="Imagen: caos sin sistema / antes vs después"
+                  label="Comparativa de dolores sin sistema vs con Axios"
                   aspectRatio="aspect-[16/7]"
                   
-                  url='/papervsadmin.png'
+                  url='/comparativaDolor.png'
                 />
               </div>
             </div>
@@ -784,7 +783,7 @@ export function Landing() {
               <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Starter</p>
               <h3 className="mt-2 text-2xl font-bold text-zinc-900">Para arrancar</h3>
               <div className="mt-3 flex items-end gap-1">
-                <span className="text-4xl font-extrabold text-zinc-900">$2.100</span>
+                <span className="text-4xl font-extrabold text-zinc-900">$1.990</span>
                 <span className="mb-1 text-sm text-zinc-400">UYU / mes</span>
               </div>
               <p className="mt-2 text-sm text-zinc-500">
@@ -824,7 +823,7 @@ export function Landing() {
               <p className="text-xs font-bold uppercase tracking-widest text-red-400">Profesional</p>
               <h3 className="mt-2 text-2xl font-bold text-white">Para escalar</h3>
               <div className="mt-3 flex items-end gap-1">
-                <span className="text-4xl font-extrabold text-white">$3.200</span>
+                <span className="text-4xl font-extrabold text-white">$2.890</span>
                 <span className="mb-1 text-sm text-zinc-400">UYU / mes</span>
               </div>
               <p className="mt-2 text-sm text-zinc-400">
