@@ -9,7 +9,6 @@ import {
   Globe,
   ImageIcon,
   Package,
-  Play,
   Shield,
   ShieldCheck,
   ShoppingBag,
@@ -239,30 +238,30 @@ function ImageCarousel({
 }
 
 // Placeholder component for video
-function VideoPlaceholder({
-  className = '',
-  label = 'Video demo',
-}: {
-  className?: string
-  label?: string
-}) {
-  return (
-    <div
-      className={`group relative flex cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-zinc-300 bg-gradient-to-br from-zinc-100 to-zinc-200 aspect-video ${className}`}
-    >
-      <div className="flex flex-col items-center gap-3 text-center text-zinc-400">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-zinc-300 bg-white shadow-sm transition-transform group-hover:scale-105">
-          <Play className="h-7 w-7 translate-x-0.5 text-zinc-500" />
-        </div>
-        <div>
-          <span className="block text-sm font-semibold text-zinc-500">{label}</span>
-          <span className="text-xs text-zinc-400">Agregá tu video de YouTube o Vimeo aquí</span>
-        </div>
-      </div>
-      <div className="absolute inset-0 rounded-2xl ring-2 ring-inset ring-transparent transition group-hover:ring-red-300" />
-    </div>
-  )
-}
+// function VideoPlaceholder({
+//   className = '',
+//   label = 'Video demo',
+// }: {
+//   className?: string
+//   label?: string
+// }) {
+//   return (
+//     <div
+//       className={`group relative flex cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-zinc-300 bg-gradient-to-br from-zinc-100 to-zinc-200 aspect-video ${className}`}
+//     >
+//       <div className="flex flex-col items-center gap-3 text-center text-zinc-400">
+//         <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-zinc-300 bg-white shadow-sm transition-transform group-hover:scale-105">
+//           <Play className="h-7 w-7 translate-x-0.5 text-zinc-500" />
+//         </div>
+//         <div>
+//           <span className="block text-sm font-semibold text-zinc-500">{label}</span>
+//           <span className="text-xs text-zinc-400">Agregá tu video de YouTube o Vimeo aquí</span>
+//         </div>
+//       </div>
+//       <div className="absolute inset-0 rounded-2xl ring-2 ring-inset ring-transparent transition group-hover:ring-red-300" />
+//     </div>
+//   )
+// }
 
 export function Landing() {
   return (
