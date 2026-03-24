@@ -107,12 +107,14 @@ export function Login() {
                 <Input
                   label="Email"
                   type="email"
+                  placeholder="tu@email.com"
                   {...register('email')}
                   error={errors.email?.message}
                 />
                 <Input
                   label="Contraseña"
                   type="password"
+                  placeholder="••••••••"
                   {...register('password')}
                   error={errors.password?.message}
                 />

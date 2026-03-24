@@ -103,6 +103,7 @@ export function ForgotPassword() {
                   <Input
                     label="Email"
                     type="email"
+                    placeholder="tu@email.com"
                     {...register('email')}
                     error={errors.email?.message}
                   />
@@ -111,7 +112,7 @@ export function ForgotPassword() {
                   </Button>
                   <Link
                     to="/login"
-                    className="block w-full text-center text-gray-600 hover:text-gray-900 text-sm mt-2"
+                    className="block w-full text-center text-admin-600 hover:text-admin-700 font-medium text-sm mt-2"
                   >
                     Volver al inicio de sesión
                   </Link>

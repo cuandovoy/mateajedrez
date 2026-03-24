@@ -22,7 +22,15 @@
 
     <!-- PWA / Web App Manifest -->
     <link rel="manifest" href="/manifest.webmanifest" />
-    
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Axios" />
+    <meta name="application-name" content="Axios Stock" />
+    <meta name="msapplication-starturl" content="/" />
+    <meta name="msapplication-task" content="name=Admin Panel;action-uri=/admin;icon-uri=/logo3.png" />
+    <meta name="msapplication-task" content="name=Tienda Online;action-uri=/store;icon-uri=/logo2.png" />
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Axios - Panel de Administración" />
@@ -72,6 +80,23 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- Service Worker Registration -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker
+            .register('/sw.js')
+            .then((reg) => {
+              console.log('Service Worker registrado:', reg);
+            })
+            .catch((err) => {
+              console.log('Service Worker registration error:', err);
+            });
+        });
+      }
+    </script>
+
     <script type="text/javascript">
     (function(c,l,a,r,i,t,y){
         c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
