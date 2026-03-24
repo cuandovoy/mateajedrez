@@ -442,7 +442,7 @@ export function Landing() {
       </section>
 
       {/* DEMO VIDEO */}
-      <section id="demo" className="bg-[#12192C] text-white">
+      {/* <section id="demo" className="bg-[#12192C] text-white">
         <div className="container-custom py-16 md:py-24">
           <div className="mb-10 text-center">
             <p className="text-sm font-bold uppercase tracking-widest text-red-400">Demo</p>
@@ -460,7 +460,7 @@ export function Landing() {
             </p>
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* FEATURES */}
       <section id="features" className="container-custom py-16 md:py-24">

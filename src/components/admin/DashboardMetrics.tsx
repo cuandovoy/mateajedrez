@@ -1,3 +1,35 @@
+// Convierte una fecha al string YYYY-MM-DD en la timezone de la organización
+const toOrgDateKey = (date: Date, tz: string): string => {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const p = Object.fromEntries(parts.map((x) => [x.type, x.value]))
+  return `${p.year}-${p.month}-${p.day}`
+}
+
+// Retorna el offset UTC de la timezone de la org como "+HH:MM" / "-HH:MM" para Supabase
+const orgTzOffset = (date: Date, tz: string): string => {
+  // Usa Intl para obtener el offset real incluyendo DST
+  const utcMs = date.getTime()
+  const localMs = new Date(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false,
+    }).format(date).replace(/(\d+)\/(\d+)\/(\d+),\s(\d+):(\d+):(\d+)/, '$3-$1-$2T$4:$5:$6')
+  ).getTime()
+  const diffMin = Math.round((localMs - utcMs) / 60000)
+  const sign = diffMin >= 0 ? '+' : '-'
+  const abs = Math.abs(diffMin)
+  const h = String(Math.floor(abs / 60)).padStart(2, '0')
+  const m = String(abs % 60).padStart(2, '0')
+  return `${sign}${h}:${m}`
+}
+
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
@@ -30,7 +62,7 @@ interface Metrics {
   // Previous-period equivalents for delta
   prevMonthRevenue: number
   prevMonthOrders: number
-  prevMonthTodayRevenue: number // yesterday's revenue
+  yesterdayRevenue: number
   prevMonthAverageOrderValue: number
 }
 
@@ -41,7 +73,7 @@ interface DailyPoint {
 }
 
 
-function MiniBarChart({ data }: { data: DailyPoint[] }) {
+function MiniBarChart({ data, timezone }: { data: DailyPoint[]; timezone: string }) {
   if (data.length === 0) return null
   const maxRevenue = Math.max(...data.map((d) => d.revenue), 1)
 
@@ -50,7 +82,7 @@ function MiniBarChart({ data }: { data: DailyPoint[] }) {
       <div className="flex items-end justify-between gap-1 h-20">
         {data.map((d) => {
           const heightPct = (d.revenue / maxRevenue) * 100
-          const isToday = d.date === new Date().toISOString().split('T')[0]
+          const isToday = d.date === toOrgDateKey(new Date(), timezone)
           return (
             <div
               key={d.date}
@@ -89,7 +121,7 @@ export function DashboardMetrics() {
     averageOrderValue: 0,
     prevMonthRevenue: 0,
     prevMonthOrders: 0,
-    prevMonthTodayRevenue: 0,
+    yesterdayRevenue: 0,
     prevMonthAverageOrderValue: 0,
   })
   const [dailyData, setDailyData] = useState<DailyPoint[]>([])
@@ -103,27 +135,40 @@ export function DashboardMetrics() {
     if (!organizationId) return
     try {
       const now = new Date()
-      const todayStr = now.toISOString().split('T')[0]
+      const tz = (settings.timezone as string | undefined) ?? 'America/Montevideo'
+      const tzOffset = orgTzOffset(now, tz)
 
-      // Yesterday
+      // Fechas en la timezone de la org (no UTC, no browser)
+      const todayStr = toOrgDateKey(now, tz)
+
       const yesterday = new Date(now)
       yesterday.setDate(yesterday.getDate() - 1)
-      const yesterdayStr = yesterday.toISOString().split('T')[0]
+      const yesterdayStr = toOrgDateKey(yesterday, tz)
 
-      // This month range
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-      const monthStartStr = monthStart.toISOString().split('T')[0]
+      // Primer día del mes actual en la tz de la org
+      // Tomamos el año/mes del "hoy" en la org timezone
+      const [todayYear, todayMonth] = todayStr.split('-').map(Number)
+      const monthStartStr = `${todayYear}-${String(todayMonth).padStart(2, '0')}-01`
 
-      // Previous month range (same day span to be fair)
-      const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-      const prevMonthEnd = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-      const prevMonthStartStr = prevMonthStart.toISOString().split('T')[0]
-      const prevMonthEndStr = prevMonthEnd.toISOString().split('T')[0]
+      // Mes anterior — mismo span de días, sin overflow de mes corto
+      const todayDay = parseInt(todayStr.split('-')[2])
+      const prevMonthDate = new Date(now)
+      prevMonthDate.setMonth(prevMonthDate.getMonth() - 1)
+      const lastDayOfPrevMonth = new Date(todayYear, todayMonth - 1, 0).getDate()
+      const prevMonthDay = Math.min(todayDay, lastDayOfPrevMonth)
+      const prevMonthYear = todayMonth === 1 ? todayYear - 1 : todayYear
+      const prevMonthNum = todayMonth === 1 ? 12 : todayMonth - 1
+      const prevMonthStartStr = `${prevMonthYear}-${String(prevMonthNum).padStart(2, '0')}-01`
+      const prevMonthEndStr = `${prevMonthYear}-${String(prevMonthNum).padStart(2, '0')}-${String(prevMonthDay).padStart(2, '0')}`
 
-      // Last 14 days for chart
+      // Últimos 14 días para el gráfico
       const fourteenDaysAgo = new Date(now)
       fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 13)
-      const fourteenDaysAgoStr = fourteenDaysAgo.toISOString().split('T')[0]
+      const fourteenDaysAgoStr = toOrgDateKey(fourteenDaysAgo, tz)
+
+      // Supabase almacena en UTC — incluir offset para que el filtro sea exacto
+      const startOf = (dateStr: string) => `${dateStr}T00:00:00${tzOffset}`
+      const endOf   = (dateStr: string) => `${dateStr}T23:59:59${tzOffset}`
 
       const [
         ordersResult,
@@ -143,7 +188,7 @@ export function DashboardMetrics() {
           .select('total, status')
           .eq('organization_id', organizationId)
           .in('status', ['delivered', 'shipped', 'processing'])
-          .gte('created_at', `${monthStartStr}T00:00:00`),
+          .gte('created_at', startOf(monthStartStr)),
         supabase
           .from('products')
           .select('id, stock')
@@ -176,30 +221,30 @@ export function DashboardMetrics() {
           .select('total')
           .eq('organization_id', organizationId)
           .in('status', ['delivered', 'shipped', 'processing'])
-          .gte('created_at', `${todayStr}T00:00:00`),
-        // Yesterday's revenue (for day delta)
+          .gte('created_at', startOf(todayStr)),
+        // Yesterday's revenue (for "vs ayer" delta)
         supabase
           .from('orders')
           .select('total')
           .eq('organization_id', organizationId)
           .in('status', ['delivered', 'shipped', 'processing'])
-          .gte('created_at', `${yesterdayStr}T00:00:00`)
-          .lt('created_at', `${todayStr}T00:00:00`),
-        // Previous month same period
+          .gte('created_at', startOf(yesterdayStr))
+          .lte('created_at', endOf(yesterdayStr)),
+        // Previous month same period (1st to same day of month)
         supabase
           .from('orders')
           .select('total, status')
           .eq('organization_id', organizationId)
           .in('status', ['delivered', 'shipped', 'processing'])
-          .gte('created_at', `${prevMonthStartStr}T00:00:00`)
-          .lte('created_at', `${prevMonthEndStr}T23:59:59`),
+          .gte('created_at', startOf(prevMonthStartStr))
+          .lte('created_at', endOf(prevMonthEndStr)),
         // Last 14 days for chart
         supabase
           .from('orders')
           .select('total, created_at')
           .eq('organization_id', organizationId)
           .in('status', ['delivered', 'shipped', 'processing'])
-          .gte('created_at', `${fourteenDaysAgoStr}T00:00:00`)
+          .gte('created_at', startOf(fourteenDaysAgoStr))
           .order('created_at', { ascending: true }),
       ])
 
@@ -214,10 +259,10 @@ export function DashboardMetrics() {
       const todayRevenue = (todayOrdersResult.data as Array<{ total: number }> | null)?.reduce((sum, o) => sum + o.total, 0) || 0
       const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0
 
-      // Previous month
+      // Previous month / yesterday
       const prevMonthRevenue = (prevMonthOrdersResult.data as Array<{ total: number }> | null)?.reduce((sum, o) => sum + o.total, 0) || 0
       const prevMonthOrders = (prevMonthOrdersResult.data as Array<{ total: number }> | null)?.length || 0
-      const prevMonthTodayRevenue = (yesterdayOrdersResult.data as Array<{ total: number }> | null)?.reduce((sum, o) => sum + o.total, 0) || 0
+      const yesterdayRevenue = (yesterdayOrdersResult.data as Array<{ total: number }> | null)?.reduce((sum, o) => sum + o.total, 0) || 0
       const prevMonthAverageOrderValue = prevMonthOrders > 0 ? prevMonthRevenue / prevMonthOrders : 0
 
       setMetrics({
@@ -231,22 +276,23 @@ export function DashboardMetrics() {
         averageOrderValue,
         prevMonthRevenue,
         prevMonthOrders,
-        prevMonthTodayRevenue,
+        yesterdayRevenue,
         prevMonthAverageOrderValue,
       })
 
-      // Build daily chart data
+      // Build daily chart data — bucket por fecha en tz de la org
       const dayMap = new Map<string, DailyPoint>()
       for (let i = 0; i < 14; i++) {
         const d = new Date(fourteenDaysAgo)
         d.setDate(d.getDate() + i)
-        const key = d.toISOString().split('T')[0]
+        const key = toOrgDateKey(d, tz)
         dayMap.set(key, { date: key, revenue: 0, orders: 0 })
       }
       ;(recentOrdersResult.data || []).forEach((o: { total: number; created_at: string | null }) => {
         if (!o.created_at) return
-        const key = o.created_at.split('T')[0]
-        const pt = dayMap.get(key)
+        // Convertir timestamp UTC a fecha en la tz de la org
+        const orgKey = toOrgDateKey(new Date(o.created_at), tz)
+        const pt = dayMap.get(orgKey)
         if (pt) {
           pt.revenue += o.total
           pt.orders += 1
@@ -307,9 +353,9 @@ export function DashboardMetrics() {
       icon: TrendingUp,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
-      description: 'Ventas del día',
+      description: 'vs ayer',
       deltaCurrentValue: metrics.todayRevenue,
-      deltaPrevValue: metrics.prevMonthTodayRevenue,
+      deltaPrevValue: metrics.yesterdayRevenue,
     },
     {
       title: 'Órdenes del Mes',
@@ -455,7 +501,7 @@ export function DashboardMetrics() {
               Ver órdenes <ArrowRight className="h-3 w-3" />
             </button>
           </div>
-          <MiniBarChart data={dailyData} />
+          <MiniBarChart data={dailyData} timezone={(settings.timezone as string | undefined) ?? 'America/Montevideo'} />
         </CardContent>
       </Card>
     </div>
