@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AdminBreadcrumbs } from '@/components/admin/AdminBreadcrumbs'
+import { InstallBanner } from '@/components/admin/InstallBanner'
 import { ToastContainer } from './ToastContainer'
 import { CreateOrganizationModal } from '@/components/admin/CreateOrganizationModal'
 import { PermissionGate } from '@/components/features/PermissionGate'
@@ -492,6 +493,7 @@ export function AdminLayout() {
       />
 
       <ToastContainer />
+      <InstallBanner />
     </div>
   )
 }
