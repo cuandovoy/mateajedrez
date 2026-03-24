@@ -14,7 +14,7 @@ import {
   RefreshCw,
   User
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 
 type AuditLog = {
   id: string
@@ -89,6 +89,9 @@ export function AdminAuditLogs() {
     start_date: '',
     end_date: '',
   })
+  const [userEmailSearch, setUserEmailSearch] = useState('')
+  const [summarySearch, setSummarySearch] = useState('')
+  const [showAdvanced, setShowAdvanced] = useState(false)
   const pageSize = 50
 
   useEffect(() => {
@@ -152,8 +155,28 @@ export function AdminAuditLogs() {
       start_date: '',
       end_date: '',
     })
+    setUserEmailSearch('')
+    setSummarySearch('')
     setPage(1)
   }
+
+  const filteredLogs = useMemo(() => {
+    let result = logs
+    if (userEmailSearch.trim()) {
+      const term = userEmailSearch.trim().toLowerCase()
+      result = result.filter((l) => l.user_email?.toLowerCase().includes(term))
+    }
+    if (summarySearch.trim()) {
+      const term = summarySearch.trim().toLowerCase()
+      result = result.filter((l) => {
+        const summary = getChangeSummary(l).toLowerCase()
+        const fields = (l.changed_fields || []).join(' ').toLowerCase()
+        const notes = (l.notes || '').toLowerCase()
+        return summary.includes(term) || fields.includes(term) || notes.includes(term)
+      })
+    }
+    return result
+  }, [logs, userEmailSearch, summarySearch])
 
   const getActionColor = (action: string) => {
     switch (action) {
@@ -274,15 +297,15 @@ export function AdminAuditLogs() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tabla</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Módulo</label>
               <select
                 value={filters.table_name}
                 onChange={(e) => handleFilterChange('table_name', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
               >
-                <option value="">Todas</option>
+                <option value="">Todos los módulos</option>
                 {TABLE_NAMES.map((table) => (
                   <option key={table} value={table}>
                     {getTableDisplayName(table)}
@@ -298,7 +321,7 @@ export function AdminAuditLogs() {
                 onChange={(e) => handleFilterChange('action', e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
               >
-                <option value="">Todas</option>
+                <option value="">Todas las acciones</option>
                 {ACTIONS.map((action) => (
                   <option key={action} value={action}>
                     {getActionLabel(action)}
@@ -308,22 +331,22 @@ export function AdminAuditLogs() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">ID de Registro</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Buscar por usuario</label>
               <Input
                 type="text"
-                value={filters.record_id}
-                onChange={(e) => handleFilterChange('record_id', e.target.value)}
-                placeholder="UUID del registro"
+                value={userEmailSearch}
+                onChange={(e) => setUserEmailSearch(e.target.value)}
+                placeholder="Email del usuario"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">ID de Usuario</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Buscar en resumen</label>
               <Input
                 type="text"
-                value={filters.user_id}
-                onChange={(e) => handleFilterChange('user_id', e.target.value)}
-                placeholder="UUID del usuario"
+                value={summarySearch}
+                onChange={(e) => setSummarySearch(e.target.value)}
+                placeholder="Campos, notas..."
               />
             </div>
 
@@ -344,6 +367,39 @@ export function AdminAuditLogs() {
                 onChange={(e) => handleFilterChange('end_date', e.target.value)}
               />
             </div>
+          </div>
+
+          {/* Advanced filters (UUIDs) */}
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowAdvanced((v) => !v)}
+              className="text-xs text-gray-500 hover:text-gray-700 underline"
+            >
+              {showAdvanced ? 'Ocultar filtros avanzados' : 'Filtros avanzados (UUIDs)'}
+            </button>
+            {showAdvanced && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">ID de Registro (UUID)</label>
+                  <Input
+                    type="text"
+                    value={filters.record_id}
+                    onChange={(e) => handleFilterChange('record_id', e.target.value)}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">ID de Usuario (UUID)</label>
+                  <Input
+                    type="text"
+                    value={filters.user_id}
+                    onChange={(e) => handleFilterChange('user_id', e.target.value)}
+                    placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 flex justify-end">
@@ -367,7 +423,7 @@ export function AdminAuditLogs() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600"></div>
             </div>
-          ) : logs.length === 0 ? (
+          ) : filteredLogs.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No se encontraron registros de auditoría</p>
@@ -399,7 +455,7 @@ export function AdminAuditLogs() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {logs.map((log) => (
+                    {filteredLogs.map((log) => (
                       <tr key={log.id} className="hover:bg-gray-50">
                         <td className="px-4 py-3 text-sm text-gray-900">
                           {formatDateTime(log.created_at, settings)}

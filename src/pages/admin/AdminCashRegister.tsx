@@ -370,12 +370,16 @@ function AdminCashRegisterContent() {
         </div>
 
         {openSessions.length === 0 ? (
-          <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-12 text-center">
-            <DollarSign className="mx-auto h-10 w-10 text-gray-300 mb-3" />
-            <p className="text-gray-500 font-medium">No hay cajas abiertas en este momento</p>
-            <p className="text-gray-400 text-sm mt-1">Abrí una caja para comenzar a registrar ventas</p>
-            <Button className="mt-4" onClick={handleNew} size="sm">
-              <Plus className="h-4 w-4 mr-2" />
+          <div className="rounded-xl border-2 border-dashed border-gray-200 bg-gray-50 py-16 text-center px-6">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
+              <DollarSign className="h-8 w-8 text-gray-400" />
+            </div>
+            <p className="text-lg font-semibold text-gray-700">No hay cajas abiertas</p>
+            <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
+              Una sesión de caja te permite registrar ventas, cobros y hacer el cierre diario con el resumen de movimientos. Abrí una caja para comenzar.
+            </p>
+            <Button className="mt-6" onClick={handleNew} size="lg">
+              <Plus className="h-5 w-5 mr-2" />
               Abrir Caja
             </Button>
           </div>

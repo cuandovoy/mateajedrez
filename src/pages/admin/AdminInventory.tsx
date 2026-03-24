@@ -55,6 +55,13 @@ interface InventoryItem {
   source_stock: number | null
 }
 
+interface CrossViewRow {
+  product_id: string
+  product_name: string
+  sku: string | null
+  branchStocks: Record<string, { stock: number; min_stock: number; low_stock_threshold: number }>
+}
+
 type ProductImageRef = {
   image_url: string
   is_primary: boolean
@@ -101,6 +108,9 @@ export function AdminInventory() {
   const [transferModalItem, setTransferModalItem] = useState<InventoryItem | null>(null)
   const [movementsModalItem, setMovementsModalItem] = useState<InventoryItem | null>(null)
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
+  const [inventoryViewTab, setInventoryViewTab] = useState<'branch' | 'product'>('branch')
+  const [crossViewData, setCrossViewData] = useState<CrossViewRow[]>([])
+  const [crossViewLoading, setCrossViewLoading] = useState(false)
   const [filtersCollapsed, setFiltersCollapsed] = useState(false)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
@@ -537,6 +547,56 @@ export function AdminInventory() {
     } catch (error) {
       console.error('Error checking unsynced inventory items:', error)
       setUnsyncedCount(null)
+    }
+  }
+
+  const fetchCrossView = async () => {
+    if (!organizationId) return
+    setCrossViewLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('branch_inventory')
+        .select(`
+          product_id,
+          variant_id,
+          stock,
+          min_stock,
+          low_stock_threshold,
+          branch:branches!inner(id, name, organization_id),
+          product:products(id, name, sku)
+        `)
+        .eq('branches.organization_id', organizationId)
+        .is('variant_id', null) // Only base products for clarity
+        .not('product_id', 'is', null)
+
+      if (error) throw error
+
+      const rowMap = new Map<string, CrossViewRow>()
+      for (const item of data || []) {
+        const row = item as any
+        const productId = row.product_id as string
+        const branchId = row.branch?.id as string
+        if (!productId || !branchId) continue
+        if (!rowMap.has(productId)) {
+          rowMap.set(productId, {
+            product_id: productId,
+            product_name: row.product?.name || 'Producto',
+            sku: row.product?.sku || null,
+            branchStocks: {},
+          })
+        }
+        rowMap.get(productId)!.branchStocks[branchId] = {
+          stock: row.stock ?? 0,
+          min_stock: row.min_stock ?? 0,
+          low_stock_threshold: row.low_stock_threshold ?? 0,
+        }
+      }
+
+      setCrossViewData(Array.from(rowMap.values()).sort((a, b) => a.product_name.localeCompare(b.product_name)))
+    } catch (err) {
+      console.error('Error fetching cross-view inventory:', err)
+    } finally {
+      setCrossViewLoading(false)
     }
   }
 
@@ -1050,8 +1110,98 @@ export function AdminInventory() {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
+      {/* View tab toggle */}
+      <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit">
+        <button
+          type="button"
+          onClick={() => setInventoryViewTab('branch')}
+          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${inventoryViewTab === 'branch' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-800'}`}
+        >
+          Por sucursal
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setInventoryViewTab('product')
+            if (crossViewData.length === 0) fetchCrossView()
+          }}
+          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${inventoryViewTab === 'product' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-800'}`}
+        >
+          Por producto (cruzado)
+        </button>
+      </div>
+
+      {/* Cross-view table */}
+      {inventoryViewTab === 'product' && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Stock por producto en todas las sucursales
+            </CardTitle>
+            <Button variant="outline" size="sm" onClick={fetchCrossView} disabled={crossViewLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${crossViewLoading ? 'animate-spin' : ''}`} />
+              Actualizar
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {crossViewLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600" />
+              </div>
+            ) : crossViewData.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                <p>No hay datos de inventario disponibles</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs sticky left-0 bg-gray-50 z-10">Producto</th>
+                      <th className="px-3 py-3 text-left font-medium text-gray-500 uppercase text-xs">SKU</th>
+                      {branches.map((b) => (
+                        <th key={b.id} className="px-4 py-3 text-center font-medium text-gray-500 uppercase text-xs whitespace-nowrap">
+                          {b.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {crossViewData.map((row) => (
+                      <tr key={row.product_id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 font-medium text-gray-900 sticky left-0 bg-white max-w-[200px] truncate">
+                          {capitalizeFirst(row.product_name)}
+                        </td>
+                        <td className="px-3 py-3 text-gray-500 text-xs font-mono">{row.sku || '—'}</td>
+                        {branches.map((b) => {
+                          const cell = row.branchStocks[b.id]
+                          if (!cell) return (
+                            <td key={b.id} className="px-4 py-3 text-center text-gray-300">—</td>
+                          )
+                          const isLow = cell.stock <= (cell.low_stock_threshold || 0) || cell.stock <= (cell.min_stock || 0)
+                          const isOut = cell.stock === 0
+                          return (
+                            <td key={b.id} className="px-4 py-3 text-center">
+                              <span className={`inline-block min-w-[2.5rem] rounded-md px-2 py-0.5 text-sm font-semibold ${isOut ? 'bg-red-100 text-red-700' : isLow ? 'bg-yellow-100 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
+                                {cell.stock}
+                              </span>
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filters — only shown in branch view */}
+      {inventoryViewTab === 'branch' && <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3">
             <CardTitle className="text-base flex items-center space-x-2">
@@ -1179,10 +1329,10 @@ export function AdminInventory() {
             )}
           </CardContent>
         )}
-      </Card>
+      </Card>}
 
-      {/* Inventory Table */}
-      <Card>
+      {/* Inventory Table — only in branch view */}
+      {inventoryViewTab === 'branch' && <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Package className="h-5 w-5" />
@@ -1425,7 +1575,7 @@ export function AdminInventory() {
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Modals */}
       {receiptModalItem && (

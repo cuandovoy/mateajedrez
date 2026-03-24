@@ -118,7 +118,6 @@ const starterFeatures = [
   { text: 'Gestión de clientes', included: true },
   { text: 'Transferencias entre sucursales', included: false },
   { text: 'Reportes avanzados', included: false },
-  { text: 'Tienda personalizada', included: false },
   { text: 'Config. de notificaciones', included: false },
 ]
 
@@ -131,7 +130,6 @@ const proFeatures = [
   { text: 'Gestión de clientes', included: true },
   { text: 'Transferencias entre sucursales', included: true },
   { text: 'Reportes avanzados', included: true },
-  { text: 'Tienda personalizada', included: true },
   { text: 'Config. de notificaciones', included: true },
 ]
 
@@ -774,6 +772,10 @@ export function Landing() {
           <p className="mt-4 text-zinc-500 max-w-xl mx-auto">
             Dos planes diseñados para acompañar tu crecimiento desde el primer día.
           </p>
+          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-green-200 bg-green-50 px-5 py-2 text-sm font-semibold text-green-700">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-[10px] font-bold text-white">%</span>
+            Pagando anualmente — <span className="text-green-600">10% OFF</span>
+          </div>
         </div>
 
         <div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
@@ -782,6 +784,10 @@ export function Landing() {
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">Starter</p>
               <h3 className="mt-2 text-2xl font-bold text-zinc-900">Para arrancar</h3>
+              <div className="mt-3 flex items-end gap-1">
+                <span className="text-4xl font-extrabold text-zinc-900">$2.100</span>
+                <span className="mb-1 text-sm text-zinc-400">UYU / mes</span>
+              </div>
               <p className="mt-2 text-sm text-zinc-500">
                 Todo lo esencial para poner tu negocio en marcha con una sola sucursal.
               </p>
@@ -818,6 +824,10 @@ export function Landing() {
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-red-400">Profesional</p>
               <h3 className="mt-2 text-2xl font-bold text-white">Para escalar</h3>
+              <div className="mt-3 flex items-end gap-1">
+                <span className="text-4xl font-extrabold text-white">$3.200</span>
+                <span className="mb-1 text-sm text-zinc-400">UYU / mes</span>
+              </div>
               <p className="mt-2 text-sm text-zinc-400">
                 Sin límites de productos ni sucursales. Con reportes avanzados y tienda personalizada.
               </p>
@@ -855,15 +865,15 @@ export function Landing() {
               Dejá atrás las planillas y las herramientas desconectadas. Axios unifica todo en un sistema que crece con vos.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-              <Link
-                to="https://axiostock.com/minegocio"
+              <a
+                href="https://axiostock.com/minegocio"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-7 py-3.5 text-sm font-bold text-white hover:bg-red-500 transition-colors shadow-lg shadow-red-600/25"
               >
                 Ver la tienda demo
                 <ArrowRight className="h-4 w-4" />
-              </Link>
+              </a>
               <a
                 href="https://wa.me/59898157459?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20Axios"
                 target="_blank"
@@ -901,7 +911,7 @@ export function Landing() {
               <p className="text-xs font-semibold uppercase tracking-widest text-zinc-600 mb-4">Plataforma</p>
               <ul className="space-y-2">
                 {[
-                  { label: 'Ver tienda demo', to: '/products' },
+                  { label: 'Ver tienda demo', href: 'https://axiostock.com/minegocio' },
                   { label: 'Panel de administración', to: '/login' },
                   { label: 'Funcionalidades', href: '#features' },
                   { label: 'Planes', href: '#plans' },

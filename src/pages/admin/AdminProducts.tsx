@@ -110,6 +110,12 @@ function AdminProductsContent() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [filtersCollapsed, setFiltersCollapsed] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
+  const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
+  const [bulkAction, setBulkAction] = useState<'status' | 'category' | 'price' | null>(null)
+  const [bulkStatusValue, setBulkStatusValue] = useState<'active' | 'inactive'>('active')
+  const [bulkCategoryId, setBulkCategoryId] = useState('')
+  const [bulkPricePct, setBulkPricePct] = useState('')
+  const [bulkLoading, setBulkLoading] = useState(false)
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [filters, setFilters] = useState<ProductFilters>({
@@ -124,6 +130,15 @@ function AdminProductsContent() {
     sortDirection: 'desc',
   })
   const [appliedSearch, setAppliedSearch] = useState('')
+
+  // Auto-apply search with debounce (400ms) when user types
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(0)
+      setAppliedSearch(filters.search.trim())
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [filters.search])
 
   const {
     register,
@@ -817,6 +832,67 @@ function AdminProductsContent() {
     }
   }
 
+  const handleToggleSelect = (id: string) => {
+    setSelectedProductIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleSelectAll = (allSelected: boolean) => {
+    if (allSelected) {
+      setSelectedProductIds(new Set(paginatedProducts.map((p) => p.id)))
+    } else {
+      setSelectedProductIds(new Set())
+    }
+  }
+
+  const applyBulkAction = async () => {
+    if (!organizationId || selectedProductIds.size === 0 || !bulkAction) return
+    setBulkLoading(true)
+    try {
+      const ids = Array.from(selectedProductIds)
+      if (bulkAction === 'status') {
+        const { error } = await supabase
+          .from('products')
+          .update({ is_active: bulkStatusValue === 'active' })
+          .in('id', ids)
+          .eq('organization_id', organizationId)
+        if (error) throw error
+        show(`${ids.length} productos actualizados`, 'success')
+      } else if (bulkAction === 'category' && bulkCategoryId) {
+        const { error } = await supabase
+          .from('products')
+          .update({ category_id: bulkCategoryId })
+          .in('id', ids)
+          .eq('organization_id', organizationId)
+        if (error) throw error
+        show(`${ids.length} productos actualizados`, 'success')
+      } else if (bulkAction === 'price' && bulkPricePct) {
+        const pct = parseFloat(bulkPricePct)
+        if (isNaN(pct)) return
+        const factor = 1 + pct / 100
+        for (const id of ids) {
+          const product = products.find((p) => p.id === id)
+          if (!product) continue
+          const newPrice = Math.round(product.price * factor * 100) / 100
+          await supabase.from('products').update({ price: newPrice }).eq('id', id)
+        }
+        show(`Precio ajustado en ${pct > 0 ? '+' : ''}${pct}% para ${ids.length} productos`, 'success')
+      }
+      setSelectedProductIds(new Set())
+      setBulkAction(null)
+      setBulkPricePct('')
+      fetchProducts()
+    } catch (err: any) {
+      show(err?.message || 'Error al aplicar la acción masiva', 'error')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   const handleEdit = (product: ProductWithImages) => {
     setEditingProduct(product)
 
@@ -1343,9 +1419,83 @@ function AdminProductsContent() {
               onManageSuppliers={setSupplierManagerProduct}
               onAdjustInventory={goToInventoryAdjustment}
               getPrimaryImage={getPrimaryImage}
+              selectedIds={selectedProductIds}
+              onToggleSelect={handleToggleSelect}
+              onSelectAll={handleSelectAll}
             />
           </CardContent>
         </Card>
+      )}
+
+      {/* Floating bulk action bar */}
+      {selectedProductIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-2xl ring-1 ring-black/5">
+          <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
+            {selectedProductIds.size} {selectedProductIds.size === 1 ? 'producto' : 'productos'} seleccionado{selectedProductIds.size !== 1 ? 's' : ''}
+          </span>
+          <div className="h-5 w-px bg-gray-200" />
+          {/* Action selector */}
+          <select
+            value={bulkAction || ''}
+            onChange={(e) => setBulkAction((e.target.value as any) || null)}
+            className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-admin-500"
+          >
+            <option value="">Elegir acción…</option>
+            <option value="status">Cambiar estado</option>
+            <option value="category">Cambiar categoría</option>
+            <option value="price">Ajustar precio %</option>
+          </select>
+          {/* Contextual inputs */}
+          {bulkAction === 'status' && (
+            <select
+              value={bulkStatusValue}
+              onChange={(e) => setBulkStatusValue(e.target.value as 'active' | 'inactive')}
+              className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-admin-500"
+            >
+              <option value="active">Activo</option>
+              <option value="inactive">Inactivo</option>
+            </select>
+          )}
+          {bulkAction === 'category' && (
+            <select
+              value={bulkCategoryId}
+              onChange={(e) => setBulkCategoryId(e.target.value)}
+              className="text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-admin-500"
+            >
+              <option value="">Categoría…</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          )}
+          {bulkAction === 'price' && (
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                value={bulkPricePct}
+                onChange={(e) => setBulkPricePct(e.target.value)}
+                placeholder="ej: 10 o -5"
+                className="w-24 text-sm border border-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-admin-500"
+              />
+              <span className="text-sm text-gray-500">%</span>
+            </div>
+          )}
+          <Button
+            size="sm"
+            onClick={applyBulkAction}
+            disabled={!bulkAction || bulkLoading || (bulkAction === 'category' && !bulkCategoryId) || (bulkAction === 'price' && !bulkPricePct)}
+            isLoading={bulkLoading}
+          >
+            Aplicar
+          </Button>
+          <button
+            type="button"
+            onClick={() => { setSelectedProductIds(new Set()); setBulkAction(null) }}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            Cancelar
+          </button>
+        </div>
       )}
 
       {filteredProducts.length === 0 && !loading && (

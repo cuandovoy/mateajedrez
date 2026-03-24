@@ -8,8 +8,9 @@ import { supabase } from '@/lib/supabase'
 import { formatDateShort } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { Customer } from '@/types/database.types'
-import { Edit, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2 } from 'lucide-react'
+import { Edit, ExternalLink, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 interface CustomerForm {
   full_name: string
@@ -465,9 +466,13 @@ export function AdminCustomers() {
                       return (
                         <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
                           <td className="py-3 px-4">
-                            <div className="font-medium text-gray-900">
+                            <Link
+                              to={`/customers/${customer.id}`}
+                              className="font-medium text-gray-900 hover:text-admin-600 hover:underline inline-flex items-center gap-1"
+                            >
                               {customer.full_name}
-                            </div>
+                              <ExternalLink className="h-3 w-3 text-gray-400" />
+                            </Link>
                           </td>
                           <td className="py-3 px-4">
                             <div className="space-y-1 text-sm">

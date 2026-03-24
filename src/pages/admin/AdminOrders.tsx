@@ -57,6 +57,8 @@ type CustomerLite = {
 
 type ShippingAddressLite = {
   fullName?: string
+  full_name?: string
+  name?: string
   email?: string
   phone?: string
   address?: string
@@ -430,9 +432,11 @@ export function AdminOrders() {
                     {orders.map((order) => {
                       const collectionStatus = getCollectionStatus(order)
                       const shippingAddress = order.shipping_address as ShippingAddressLite
-                      const customerName = order.customer?.full_name || shippingAddress?.fullName || 'Cliente Invitado'
+                      const shippingName = shippingAddress?.fullName || shippingAddress?.full_name || shippingAddress?.name
+                      const customerName = order.customer?.full_name || shippingName || null
                       const customerEmail = order.customer?.email || shippingAddress?.email
                       const customerPhone = order.customer?.phone || shippingAddress?.phone
+                      const isGuest = !order.customer?.id && !!shippingName
                       return (
                         <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-4">
@@ -443,9 +447,16 @@ export function AdminOrders() {
                           </td>
                           <td className="py-3 px-4">
                             <div>
-                              <p className="font-medium text-gray-900">
-                                {customerName}
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-medium text-gray-900">
+                                  {customerName || 'Sin nombre'}
+                                </p>
+                                {isGuest && (
+                                  <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600">
+                                    Invitado
+                                  </span>
+                                )}
+                              </div>
                               {(customerEmail || customerPhone) && (
                                 <p className="text-sm text-gray-500">
                                   {[customerEmail, customerPhone].filter(Boolean).join(' · ')}

@@ -26,6 +26,9 @@ interface ProductTableProps {
   onManageSuppliers?: (product: Product) => void
   onAdjustInventory?: (product: Product) => void
   getPrimaryImage: (product: ProductWithCategory) => string | null
+  selectedIds?: Set<string>
+  onToggleSelect?: (id: string) => void
+  onSelectAll?: (allSelected: boolean) => void
 }
 
 export function ProductTable({
@@ -38,9 +41,14 @@ export function ProductTable({
   onManageSuppliers,
   onAdjustInventory,
   getPrimaryImage,
+  selectedIds,
+  onToggleSelect,
+  onSelectAll,
 }: ProductTableProps) {
   const settings = useOrgSettings()
   const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set())
+  const bulkEnabled = !!onToggleSelect
+  const allSelected = bulkEnabled && products.length > 0 && products.every((p) => selectedIds?.has(p.id))
 
   const toggleExpandedProduct = (productId: string) => {
     setExpandedProductIds((prev) => {
@@ -162,6 +170,16 @@ export function ProductTable({
       <table className="min-w-full divide-y divide-gray-200 bg-white">
         <thead className="bg-gray-50">
           <tr>
+            {bulkEnabled && (
+              <th className="px-4 py-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={(e) => onSelectAll?.(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                />
+              </th>
+            )}
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Imagen
             </th>
@@ -197,7 +215,17 @@ export function ProductTable({
             const isExpanded = expandedProductIds.has(product.id)
             return (
               <Fragment key={product.id}>
-              <tr className="hover:bg-gray-50 transition-colors">
+              <tr className={`hover:bg-gray-50 transition-colors ${selectedIds?.has(product.id) ? 'bg-admin-50' : ''}`}>
+                {bulkEnabled && (
+                  <td className="px-4 py-4 align-top">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds?.has(product.id) ?? false}
+                      onChange={() => onToggleSelect?.(product.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                    />
+                  </td>
+                )}
                 <td className="px-6 py-4 whitespace-nowrap align-top">
                   <div className="flex-shrink-0 h-12 w-12">
                     {primaryImage ? (
