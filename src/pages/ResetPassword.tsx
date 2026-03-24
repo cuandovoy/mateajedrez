@@ -30,23 +30,18 @@ export function ResetPassword() {
   }, [])
 
   useEffect(() => {
-    // Escuchar el evento PASSWORD_RECOVERY que Supabase dispara
-    // automáticamente al detectar y procesar el token en la URL (flujo PKCE o implicit)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        setHasValidRecovery(true)
-      }
-    })
+    const params = new URLSearchParams(window.location.search)
+    const tokenHash = params.get('token_hash')
+    const type = params.get('type')
 
-    // Fallback: si tras 3 segundos no hubo evento, el enlace es inválido/expirado
-    const timeout = setTimeout(() => {
-      setHasValidRecovery((prev) => (prev === null ? false : prev))
-    }, 3000)
-
-    return () => {
-      subscription.unsubscribe()
-      clearTimeout(timeout)
+    if (!tokenHash || type !== 'recovery') {
+      setHasValidRecovery(false)
+      return
     }
+
+    supabase.auth
+      .verifyOtp({ token_hash: tokenHash, type: 'recovery' })
+      .then(({ error }) => setHasValidRecovery(!error))
   }, [])
 
   const {
