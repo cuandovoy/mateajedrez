@@ -8,7 +8,7 @@ import { ManualSaleForm } from '@/components/admin/ManualSaleForm'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatDateShort, formatPrice } from '@/lib/utils'
-import { Search, Calendar, Filter, ChevronLeft, ChevronRight, Eye, Plus } from 'lucide-react'
+import { Search, Calendar, Filter, ChevronLeft, ChevronRight, ChevronDown, Eye, Plus } from 'lucide-react'
 import type { Order, CashSession, Branch } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -91,6 +91,7 @@ export function AdminOrders() {
   )
   const [discountFilter, setDiscountFilter] = useState<'all' | 'with_discount' | 'without_discount'>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [isManualSaleOpen, setIsManualSaleOpen] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
   const [openCashSessions, setOpenCashSessions] = useState<CashSession[]>([])
@@ -278,125 +279,152 @@ export function AdminOrders() {
         </Button>
       </div>
 
+      {/* Mobile search */}
+      <div className="md:hidden mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Buscar órdenes..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
       {/* Filters */}
+      <div className="hidden md:block">
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filtros</span>
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => setFiltersOpen((v) => !v)}
+        >
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Filter className="h-5 w-5" />
+              <span>Filtros</span>
+              {(startDate || endDate || statusFilter !== 'all' || discountFilter !== 'all' || searchTerm) && (
+                <span className="ml-1 inline-flex items-center rounded-full bg-admin-100 text-admin-700 text-xs font-medium px-2 py-0.5">Activos</span>
+              )}
+            </div>
+            <ChevronDown className={cn('h-4 w-4 text-gray-500 transition-transform', filtersOpen && 'rotate-180')} />
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {/* Search */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Buscar
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="ID, nombre, teléfono..."
-                  value={searchTerm}
+        {filtersOpen && (
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              {/* Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Buscar
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="ID, nombre, teléfono..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha Inicio
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => {
+                      setStartDate(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* End Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Fecha Fin
+                </label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => {
+                      setEndDate(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Status Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Estado
+                </label>
+                <select
+                  value={statusFilter}
                   onChange={(e) => {
-                    setSearchTerm(e.target.value)
+                    setStatusFilter(e.target.value as OrderStatus | 'all')
                     setCurrentPage(1)
                   }}
-                  className="pl-10"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
+                >
+                  <option value="all">Todos</option>
+                  <option value="pending_allocation">Pend. asignación</option>
+                  <option value="pending">Pendiente</option>
+                  <option value="processing">En Proceso</option>
+                  <option value="shipped">Enviado</option>
+                  <option value="delivered">Entregado</option>
+                  <option value="cancelled">Cancelado</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Descuento
+                </label>
+                <select
+                  value={discountFilter}
+                  onChange={(e) => {
+                    setDiscountFilter(e.target.value as 'all' | 'with_discount' | 'without_discount')
+                    setCurrentPage(1)
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
+                >
+                  <option value="all">Todos</option>
+                  <option value="with_discount">Con descuento</option>
+                  <option value="without_discount">Sin descuento</option>
+                </select>
               </div>
             </div>
 
-            {/* Start Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha Inicio
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => {
-                    setStartDate(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="pl-10"
-                />
+            {(startDate || endDate || statusFilter !== 'all' || discountFilter !== 'all' || searchTerm) && (
+              <div className="mt-4">
+                <Button variant="outline" onClick={handleResetFilters}>
+                  Limpiar Filtros
+                </Button>
               </div>
-            </div>
-
-            {/* End Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Fecha Fin
-              </label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => {
-                    setEndDate(e.target.value)
-                    setCurrentPage(1)
-                  }}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Estado
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as OrderStatus | 'all')
-                  setCurrentPage(1)
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
-              >
-                <option value="all">Todos</option>
-                <option value="pending_allocation">Pend. asignación</option>
-                <option value="pending">Pendiente</option>
-                <option value="processing">En Proceso</option>
-                <option value="shipped">Enviado</option>
-                <option value="delivered">Entregado</option>
-                <option value="cancelled">Cancelado</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Descuento
-              </label>
-              <select
-                value={discountFilter}
-                onChange={(e) => {
-                  setDiscountFilter(e.target.value as 'all' | 'with_discount' | 'without_discount')
-                  setCurrentPage(1)
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
-              >
-                <option value="all">Todos</option>
-                <option value="with_discount">Con descuento</option>
-                <option value="without_discount">Sin descuento</option>
-              </select>
-            </div>
-          </div>
-
-          {(startDate || endDate || statusFilter !== 'all' || discountFilter !== 'all' || searchTerm) && (
-            <div className="mt-4">
-              <Button variant="outline" onClick={handleResetFilters}>
-                Limpiar Filtros
-              </Button>
-            </div>
-          )}
-        </CardContent>
+            )}
+          </CardContent>
+        )}
       </Card>
+      </div>
 
       {/* Orders Table */}
       <Card>
@@ -414,7 +442,54 @@ export function AdminOrders() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y">
+                {orders.map((order) => {
+                  const collectionStatus = getCollectionStatus(order)
+                  const shippingAddress = order.shipping_address as ShippingAddressLite
+                  const shippingName = shippingAddress?.fullName || shippingAddress?.full_name || shippingAddress?.name
+                  const customerName = order.customer?.full_name || shippingName || null
+                  const isGuest = !order.customer?.id && !!shippingName
+                  return (
+                    <div key={order.id} className="p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="font-semibold text-gray-900">{formatOrderDisplayNumber(order)}</p>
+                          <p className="text-sm text-gray-600 flex items-center gap-1">
+                            {customerName || 'Sin nombre'}
+                            {isGuest && (
+                              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600">
+                                Invitado
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <p className="text-sm font-semibold text-gray-900 shrink-0">{formatPrice(order.total, settings)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', getStatusColor(order.status))}>
+                          {getStatusLabel(order.status)}
+                        </span>
+                        <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', collectionStatus.color)}>
+                          {collectionStatus.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs text-gray-400">{formatDateShort(order.created_at, settings)}</p>
+                        <Link to={`/orders/${order.id}`}>
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-3.5 w-3.5 mr-1" />
+                            Ver
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">

@@ -1237,7 +1237,36 @@ export function AdminExpenses() {
               onChange={(event) => setSearchOrder(event.target.value)}
             />
 
-            <div className="overflow-x-auto">
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-3">
+              {filteredPurchaseOrders.length === 0 && (
+                <p className="py-6 text-center text-sm text-gray-500">No se encontraron ordenes de compra.</p>
+              )}
+              {filteredPurchaseOrders.map((purchaseOrder) => (
+                <div key={purchaseOrder.id} className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">#{purchaseOrder.po_number ?? '-'}</p>
+                      <p className="text-xs text-gray-600">{supplierNameById.get(purchaseOrder.supplier_id) || 'Proveedor'} · {branchNameById.get(purchaseOrder.branch_id) || 'Sucursal'}</p>
+                    </div>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${getStatusBadgeClass(purchaseOrder.status)}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${getStatusDotClass(purchaseOrder.status)}`} />
+                      {formatPurchaseOrderStatus(purchaseOrder.status)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-400">{formatDateShort(purchaseOrder.created_at, settings)}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-gray-900">{formatPrice(Number(purchaseOrder.total || 0), settings)}</p>
+                      <ActionsMenu actions={[{ label: 'Editar orden', onClick: () => openPurchaseOrderEditor(purchaseOrder.id) }]} className="inline-flex" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full min-w-[820px]">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -1266,12 +1295,7 @@ export function AdminExpenses() {
                       <td className="px-2 py-2 text-sm text-gray-700">{formatDateShort(purchaseOrder.created_at, settings)}</td>
                       <td className="px-2 py-2 text-right">
                         <ActionsMenu
-                          actions={[
-                            {
-                              label: 'Editar orden',
-                              onClick: () => openPurchaseOrderEditor(purchaseOrder.id),
-                            },
-                          ]}
+                          actions={[{ label: 'Editar orden', onClick: () => openPurchaseOrderEditor(purchaseOrder.id) }]}
                           className="inline-flex"
                         />
                       </td>
@@ -1297,7 +1321,47 @@ export function AdminExpenses() {
             <CardTitle>Facturas de proveedor</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-3">
+              {supplierInvoices.length === 0 && (
+                <p className="py-6 text-center text-sm text-gray-500">No hay facturas cargadas.</p>
+              )}
+              {supplierInvoices.map((invoice) => {
+                const invoiceActions = [
+                  ...(Number(invoice.outstanding_amount) > 0 ? [{
+                    label: 'Pagar factura',
+                    onClick: () => { setPaymentModalInvoice(invoice); setPaymentForm((prev) => ({ ...prev, supplier_invoice_id: invoice.id, amount: String(invoice.outstanding_amount) })) },
+                  }] : []),
+                  ...(invoice.status === 'partially_paid' || invoice.status === 'paid' ? [{ label: 'Revertir ultimo pago', onClick: () => reverseLatestSupplierPayment(invoice) }] : []),
+                ]
+                return (
+                  <div key={invoice.id} className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{invoice.invoice_number}</p>
+                        <p className="text-xs text-gray-600">{supplierNameById.get(invoice.supplier_id) || 'Proveedor'}</p>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ${getStatusBadgeClass(invoice.status)}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${getStatusDotClass(invoice.status)}`} />
+                        {formatInvoiceStatus(invoice.status)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs text-gray-500 space-y-0.5">
+                        <p>Total: {formatPrice(Number(invoice.total_amount), settings)}</p>
+                        <p>Pendiente: <span className="font-semibold text-gray-900">{formatPrice(Number(invoice.outstanding_amount), settings)}</span></p>
+                      </div>
+                      {invoice.status !== 'cancelled' && invoiceActions.length > 0 && (
+                        <ActionsMenu actions={invoiceActions} className="inline-flex" />
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -1327,27 +1391,10 @@ export function AdminExpenses() {
                           <ActionsMenu
                             actions={[
                               ...(Number(invoice.outstanding_amount) > 0
-                                ? [
-                                    {
-                                      label: 'Pagar factura',
-                                      onClick: () => {
-                                        setPaymentModalInvoice(invoice)
-                                        setPaymentForm((previous) => ({
-                                          ...previous,
-                                          supplier_invoice_id: invoice.id,
-                                          amount: String(invoice.outstanding_amount),
-                                        }))
-                                      },
-                                    },
-                                  ]
+                                ? [{ label: 'Pagar factura', onClick: () => { setPaymentModalInvoice(invoice); setPaymentForm((previous) => ({ ...previous, supplier_invoice_id: invoice.id, amount: String(invoice.outstanding_amount) })) } }]
                                 : []),
                               ...(invoice.status === 'partially_paid' || invoice.status === 'paid'
-                                ? [
-                                    {
-                                      label: 'Revertir ultimo pago',
-                                      onClick: () => reverseLatestSupplierPayment(invoice),
-                                    },
-                                  ]
+                                ? [{ label: 'Revertir ultimo pago', onClick: () => reverseLatestSupplierPayment(invoice) }]
                                 : []),
                             ]}
                             className="inline-flex"
@@ -1460,7 +1507,33 @@ export function AdminExpenses() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-3">
+              {expenseLedgerEntries.length === 0 && (
+                <p className="py-6 text-center text-sm text-gray-500">No hay movimientos de egresos registrados.</p>
+              )}
+              {expenseLedgerEntries.map((entry) => (
+                <div key={entry.id} className="rounded-lg border border-gray-200 bg-white p-3 space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">{formatLedgerEventType(entry.event_type)}</p>
+                      <p className="text-xs text-gray-500">{formatLedgerEntryKind(entry.entry_kind)} · {formatLedgerSource(entry.source_table)}</p>
+                      {entry.supplier_id && <p className="text-xs text-gray-500">{supplierNameById.get(entry.supplier_id) || 'Proveedor'}</p>}
+                    </div>
+                    <p className="text-sm font-bold text-gray-900 shrink-0">{formatPrice(Number(entry.net_amount), settings)}</p>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-gray-400">{formatDateShort(entry.occurred_at, settings)}</p>
+                    <button type="button" onClick={() => setLedgerDetailEntry(entry)} className="text-xs text-admin-600 hover:underline">
+                      Ver detalle
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full min-w-[820px]">
                 <thead>
                   <tr className="border-b border-gray-200">
@@ -1484,12 +1557,7 @@ export function AdminExpenses() {
                       <td className="px-2 py-2 text-right text-sm font-semibold text-gray-900">{formatPrice(Number(entry.net_amount), settings)}</td>
                       <td className="px-2 py-2 text-right">
                         <ActionsMenu
-                          actions={[
-                            {
-                              label: 'Ver detalle',
-                              onClick: () => setLedgerDetailEntry(entry),
-                            },
-                          ]}
+                          actions={[{ label: 'Ver detalle', onClick: () => setLedgerDetailEntry(entry) }]}
                           className="inline-flex"
                         />
                       </td>

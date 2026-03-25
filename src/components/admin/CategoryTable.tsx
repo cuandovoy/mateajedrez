@@ -38,7 +38,74 @@ export function CategoryTable({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <>
+      {/* Mobile cards */}
+      <div className="md:hidden divide-y">
+        {parentCategories.map((category) => {
+          const subcategories = subcategoriesMap.get(category.id) || []
+          return (
+            <div key={category.id}>
+              <div className="p-4 space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    {category.image_url ? (
+                      <img src={category.image_url} alt={category.name} className="h-10 w-10 rounded object-cover shrink-0" />
+                    ) : (
+                      <div className="h-10 w-10 rounded bg-gray-100 flex items-center justify-center shrink-0">
+                        <ImageIcon className="h-5 w-5 text-gray-400" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-semibold text-gray-900">{category.name}</p>
+                      {category.description && <p className="text-xs text-gray-500 line-clamp-1">{category.description}</p>}
+                      <p className="text-xs text-gray-400 font-mono">{category.slug}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Principal</span>
+                    <ActionsMenu actions={[
+                      { label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(category) },
+                      { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(category.id), variant: 'danger' },
+                    ]} />
+                  </div>
+                </div>
+                {subcategories.length > 0 && (
+                  <p className="text-xs text-gray-500 pl-13">{subcategories.length} subcategoría{subcategories.length !== 1 ? 's' : ''}</p>
+                )}
+              </div>
+              {subcategories.map((sub) => (
+                <div key={sub.id} className="p-4 pl-8 border-t border-gray-50 bg-gray-50/60 space-y-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3">
+                      {sub.image_url ? (
+                        <img src={sub.image_url} alt={sub.name} className="h-8 w-8 rounded object-cover shrink-0" />
+                      ) : (
+                        <div className="h-8 w-8 rounded bg-gray-200 flex items-center justify-center shrink-0">
+                          <ImageIcon className="h-4 w-4 text-gray-400" />
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{sub.name}</p>
+                        <p className="text-xs text-gray-400 font-mono">{sub.slug}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">Sub</span>
+                      <ActionsMenu actions={[
+                        { label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(sub) },
+                        { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(sub.id), variant: 'danger' },
+                      ]} />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 bg-white">
         <thead className="bg-gray-50">
           <tr>
@@ -196,6 +263,7 @@ export function CategoryTable({
           })}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   )
 }

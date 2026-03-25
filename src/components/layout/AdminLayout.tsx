@@ -463,12 +463,50 @@ export function AdminLayout() {
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-admin-600" />
             </div>
           )}
-          <div className="p-4 md:p-6">
+          <div className="p-4 md:p-6 pb-20 lg:pb-6">
             <AdminBreadcrumbs />
             <Outlet />
           </div>
         </main>
       </div>
+
+      {/* Bottom Navigation - solo mobile */}
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200">
+        <div className="flex items-stretch h-16">
+          {[
+            { path: '/', label: 'Inicio', icon: LayoutDashboard },
+            { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
+            { path: '/products', label: 'Productos', icon: Package },
+            { path: '/cash-register', label: 'PdV', icon: StoreIcon },
+          ].map(({ path, label, icon: Icon }) => {
+            const active = isActive(path)
+            return (
+              <Link
+                key={path}
+                to={path}
+                onClick={() => setSidebarOpen(false)}
+                className={cn(
+                  'flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors',
+                  active ? 'text-admin-600' : 'text-gray-500'
+                )}
+              >
+                <Icon className={cn('h-5 w-5', active ? 'text-admin-600' : 'text-gray-400')} />
+                {label}
+              </Link>
+            )
+          })}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className={cn(
+              'flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors',
+              sidebarOpen ? 'text-admin-600' : 'text-gray-500'
+            )}
+          >
+            <Menu className={cn('h-5 w-5', sidebarOpen ? 'text-admin-600' : 'text-gray-400')} />
+            Más
+          </button>
+        </div>
+      </nav>
 
       {createOrgModalOpen && (
         <CreateOrganizationModal onClose={() => setCreateOrgModalOpen(false)} />

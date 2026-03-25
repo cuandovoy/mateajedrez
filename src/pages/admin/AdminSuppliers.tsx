@@ -13,7 +13,7 @@ import {
 import type { Supplier, SupplierInsert, SupplierUpdate } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useOrganization } from '@/hooks/useOrganization'
-import { Building2, ChevronLeft, ChevronRight, Edit, Filter, Globe, Grid3x3, List, Mail, MapPin, Phone, Plus, Trash2, X } from 'lucide-react'
+import { Building2, ChevronLeft, ChevronRight, Edit, Filter, Globe, Grid3x3, List, Mail, MapPin, Phone, Plus, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -83,7 +83,7 @@ function AdminSuppliersContent() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false)
+  const [filtersCollapsed, setFiltersCollapsed] = useState(true)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<SupplierSortBy>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -269,12 +269,12 @@ function AdminSuppliersContent() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Proveedores</h1>
-          <p className="text-gray-600 mt-2">Gestiona la información de tus proveedores</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Proveedores</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Gestiona la información de tus proveedores</p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
             <button
               onClick={() => setViewMode('list')}
@@ -298,7 +298,22 @@ function AdminSuppliersContent() {
         </div>
       </div>
 
+      {/* Mobile search */}
+      <div className="md:hidden mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Buscar proveedores..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
       {/* Filters Panel */}
+      <div className="hidden md:block">
       <Card className="mb-6">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3">
@@ -388,6 +403,7 @@ function AdminSuppliersContent() {
           </CardContent>
         )}
       </Card>
+      </div>
 
       {/* Results count */}
       <div className="mb-4 flex items-center justify-between">

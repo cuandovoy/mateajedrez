@@ -1193,43 +1193,45 @@ export function AdminOrderDetail() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <Link to="/orders">
-            <Button variant="outline" className="mb-4">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver a Órdenes
-            </Button>
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900">Detalle de Orden</h1>
-          <p className="text-gray-600 mt-2">
-            Orden {formatOrderDisplayNumber(order.id, order.order_number)}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">Ref. interna: {order.id}</p>
+      <div className="mb-6">
+        <Link to="/orders">
+          <Button variant="outline" className="mb-4" size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver a Órdenes
+          </Button>
+        </Link>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Detalle de Orden</h1>
+            <p className="text-gray-600 mt-1">
+              Orden {formatOrderDisplayNumber(order.id, order.order_number)}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5 break-all">Ref. interna: {order.id}</p>
+          </div>
+          {!isEditing ? (
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <Button variant="secondary" size="sm" onClick={handleExportInternalReceipt}>
+                <FileText className="h-4 w-4 mr-2" />
+                Comprobante
+              </Button>
+              <Button onClick={() => setIsEditing(true)} size="sm">
+                <Edit2 className="h-4 w-4 mr-2" />
+                Editar
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2 shrink-0">
+              <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} disabled={saving}>
+                <X className="h-4 w-4 mr-2" />
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveEdit} size="sm" disabled={saving}>
+                <Save className="h-4 w-4 mr-2" />
+                {saving ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
+          )}
         </div>
-        {!isEditing ? (
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={handleExportInternalReceipt}>
-              <FileText className="h-4 w-4 mr-2" />
-              Comprobante interno
-            </Button>
-            <Button onClick={() => setIsEditing(true)} size="sm">
-              <Edit2 className="h-4 w-4 mr-2" />
-              Editar
-            </Button>
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} disabled={saving}>
-              <X className="h-4 w-4 mr-2" />
-              Cancelar
-            </Button>
-            <Button onClick={handleSaveEdit} size="sm" disabled={saving}>
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? 'Guardando...' : 'Guardar'}
-            </Button>
-          </div>
-        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1361,6 +1363,7 @@ export function AdminOrderDetail() {
                       size="sm"
                       onClick={() => handleStatusUpdate(status)}
                       disabled={updating || order.status === status}
+                      className="text-xs"
                     >
                       {getStatusLabel(status)}
                     </Button>

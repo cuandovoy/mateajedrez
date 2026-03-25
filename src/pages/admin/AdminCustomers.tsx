@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { formatDateShort } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { Customer } from '@/types/database.types'
-import { Edit, ExternalLink, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2 } from 'lucide-react'
+import { ChevronDown, Edit, ExternalLink, Filter, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -50,6 +50,7 @@ export function AdminCustomers() {
     notes: '',
   })
   const { show } = useToastStore()
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   useEffect(() => {
     if (organizationId) fetchCustomers()
@@ -410,19 +411,55 @@ export function AdminCustomers() {
         </Card>
       )}
 
-      {/* Search */}
+      {/* Search / Filtros colapsables */}
       {!showForm && (
-        <div className="flex gap-2">
-          <div className="flex-1 relative">
+        <div className="md:hidden mb-4">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Buscar por nombre, teléfono, email o RUT..."
+              placeholder="Buscar clientes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
+        </div>
+      )}
+
+      {!showForm && (
+        <div className="hidden md:block">
+        <Card>
+          <button
+            onClick={() => setFiltersOpen((p) => !p)}
+            className="w-full flex items-center justify-between px-4 py-3 text-left"
+          >
+            <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <Filter className="h-4 w-4" />
+              Buscar / Filtros
+              {searchTerm && (
+                <span className="ml-1 inline-flex items-center rounded-full bg-admin-100 px-2 py-0.5 text-xs font-medium text-admin-700">
+                  1 activo
+                </span>
+              )}
+            </span>
+            <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {filtersOpen && (
+            <CardContent className="pt-0 pb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Buscar por nombre, teléfono, email o RUT..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </CardContent>
+          )}
+        </Card>
         </div>
       )}
 
@@ -439,107 +476,104 @@ export function AdminCustomers() {
                 {searchTerm ? 'No se encontraron clientes' : 'No hay clientes registrados'}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="border-b">
-                    <tr>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-900">
-                        Nombre
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-900">
-                        Contacto
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-900">
-                        Dirección
-                      </th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-900">
-                        Fecha Registro
-                      </th>
-                      <th className="text-right py-3 px-4 font-semibold text-gray-900">
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {filteredCustomers.map((customer) => {
-                      const address = (customer.address || {}) as any
-                      return (
-                        <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="py-3 px-4">
-                            <Link
-                              to={`/customers/${customer.id}`}
-                              className="font-medium text-gray-900 hover:text-admin-600 hover:underline inline-flex items-center gap-1"
-                            >
-                              {customer.full_name}
-                              <ExternalLink className="h-3 w-3 text-gray-400" />
-                            </Link>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="space-y-1 text-sm">
-                              <div className="flex items-center gap-2 text-gray-600">
-                                <Phone className="h-4 w-4" />
-                                {customer.phone}
+              <>
+                {/* Mobile cards */}
+                <div className="md:hidden divide-y">
+                  {filteredCustomers.map((customer) => {
+                    const address = (customer.address || {}) as any
+                    return (
+                      <div key={customer.id} className="p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <Link
+                            to={`/customers/${customer.id}`}
+                            className="font-medium text-gray-900 hover:text-admin-600 inline-flex items-center gap-1"
+                          >
+                            {customer.full_name}
+                            <ExternalLink className="h-3 w-3 text-gray-400" />
+                          </Link>
+                          <ActionsMenu
+                            actions={[
+                              { label: 'WhatsApp', icon: <MessageCircle className="h-4 w-4" />, onClick: () => handleWhatsApp(customer.phone, customer.full_name) },
+                              { label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => handleEdit(customer) },
+                              { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => handleDelete(customer.id), variant: 'danger' },
+                            ]}
+                          />
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          <Phone className="h-3.5 w-3.5 text-gray-400" />
+                          {customer.phone}
+                        </div>
+                        {customer.email && (
+                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                            <Mail className="h-3.5 w-3.5 text-gray-400" />
+                            {customer.email}
+                          </div>
+                        )}
+                        {address.city && (
+                          <div className="flex items-center gap-2 text-xs text-gray-400">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {[address.city, address.state].filter(Boolean).join(', ')}
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-400">{formatDateShort(customer.created_at, settings)}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="border-b">
+                      <tr>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-900">Nombre</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-900">Contacto</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-900">Dirección</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-900">Fecha Registro</th>
+                        <th className="text-right py-3 px-4 font-semibold text-gray-900">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {filteredCustomers.map((customer) => {
+                        const address = (customer.address || {}) as any
+                        return (
+                          <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="py-3 px-4">
+                              <Link to={`/customers/${customer.id}`} className="font-medium text-gray-900 hover:text-admin-600 hover:underline inline-flex items-center gap-1">
+                                {customer.full_name}
+                                <ExternalLink className="h-3 w-3 text-gray-400" />
+                              </Link>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="space-y-1 text-sm">
+                                <div className="flex items-center gap-2 text-gray-600"><Phone className="h-4 w-4" />{customer.phone}</div>
+                                {customer.email && <div className="flex items-center gap-2 text-gray-600"><Mail className="h-4 w-4" />{customer.email}</div>}
+                                {customer.rut && <div className="flex items-center gap-2 text-gray-600"><span className="inline-block h-4 w-4 rounded-sm bg-gray-200 text-[10px] leading-4 text-center font-semibold text-gray-700">R</span>{customer.rut}</div>}
                               </div>
-                              {customer.email && (
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <Mail className="h-4 w-4" />
-                                  {customer.email}
+                            </td>
+                            <td className="py-3 px-4">
+                              {address.address ? (
+                                <div className="flex items-start gap-2 text-sm text-gray-600">
+                                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                  <div><div>{address.address}</div><div>{address.city}, {address.state}</div></div>
                                 </div>
-                              )}
-                              {customer.rut && (
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <span className="inline-block h-4 w-4 rounded-sm bg-gray-200 text-[10px] leading-4 text-center font-semibold text-gray-700">R</span>
-                                  {customer.rut}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            {address.address ? (
-                              <div className="flex items-start gap-2 text-sm text-gray-600">
-                                <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                <div>
-                                  <div>{address.address}</div>
-                                  <div>{address.city}, {address.state}</div>
-                                </div>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400 text-sm">—</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="text-sm text-gray-600">
-                              {formatDateShort(customer.created_at, settings)}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <ActionsMenu
-                              actions={[
-                                {
-                                  label: 'WhatsApp',
-                                  icon: <MessageCircle className="h-4 w-4" />,
-                                  onClick: () => handleWhatsApp(customer.phone, customer.full_name),
-                                },
-                                {
-                                  label: 'Editar',
-                                  icon: <Edit className="h-4 w-4" />,
-                                  onClick: () => handleEdit(customer),
-                                },
-                                {
-                                  label: 'Eliminar',
-                                  icon: <Trash2 className="h-4 w-4" />,
-                                  onClick: () => handleDelete(customer.id),
-                                  variant: 'danger',
-                                },
-                              ]}
-                            />
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+                              ) : <span className="text-gray-400 text-sm">—</span>}
+                            </td>
+                            <td className="py-3 px-4"><div className="text-sm text-gray-600">{formatDateShort(customer.created_at, settings)}</div></td>
+                            <td className="py-3 px-4 text-right">
+                              <ActionsMenu actions={[
+                                { label: 'WhatsApp', icon: <MessageCircle className="h-4 w-4" />, onClick: () => handleWhatsApp(customer.phone, customer.full_name) },
+                                { label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => handleEdit(customer) },
+                                { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => handleDelete(customer.id), variant: 'danger' },
+                              ]} />
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

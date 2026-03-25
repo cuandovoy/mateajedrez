@@ -24,7 +24,56 @@ export function BranchTable({ branches, onEdit, onDelete }: BranchTableProps) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <>
+      {/* Mobile cards */}
+      <div className="md:hidden divide-y">
+        {branches.map((branch) => (
+          <div key={branch.id} className="p-4 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <Building2 className="h-5 w-5 text-admin-600 shrink-0" />
+                <div>
+                  <p className="font-semibold text-gray-900">{branch.name}</p>
+                  {branch.code && <p className="text-xs text-gray-500">Código: {branch.code}</p>}
+                  <p className="text-xs text-gray-500">{getBranchKindLabel(branch.kind)}{branch.is_isolated_warehouse ? ' · Aislado' : ''}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${branch.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                  {branch.is_active ? 'Activa' : 'Inactiva'}
+                </span>
+                <ActionsMenu actions={[
+                  { label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(branch) },
+                  { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(branch.id), variant: 'danger' },
+                ]} />
+              </div>
+            </div>
+            <div className="space-y-1">
+              {branch.email && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Mail className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                  {branch.email}
+                </div>
+              )}
+              {branch.phone && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Phone className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                  {branch.phone}
+                </div>
+              )}
+              {(branch.city || branch.country) && (
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
+                  {[branch.address, branch.city, branch.country].filter(Boolean).join(', ')}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200 bg-white">
         <thead className="bg-gray-50">
           <tr>
@@ -142,6 +191,7 @@ export function BranchTable({ branches, onEdit, onDelete }: BranchTableProps) {
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   )
 }

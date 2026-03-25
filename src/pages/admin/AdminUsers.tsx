@@ -10,7 +10,7 @@ import { cn, formatDateShort } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useToastStore } from '@/store/toastStore'
 import type { UserProfile } from '@/types'
-import { ChevronLeft, ChevronRight, Filter, Plus, Search, Users } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Filter, Plus, Search, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -86,6 +86,7 @@ export function AdminUsers() {
   })
   
   // Filters
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all')
 
@@ -403,67 +404,94 @@ export function AdminUsers() {
         </Card>
       )}
 
+      {/* Mobile search */}
+      <div className="md:hidden mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Buscar usuarios..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
       {/* Filters */}
+      <div className="hidden md:block">
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filtros</span>
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => setFiltersOpen((v) => !v)}
+        >
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Filter className="h-5 w-5" />
+              <span>Filtros</span>
+              {(roleFilter !== 'all' || searchTerm) && (
+                <span className="ml-1 inline-flex items-center rounded-full bg-admin-100 text-admin-700 text-xs font-medium px-2 py-0.5">Activos</span>
+              )}
+            </div>
+            <ChevronDown className={cn('h-4 w-4 text-gray-500 transition-transform', filtersOpen && 'rotate-180')} />
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Search */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Buscar
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Nombre, teléfono, dirección..."
-                  value={searchTerm}
+        {filtersOpen && (
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Buscar
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Nombre, teléfono, dirección..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value)
+                      setCurrentPage(1)
+                    }}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Role Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Rol
+                </label>
+                <select
+                  value={roleFilter}
                   onChange={(e) => {
-                    setSearchTerm(e.target.value)
+                    setRoleFilter(e.target.value as UserRole | 'all')
                     setCurrentPage(1)
                   }}
-                  className="pl-10"
-                />
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
+                >
+                  <option value="all">Todos</option>
+                  <option value="user">Usuario</option>
+                  <option value="viewer">Visualizador</option>
+                  <option value="manager">Gerente</option>
+                  <option value="admin">Administrador</option>
+                </select>
               </div>
             </div>
 
-            {/* Role Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Rol
-              </label>
-              <select
-                value={roleFilter}
-                onChange={(e) => {
-                  setRoleFilter(e.target.value as UserRole | 'all')
-                  setCurrentPage(1)
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
-              >
-                <option value="all">Todos</option>
-                <option value="user">Usuario</option>
-                <option value="viewer">Visualizador</option>
-                <option value="manager">Gerente</option>
-                <option value="admin">Administrador</option>
-              </select>
-            </div>
-          </div>
-
-          {(roleFilter !== 'all' || searchTerm) && (
-            <div className="mt-4">
-              <Button variant="outline" onClick={handleResetFilters}>
-                Limpiar Filtros
-              </Button>
-            </div>
-          )}
-        </CardContent>
+            {(roleFilter !== 'all' || searchTerm) && (
+              <div className="mt-4">
+                <Button variant="outline" onClick={handleResetFilters}>
+                  Limpiar Filtros
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
+      </div>
 
       {/* Users Table */}
       <Card>
@@ -483,7 +511,46 @@ export function AdminUsers() {
             />
           ) : (
             <>
-              <div className="overflow-x-auto">
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y">
+                {users.map((user) => (
+                  <div key={user.user_id ?? user.id} className="p-4 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-gray-900">{user.full_name || 'Sin nombre'}</p>
+                        {user.email && <p className="text-sm text-gray-500">{user.email}</p>}
+                        {user.phone && <p className="text-sm text-gray-500">{user.phone}</p>}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', user.isGuest ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800')}>
+                          {user.isGuest ? 'Invitado' : 'Registrado'}
+                        </span>
+                        <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', getRoleColor(user.base_role_key || user.role))}>
+                          {user.role_name || getRoleLabel(user.role)}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={user.organization_role_id ?? ''}
+                        onChange={(e) => handleRoleChange(user.user_id ?? user.id, e.target.value)}
+                        disabled={updatingRole === (user.user_id ?? user.id) || user.user_id === authUser?.id}
+                        className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-200 disabled:bg-gray-100 disabled:text-gray-500"
+                      >
+                        {organizationRoles.map((roleOption) => (
+                          <option key={roleOption.id} value={roleOption.id}>
+                            {roleOption.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <p className="text-xs text-gray-400">{formatDateShort(user.created_at, settings)}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-gray-200">

@@ -15,6 +15,7 @@ import { useOrgFeature } from '@/hooks/useOrgFeature'
 import { useToastStore } from '@/store/toastStore'
 import {
   Building2,
+  ChevronDown,
   Edit,
   Filter,
   Grid3x3,
@@ -23,6 +24,7 @@ import {
   MapPin,
   Phone,
   Plus,
+  Search,
   Trash2,
   X,
 } from 'lucide-react'
@@ -61,6 +63,7 @@ function AdminBranchesContent() {
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [search, setSearch] = useState('')
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const {
     register,
@@ -270,31 +273,23 @@ function AdminBranchesContent() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Sucursales</h1>
-          <p className="text-gray-600 mt-2">Gestiona las sucursales de tu tienda</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Sucursales</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Gestiona las sucursales de tu tienda</p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 ${
-                viewMode === 'list'
-                  ? 'bg-admin-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`p-2 ${viewMode === 'list' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
               title="Vista de lista"
             >
               <List className="h-4 w-4" />
             </button>
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 ${
-                viewMode === 'grid'
-                  ? 'bg-admin-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`p-2 ${viewMode === 'grid' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
               title="Vista de grilla"
             >
               <Grid3x3 className="h-4 w-4" />
@@ -307,31 +302,58 @@ function AdminBranchesContent() {
         </div>
       </div>
 
+      {/* Mobile search */}
+      <div className="md:hidden mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Buscar sucursales..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
       {/* Filters Panel */}
+      <div className="hidden md:block">
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Filter className="h-5 w-5" />
-            <span>Filtros</span>
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => setFiltersOpen((v) => !v)}
+        >
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Filter className="h-5 w-5" />
+              <span>Filtros</span>
+              {search && (
+                <span className="ml-1 inline-flex items-center rounded-full bg-admin-100 text-admin-700 text-xs font-medium px-2 py-0.5">Activos</span>
+              )}
+            </div>
+            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <SearchFilter
-              value={search}
-              onChange={setSearch}
-              placeholder="Buscar sucursales..."
-            />
-          </div>
-          {search && (
-            <div className="mt-4">
-              <Button variant="outline" onClick={() => setSearch('')}>
-                Limpiar Filtros
-              </Button>
+        {filtersOpen && (
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <SearchFilter
+                value={search}
+                onChange={setSearch}
+                placeholder="Buscar sucursales..."
+              />
             </div>
-          )}
-        </CardContent>
+            {search && (
+              <div className="mt-4">
+                <Button variant="outline" onClick={() => setSearch('')}>
+                  Limpiar Filtros
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
+      </div>
 
       {/* Results count */}
       <div className="mb-4 flex items-center justify-between">

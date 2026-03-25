@@ -111,7 +111,7 @@ export function AdminInventory() {
   const [inventoryViewTab, setInventoryViewTab] = useState<'branch' | 'product'>('branch')
   const [crossViewData, setCrossViewData] = useState<CrossViewRow[]>([])
   const [crossViewLoading, setCrossViewLoading] = useState(false)
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false)
+  const [filtersCollapsed, setFiltersCollapsed] = useState(true)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
@@ -1048,63 +1048,46 @@ export function AdminInventory() {
   
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
-          <p className="text-gray-600 mt-1">Administra el stock por sucursal</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Gestión de Inventario</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Administra el stock por sucursal</p>
         </div>
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={handleExportAllInventory}
             disabled={exportingAll}
+            size="sm"
             className="shrink-0"
           >
             <Download className="h-4 w-4 mr-2" />
-            {exportingAll ? 'Exportando...' : 'Exportar todo (Excel)'}
+            {exportingAll ? 'Exportando...' : 'Exportar (Excel)'}
           </Button>
           {missingProductsCount !== null && missingProductsCount > 0 && (
-            <div className="flex items-center space-x-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-blue-600" />
-              <span className="text-sm font-medium text-blue-900">
-                {missingProductsCount} producto{missingProductsCount !== 1 ? 's' : ''} sin inventario
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSyncMissingProducts}
-                disabled={syncing}
-                className="ml-2"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Sincronizando...' : 'Sincronizar'}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-sm">
+              <AlertTriangle className="h-4 w-4 text-blue-600 shrink-0" />
+              <span className="font-medium text-blue-900">{missingProductsCount} sin inventario</span>
+              <Button variant="outline" size="sm" onClick={handleSyncMissingProducts} disabled={syncing}>
+                <RefreshCw className={`h-3.5 w-3.5 mr-1 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Sync...' : 'Sincronizar'}
               </Button>
             </div>
           )}
           {isAdmin && unsyncedCount !== null && unsyncedCount > 0 && (
-            <div className="flex items-center space-x-2 px-4 py-2 bg-purple-50 border border-purple-200 rounded-lg">
-              <RefreshCw className="h-5 w-5 text-purple-600" />
-              <span className="text-sm font-medium text-purple-900">
-                {unsyncedCount} item{unsyncedCount !== 1 ? 's' : ''} desincronizado{unsyncedCount !== 1 ? 's' : ''}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSyncAllUnsynced}
-                disabled={syncingAll}
-                className="ml-2"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${syncingAll ? 'animate-spin' : ''}`} />
-                {syncingAll ? 'Sincronizando...' : 'Sincronizar todos'}
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-lg text-sm">
+              <RefreshCw className="h-4 w-4 text-purple-600 shrink-0" />
+              <span className="font-medium text-purple-900">{unsyncedCount} desincronizado{unsyncedCount !== 1 ? 's' : ''}</span>
+              <Button variant="outline" size="sm" onClick={handleSyncAllUnsynced} disabled={syncingAll}>
+                <RefreshCw className={`h-3.5 w-3.5 mr-1 ${syncingAll ? 'animate-spin' : ''}`} />
+                {syncingAll ? 'Sync...' : 'Sincronizar'}
               </Button>
             </div>
           )}
           {lowStockCount > 0 && (
-            <div className="flex items-center space-x-2 px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              <span className="text-sm font-medium text-yellow-900">
-                {lowStockCount} producto{lowStockCount !== 1 ? 's' : ''} con stock bajo
-              </span>
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg text-sm">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 shrink-0" />
+              <span className="font-medium text-yellow-900">{lowStockCount} stock bajo</span>
             </div>
           )}
         </div>
@@ -1155,53 +1138,103 @@ export function AdminInventory() {
                 <p>No hay datos de inventario disponibles</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs sticky left-0 bg-gray-50 z-10">Producto</th>
-                      <th className="px-3 py-3 text-left font-medium text-gray-500 uppercase text-xs">SKU</th>
-                      {branches.map((b) => (
-                        <th key={b.id} className="px-4 py-3 text-center font-medium text-gray-500 uppercase text-xs whitespace-nowrap">
-                          {b.name}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {crossViewData.map((row) => (
-                      <tr key={row.product_id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-900 sticky left-0 bg-white max-w-[200px] truncate">
-                          {capitalizeFirst(row.product_name)}
-                        </td>
-                        <td className="px-3 py-3 text-gray-500 text-xs font-mono">{row.sku || '—'}</td>
+              <>
+                {/* Mobile: cards por producto */}
+                <div className="md:hidden divide-y">
+                  {crossViewData.map((row) => (
+                    <div key={row.product_id} className="p-4 space-y-2">
+                      <div>
+                        <p className="font-semibold text-gray-900">{capitalizeFirst(row.product_name)}</p>
+                        {row.sku && <p className="text-xs text-gray-400 font-mono">{row.sku}</p>}
+                      </div>
+                      <div className="space-y-1.5">
                         {branches.map((b) => {
                           const cell = row.branchStocks[b.id]
-                          if (!cell) return (
-                            <td key={b.id} className="px-4 py-3 text-center text-gray-300">—</td>
-                          )
-                          const isLow = cell.stock <= (cell.low_stock_threshold || 0) || cell.stock <= (cell.min_stock || 0)
-                          const isOut = cell.stock === 0
+                          const isOut = !cell || cell.stock === 0
+                          const isLow = cell && !isOut && (cell.stock <= (cell.low_stock_threshold || 0) || cell.stock <= (cell.min_stock || 0))
                           return (
-                            <td key={b.id} className="px-4 py-3 text-center">
-                              <span className={`inline-block min-w-[2.5rem] rounded-md px-2 py-0.5 text-sm font-semibold ${isOut ? 'bg-red-100 text-red-700' : isLow ? 'bg-yellow-100 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
-                                {cell.stock}
-                              </span>
-                            </td>
+                            <div key={b.id} className="flex items-center justify-between gap-2">
+                              <span className="text-sm text-gray-600 truncate">{b.name}</span>
+                              {cell ? (
+                                <span className={`inline-block min-w-[2.5rem] text-center rounded-md px-2 py-0.5 text-sm font-semibold shrink-0 ${isOut ? 'bg-red-100 text-red-700' : isLow ? 'bg-yellow-100 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
+                                  {cell.stock}
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 text-sm">—</span>
+                              )}
+                            </div>
                           )
                         })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop: tabla */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs sticky left-0 bg-gray-50 z-10">Producto</th>
+                        <th className="px-3 py-3 text-left font-medium text-gray-500 uppercase text-xs">SKU</th>
+                        {branches.map((b) => (
+                          <th key={b.id} className="px-4 py-3 text-center font-medium text-gray-500 uppercase text-xs whitespace-nowrap">
+                            {b.name}
+                          </th>
+                        ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {crossViewData.map((row) => (
+                        <tr key={row.product_id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-900 sticky left-0 bg-white max-w-[200px] truncate">
+                            {capitalizeFirst(row.product_name)}
+                          </td>
+                          <td className="px-3 py-3 text-gray-500 text-xs font-mono">{row.sku || '—'}</td>
+                          {branches.map((b) => {
+                            const cell = row.branchStocks[b.id]
+                            if (!cell) return (
+                              <td key={b.id} className="px-4 py-3 text-center text-gray-300">—</td>
+                            )
+                            const isLow = cell.stock <= (cell.low_stock_threshold || 0) || cell.stock <= (cell.min_stock || 0)
+                            const isOut = cell.stock === 0
+                            return (
+                              <td key={b.id} className="px-4 py-3 text-center">
+                                <span className={`inline-block min-w-[2.5rem] rounded-md px-2 py-0.5 text-sm font-semibold ${isOut ? 'bg-red-100 text-red-700' : isLow ? 'bg-yellow-100 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
+                                  {cell.stock}
+                                </span>
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
       )}
 
+      {/* Mobile search — only in branch view */}
+      {inventoryViewTab === 'branch' && (
+        <div className="md:hidden mb-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              type="text"
+              placeholder="Buscar productos..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Filters — only shown in branch view */}
-      {inventoryViewTab === 'branch' && <Card>
+      {inventoryViewTab === 'branch' && <div className="hidden md:block"><Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3">
             <CardTitle className="text-base flex items-center space-x-2">
@@ -1329,7 +1362,7 @@ export function AdminInventory() {
             )}
           </CardContent>
         )}
-      </Card>}
+      </Card></div>}
 
       {/* Inventory Table — only in branch view */}
       {inventoryViewTab === 'branch' && <Card>
@@ -1350,7 +1383,81 @@ export function AdminInventory() {
               <p>No se encontraron productos en el inventario</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              {/* Mobile cards */}
+              <div className="md:hidden divide-y">
+                {inventory.map((item) => {
+                  const isLow = item.is_low_stock
+                  const isOut = item.stock === 0
+                  return (
+                    <div key={item.id} className={`p-4 space-y-2 ${isLow ? 'bg-yellow-50' : ''}`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {item.thumbnail_url ? (
+                            <img src={item.thumbnail_url} alt={item.product_name} className="h-10 w-10 rounded-md object-cover shrink-0" loading="lazy" />
+                          ) : (
+                            <div className="h-10 w-10 rounded-md bg-gray-100 flex items-center justify-center shrink-0">
+                              <Package className="h-4 w-4 text-gray-400" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{capitalizeFirst(item.product_name)}</p>
+                            {item.variant_name && <p className="text-xs text-gray-500">{capitalizeFirst(item.variant_name)}</p>}
+                            <p className="text-xs text-gray-400 font-mono">{item.sku || 'N/A'}</p>
+                          </div>
+                        </div>
+                        {editingItem?.id === item.id ? (
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button variant="ghost" size="sm" onClick={handleSave} disabled={saving} className="text-green-600 hover:text-green-700 p-1">
+                              <Save className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={handleCancelEdit} disabled={saving} className="text-gray-600 p-1">
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <ActionsMenu
+                            actions={[
+                              {
+                                label: syncingItemId === item.id ? 'Sincronizando...' : item.source_stock === null ? 'Sin stock de origen' : `Sincronizar (${item.source_stock})`,
+                                icon: <RefreshCw className={`h-4 w-4 ${syncingItemId === item.id ? 'animate-spin' : ''}`} />,
+                                onClick: () => handleSyncItemStock(item),
+                                disabled: syncingItemId !== null || item.source_stock === null,
+                              },
+                              { label: 'Editar Stock', icon: <Edit className="h-4 w-4" />, onClick: () => handleEdit(item) },
+                              { label: 'Ingreso manual', icon: <Plus className="h-4 w-4" />, onClick: () => setReceiptModalItem(item) },
+                              { label: 'Ajuste de Inventario', icon: <Edit className="h-4 w-4" />, onClick: () => setAdjustmentModalItem(item) },
+                              ...(canUseFeature('transfers') ? [{ label: 'Transferir', icon: <ArrowRight className="h-4 w-4" />, onClick: () => setTransferModalItem(item) }] : []),
+                              { label: 'Ver Historial', icon: <History className="h-4 w-4" />, onClick: () => setMovementsModalItem(item) },
+                            ]}
+                          />
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-1 text-gray-500">
+                          <Building2 className="h-3.5 w-3.5" />
+                          <span className="text-xs">{item.branch_name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {editingItem?.id === item.id ? (
+                            <div className="flex items-center gap-2">
+                              <Input type="number" min="0" value={editingItem.stock} onChange={(e) => setEditingItem({ ...editingItem, stock: parseInt(e.target.value) || 0 })} className="w-20 text-center h-8" autoFocus />
+                            </div>
+                          ) : (
+                            <span className={`text-lg font-bold ${isOut ? 'text-red-600' : isLow ? 'text-yellow-600' : 'text-green-700'}`}>
+                              {item.stock}
+                            </span>
+                          )}
+                          <span className="text-xs text-gray-400">en stock</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
@@ -1538,7 +1645,8 @@ export function AdminInventory() {
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
 
           {/* Paginación */}

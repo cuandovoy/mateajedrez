@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useOrganization } from '@/hooks/useOrganization'
-import { Plus, Edit, Trash2, Upload, X, Grid3x3, List, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Edit, Trash2, Upload, X, Grid3x3, List, Filter, ChevronLeft, ChevronRight, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -41,7 +41,7 @@ function AdminCategoriesContent() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false)
+  const [filtersCollapsed, setFiltersCollapsed] = useState(true)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<CategorySortBy>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -239,12 +239,12 @@ function AdminCategoriesContent() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Categorías</h1>
-          <p className="text-gray-600 mt-2">Organiza tus productos en categorías y subcategorías</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Categorías</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">Organiza tus productos en categorías y subcategorías</p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
             <button
               onClick={() => setViewMode('list')}
@@ -268,7 +268,22 @@ function AdminCategoriesContent() {
         </div>
       </div>
 
+      {/* Mobile search */}
+      <div className="md:hidden mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            type="text"
+            placeholder="Buscar categorías..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
       {/* Filters Panel */}
+      <div className="hidden md:block">
       <Card className="mb-6">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3">
@@ -357,6 +372,7 @@ function AdminCategoriesContent() {
           </CardContent>
         )}
       </Card>
+      </div>
 
       {/* Results count */}
       <div className="mb-4 flex items-center justify-between">

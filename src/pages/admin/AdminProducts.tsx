@@ -108,7 +108,7 @@ function AdminProductsContent() {
   const [supplierManagerProduct, setSupplierManagerProduct] = useState<Product | null>(null)
   const [initialBranchId, setInitialBranchId] = useState<string>('')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false)
+  const [filtersCollapsed, setFiltersCollapsed] = useState(true)
   const [exportingPdf, setExportingPdf] = useState(false)
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
   const [bulkAction, setBulkAction] = useState<'status' | 'category' | 'price' | null>(null)
@@ -1113,43 +1113,42 @@ function AdminProductsContent() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Productos</h1>
-        <p className="text-gray-600 mt-2">
-          Gestiona todos los productos de tu tienda
-          {tier === 'starter' && limits.products != null && (
-            <span className="ml-2 text-sm text-gray-500">
-              ({productCount} / {limits.products})
-            </span>
-          )}
-        </p>
-      </div>
-
-      <div className="mb-8 flex items-center justify-between gap-4">
-        <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-2 ${viewMode === 'list' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-            title="Vista de lista"
-          >
-            <List className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setViewMode('grid')}
-            className={`p-2 ${viewMode === 'grid' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
-            title="Vista de grilla"
-          >
-            <Grid3x3 className="h-4 w-4" />
-          </button>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Productos</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">
+            Gestiona todos los productos de tu tienda
+            {tier === 'starter' && limits.products != null && (
+              <span className="ml-2 text-sm text-gray-500">
+                ({productCount} / {limits.products})
+              </span>
+            )}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 ${viewMode === 'list' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              title="Vista de lista"
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 ${viewMode === 'grid' ? 'bg-admin-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+              title="Vista de grilla"
+            >
+              <Grid3x3 className="h-4 w-4" />
+            </button>
+          </div>
           <Button
             variant="outline"
             onClick={exportProductsPdf}
             disabled={exportingPdf || filteredProducts.length === 0}
           >
             <Download className="h-4 w-4 mr-2" />
-            {exportingPdf ? 'Exportando...' : 'Exportar PDF'}
+            {exportingPdf ? 'Exportando...' : 'PDF'}
           </Button>
           <Button onClick={handleNew} disabled={isAtLimit('products')}>
             <Plus className="h-4 w-4 mr-2" />
@@ -1158,7 +1157,17 @@ function AdminProductsContent() {
         </div>
       </div>
 
+      {/* Mobile search */}
+      <div className="md:hidden mb-4">
+        <SearchFilter
+          value={filters.search}
+          onChange={(value) => setFilters({ ...filters, search: value })}
+          placeholder="Buscar productos..."
+        />
+      </div>
+
       {/* Filters Panel */}
+      <div className="hidden md:block">
       <Card className="mb-6">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between gap-3">
@@ -1296,6 +1305,7 @@ function AdminProductsContent() {
           </CardContent>
         )}
       </Card>
+      </div>
 
       {/* Results count */}
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
