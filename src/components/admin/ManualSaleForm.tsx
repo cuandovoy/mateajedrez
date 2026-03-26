@@ -642,6 +642,7 @@ export function ManualSaleForm({
 
     const total = Math.max(subtotalBeforeDiscount - discountTotal, 0)
     setLoading(true)
+    let orderId: string | undefined
 
     try {
       // Check if any product has insufficient stock - alert but allow
@@ -764,6 +765,7 @@ export function ManualSaleForm({
         .single()
 
       if (orderError || !order) throw orderError || new Error('Failed to create order')
+      orderId = (order as { id: string }).id
 
       await trackAuditAction({
         organizationId,
@@ -806,6 +808,8 @@ export function ManualSaleForm({
           ) {
             show('Algunos productos ya no tienen stock disponible', 'error')
             setLoading(false)
+            // La orden se creó aunque los items fallaron — refrescar la lista
+            if (orderId) onSaleCreated()
             return
           }
           throw itemsError
@@ -900,6 +904,11 @@ export function ManualSaleForm({
     } catch (error) {
       console.error('Error creating manual sale:', error)
       show('Error al registrar la venta. Por favor, intenta nuevamente.', 'error')
+      // Si la orden fue creada antes del error, igual refrescar la lista
+      // La orden se creó antes del error — refrescar el listado
+      if (orderId) {
+        onSaleCreated()
+      }
     } finally {
       setLoading(false)
     }

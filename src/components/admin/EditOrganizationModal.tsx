@@ -11,8 +11,15 @@ import { useAdminStore } from '@/store/adminStore'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Tables } from '@/types/database.types'
-import { Bell, Building2, CreditCard, Globe, Upload, X } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { Bell, Building2, CreditCard, Globe, Upload, X, ShoppingCart, AlertTriangle, RefreshCw } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { NOTIFICATION_TYPES, parseInappConfig, type InappNotificationsConfig, type NotificationType } from '@/lib/notification-types'
+
+const INAPP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  ShoppingCart,
+  AlertTriangle,
+  RefreshCw,
+}
 
 type Organization = Tables<'organizations'>
 export type OrganizationSettings = Record<string, unknown>
@@ -160,6 +167,12 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   const [orderStatusNotifyCustomer, setOrderStatusNotifyCustomer] = useState(
     (rawSettings.order_status_notify_customer as boolean) ?? false
   )
+  const [inappNotifications, setInappNotifications] = useState<InappNotificationsConfig>(
+    parseInappConfig(rawSettings.inapp_notifications)
+  )
+  const [inappLowStockThreshold, setInappLowStockThreshold] = useState(
+    parseInappConfig(rawSettings.inapp_notifications).low_stock_threshold ?? 5
+  )
   const [transferMethodId, setTransferMethodId] = useState<string | null>(null)
   const [transferMethodConfig, setTransferMethodConfig] = useState<Record<string, unknown>>({})
   const [transferInstructions, setTransferInstructions] = useState('')
@@ -233,6 +246,9 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     setNewOrderNotify((s.new_order_notify as boolean) ?? false)
     setLowStockNotify((s.low_stock_notify as boolean) ?? false)
     setOrderStatusNotifyCustomer((s.order_status_notify_customer as boolean) ?? false)
+    const parsedInapp = parseInappConfig(s.inapp_notifications)
+    setInappNotifications(parsedInapp)
+    setInappLowStockThreshold(parsedInapp.low_stock_threshold ?? 5)
     setTransferMethodId(null)
     setTransferMethodConfig({})
     setTransferInstructions('')
@@ -310,6 +326,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   }, [organization.id])
 
   const prevSettings = (organization.settings as Record<string, unknown>) ?? {}
+  const prevInapp = parseInappConfig(prevSettings.inapp_notifications)
   const prevMinimalLogoUrl =
     typeof prevSettings[STORE_LOGO_MINIMAL_KEY] === 'string' ? (prevSettings[STORE_LOGO_MINIMAL_KEY] as string) : null
   const prevCoverUrls = buildInitialCoverUrls(prevSettings, organization.cover_image_url ?? null)
@@ -356,7 +373,11 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     notificationEmail !== ((prevSettings.notification_email as string) ?? '') ||
     newOrderNotify !== ((prevSettings.new_order_notify as boolean) ?? false) ||
     lowStockNotify !== ((prevSettings.low_stock_notify as boolean) ?? false) ||
-    orderStatusNotifyCustomer !== ((prevSettings.order_status_notify_customer as boolean) ?? false)
+    orderStatusNotifyCustomer !== ((prevSettings.order_status_notify_customer as boolean) ?? false) ||
+    inappNotifications.new_order !== prevInapp.new_order ||
+    inappNotifications.low_stock !== prevInapp.low_stock ||
+    inappNotifications.order_status_change !== prevInapp.order_status_change ||
+    inappLowStockThreshold !== (prevInapp.low_stock_threshold ?? 5)
 
   useEffect(() => {
     setHasUnsavedChanges(Boolean(isDirty))
@@ -566,6 +587,12 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         new_order_notify: newOrderNotify,
         low_stock_notify: lowStockNotify,
         order_status_notify_customer: orderStatusNotifyCustomer,
+        inapp_notifications: {
+          new_order: inappNotifications.new_order,
+          low_stock: inappNotifications.low_stock,
+          low_stock_threshold: Math.max(1, Math.trunc(inappLowStockThreshold || 5)),
+          order_status_change: inappNotifications.order_status_change,
+        },
         [STORE_LOGO_MINIMAL_KEY]: finalMinimalLogoUrl,
         [STORE_COVER_IMAGES_KEY]: finalCoverUrls,
       }
@@ -1185,51 +1212,118 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
 
               <TabsContent value="notificaciones" className="mt-6 flex-1 min-h-0">
                 <PlanGate feature="notifications_config" canUse={canUseNotifications}>
-                  <div className="space-y-6">
-                    <p className="text-sm text-gray-600">
-                      Configura las notificaciones por email para tu organización.
-                    </p>
-                    <Input
-                      label="Email para notificaciones"
-                      type="email"
-                      value={notificationEmail}
-                      onChange={(e) => setNotificationEmail(e.target.value)}
-                      placeholder="admin@mitienda.com"
-                    />
-                    <p className="text-xs text-gray-500">
-                      Recibirás aquí las notificaciones de nuevas órdenes y stock bajo.
-                    </p>
-                    <div className="space-y-3 border-t pt-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={newOrderNotify}
-                          onChange={(e) => setNewOrderNotify(e.target.checked)}
-                          className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Notificar nueva orden</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={lowStockNotify}
-                          onChange={(e) => setLowStockNotify(e.target.checked)}
-                          className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">Notificar stock bajo</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={orderStatusNotifyCustomer}
-                          onChange={(e) => setOrderStatusNotifyCustomer(e.target.checked)}
-                          className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">
-                          Notificar al cliente al cambiar estado de la orden
-                        </span>
-                      </label>
+                  <div className="space-y-8">
+
+                    {/* Notificaciones por email */}
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-800">Notificaciones por email</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Recibirás un email en la dirección configurada cuando ocurran estos eventos.
+                        </p>
+                      </div>
+                      <Input
+                        label="Email para notificaciones"
+                        type="email"
+                        value={notificationEmail}
+                        onChange={(e) => setNotificationEmail(e.target.value)}
+                        placeholder="admin@mitienda.com"
+                      />
+                      <div className="space-y-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newOrderNotify}
+                            onChange={(e) => setNewOrderNotify(e.target.checked)}
+                            className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                          />
+                          <span className="text-sm text-gray-700">Nuevo pedido</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={lowStockNotify}
+                            onChange={(e) => setLowStockNotify(e.target.checked)}
+                            className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                          />
+                          <span className="text-sm text-gray-700">Stock bajo</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={orderStatusNotifyCustomer}
+                            onChange={(e) => setOrderStatusNotifyCustomer(e.target.checked)}
+                            className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                          />
+                          <span className="text-sm text-gray-700">
+                            Notificar al cliente al cambiar estado de la orden
+                          </span>
+                        </label>
+                      </div>
                     </div>
+
+                    {/* Notificaciones in-app (campanita) */}
+                    <div className="space-y-4 border-t pt-6">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-800">Notificaciones en el panel</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Aparecen en la campanita del panel de administración en tiempo real.
+                        </p>
+                      </div>
+                      <div className="space-y-4">
+                        {NOTIFICATION_TYPES.map((notifType) => {
+                          const Icon = INAPP_ICONS[notifType.icon]
+                          const enabled = inappNotifications[notifType.type as NotificationType]
+                          return (
+                            <div key={notifType.type} className="rounded-lg border border-gray-200 p-4 space-y-3">
+                              <label className="flex items-start gap-3 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={enabled}
+                                  onChange={(e) =>
+                                    setInappNotifications((prev) => ({
+                                      ...prev,
+                                      [notifType.type]: e.target.checked,
+                                    }))
+                                  }
+                                  className="mt-0.5 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                                />
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {Icon && (
+                                    <Icon className={`h-4 w-4 shrink-0 ${notifType.color}`} />
+                                  )}
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-700">{notifType.label}</p>
+                                    <p className="text-xs text-gray-500">{notifType.description}</p>
+                                  </div>
+                                </div>
+                              </label>
+
+                              {/* Umbral configurable (solo low_stock) */}
+                              {notifType.hasThreshold && enabled && (
+                                <div className="ml-7 flex items-center gap-3">
+                                  <label className="text-xs text-gray-600 shrink-0">
+                                    {notifType.thresholdLabel}:
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={9999}
+                                    value={inappLowStockThreshold}
+                                    onChange={(e) =>
+                                      setInappLowStockThreshold(Math.max(1, parseInt(e.target.value) || 1))
+                                    }
+                                    className="w-20 rounded-md border border-gray-300 px-2 py-1 text-sm focus:border-admin-500 focus:ring-1 focus:ring-admin-500"
+                                  />
+                                  <span className="text-xs text-gray-500">unidades</span>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+
                   </div>
                 </PlanGate>
               </TabsContent>

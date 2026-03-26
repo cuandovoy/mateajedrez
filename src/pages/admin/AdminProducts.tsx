@@ -21,6 +21,8 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, ProductVariant, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { productSchema } from '@/lib/schemas'
+import type { ProductForm } from '@/lib/schemas'
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -28,18 +30,8 @@ import { getMaxProductImages } from '@/lib/planLimits'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useToastStore } from '@/store/toastStore'
-import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
 
-const productSchema = z.object({
-  name: z.string().min(1, 'El nombre es requerido'),
-  description: z.string().optional(),
-  price: z.number().min(0, 'El precio debe ser mayor a 0'),
-  stock: z.number().min(0, 'El stock debe ser mayor o igual a 0'),
-  category_id: z.string().min(1, 'La categoría es requerida'),
-  sku: z.string().min(1, 'El SKU es requerido'),
-  is_active: z.boolean().default(true),
-})
 
 interface ProductImageItem {
   id?: string
@@ -55,7 +47,6 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp
 const DEFAULT_PAGE_SIZE = 25
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
 
-type ProductForm = z.infer<typeof productSchema>
 
 interface ProductWithImages extends Product {
   product_images?: ProductImage[]

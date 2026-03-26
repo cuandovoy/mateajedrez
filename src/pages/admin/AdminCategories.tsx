@@ -4,7 +4,8 @@ import { Plus, Edit, Trash2, Upload, X, Grid3x3, List, Filter, ChevronLeft, Chev
 import { supabase } from '@/lib/supabase'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
+import { categorySchema } from '@/lib/schemas'
+import type { CategoryForm } from '@/lib/schemas'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -18,18 +19,8 @@ type ViewMode = 'grid' | 'list'
 type CategorySortBy = 'name' | 'slug' | 'created_at'
 type SortDirection = 'asc' | 'desc'
 
-const categorySchema = z.object({
-  name: z.string().min(1, 'El nombre es requerido'),
-  description: z.string().optional(),
-  slug: z.string().min(1, 'El slug es requerido'),
-  image_url: z.string().url().optional().or(z.literal('')),
-  parent_id: z.string().optional().or(z.literal('')),
-})
-
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5MB
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-
-type CategoryForm = z.infer<typeof categorySchema>
 
 function AdminCategoriesContent() {
   const { organizationId } = useOrganization()

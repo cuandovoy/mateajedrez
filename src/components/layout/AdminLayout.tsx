@@ -29,6 +29,7 @@ import {
 import { Link } from 'react-router-dom'
 import { AdminBreadcrumbs } from '@/components/admin/AdminBreadcrumbs'
 import { InstallBanner } from '@/components/admin/InstallBanner'
+import { NotificationBell } from '@/components/admin/NotificationBell'
 import { ToastContainer } from './ToastContainer'
 import { CreateOrganizationModal } from '@/components/admin/CreateOrganizationModal'
 import { PermissionGate } from '@/components/features/PermissionGate'
@@ -313,6 +314,7 @@ export function AdminLayout() {
                   <span className="text-xs font-medium">Ver tienda</span>
                 </a>
               )}
+              <NotificationBell orgId={currentOrganization?.id} />
               <div className="flex items-center gap-1">
                 <span className="hidden md:block text-xs text-gray-500 truncate max-w-[140px]">{user.email}</span>
                 <Button

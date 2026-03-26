@@ -5,18 +5,15 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
-import {
-  normalizeUruguayanPhone,
-  validateUruguayanPhone,
-  validateUruguayanRUT
-} from '@/lib/uruguay-validators'
+import { normalizeUruguayanPhone } from '@/lib/uruguay-validators'
+import { supplierSchema } from '@/lib/schemas'
+import type { SupplierForm } from '@/lib/schemas'
 import type { Supplier, SupplierInsert, SupplierUpdate } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useOrganization } from '@/hooks/useOrganization'
 import { Building2, ChevronLeft, ChevronRight, Edit, Filter, Globe, Grid3x3, List, Mail, MapPin, Phone, Plus, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { z } from 'zod'
 
 // Helper to format RUT for display in form
 function formatRUTForInput(rut: string): string {
@@ -43,38 +40,6 @@ type ViewMode = 'grid' | 'list'
 type SupplierSortBy = 'name' | 'city' | 'country' | 'created_at'
 type SortDirection = 'asc' | 'desc'
 
-const supplierSchema = z.object({
-  name: z.string().min(1, 'El nombre es requerido'),
-  contact_name: z.string().optional(),
-  email: z.string().email('Email inválido').optional().or(z.literal('')),
-  phone: z
-    .string()
-    .min(1, 'El teléfono es requerido')
-    .refine(
-      (val) => validateUruguayanPhone(val),
-      {
-        message: 'Teléfono inválido. Formato: +598 X XXX XXXX o 0X XXXX XXXX (8 dígitos)',
-      }
-    ),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  country: z.string().optional(),
-  postal_code: z.string().optional(),
-  tax_id: z
-    .string()
-    .min(1, 'El RUT es requerido')
-    .refine(
-      (val) => validateUruguayanRUT(val),
-      {
-        message: 'RUT inválido. Formato: XX.XXXXXX.001-X (12 dígitos)',
-      }
-    ),
-  website: z.string().url('URL inválida').optional().or(z.literal('')),
-  notes: z.string().optional(),
-  is_active: z.boolean().default(true),
-})
-
-type SupplierForm = z.infer<typeof supplierSchema>
 
 function AdminSuppliersContent() {
   const { organizationId } = useOrganization()

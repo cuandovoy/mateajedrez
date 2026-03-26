@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -82,8 +82,9 @@ export function AdminOrders() {
   
   // Filters - Initialize from URL params
   const statusFromUrl = searchParams.get('status') as OrderStatus | null
+  const todayStr = new Date().toISOString().split('T')[0]
   const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
+  const [endDate, setEndDate] = useState(todayStr)
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>(
     statusFromUrl && ['pending_allocation', 'pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(statusFromUrl)
       ? statusFromUrl
@@ -96,6 +97,8 @@ export function AdminOrders() {
   const [branches, setBranches] = useState<Branch[]>([])
   const [openCashSessions, setOpenCashSessions] = useState<CashSession[]>([])
   const [saleBranchId, setSaleBranchId] = useState('')
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const fetchOrdersRef = useRef<() => void>(() => {})
 
   // Update URL when status filter changes
   useEffect(() => {
@@ -113,6 +116,37 @@ export function AdminOrders() {
       fetchOpenCashSessions()
     }
   }, [organizationId, currentPage, startDate, endDate, statusFilter, discountFilter, searchTerm])
+
+  // Realtime: refetch cuando se inserta o actualiza una orden de esta org
+  useEffect(() => {
+    if (!organizationId) return
+
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+      channelRef.current = null
+    }
+
+    const channel = supabase
+      .channel(`orders:${organizationId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'orders', filter: `organization_id=eq.${organizationId}` },
+        () => { fetchOrdersRef.current() }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `organization_id=eq.${organizationId}` },
+        () => { fetchOrdersRef.current() }
+      )
+      .subscribe()
+
+    channelRef.current = channel
+
+    return () => {
+      supabase.removeChannel(channel)
+      channelRef.current = null
+    }
+  }, [organizationId])
 
   const fetchBranches = async () => {
     if (!organizationId) return
@@ -197,7 +231,6 @@ export function AdminOrders() {
           )
         })
       }
-
       setOrders(filteredData as OrderWithPayments[])
       setTotalCount(count || 0)
     } catch (error) {
@@ -206,12 +239,14 @@ export function AdminOrders() {
       setLoading(false)
     }
   }
+  // Mantener ref siempre actualizada con el closure más reciente
+  fetchOrdersRef.current = fetchOrders
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
 
   const handleResetFilters = () => {
     setStartDate('')
-    setEndDate('')
+    setEndDate(new Date().toISOString().split('T')[0])
     setStatusFilter('all')
     setDiscountFilter('all')
     setSearchTerm('')

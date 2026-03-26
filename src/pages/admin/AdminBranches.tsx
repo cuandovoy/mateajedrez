@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
+import { branchSchema } from '@/lib/schemas'
+import type { BranchForm } from '@/lib/schemas'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -32,25 +33,6 @@ import type { Branch, BranchInsert } from '@/types'
 
 type ViewMode = 'grid' | 'list'
 
-const branchSchema = z.object({
-  name: z.string().min(1, 'El nombre es requerido'),
-  code: z.string().optional().or(z.literal('')),
-  address: z.string().optional(),
-  city: z.string().optional(),
-  country: z.string().default('Uruguay'),
-  postal_code: z.string().optional(),
-  phone: z.string().optional(),
-  email: z.string().email('Email inválido').optional().or(z.literal('')),
-  is_active: z.boolean().default(true),
-  kind: z.enum(['store', 'warehouse', 'seller']).default('store'),
-  can_dispatch: z.boolean().default(true),
-  can_receive: z.boolean().default(true),
-  can_sell: z.boolean().default(true),
-  is_isolated_warehouse: z.boolean().default(false),
-  notes: z.string().optional(),
-})
-
-type BranchForm = z.infer<typeof branchSchema>
 
 function AdminBranchesContent() {
   const { organizationId } = useOrganization()
