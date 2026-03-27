@@ -119,6 +119,21 @@ export function PublicStore() {
       : []
   const hasCoverImages = coverImages.length > 0
 
+  // Vitrina settings
+  const heroShowTitle    = (settings.store_hero_show_title as boolean) !== false
+  const heroShowSubtitle = (settings.store_hero_show_subtitle as boolean) !== false
+  const heroShowCta      = (settings.store_hero_show_cta as boolean) !== false
+  const heroSubtitleText = (settings.store_hero_subtitle_text as string) || 'Bienvenido a nuestra tienda'
+  const heroOverlayOpacity = typeof settings.store_hero_overlay_opacity === 'number'
+    ? settings.store_hero_overlay_opacity
+    : 25
+  const heroTextColor    = (settings.store_hero_text_color as string) || '#ffffff'
+  const heroTextPosition = (settings.store_hero_text_position as string) ?? 'center'
+  const heroHeight       = (settings.store_hero_height as string) ?? 'md'
+
+  const heroHeightClass = { sm: 'py-10 md:py-14', md: 'py-16 md:py-24', lg: 'py-24 md:py-36', xl: 'py-36 md:py-56' }[heroHeight] ?? 'py-16 md:py-24'
+  const heroAlignClass  = { center: 'text-center items-center', left: 'text-left items-start', 'bottom-left': 'text-left items-start justify-end pb-12' }[heroTextPosition] ?? 'text-center items-center'
+
   useEffect(() => {
     setCurrentCoverIndex(0)
   }, [coverImages.join('|')])
@@ -146,7 +161,7 @@ export function PublicStore() {
     <div className="bg-white">
       {/* Hero Banner Section */}
       <section className="relative w-full mb-0">
-        <div className="relative w-full py-16 md:py-24 overflow-hidden">
+        <div className={`relative w-full ${heroHeightClass} overflow-hidden flex flex-col`}>
           {hasCoverImages ? (
             <div className="absolute inset-0">
               {coverImages.map((imageUrl, index) => (
@@ -159,54 +174,69 @@ export function PublicStore() {
                   }}
                 />
               ))}
-              <div className="absolute inset-0 bg-black/25" />
+              {heroOverlayOpacity > 0 && (
+                <div
+                  className="absolute inset-0"
+                  style={{ backgroundColor: `rgba(0,0,0,${heroOverlayOpacity / 100})` }}
+                />
+              )}
             </div>
           ) : (
             <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200" />
           )}
 
-          <div className="container-custom text-center relative z-10">
-            <h1
-              className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4"
-              style={{
-                color: hasCoverImages ? 'white' : `var(--org-primary-color, #6366f1)`,
-                fontFamily: `var(--org-font-heading, var(--org-font-family, Poppins))`,
-                textShadow: hasCoverImages ? '0 1px 2px rgba(0,0,0,0.5)' : undefined,
-              }}
-            >
-              {organization.name}
-            </h1>
-            <p
-              className="text-lg md:text-xl mb-8"
-              style={{
-                color: hasCoverImages ? 'rgba(255,255,255,0.95)' : 'rgb(75 85 99)',
-                textShadow: hasCoverImages ? '0 1px 2px rgba(0,0,0,0.4)' : undefined,
-              }}
-            >
-              Bienvenido a nuestra tienda
-            </p>
-            <Link to={`/${slug}/products`}>
-              <Button
-                size="lg"
-                className="px-8 py-4 md:px-12 md:py-5 text-base md:text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+          <div className={`container-custom relative z-10 flex flex-col flex-1 ${heroAlignClass}`}>
+            {heroShowTitle && (
+              <h1
+                className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4"
                 style={{
-                  backgroundColor: `var(--org-primary-color, #6366f1)`,
-                  color: 'white',
+                  color: hasCoverImages ? heroTextColor : `var(--org-primary-color, #6366f1)`,
+                  fontFamily: `var(--org-font-heading, var(--org-font-family, Poppins))`,
+                  textShadow: hasCoverImages ? '0 1px 2px rgba(0,0,0,0.3)' : undefined,
                 }}
               >
-                Ver Productos
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
+                {organization.name}
+              </h1>
+            )}
+
+            {heroShowSubtitle && (
+              <p
+                className="text-lg md:text-xl mb-8"
+                style={{
+                  color: hasCoverImages ? heroTextColor : 'rgb(75 85 99)',
+                  textShadow: hasCoverImages ? '0 1px 2px rgba(0,0,0,0.25)' : undefined,
+                }}
+              >
+                {heroSubtitleText}
+              </p>
+            )}
+
+            {heroShowCta && (
+              <Link to={`/${slug}/products`}>
+                <Button
+                  size="lg"
+                  className="px-8 py-4 md:px-12 md:py-5 text-base md:text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  style={{
+                    backgroundColor: `var(--org-primary-color, #6366f1)`,
+                    color: 'white',
+                  }}
+                >
+                  Ver Productos
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </Link>
+            )}
 
             {coverImages.length > 1 && (
-              <div className="mt-6 flex items-center justify-center gap-2">
+              <div className={`mt-6 flex items-center gap-2 ${heroTextPosition === 'center' ? 'justify-center' : 'justify-start'}`}>
                 {coverImages.map((_, index) => (
                   <span
                     key={`indicator-${index}`}
-                    className={`h-2 w-2 rounded-full transition-colors ${
-                      index === currentCoverIndex ? 'bg-white' : 'bg-white/45'
-                    }`}
+                    className="h-2 w-2 rounded-full transition-all"
+                    style={{
+                      backgroundColor: heroTextColor,
+                      opacity: index === currentCoverIndex ? 1 : 0.45,
+                    }}
                   />
                 ))}
               </div>

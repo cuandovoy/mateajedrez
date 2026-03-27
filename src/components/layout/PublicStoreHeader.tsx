@@ -39,6 +39,11 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
   const mobileLogoUrl = minimalLogoUrl || desktopLogoUrl
   const primaryColor = organization.primary_color || '#6366f1'
 
+  const showName = (settings.store_header_show_name as boolean) !== false
+  const logoSizeKey = (settings.store_header_logo_size as string) ?? 'md'
+  const logoSizeClass = { sm: 'h-10 w-10', md: 'h-16 w-16', lg: 'h-20 w-20' }[logoSizeKey] ?? 'h-16 w-16'
+  const logoSizeClassMobile = { sm: 'h-8 w-8', md: 'h-12 w-12', lg: 'h-14 w-14' }[logoSizeKey] ?? 'h-12 w-12'
+
   return (
     <header
       className="sticky top-0 z-30 border-b"
@@ -56,16 +61,16 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
                 <img
                   src={desktopLogoUrl}
                   alt={organization.name}
-                  className="h-16 w-16 object-contain"
+                  className={`${logoSizeClass} object-contain`}
                 />
               ) : (
-                <div className="h-16 w-16 flex items-center justify-center bg-white/20 rounded-lg">
+                <div className={`${logoSizeClass} flex items-center justify-center bg-white/20 rounded-lg`}>
                   <span className="text-white font-bold text-lg">
                     {organization.name.charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}
-              <span className="text-white font-semibold text-lg">{organization.name}</span>
+              {showName && <span className="text-white font-semibold text-lg">{organization.name}</span>}
             </Link>
           </div>
 
@@ -118,16 +123,16 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
                 <img
                   src={mobileLogoUrl}
                   alt={organization.name}
-                  className="h-12 w-12 object-contain"
+                  className={`${logoSizeClassMobile} object-contain`}
                 />
               ) : (
-                <div className="h-12 w-12 flex items-center justify-center bg-white/20 rounded-lg">
+                <div className={`${logoSizeClassMobile} flex items-center justify-center bg-white/20 rounded-lg`}>
                   <span className="text-white font-bold">
                     {organization.name.charAt(0).toUpperCase()}
                   </span>
                 </div>
               )}
-              <span className="text-white font-semibold text-sm">{organization.name}</span>
+              {showName && <span className="text-white font-semibold text-sm">{organization.name}</span>}
             </Link>
           </div>
 

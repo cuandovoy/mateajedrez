@@ -11,7 +11,7 @@ import { useAdminStore } from '@/store/adminStore'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Tables } from '@/types/database.types'
-import { Bell, Building2, CreditCard, Globe, Upload, X, ShoppingCart, AlertTriangle, RefreshCw, DollarSign, Calendar, CheckCircle, Clock, Trash2 } from 'lucide-react'
+import { Bell, Building2, CreditCard, Globe, Upload, X, ShoppingCart, AlertTriangle, RefreshCw, DollarSign, Calendar, CheckCircle, Clock, Trash2, Store, Eye, EyeOff } from 'lucide-react'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { NOTIFICATION_TYPES, parseInappConfig, type InappNotificationsConfig, type NotificationType } from '@/lib/notification-types'
 import { getOrgAccessStatus } from '@/lib/orgAccess'
@@ -199,6 +199,21 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     ...DEFAULT_DAILY_SUMMARY,
     ...(rawSettings.daily_summary as Partial<DailySummaryConfig> | undefined),
   })
+
+  // ── Vitrina / Tienda pública ───────────────────────────────────────────────
+  const [headerShowName, setHeaderShowName]     = useState((rawSettings.store_header_show_name as boolean) !== false)
+  const [headerLogoSize, setHeaderLogoSize]     = useState<'sm'|'md'|'lg'>((rawSettings.store_header_logo_size as 'sm'|'md'|'lg') ?? 'md')
+  const [heroShowTitle, setHeroShowTitle]       = useState((rawSettings.store_hero_show_title as boolean) !== false)
+  const [heroShowSubtitle, setHeroShowSubtitle] = useState((rawSettings.store_hero_show_subtitle as boolean) !== false)
+  const [heroShowCta, setHeroShowCta]           = useState((rawSettings.store_hero_show_cta as boolean) !== false)
+  const [heroSubtitleText, setHeroSubtitleText] = useState((rawSettings.store_hero_subtitle_text as string) ?? '')
+  const [heroOverlayOpacity, setHeroOverlayOpacity] = useState<number>(
+    typeof rawSettings.store_hero_overlay_opacity === 'number' ? rawSettings.store_hero_overlay_opacity : 25
+  )
+  const [heroTextColor, setHeroTextColor]       = useState<string>((rawSettings.store_hero_text_color as string) ?? '#ffffff')
+  const [heroTextPosition, setHeroTextPosition] = useState<'center'|'left'|'bottom-left'>((rawSettings.store_hero_text_position as 'center'|'left'|'bottom-left') ?? 'center')
+  const [heroHeight, setHeroHeight]             = useState<'sm'|'md'|'lg'|'xl'>((rawSettings.store_hero_height as 'sm'|'md'|'lg'|'xl') ?? 'md')
+
   const [transferMethodId, setTransferMethodId] = useState<string | null>(null)
   const [transferMethodConfig, setTransferMethodConfig] = useState<Record<string, unknown>>({})
   const [transferInstructions, setTransferInstructions] = useState('')
@@ -725,6 +740,17 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         [STORE_LOGO_MINIMAL_KEY]: finalMinimalLogoUrl,
         [STORE_COVER_IMAGES_KEY]: finalCoverUrls,
         daily_summary: dailySummary,
+        // Vitrina
+        store_header_show_name: headerShowName,
+        store_header_logo_size: headerLogoSize,
+        store_hero_show_title: heroShowTitle,
+        store_hero_show_subtitle: heroShowSubtitle,
+        store_hero_show_cta: heroShowCta,
+        store_hero_subtitle_text: heroSubtitleText.trim() || undefined,
+        store_hero_overlay_opacity: heroOverlayOpacity,
+        store_hero_text_color: heroTextColor,
+        store_hero_text_position: heroTextPosition,
+        store_hero_height: heroHeight,
       }
       const { data, error: updateError } = await supabase
         .from('organizations')
@@ -796,8 +822,8 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6 overflow-y-auto">
-      <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col shrink-0">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <Card className="w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden">
         <CardHeader className="flex flex-row items-center justify-between px-6 pb-5 border-b shrink-0">
           <CardTitle className="flex items-center gap-2">
             <Building2 className="h-5 w-5 text-admin-600" />
@@ -812,37 +838,41 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
             <X className="h-5 w-5" />
           </button>
         </CardHeader>
-        <CardContent className="pt-6 px-6 pb-6 overflow-y-auto flex-1 min-h-0">
-          <form onSubmit={handleSubmit} className="flex flex-col h-full gap-6">
-            <Tabs defaultValue="general" className="flex flex-col flex-1 min-h-0" onValueChange={(v: string) => { if (v === 'suscripcion') fetchPayments() }}>
-              <TabsList className="w-full grid grid-cols-6 shrink-0 gap-1 p-1">
-                <TabsTrigger value="general" className="flex items-center gap-1.5">
-                  <Building2 className="h-4 w-4" />
+        <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
+          <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
+            <Tabs defaultValue="general" className="flex-1 min-h-0 min-w-0" orientation="vertical" onValueChange={(v: string) => { if (v === 'suscripcion') fetchPayments() }}>
+              <TabsList>
+                <TabsTrigger value="general">
+                  <Building2 className="h-4 w-4 shrink-0 text-gray-400" />
                   General
                 </TabsTrigger>
-                <TabsTrigger value="estilos" className="flex items-center gap-1.5">
-                  <span className="text-xs">🎨</span>
+                <TabsTrigger value="estilos">
+                  <span className="h-4 w-4 shrink-0 flex items-center justify-center text-gray-400 text-xs">🎨</span>
                   Estilos
                 </TabsTrigger>
-                <TabsTrigger value="formato" className="flex items-center gap-1.5">
-                  <Globe className="h-4 w-4" />
+                <TabsTrigger value="formato">
+                  <Globe className="h-4 w-4 shrink-0 text-gray-400" />
                   Formato
                 </TabsTrigger>
-                <TabsTrigger value="pagos" className="flex items-center gap-1.5">
-                  <CreditCard className="h-4 w-4" />
-                  Pagos
+                <TabsTrigger value="pagos">
+                  <CreditCard className="h-4 w-4 shrink-0 text-gray-400" />
+                  Métodos de pago
                 </TabsTrigger>
-                <TabsTrigger value="notificaciones" className="flex items-center gap-1.5">
-                  <Bell className="h-4 w-4" />
+                <TabsTrigger value="notificaciones">
+                  <Bell className="h-4 w-4 shrink-0 text-gray-400" />
                   Notificaciones
                 </TabsTrigger>
-                <TabsTrigger value="suscripcion" className="flex items-center gap-1.5">
-                  <DollarSign className="h-4 w-4" />
+                <TabsTrigger value="vitrina">
+                  <Store className="h-4 w-4 shrink-0 text-gray-400" />
+                  Hero
+                </TabsTrigger>
+                <TabsTrigger value="suscripcion">
+                  <DollarSign className="h-4 w-4 shrink-0 text-gray-400" />
                   Suscripción
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="general" className="mt-6 space-y-6 flex-1 min-h-0">
+              <TabsContent value="general" className="p-6 space-y-6">
                 <Input
                   label="Nombre de la organización *"
                   value={name}
@@ -954,7 +984,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 </div>
               </TabsContent>
 
-              <TabsContent value="estilos" className="mt-6 space-y-6 flex-1 min-h-0">
+              <TabsContent value="estilos" className="p-6 space-y-6">
                 <p className="text-sm text-gray-600">Personaliza la apariencia de tu tienda pública.</p>
 
                 <div>
@@ -1113,7 +1143,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 </div>
               </TabsContent>
 
-              <TabsContent value="formato" className="mt-6 space-y-6 flex-1 min-h-0">
+              <TabsContent value="formato" className="p-6 space-y-6">
                 <p className="text-sm text-gray-600">Configuración regional y reglas de negocio.</p>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Moneda</label>
@@ -1318,7 +1348,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 </div>
               </TabsContent>
 
-              <TabsContent value="pagos" className="mt-6 flex-1 min-h-0">
+              <TabsContent value="pagos" className="p-6">
                 <div className="space-y-4">
                   <Input
                     label="Teléfono / WhatsApp para comprobantes"
@@ -1344,7 +1374,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 </div>
               </TabsContent>
 
-              <TabsContent value="notificaciones" className="mt-6 flex-1 min-h-0">
+              <TabsContent value="notificaciones" className="p-6">
                 <PlanGate feature="notifications_config" canUse={canUseNotifications}>
                   <div className="space-y-8">
 
@@ -1561,7 +1591,209 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
               </TabsContent>
 
               {/* ── Tab Suscripción ───────────────────────────────────────── */}
-              <TabsContent value="suscripcion" className="mt-6 flex-1 min-h-0 space-y-6">
+              {/* ── Tab Vitrina ───────────────────────────────────────────── */}
+              <TabsContent value="vitrina" className="p-6 space-y-8">
+
+                {/* Header */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-800">Encabezado de la tienda</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Configurá cómo se ve el header en la tienda pública.</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">Mostrar nombre de la organización</p>
+                        <p className="text-xs text-gray-500">Desactivá si tu logo ya incluye el nombre del negocio.</p>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={headerShowName}
+                        onChange={(e) => setHeaderShowName(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                      />
+                    </label>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Tamaño del logo</label>
+                      <div className="flex gap-2">
+                        {(['sm','md','lg'] as const).map((size) => {
+                          const labels = { sm: 'Pequeño', md: 'Mediano', lg: 'Grande' }
+                          const px = { sm: '40px', md: '64px', lg: '80px' }
+                          return (
+                            <button
+                              key={size}
+                              type="button"
+                              onClick={() => setHeaderLogoSize(size)}
+                              className={`flex-1 flex flex-col items-center gap-1 py-3 px-2 rounded-lg border text-sm transition-colors ${
+                                headerLogoSize === size
+                                  ? 'border-admin-500 bg-admin-50 text-admin-700 font-medium'
+                                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              <span className="font-mono text-xs text-gray-400">{px[size]}</span>
+                              {labels[size]}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <hr className="border-gray-100" />
+
+                {/* Hero / Banner */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-800">Banner principal (Hero)</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Controlá qué texto aparece sobre la imagen de portada.</p>
+                  </div>
+
+                  {/* Altura */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Altura del banner</label>
+                    <div className="flex gap-2">
+                      {(['sm','md','lg','xl'] as const).map((h) => {
+                        const labels = { sm: 'Compacto', md: 'Normal', lg: 'Alto', xl: 'Pantalla completa' }
+                        return (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => setHeroHeight(h)}
+                            className={`flex-1 py-2 px-1 rounded-lg border text-xs transition-colors ${
+                              heroHeight === h
+                                ? 'border-admin-500 bg-admin-50 text-admin-700 font-medium'
+                                : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                            }`}
+                          >
+                            {labels[h]}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Visibilidad de elementos */}
+                  <div className="space-y-2">
+                    <label className="block text-sm font-medium text-gray-700">Elementos visibles</label>
+                    {[
+                      { key: 'title', label: 'Nombre del negocio', desc: 'Título grande sobre el banner', value: heroShowTitle, set: setHeroShowTitle },
+                      { key: 'subtitle', label: 'Mensaje de bienvenida', desc: 'Subtítulo debajo del nombre', value: heroShowSubtitle, set: setHeroShowSubtitle },
+                      { key: 'cta', label: 'Botón "Ver Productos"', desc: 'Call to action principal', value: heroShowCta, set: setHeroShowCta },
+                    ].map(({ key, label, desc, value, set }) => (
+                      <label key={key} className="flex items-center justify-between gap-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 cursor-pointer">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {value ? <Eye className="h-4 w-4 text-gray-400 shrink-0" /> : <EyeOff className="h-4 w-4 text-gray-300 shrink-0" />}
+                          <div>
+                            <p className="text-sm font-medium text-gray-800">{label}</p>
+                            <p className="text-xs text-gray-500">{desc}</p>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={value}
+                          onChange={(e) => set(e.target.checked)}
+                          className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                        />
+                      </label>
+                    ))}
+                  </div>
+
+                  {/* Texto del subtítulo personalizado */}
+                  {heroShowSubtitle && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Texto del mensaje de bienvenida</label>
+                      <input
+                        type="text"
+                        value={heroSubtitleText}
+                        onChange={(e) => setHeroSubtitleText(e.target.value)}
+                        placeholder="Bienvenido a nuestra tienda"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">Dejalo vacío para usar el texto por defecto.</p>
+                    </div>
+                  )}
+
+                  {/* Overlay y color de texto — solo aplica con imagen */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Oscurecimiento de imagen <span className="text-gray-400">({heroOverlayOpacity}%)</span>
+                      </label>
+                      <input
+                        type="range"
+                        min={0}
+                        max={75}
+                        step={5}
+                        value={heroOverlayOpacity}
+                        onChange={(e) => setHeroOverlayOpacity(Number(e.target.value))}
+                        className="w-full accent-admin-600"
+                      />
+                      <div className="flex justify-between text-xs text-gray-400 mt-0.5">
+                        <span>Sin oscurecer</span>
+                        <span>Muy oscuro</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Color del texto</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={heroTextColor}
+                          onChange={(e) => setHeroTextColor(e.target.value)}
+                          className="h-9 w-12 rounded border border-gray-300 cursor-pointer p-0.5 bg-white"
+                          title="Elegir color"
+                        />
+                        <div className="flex gap-1.5 flex-wrap">
+                          {['#ffffff','#000000','#111827','#f9fafb','#fef3c7','#dbeafe','#fce7f3'].map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => setHeroTextColor(color)}
+                              title={color}
+                              className={`h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 ${
+                                heroTextColor === color ? 'border-admin-500 scale-110' : 'border-gray-300'
+                              }`}
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Usá blanco para imágenes oscuras, negro para imágenes claras.</p>
+                    </div>
+                  </div>
+
+                  {/* Posición del texto */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Posición del texto</label>
+                    <div className="flex gap-2">
+                      {([
+                        { value: 'center', label: 'Centro' },
+                        { value: 'left', label: 'Izquierda' },
+                        { value: 'bottom-left', label: 'Abajo izq.' },
+                      ] as const).map(({ value, label }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setHeroTextPosition(value)}
+                          className={`flex-1 py-2 px-2 rounded-lg border text-sm transition-colors ${
+                            heroTextPosition === value
+                              ? 'border-admin-500 bg-admin-50 text-admin-700 font-medium'
+                              : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="suscripcion" className="p-6 space-y-6">
                 {/* Estado actual */}
                 {(() => {
                   const orgForAccess = {
@@ -1731,13 +1963,13 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
             </Tabs>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg shrink-0">{error}</p>
+              <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg shrink-0 mx-6 mb-2">{error}</p>
             )}
-            <div className="flex gap-4 pt-5 border-t shrink-0">
+            <div className="flex gap-3 px-6 py-4 border-t shrink-0 bg-white rounded-b-lg">
               <Button type="submit" disabled={loading || uploadingLogo || uploadingMinimalLogo || uploadingCover} className="flex-1">
-                {loading || uploadingLogo || uploadingMinimalLogo || uploadingCover ? 'Guardando...' : 'Guardar'}
+                {loading || uploadingLogo || uploadingMinimalLogo || uploadingCover ? 'Guardando...' : 'Guardar cambios'}
               </Button>
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+              <Button type="button" variant="outline" onClick={onClose}>
                 Cancelar
               </Button>
             </div>
