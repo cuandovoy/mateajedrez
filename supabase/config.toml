@@ -1,0 +1,2 @@
+[functions.daily-sales-summary]
+verify_jwt = false

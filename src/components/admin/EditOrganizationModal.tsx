@@ -11,9 +11,10 @@ import { useAdminStore } from '@/store/adminStore'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Tables } from '@/types/database.types'
-import { Bell, Building2, CreditCard, Globe, Upload, X, ShoppingCart, AlertTriangle, RefreshCw } from 'lucide-react'
-import React, { useState, useEffect, useRef } from 'react'
+import { Bell, Building2, CreditCard, Globe, Upload, X, ShoppingCart, AlertTriangle, RefreshCw, DollarSign, Calendar, CheckCircle, Clock, Trash2 } from 'lucide-react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { NOTIFICATION_TYPES, parseInappConfig, type InappNotificationsConfig, type NotificationType } from '@/lib/notification-types'
+import { getOrgAccessStatus } from '@/lib/orgAccess'
 
 const INAPP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   ShoppingCart,
@@ -23,6 +24,27 @@ const INAPP_ICONS: Record<string, React.ComponentType<{ className?: string }>> =
 
 type Organization = Tables<'organizations'>
 export type OrganizationSettings = Record<string, unknown>
+
+interface DailySummaryConfig {
+  enabled: boolean
+  phone: string
+  send_hour: number
+  timezone: string
+  channel: 'whatsapp' | 'sms'
+}
+
+const DEFAULT_DAILY_SUMMARY: DailySummaryConfig = {
+  enabled:   false,
+  phone:     '',
+  send_hour: 20,
+  timezone:  'America/Montevideo',
+  channel:   'whatsapp',
+}
+
+const SUMMARY_HOURS = Array.from({ length: 24 }, (_, i) => ({
+  value: i,
+  label: `${String(i).padStart(2, '0')}:00 hs`,
+}))
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
 const MAX_FILE_SIZE_MB = 5
@@ -173,6 +195,10 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   const [inappLowStockThreshold, setInappLowStockThreshold] = useState(
     parseInappConfig(rawSettings.inapp_notifications).low_stock_threshold ?? 5
   )
+  const [dailySummary, setDailySummary] = useState<DailySummaryConfig>({
+    ...DEFAULT_DAILY_SUMMARY,
+    ...(rawSettings.daily_summary as Partial<DailySummaryConfig> | undefined),
+  })
   const [transferMethodId, setTransferMethodId] = useState<string | null>(null)
   const [transferMethodConfig, setTransferMethodConfig] = useState<Record<string, unknown>>({})
   const [transferInstructions, setTransferInstructions] = useState('')
@@ -192,6 +218,87 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   const [uploadingCover, setUploadingCover] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [sendingTest, setSendingTest] = useState(false)
+
+  // ── Tab Suscripción ────────────────────────────────────────────────────────
+  type OrgPayment = {
+    id: string
+    amount: number
+    plan: string
+    period_months: number
+    covered_from: string
+    covered_to: string
+    notes: string | null
+    created_at: string
+  }
+  const [payments, setPayments] = useState<OrgPayment[]>([])
+  const [loadingPayments, setLoadingPayments] = useState(false)
+  const [submittingPayment, setSubmittingPayment] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentPlan, setPaymentPlan] = useState<'starter' | 'profesional'>(
+    (organization.subscription_tier as 'starter' | 'profesional') ?? 'starter'
+  )
+  const [paymentPeriodMonths, setPaymentPeriodMonths] = useState(1)
+  const [paymentCoveredFrom, setPaymentCoveredFrom] = useState(() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+  })
+  const [paymentNotes, setPaymentNotes] = useState('')
+  const [paymentError, setPaymentError] = useState<string | null>(null)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any
+
+  const fetchPayments = useCallback(async () => {
+    setLoadingPayments(true)
+    try {
+      const { data } = await db
+        .from('organization_payments')
+        .select('id, amount, plan, period_months, covered_from, covered_to, notes, created_at')
+        .eq('organization_id', organization.id)
+        .order('covered_from', { ascending: false })
+        .limit(24)
+      setPayments((data as OrgPayment[]) ?? [])
+    } finally {
+      setLoadingPayments(false)
+    }
+  }, [organization.id])
+
+  const handleRegisterPayment = async () => {
+    setPaymentError(null)
+    const amount = parseFloat(paymentAmount)
+    if (!amount || amount <= 0) {
+      setPaymentError('Ingresá un monto válido')
+      return
+    }
+    setSubmittingPayment(true)
+    try {
+      const { error: rpcError } = await supabase.rpc('register_org_payment' as never, {
+        p_organization_id: organization.id,
+        p_amount: amount,
+        p_plan: paymentPlan,
+        p_period_months: paymentPeriodMonths,
+        p_covered_from: paymentCoveredFrom,
+        p_notes: paymentNotes || null,
+      } as never)
+      if (rpcError) throw rpcError
+      show('Pago registrado correctamente', 'success')
+      setPaymentAmount('')
+      setPaymentNotes('')
+      await fetchPayments()
+      await fetchOrganizations()
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : 'Error al registrar el pago')
+    } finally {
+      setSubmittingPayment(false)
+    }
+  }
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!confirm('¿Eliminar este pago del historial?')) return
+    await db.from('organization_payments').delete().eq('id', paymentId)
+    await fetchPayments()
+  }
 
   useEffect(() => {
     setName(organization.name)
@@ -249,6 +356,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     const parsedInapp = parseInappConfig(s.inapp_notifications)
     setInappNotifications(parsedInapp)
     setInappLowStockThreshold(parsedInapp.low_stock_threshold ?? 5)
+    setDailySummary({ ...DEFAULT_DAILY_SUMMARY, ...(s.daily_summary as Partial<DailySummaryConfig> | undefined) })
     setTransferMethodId(null)
     setTransferMethodConfig({})
     setTransferInstructions('')
@@ -377,7 +485,8 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
     inappNotifications.new_order !== prevInapp.new_order ||
     inappNotifications.low_stock !== prevInapp.low_stock ||
     inappNotifications.order_status_change !== prevInapp.order_status_change ||
-    inappLowStockThreshold !== (prevInapp.low_stock_threshold ?? 5)
+    inappLowStockThreshold !== (prevInapp.low_stock_threshold ?? 5) ||
+    JSON.stringify(dailySummary) !== JSON.stringify({ ...DEFAULT_DAILY_SUMMARY, ...(prevSettings.daily_summary as Partial<DailySummaryConfig> | undefined) })
 
   useEffect(() => {
     setHasUnsavedChanges(Boolean(isDirty))
@@ -390,6 +499,26 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
       setConsignmentDefaultWarehouseBranchId('')
     }
   }, [consignmentEnabled])
+
+  const handleTestSend = async () => {
+    if (!dailySummary.phone.trim()) {
+      show('Configurá un número de teléfono antes de probar', 'error')
+      return
+    }
+    setSendingTest(true)
+    try {
+      const { error: fnError } = await supabase.functions.invoke('daily-sales-summary', {
+        body: { organization_id: organization.id, test: true },
+      })
+      if (fnError) throw fnError
+      show('Mensaje de prueba enviado', 'success')
+    } catch (err) {
+      show('Error al enviar el mensaje de prueba', 'error')
+      console.error(err)
+    } finally {
+      setSendingTest(false)
+    }
+  }
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -595,6 +724,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         },
         [STORE_LOGO_MINIMAL_KEY]: finalMinimalLogoUrl,
         [STORE_COVER_IMAGES_KEY]: finalCoverUrls,
+        daily_summary: dailySummary,
       }
       const { data, error: updateError } = await supabase
         .from('organizations')
@@ -684,8 +814,8 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         </CardHeader>
         <CardContent className="pt-6 px-6 pb-6 overflow-y-auto flex-1 min-h-0">
           <form onSubmit={handleSubmit} className="flex flex-col h-full gap-6">
-            <Tabs defaultValue="general" className="flex flex-col flex-1 min-h-0">
-              <TabsList className="w-full grid grid-cols-5 shrink-0 gap-1 p-1">
+            <Tabs defaultValue="general" className="flex flex-col flex-1 min-h-0" onValueChange={(v: string) => { if (v === 'suscripcion') fetchPayments() }}>
+              <TabsList className="w-full grid grid-cols-6 shrink-0 gap-1 p-1">
                 <TabsTrigger value="general" className="flex items-center gap-1.5">
                   <Building2 className="h-4 w-4" />
                   General
@@ -705,6 +835,10 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 <TabsTrigger value="notificaciones" className="flex items-center gap-1.5">
                   <Bell className="h-4 w-4" />
                   Notificaciones
+                </TabsTrigger>
+                <TabsTrigger value="suscripcion" className="flex items-center gap-1.5">
+                  <DollarSign className="h-4 w-4" />
+                  Suscripción
                 </TabsTrigger>
               </TabsList>
 
@@ -1324,8 +1458,275 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                       </div>
                     </div>
 
+                    {/* Resumen diario por Twilio */}
+                    <div className="space-y-4 border-t pt-6">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-800">Resumen diario por WhatsApp / SMS</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          Envía ventas y gastos del día vía Twilio al finalizar la jornada.
+                        </p>
+                      </div>
+
+                      {/* Activar */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-700">Activar envío diario</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={dailySummary.enabled}
+                          onClick={() => setDailySummary((c) => ({ ...c, enabled: !c.enabled }))}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-admin-500 ${dailySummary.enabled ? 'bg-admin-600' : 'bg-gray-300'}`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${dailySummary.enabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                      </div>
+
+                      {/* Canal */}
+                      <div>
+                        <p className="text-xs font-medium text-gray-600 mb-1.5">Canal</p>
+                        <div className="flex gap-2">
+                          {(['whatsapp', 'sms'] as const).map((ch) => (
+                            <button
+                              key={ch}
+                              type="button"
+                              onClick={() => setDailySummary((c) => ({ ...c, channel: ch }))}
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+                                dailySummary.channel === ch
+                                  ? 'border-admin-600 bg-admin-50 text-admin-700'
+                                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                              }`}
+                            >
+                              {ch === 'whatsapp' ? 'WhatsApp' : 'SMS'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Teléfono */}
+                      <Input
+                        label="Número destino"
+                        placeholder="+598912345678"
+                        value={dailySummary.phone}
+                        onChange={(e) => setDailySummary((c) => ({ ...c, phone: e.target.value }))}
+                      />
+
+                      {/* Hora + timezone */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Hora de envío</label>
+                          <select
+                            value={dailySummary.send_hour}
+                            onChange={(e) => setDailySummary((c) => ({ ...c, send_hour: Number(e.target.value) }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-admin-500"
+                          >
+                            {SUMMARY_HOURS.map((h) => (
+                              <option key={h.value} value={h.value}>{h.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Zona horaria</label>
+                          <select
+                            value={dailySummary.timezone}
+                            onChange={(e) => setDailySummary((c) => ({ ...c, timezone: e.target.value }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-admin-500"
+                          >
+                            {TIMEZONES.map((tz) => (
+                              <option key={tz.value} value={tz.value}>{tz.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Envío manual de prueba */}
+                      <div className="pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={sendingTest || !dailySummary.phone.trim()}
+                          onClick={handleTestSend}
+                          title="Envía el resumen de hoy ahora mismo, sin importar la hora ni el estado de activación"
+                        >
+                          {sendingTest ? 'Enviando...' : 'Enviar resumen ahora'}
+                        </Button>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Útil para probar la configuración. No cuenta como envío automático del día.
+                        </p>
+                      </div>
+                    </div>
+
                   </div>
                 </PlanGate>
+              </TabsContent>
+
+              {/* ── Tab Suscripción ───────────────────────────────────────── */}
+              <TabsContent value="suscripcion" className="mt-6 flex-1 min-h-0 space-y-6">
+                {/* Estado actual */}
+                {(() => {
+                  const orgForAccess = {
+                    subscription_status: organization.subscription_status,
+                    subscription_tier: organization.subscription_tier,
+                    trial_ends_at: (organization as Record<string, unknown>).trial_ends_at as string | null,
+                    subscription_expires_at: (organization as Record<string, unknown>).subscription_expires_at as string | null,
+                  }
+                  const access = getOrgAccessStatus(orgForAccess)
+                  const statusColors: Record<string, string> = {
+                    trialing: 'bg-amber-50 border-amber-200 text-amber-800',
+                    active: 'bg-green-50 border-green-200 text-green-800',
+                    blocked: 'bg-red-50 border-red-200 text-red-800',
+                  }
+                  const statusLabels: Record<string, string> = {
+                    trialing: 'En prueba',
+                    active: 'Activa',
+                    blocked: 'Bloqueada',
+                  }
+                  const tierLabel = organization.subscription_tier === 'profesional' ? 'Profesional' : 'Starter'
+                  return (
+                    <div className={`rounded-lg border p-4 ${statusColors[access.status]}`}>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          {access.status === 'active' && <CheckCircle className="h-5 w-5" />}
+                          {access.status === 'trialing' && <Clock className="h-5 w-5" />}
+                          {access.status === 'blocked' && <AlertTriangle className="h-5 w-5" />}
+                          <span className="font-semibold">{statusLabels[access.status]}</span>
+                          <span className="text-sm opacity-75">· Plan {tierLabel}</span>
+                        </div>
+                        {access.status !== 'blocked' && access.blocksAt && (
+                          <span className="text-sm">
+                            {access.status === 'trialing' ? 'Trial vence' : 'Vence'}: <strong>{access.blocksAt.toLocaleDateString('es-UY')}</strong>
+                            {' '}({access.daysLeft} día{access.daysLeft !== 1 ? 's' : ''})
+                          </span>
+                        )}
+                        {access.status === 'blocked' && (
+                          <span className="text-sm font-medium">Sin acceso · Registrá un pago para reactivar</span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Registrar pago */}
+                <div className="border rounded-lg p-4 space-y-4">
+                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-green-600" />
+                    Registrar pago
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Monto ($)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={paymentAmount}
+                        onChange={(e) => setPaymentAmount(e.target.value)}
+                        placeholder="1700"
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Plan</label>
+                      <select
+                        value={paymentPlan}
+                        onChange={(e) => setPaymentPlan(e.target.value as 'starter' | 'profesional')}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      >
+                        <option value="starter">Starter</option>
+                        <option value="profesional">Profesional</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Mes cubierto (desde)</label>
+                      <input
+                        type="date"
+                        value={paymentCoveredFrom}
+                        onChange={(e) => setPaymentCoveredFrom(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Meses</label>
+                      <select
+                        value={paymentPeriodMonths}
+                        onChange={(e) => setPaymentPeriodMonths(Number(e.target.value))}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      >
+                        {[1,2,3,6,12].map((m) => (
+                          <option key={m} value={m}>{m} {m === 1 ? 'mes' : 'meses'}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notas (opcional)</label>
+                    <input
+                      type="text"
+                      value={paymentNotes}
+                      onChange={(e) => setPaymentNotes(e.target.value)}
+                      placeholder="Ej: transferencia banco, referencia #123"
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                    />
+                  </div>
+
+                  {paymentError && (
+                    <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded">{paymentError}</p>
+                  )}
+
+                  <Button
+                    type="button"
+                    onClick={handleRegisterPayment}
+                    disabled={submittingPayment}
+                    className="w-full gap-2"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    {submittingPayment ? 'Registrando...' : 'Registrar pago y activar'}
+                  </Button>
+                </div>
+
+                {/* Historial */}
+                <div className="border rounded-lg p-4 space-y-3">
+                  <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    Historial de pagos
+                  </h3>
+
+                  {loadingPayments ? (
+                    <p className="text-sm text-gray-500">Cargando...</p>
+                  ) : payments.length === 0 ? (
+                    <p className="text-sm text-gray-400 italic">Sin pagos registrados aún.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {payments.map((p) => (
+                        <div key={p.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2 gap-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="font-medium text-gray-900 shrink-0">
+                              ${Number(p.amount).toLocaleString('es-UY')}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700 shrink-0 capitalize">
+                              {p.plan}
+                            </span>
+                            <span className="text-gray-500 truncate">
+                              {new Date(p.covered_from + 'T12:00:00').toLocaleDateString('es-UY', { month: 'short', year: 'numeric' })}
+                              {p.period_months > 1 && ` + ${p.period_months - 1} mes${p.period_months > 2 ? 'es' : ''}`}
+                            </span>
+                            {p.notes && <span className="text-gray-400 truncate hidden md:block">· {p.notes}</span>}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePayment(p.id)}
+                            className="text-gray-400 hover:text-red-500 shrink-0 p-1"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
 

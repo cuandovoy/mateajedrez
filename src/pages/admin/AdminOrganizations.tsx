@@ -5,12 +5,11 @@ import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useAuthStore } from '@/store/authStore'
 import { Building2, Plus, Pencil, Bug } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { CreateOrganizationModal } from '@/components/admin/CreateOrganizationModal'
 import { EditOrganizationModal } from '@/components/admin/EditOrganizationModal'
 import type { Organization } from '@/types/database.types'
-import { useState } from 'react'
 
 export function AdminOrganizations() {
   const { organizations, currentOrganization, setCurrentOrganization, fetchOrganizations } =

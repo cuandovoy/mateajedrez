@@ -33,6 +33,7 @@ import { NotificationBell } from '@/components/admin/NotificationBell'
 import { ToastContainer } from './ToastContainer'
 import { CreateOrganizationModal } from '@/components/admin/CreateOrganizationModal'
 import { PermissionGate } from '@/components/features/PermissionGate'
+import { OrgAccessGate } from '@/components/features/OrgAccessGate'
 import type { Permission } from '@/lib/permissions'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { Button } from '@/components/ui/Button'
@@ -465,10 +466,12 @@ export function AdminLayout() {
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-admin-600" />
             </div>
           )}
-          <div className="p-4 md:p-6 pb-20 lg:pb-6">
-            <AdminBreadcrumbs />
-            <Outlet />
-          </div>
+          <OrgAccessGate>
+            <div className="p-4 md:p-6 pb-20 lg:pb-6">
+              <AdminBreadcrumbs />
+              <Outlet />
+            </div>
+          </OrgAccessGate>
         </main>
       </div>
 

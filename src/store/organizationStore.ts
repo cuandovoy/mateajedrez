@@ -50,7 +50,7 @@ export const useOrganizationStore = create<OrganizationState>()(
               id,
               role,
               organization_id,
-              organizations(id, name, slug, logo_url, cover_image_url, primary_color, secondary_color, accent_color, font_family, font_heading, border_radius, button_style, settings, subscription_tier, subscription_status, created_at, updated_at)
+              organizations(id, name, slug, logo_url, cover_image_url, primary_color, secondary_color, accent_color, font_family, font_heading, border_radius, button_style, settings, subscription_tier, subscription_status, trial_ends_at, subscription_expires_at, created_at, updated_at)
             `)
             .eq('user_id', user.id)
 
@@ -110,8 +110,10 @@ export const useOrganizationStore = create<OrganizationState>()(
           return {
             ...row,
             settings: row.settings ?? {},
-            subscription_tier: 'starter',
-            subscription_status: 'active',
+            subscription_tier: (row as Record<string, unknown>).subscription_tier as string ?? 'starter',
+            subscription_status: (row as Record<string, unknown>).subscription_status as string ?? 'trialing',
+            trial_ends_at: (row as Record<string, unknown>).trial_ends_at as string ?? null,
+            subscription_expires_at: (row as Record<string, unknown>).subscription_expires_at as string ?? null,
           } as Organization
         } catch {
           return null

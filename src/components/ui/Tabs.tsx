@@ -8,6 +8,7 @@ interface TabsProps {
   defaultValue: string
   children: React.ReactNode
   className?: string
+  onValueChange?: (value: string) => void
 }
 
 interface TabsListProps {
@@ -45,8 +46,13 @@ function useTabs() {
   return context
 }
 
-export function Tabs({ defaultValue, children, className }: TabsProps) {
-  const [value, onChange] = useState(defaultValue)
+export function Tabs({ defaultValue, children, className, onValueChange }: TabsProps) {
+  const [value, setValueState] = useState(defaultValue)
+
+  const onChange = (v: string) => {
+    setValueState(v)
+    onValueChange?.(v)
+  }
 
   return (
     <TabsContext.Provider value={{ value, onChange }}>
