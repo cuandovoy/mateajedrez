@@ -24,6 +24,7 @@ import { AdminInventory } from '@/pages/admin/AdminInventory'
 import { AdminInventoryReports } from '@/pages/admin/AdminInventoryReports'
 import { AdminOrderDetail } from '@/pages/admin/AdminOrderDetail'
 import { AdminOrders } from '@/pages/admin/AdminOrders'
+import { AdminBillerComprobantes } from '@/pages/admin/AdminBillerComprobantes'
 import { AdminProducts } from '@/pages/admin/AdminProducts'
 import { AdminRolesPermissions } from '@/pages/admin/AdminRolesPermissions'
 import { AdminSales } from '@/pages/admin/AdminSales'
@@ -92,6 +93,7 @@ function App() {
           <Route path="/suppliers" element={<AdminSuppliers />} />
           <Route path="/orders" element={<AdminOrders />} />
           <Route path="/orders/:id" element={<AdminOrderDetail />} />
+          <Route path="/billing/comprobantes" element={<AdminBillerComprobantes />} />
           <Route path="/customers" element={<AdminCustomers />} />
           <Route path="/customers/:id" element={<AdminCustomerDetail />} />
           <Route path="/expenses" element={<AdminExpenses />} />

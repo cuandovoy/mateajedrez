@@ -11,10 +11,15 @@ import { useToastStore } from '@/store/toastStore'
 import type { CashSession, Product } from '@/types'
 import type { OrderInsert, OrderPaymentInsert } from '@/types/database.types'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { BillerCheckoutPanel } from '@/components/features/BillerCheckoutPanel'
+import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
+import { useBillerConfig } from '@/hooks/useBillerConfig'
+import type { CheckoutBillerState } from '@/types/biller'
 import { ChevronDown, ChevronUp, DollarSign, Edit2, Minus, Plus, Search, ShoppingCart, Trash2, UserCheck, Users, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
 
 interface ManualSaleFormProps {
   branchId: string
@@ -118,6 +123,15 @@ export function ManualSaleForm({
   const currentOrganization = useOrganizationStore((s) => s.currentOrganization)
   const currentMemberRole = organizations.find((o) => o.id === currentOrganization?.id)?.member?.role
   const canApplyManualDiscount = currentMemberRole === 'admin' || currentMemberRole === 'manager'
+
+  
+  
+  const { config: billerConfig } = useBillerConfig(organizationId ?? null)
+  console.log("billerConfig: ", billerConfig);
+  const [billerState, setBillerState] = useState<CheckoutBillerState>({
+    emitirCFE: false,
+    tipoComprobante: 'ticket',
+  })
 
   // Get current cash session for the selected branch
   const currentCashSession = openCashSessions?.find((s) => s.branch_id === branchId) || null
@@ -880,6 +894,28 @@ export function ManualSaleForm({
         })
       }
 
+      // Emitir CFE si está habilitado
+      if (billerState.emitirCFE && billerConfig) {
+        try {
+          const { pdfBlob } = await emitirCFEDesdeOrden(billerConfig, {
+            id: (order as { id: string }).id,
+            organization_id: organizationId,
+            payment_method: data.payment_method ?? null,
+            items: saleLines.map((line) => ({
+              product_id: line.product_id ?? line.id,
+              variant_id: line.variant_id ?? null,
+              quantity: line.quantity,
+              price: line.price,
+              name: line.product_name,
+            })),
+          }, billerState)
+          descargarPDFBlob(pdfBlob, `cfe-${(order as { id: string }).id}.pdf`)
+          show('CFE emitido correctamente', 'success')
+        } catch (e) {
+          show(e instanceof BillerApiError ? `CFE: ${e.message}` : 'Error al emitir el CFE (la venta fue registrada)', 'error')
+        }
+      }
+
       show(
         isCreditSale
           ? 'Venta a crédito registrada como completada (cobro pendiente).'
@@ -1405,6 +1441,13 @@ export function ManualSaleForm({
               )}
             </div>
           </div>
+
+          {/* CFE */}
+          {billerConfig && (
+            <div className="flex-shrink-0 px-4 pb-2">
+              <BillerCheckoutPanel config={billerConfig} onChange={setBillerState} />
+            </div>
+          )}
 
           {/* Submit buttons */}
           <div className="flex-shrink-0 border-t bg-white p-4 space-y-2">

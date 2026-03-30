@@ -11,7 +11,9 @@ import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch, Order, OrderItem } from '@/types'
 import type { OrderPayment } from '@/types/database.types'
-import { ArrowLeft, Calendar, DollarSign, Edit2, FileText, MapPin, Minus, Package, Phone, Plus, Save, Trash2, User, X } from 'lucide-react'
+import { obtenerPDF, anularComprobante, BillerApiError, descargarPDFBlob } from '@/lib/biller'
+import type { BillerConfig } from '@/types/biller'
+import { ArrowLeft, Calendar, DollarSign, Edit2, FileText, MapPin, Minus, Package, Phone, Plus, Receipt, Save, Trash2, User, X } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -134,6 +136,13 @@ export function AdminOrderDetail() {
   const [editItems, setEditItems] = useState<OrderItemWithProduct[]>([])
   const [orderDiscountRules, setOrderDiscountRules] = useState<SalesDiscountRule[]>([])
   const [itemDiscountRules, setItemDiscountRules] = useState<SalesDiscountRule[]>([])
+  const [billerComprobante, setBillerComprobante] = useState<{
+    id: string; biller_id: number; tipo_comprobante: number; serie: string | null
+    numero: number | null; estado: string
+  } | null>(null)
+  const [billerConfig, setBillerConfig] = useState<BillerConfig | null>(null)
+  const [downloadingPDF, setDownloadingPDF] = useState(false)
+  const [annullingCFE, setAnnullingCFE] = useState(false)
 
   const fetchOrder = useCallback(async () => {
     if (!id) return
@@ -213,6 +222,28 @@ export function AdminOrderDetail() {
         user_profile: userProfile,
         customer,
       })
+
+      // Load CFE comprobante for this order
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: cfeData } = await (supabase as any)
+        .from('biller_comprobantes')
+        .select('id, biller_id, tipo_comprobante, serie, numero, estado')
+        .eq('order_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      setBillerComprobante(cfeData ?? null)
+
+      // Load biller config for org (needed to call API for PDF/annul)
+      if (ord.organization_id) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: cfgData } = await (supabase as any)
+          .from('biller_config')
+          .select('*')
+          .eq('organization_id', ord.organization_id)
+          .maybeSingle()
+        setBillerConfig(cfgData ?? null)
+      }
     } catch (error) {
       console.error('Error fetching order:', error)
       show('Error al cargar la orden', 'error')
@@ -1044,6 +1075,39 @@ export function AdminOrderDetail() {
     }
   }
 
+  const handleDownloadCFEPDF = async () => {
+    if (!billerComprobante || !billerConfig) return
+    setDownloadingPDF(true)
+    try {
+      const blob = await obtenerPDF(billerConfig, billerComprobante.biller_id)
+      descargarPDFBlob(blob, `cfe-${billerComprobante.numero ?? billerComprobante.biller_id}.pdf`)
+    } catch (e) {
+      show(e instanceof BillerApiError ? e.message : 'Error al descargar el PDF del CFE', 'error')
+    } finally {
+      setDownloadingPDF(false)
+    }
+  }
+
+  const handleAnnulCFE = async () => {
+    if (!billerComprobante || !billerConfig || !id) return
+    if (!window.confirm('¿Anular el comprobante fiscal electrónico? Esta acción no se puede deshacer.')) return
+    setAnnullingCFE(true)
+    try {
+      await anularComprobante(billerConfig, billerComprobante.biller_id)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
+        .from('biller_comprobantes')
+        .update({ estado: 'anulado' })
+        .eq('id', billerComprobante.id)
+      setBillerComprobante({ ...billerComprobante, estado: 'anulado' })
+      show('Comprobante anulado correctamente', 'success')
+    } catch (e) {
+      show(e instanceof BillerApiError ? e.message : 'Error al anular el comprobante', 'error')
+    } finally {
+      setAnnullingCFE(false)
+    }
+  }
+
   const filteredProducts = products.filter(
     (p) =>
       productSearch.trim().length > 0 ||
@@ -1616,6 +1680,63 @@ export function AdminOrderDetail() {
               </div>
             </CardContent>
           </Card>
+
+          {/* CFE Biller card */}
+          {billerComprobante && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center space-x-2">
+                    <Receipt className="h-5 w-5" />
+                    <span>Comprobante Fiscal Electrónico</span>
+                  </span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    billerComprobante.estado === 'emitido'
+                      ? 'bg-teal-100 text-teal-700'
+                      : billerComprobante.estado === 'anulado'
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-gray-100 text-gray-700'
+                  }`}>
+                    {billerComprobante.estado === 'emitido' ? 'Emitido' : billerComprobante.estado === 'anulado' ? 'Anulado' : billerComprobante.estado}
+                  </span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-gray-500">Tipo</p>
+                    <p className="font-medium">{billerComprobante.tipo_comprobante === 101 ? 'e-Ticket' : billerComprobante.tipo_comprobante === 111 ? 'e-Factura' : `Tipo ${billerComprobante.tipo_comprobante}`}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Número</p>
+                    <p className="font-medium font-mono">{billerComprobante.serie ?? ''}{billerComprobante.numero ? ` ${billerComprobante.numero}` : '—'}</p>
+                  </div>
+                </div>
+                {billerComprobante.estado === 'emitido' && billerConfig && (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleDownloadCFEPDF}
+                      disabled={downloadingPDF}
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      {downloadingPDF ? 'Descargando...' : 'Descargar PDF'}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={handleAnnulCFE}
+                      disabled={annullingCFE}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      {annullingCFE ? 'Anulando...' : 'Anular CFE'}
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="space-y-6">

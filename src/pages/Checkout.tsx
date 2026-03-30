@@ -1,7 +1,11 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { BillerCheckoutPanel } from '@/components/features/BillerCheckoutPanel'
+import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
+import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { supabase } from '@/lib/supabase'
+import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
@@ -48,6 +52,11 @@ export function Checkout() {
   const checkoutStockAllocationMode = settings.checkout_stock_allocation_mode === 'manual' ? 'manual' : 'immediate'
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<string>('')
+  const [billerConfig, setBillerConfig] = useState<BillerConfig | null>(null)
+  const [billerState, setBillerState] = useState<CheckoutBillerState>({
+    emitirCFE: false,
+    tipoComprobante: 'ticket',
+  })
   const [mainBranchId, setMainBranchId] = useState<string | null>(null)
   const [formData, setFormData] = useState<ShippingForm>({
     fullName: '',
@@ -60,6 +69,18 @@ export function Checkout() {
     country: 'Uruguay',
   })
   const [errors, setErrors] = useState<Partial<ShippingForm>>({})
+
+  // Cargar configuración de Biller si la org la tiene activa
+  useEffect(() => {
+    if (!organizationId) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(supabase as any)
+      .from('biller_config')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .maybeSingle()
+      .then(({ data }: { data: BillerConfig | null }) => setBillerConfig(data))
+  }, [organizationId])
 
   // Fetch main branch on mount (filter by org when available)
   useEffect(() => {
@@ -544,6 +565,41 @@ export function Checkout() {
         }
       }
 
+      // Emitir CFE si el operador lo activó y la org tiene Biller configurado
+      if (billerState.emitirCFE && billerConfig) {
+        try {
+          const orderItemsForBiller = items.map((item) => ({
+            product_id: item.product_id,
+            variant_id: item.variant_id || null,
+            quantity: item.quantity,
+            price: item.variant?.price ?? item.product.price,
+            name: item.product.name,
+          }))
+
+          const { pdfBlob } = await emitirCFEDesdeOrden(
+            billerConfig,
+            {
+              id: (order as { id: string }).id,
+              organization_id: organizationId!,
+              payment_method: paymentMethod,
+              items: orderItemsForBiller,
+            },
+            billerState,
+          )
+
+          descargarPDFBlob(pdfBlob, `cfe-${(order as { id: string }).id}.pdf`)
+          show('Comprobante electrónico emitido correctamente', 'success')
+        } catch (billerErr) {
+          // La orden ya se guardó — no se revierte.
+          // El operador puede reintentar desde el historial.
+          const msg = billerErr instanceof BillerApiError
+            ? `Biller error ${billerErr.status}: el comprobante no pudo emitirse.`
+            : 'El comprobante electrónico no pudo emitirse.'
+          console.error('Error emitiendo CFE:', billerErr)
+          show(`Orden confirmada. ${msg} Podés reintentarlo desde el historial.`, 'error')
+        }
+      }
+
       // Clear cart
       await clearCart()
 
@@ -820,6 +876,14 @@ export function Checkout() {
                     Tus datos serán guardados para futuras compras
                   </p>
                 </div>
+
+                {/* Panel CFE — solo visible si la org tiene Biller configurado */}
+                {billerConfig && (
+                  <BillerCheckoutPanel
+                    config={billerConfig}
+                    onChange={setBillerState}
+                  />
+                )}
 
                 <Button
                   type="submit"

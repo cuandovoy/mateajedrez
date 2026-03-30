@@ -1,2 +1,5 @@
 [functions.daily-sales-summary]
 verify_jwt = false
+
+[functions.biller-proxy]
+verify_jwt = false

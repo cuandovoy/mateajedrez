@@ -104,17 +104,24 @@ function AdminCashRegisterContent() {
   }
 
   const fetchSessions = async () => {
+    if (!organizationId) {
+      setSessions([])
+      return
+    }
+
     try {
       setLoading(true)
       // Fetch sessions and calculate expected_amount
       const { data, error } = await supabase
         .from('cash_sessions')
-        .select('*')
+        .select('*, branches!inner(organization_id)')
+        .eq('branches.organization_id', organizationId)
         .order('opened_at', { ascending: false })
 
       if (error) throw error
 
-      const sessionsData = (data || []) as CashSession[]
+      const sessionsData = ((data || []) as Array<CashSession & { branches?: { organization_id: string } }>)
+        .map(({ branches: _branch, ...session }) => session)
 
       // expected_amount = apertura + ventas efectivo (excluyendo órdenes canceladas/devoluciones)
       const sessionsWithExpected = await Promise.all(
@@ -135,6 +142,7 @@ function AdminCashRegisterContent() {
                 .from('orders')
                 .select('id, status')
                 .in('id', orderIds)
+                .eq('organization_id', organizationId)
 
               const validOrderIds = new Set(
                 (ordersData || []).filter((o) => o.status !== 'cancelled').map((o) => o.id)

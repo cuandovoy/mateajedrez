@@ -4,10 +4,10 @@ import { useAdminStore } from '@/store/adminStore'
 import { useAuthStore } from '@/store/authStore'
 import { useOrganizationStore } from '@/store/organizationStore'
 import {
-  LayoutDashboard, 
-  Package, 
-  Folder, 
-  ShoppingCart, 
+  LayoutDashboard,
+  Package,
+  Folder,
+  ShoppingCart,
   Users,
   LogOut,
   Truck,
@@ -24,7 +24,8 @@ import {
   Users2,
   CreditCard,
   Store,
-  StoreIcon
+  StoreIcon,
+  Receipt,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AdminBreadcrumbs } from '@/components/admin/AdminBreadcrumbs'
@@ -50,6 +51,8 @@ type NavItem = {
   adminOnly?: boolean
   /** Feature requerida por plan (ej: transfers, cash_register) */
   planFeature?: 'transfers' | 'cash_register' | 'advanced_reports'
+  /** Ocultar si la org tiene menos sucursales activas que este valor */
+  minBranches?: number
 }
 
 type NavSection = {
@@ -61,7 +64,7 @@ export function AdminLayout() {
   const { user, isAdmin, canAccessAdminPanel, signOut, loading, profile } = useAuthStore()
   const canCreateOrganization = profile?.role === 'admin'
   const { currentOrganization, organizations, setCurrentOrganization, fetchOrganizations, switchingOrganization } = useOrganizationStore()
-  const { canUseFeature } = usePlanLimits()
+  const { canUseFeature, branchCount } = usePlanLimits()
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -120,10 +123,11 @@ export function AdminLayout() {
       title: 'Operación',
       items: [
         { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
+        { path: '/billing/comprobantes', label: 'Comprobantes CFE', icon: Receipt },
         { path: '/expenses', label: 'Compras y Egresos', icon: Wallet },
         { path: '/customers', label: 'Clientes', icon: Users2, permission: 'customers:view' },
         { path: '/cash-register', label: 'Punto de Venta', icon: StoreIcon, planFeature: 'cash_register' },
-        { path: '/transfers', label: 'Transferencias', icon: ArrowRight, planFeature: 'transfers' },
+        { path: '/transfers', label: 'Transferencias', icon: ArrowRight, planFeature: 'transfers', minBranches: 2 },
       ],
     },
     {
@@ -361,6 +365,7 @@ export function AdminLayout() {
                     {section.items
                       .filter((item) => {
                         if (item.adminOnly && !isAdmin) return false
+                        if (item.minBranches && branchCount < item.minBranches) return false
                         if (section.title === 'Reportes') return true
                         return !item.planFeature || canUseFeature(item.planFeature)
                       })

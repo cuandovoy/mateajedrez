@@ -54,6 +54,11 @@ type CustomerLite = {
   phone: string
   rut?: string | null
 }
+type BillerComprobanteLite = {
+  id: string
+  estado: string
+  tipo_comprobante: number
+}
 
 type ShippingAddressLite = {
   fullName?: string
@@ -67,6 +72,7 @@ type ShippingAddressLite = {
 type OrderWithPayments = Order & {
   order_payments?: OrderPaymentLite[] | null
   customer?: CustomerLite | null
+  biller_comprobantes?: BillerComprobanteLite[] | null
 }
 
 const ITEMS_PER_PAGE = 20
@@ -231,7 +237,29 @@ export function AdminOrders() {
           )
         })
       }
-      setOrders(filteredData as OrderWithPayments[])
+      // Fetch CFE data for visible orders
+      const orderIds = (filteredData as { id: string }[]).map((o) => o.id)
+      let cfeMap: Record<string, BillerComprobanteLite> = {}
+      if (orderIds.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: cfeData } = await (supabase as any)
+          .from('biller_comprobantes')
+          .select('id, order_id, estado, tipo_comprobante')
+          .in('order_id', orderIds)
+          .eq('estado', 'emitido')
+        if (cfeData) {
+          for (const c of cfeData as (BillerComprobanteLite & { order_id: string })[]) {
+            cfeMap[c.order_id] = c
+          }
+        }
+      }
+
+      setOrders(
+        (filteredData as OrderWithPayments[]).map((o) => ({
+          ...o,
+          biller_comprobantes: cfeMap[o.id] ? [cfeMap[o.id]] : [],
+        }))
+      )
       setTotalCount(count || 0)
     } catch (error) {
       console.error('Error fetching orders:', error)
@@ -489,7 +517,14 @@ export function AdminOrders() {
                     <div key={order.id} className="p-4 space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="font-semibold text-gray-900">{formatOrderDisplayNumber(order)}</p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-semibold text-gray-900">{formatOrderDisplayNumber(order)}</p>
+                            {order.biller_comprobantes && order.biller_comprobantes.length > 0 && (
+                              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-teal-100 text-teal-700">
+                                CFE
+                              </span>
+                            )}
+                          </div>
                           <p className="text-sm text-gray-600 flex items-center gap-1">
                             {customerName || 'Sin nombre'}
                             {isGuest && (
@@ -551,7 +586,14 @@ export function AdminOrders() {
                         <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-4">
                             <div>
-                              <p className="font-semibold text-gray-900">{formatOrderDisplayNumber(order)}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-semibold text-gray-900">{formatOrderDisplayNumber(order)}</p>
+                                {order.biller_comprobantes && order.biller_comprobantes.length > 0 && (
+                                  <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-teal-100 text-teal-700">
+                                    CFE
+                                  </span>
+                                )}
+                              </div>
                               <p className="font-mono text-xs text-gray-500">{order.id.slice(0, 8)}...</p>
                             </div>
                           </td>

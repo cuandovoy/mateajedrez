@@ -11,10 +11,13 @@ import { useAdminStore } from '@/store/adminStore'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Tables } from '@/types/database.types'
-import { Bell, Building2, CreditCard, Globe, Upload, X, ShoppingCart, AlertTriangle, RefreshCw, DollarSign, Calendar, CheckCircle, Clock, Trash2, Store, Eye, EyeOff } from 'lucide-react'
+import { Bell, Building2, CreditCard, Globe, Upload, X, ShoppingCart, AlertTriangle, RefreshCw, DollarSign, Calendar, CheckCircle, Clock, Trash2, Store, Eye, EyeOff, Receipt } from 'lucide-react'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { NOTIFICATION_TYPES, parseInappConfig, type InappNotificationsConfig, type NotificationType } from '@/lib/notification-types'
 import { getOrgAccessStatus } from '@/lib/orgAccess'
+import { emitirComprobante, BillerApiError } from '@/lib/biller'
+import { TIPO_COMPROBANTE, FORMA_PAGO, INDICADOR_FACTURACION } from '@/types/biller'
+import type { BillerConfig } from '@/types/biller'
 
 const INAPP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   ShoppingCart,
@@ -260,6 +263,103 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
   })
   const [paymentNotes, setPaymentNotes] = useState('')
   const [paymentError, setPaymentError] = useState<string | null>(null)
+
+  // ── Tab Facturación (Biller) ───────────────────────────────────────────────
+  const [billerAmbiente, setBillerAmbiente] = useState<'test' | 'production'>('test')
+  const [billerToken, setBillerToken] = useState('')
+  const [billerSucursalId, setBillerSucursalId] = useState<number | ''>('')
+  const [billerMontosBrutos, setBillerMontosBrutos] = useState<0 | 1>(1)
+  const [billerIndicador, setBillerIndicador] = useState<1 | 2 | 3 | 5>(3)
+  const [billerConfigData, setBillerConfigData] = useState<BillerConfig | null>(null)
+  const [loadingBiller, setLoadingBiller] = useState(false)
+  const [savingBiller, setSavingBiller] = useState(false)
+  const [testingBiller, setTestingBiller] = useState(false)
+
+  const fetchBillerConfig = useCallback(async () => {
+    setLoadingBiller(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any)
+      .from('biller_config')
+      .select('*')
+      .eq('organization_id', organization.id)
+      .maybeSingle()
+    if (data) {
+      setBillerConfigData(data as BillerConfig)
+      setBillerAmbiente(data.ambiente as 'test' | 'production')
+      setBillerToken(data.token)
+      setBillerSucursalId(data.sucursal_id)
+      setBillerMontosBrutos((data.montos_brutos ?? 1) as 0 | 1)
+      setBillerIndicador((data.indicador_facturacion_default ?? 3) as 1 | 2 | 3 | 5)
+    }
+    setLoadingBiller(false)
+  }, [organization.id])
+
+  const handleSaveBillerConfig = async () => {
+    if (!billerToken.trim() || !billerSucursalId) {
+      show('Completá todos los campos de Biller', 'error')
+      return
+    }
+    setSavingBiller(true)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: billerError } = await (supabase as any)
+      .from('biller_config')
+      .upsert({
+        organization_id: organization.id,
+        ambiente: billerAmbiente,
+        token: billerToken.trim(),
+        sucursal_id: Number(billerSucursalId),
+        montos_brutos: billerMontosBrutos,
+        indicador_facturacion_default: billerIndicador,
+        updated_at: new Date().toISOString(),
+      })
+    if (billerError) {
+      show('Error al guardar configuración de Biller', 'error')
+    } else {
+      show('Configuración de Biller guardada', 'success')
+      fetchBillerConfig()
+    }
+    setSavingBiller(false)
+  }
+
+  const handleTestBiller = async () => {
+    if (!billerToken.trim() || !billerSucursalId) {
+      show('Completá los campos antes de probar', 'error')
+      return
+    }
+    setTestingBiller(true)
+    try {
+      const fakeConfig: BillerConfig = {
+        id: '', organization_id: organization.id,
+        ambiente: billerAmbiente,
+        token: billerToken.trim(),
+        sucursal_id: Number(billerSucursalId),
+        montos_brutos: billerMontosBrutos,
+        indicador_facturacion_default: billerIndicador,
+        created_at: '', updated_at: '',
+      }
+      await emitirComprobante(fakeConfig, {
+        tipo_comprobante: TIPO_COMPROBANTE.E_TICKET,
+        forma_pago: FORMA_PAGO.CONTADO,
+        sucursal: Number(billerSucursalId),
+        moneda: 'UYU',
+        montos_brutos: 1,
+        cliente: '-',
+        items: [{
+          cantidad: 1,
+          concepto: 'Test de conexión Axiostock',
+          precio: 1,
+          indicador_facturacion: INDICADOR_FACTURACION.TASA_BASICA,
+        }],
+      })
+      show('Conexión exitosa — comprobante de prueba emitido en Biller', 'success')
+    } catch (err) {
+      const msg = err instanceof BillerApiError
+        ? `Error Biller ${err.status}: ${JSON.stringify(err.body)}`
+        : 'Error al conectar con Biller'
+      show(msg, 'error')
+    }
+    setTestingBiller(false)
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any
@@ -840,7 +940,7 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
         </CardHeader>
         <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
           <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
-            <Tabs defaultValue="general" className="flex-1 min-h-0 min-w-0" orientation="vertical" onValueChange={(v: string) => { if (v === 'suscripcion') fetchPayments() }}>
+            <Tabs defaultValue="general" className="flex-1 min-h-0 min-w-0" orientation="vertical" onValueChange={(v: string) => { if (v === 'suscripcion') fetchPayments(); if (v === 'facturacion') fetchBillerConfig() }}>
               <TabsList>
                 <TabsTrigger value="general">
                   <Building2 className="h-4 w-4 shrink-0 text-gray-400" />
@@ -869,6 +969,10 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                 <TabsTrigger value="suscripcion">
                   <DollarSign className="h-4 w-4 shrink-0 text-gray-400" />
                   Suscripción
+                </TabsTrigger>
+                <TabsTrigger value="facturacion">
+                  <Receipt className="h-4 w-4 shrink-0 text-gray-400" />
+                  Facturación
                 </TabsTrigger>
               </TabsList>
 
@@ -1959,6 +2063,135 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
                     </div>
                   )}
                 </div>
+              </TabsContent>
+
+              <TabsContent value="facturacion" className="p-6 space-y-6">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">Facturación electrónica</h3>
+                  <p className="text-sm text-gray-500">Configuración de Biller v2 para emisión de CFEs ante DGI Uruguay.</p>
+                </div>
+
+                {loadingBiller ? (
+                  <p className="text-sm text-gray-500">Cargando configuración...</p>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Ambiente */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
+                      <select
+                        value={billerAmbiente}
+                        onChange={(e) => setBillerAmbiente(e.target.value as 'test' | 'production')}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      >
+                        <option value="test">Test (DGI homologación)</option>
+                        <option value="production">Producción</option>
+                      </select>
+                      {billerAmbiente === 'production' && (
+                        <p className="text-xs text-orange-600 mt-1 flex items-center gap-1">
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          Los comprobantes emitidos tendrán validez fiscal real ante DGI.
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Token */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Token de API</label>
+                      <input
+                        type="password"
+                        value={billerToken}
+                        onChange={(e) => setBillerToken(e.target.value)}
+                        placeholder="Obtenerlo en biller.uy → Ajustes → API Tokens"
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      />
+                    </div>
+
+                    {/* Sucursal */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">ID de sucursal</label>
+                      <input
+                        type="number"
+                        value={billerSucursalId}
+                        onChange={(e) => setBillerSucursalId(e.target.value === '' ? '' : Number(e.target.value))}
+                        placeholder="Ver en Biller → Ajustes → Sucursales"
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      />
+                    </div>
+
+                    {/* IVA */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-gray-100">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Precios en el sistema
+                        </label>
+                        <select
+                          value={billerMontosBrutos}
+                          onChange={(e) => setBillerMontosBrutos(Number(e.target.value) as 0 | 1)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                        >
+                          <option value={1}>Con IVA incluido (retail)</option>
+                          <option value={0}>Sin IVA / precio neto (B2B)</option>
+                        </select>
+                        <p className="text-xs text-gray-400 mt-1">
+                          {billerMontosBrutos === 1
+                            ? 'Biller descompone el IVA internamente. El total del CFE coincide con el precio cobrado.'
+                            : 'Biller suma el IVA al precio. Usá esto solo si tus precios ya son netos.'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Tasa de IVA por defecto
+                        </label>
+                        <select
+                          value={billerIndicador}
+                          onChange={(e) => setBillerIndicador(Number(e.target.value) as 1 | 2 | 3 | 5)}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                        >
+                          <option value={3}>Tasa básica 22%</option>
+                          <option value={2}>Tasa mínima 10%</option>
+                          <option value={1}>Exento</option>
+                          <option value={5}>Gratuito</option>
+                        </select>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Se aplica a todos los ítems del comprobante.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={handleTestBiller}
+                        disabled={testingBiller}
+                      >
+                        {testingBiller ? 'Probando...' : 'Probar conexión'}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleSaveBillerConfig}
+                        disabled={savingBiller}
+                      >
+                        {savingBiller ? 'Guardando...' : 'Guardar'}
+                      </Button>
+                    </div>
+
+                    {billerConfigData && (
+                      <p className="text-xs text-gray-400">
+                        Última actualización: {new Date(billerConfigData.updated_at).toLocaleString('es-UY')}
+                      </p>
+                    )}
+
+                    <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-700 space-y-1">
+                      <p className="font-medium">¿Cómo obtener el token?</p>
+                      <p>1. Ingresá a <strong>biller.uy</strong> con tu usuario.</p>
+                      <p>2. Andá a <strong>Ajustes → API Tokens</strong> y generá uno nuevo.</p>
+                      <p>3. El ID de sucursal lo encontrás en <strong>Ajustes → Sucursales</strong>.</p>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
 
