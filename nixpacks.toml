@@ -1,11 +1,5 @@
 [phases.setup]
-# gettext provides envsubst for nginx env var substitution at startup
-nixPkgs = ["nodejs_22", "yarn", "gettext"]
+nixPkgs = ["nodejs_22", "yarn"]
 
 [phases.install]
 cmds = ["yarn install --frozen-lockfile --ignore-engines"]
-
-[start]
-# envsubst replaces ${SUPABASE_FUNCTIONS_URL} in nginx.conf at container startup.
-# Only that variable is substituted — all nginx $variables stay untouched.
-cmd = "envsubst '${SUPABASE_FUNCTIONS_URL}' < /app/nginx.conf > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
