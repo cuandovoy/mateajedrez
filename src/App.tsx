@@ -38,6 +38,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { Landing } from './pages/Landing'
+import { LandingFacturacion } from './pages/LandingFacturacion'
 
 function ReportsRouteGuard({ children }: { children: JSX.Element }) {
   const { canUseFeature } = usePlanLimits()
@@ -73,6 +74,7 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/landing/app" element={<Landing />} />
+        <Route path="/facturacion-electronica" element={<LandingFacturacion />} />
 
         {/* Rutas públicas de tienda por slug */}
         <Route element={<PublicStoreWrapper />}>

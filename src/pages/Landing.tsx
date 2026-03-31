@@ -9,6 +9,7 @@ import {
   Globe,
   ImageIcon,
   Package,
+  Receipt,
   Shield,
   ShieldCheck,
   ShoppingBag,
@@ -19,6 +20,7 @@ import {
   Zap
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
 
 const modules = [
@@ -265,6 +267,42 @@ function ImageCarousel({
 export function Landing() {
   return (
     <div className="bg-white text-zinc-900">
+      <Helmet>
+        <title>Axios — Control de Stock y Gestión Comercial para tu Negocio</title>
+        <meta name="description" content="Tienda online, inventario multi sucursal, caja, órdenes, clientes y reportes. Todo conectado en una sola plataforma para que vendas más y operes sin caos." />
+        <meta name="keywords" content="gestión comercial, inventario, stock, tienda online, punto de venta, caja registradora, órdenes, reportes, Uruguay" />
+        <link rel="canonical" href="https://axiostock.com/landing/app" />
+        {/* Open Graph */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://axiostock.com/landing/app" />
+        <meta property="og:title" content="Axios — Control de Stock y Gestión Comercial para tu Negocio" />
+        <meta property="og:description" content="Tienda online, inventario multi sucursal, caja, órdenes, clientes y reportes. Todo en un solo lugar." />
+        <meta property="og:image" content="https://axiostock.com/adminPanel3.png" />
+        <meta property="og:image:width" content="1280" />
+        <meta property="og:image:height" content="720" />
+        <meta property="og:locale" content="es_UY" />
+        <meta property="og:site_name" content="Axios" />
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Axios — Control de Stock y Gestión Comercial" />
+        <meta name="twitter:description" content="Tienda online, inventario multi sucursal, caja, órdenes y reportes. Todo conectado." />
+        <meta name="twitter:image" content="https://axiostock.com/adminPanel3.png" />
+        {/* JSON-LD */}
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "SoftwareApplication",
+          "name": "Axios",
+          "description": "Plataforma de gestión comercial con tienda online, inventario multi sucursal, punto de venta, órdenes, clientes y reportes.",
+          "applicationCategory": "BusinessApplication",
+          "operatingSystem": "Web",
+          "url": "https://axiostock.com",
+          "offers": [
+            { "@type": "Offer", "name": "Starter", "price": "1990", "priceCurrency": "UYU" },
+            { "@type": "Offer", "name": "Profesional", "price": "2890", "priceCurrency": "UYU" }
+          ],
+          "publisher": { "@type": "Organization", "name": "Axios", "url": "https://axiostock.com" }
+        })}</script>
+      </Helmet>
 
       {/* NAV */}
       <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
@@ -759,6 +797,59 @@ export function Landing() {
           </div>
         </div>
       </section> */}
+
+      {/* CFE TEASER */}
+      <section className="relative overflow-hidden border-y border-zinc-200 bg-[#12192C]">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_right,_rgba(220,38,38,0.12),_transparent_55%)]" />
+        <div className="container-custom relative py-14 md:py-18">
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-2 md:items-center">
+            <div>
+              <span className="inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-800/60 px-3 py-1 text-xs font-medium text-zinc-300">
+                <Receipt className="h-3.5 w-3.5 text-red-400" />
+                Nuevo · Integrado con Biller v2
+              </span>
+              <h2 className="mt-4 text-2xl font-extrabold text-white md:text-3xl leading-tight">
+                Facturación electrónica{' '}
+                <span className="text-red-400">directo desde tu venta</span>
+              </h2>
+              <p className="mt-3 text-zinc-400 leading-relaxed max-w-lg">
+                Emití e-Tickets y e-Facturas certificadas por DGI sin salir del sistema. Un clic al confirmar la orden y el CFE llega a Biller en tiempo real.
+              </p>
+              <ul className="mt-5 space-y-2">
+                {['e-Ticket y e-Factura', 'PDF descargable al instante', 'Historial y anulación desde el panel', 'Configurable por organización'].map((f) => (
+                  <li key={f} className="flex items-center gap-2 text-sm text-zinc-300">
+                    <Check className="h-4 w-4 flex-shrink-0 text-red-400" />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <Link
+                to="/facturacion-electronica"
+                className="mt-7 inline-flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-bold text-white hover:bg-red-500 transition-colors shadow-lg shadow-red-600/25"
+              >
+                Ver más
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { icon: FileText, label: 'e-Ticket', desc: 'Consumidor final', color: 'text-blue-400', bg: 'bg-blue-600/10' },
+                { icon: Building2, label: 'e-Factura', desc: 'Con RUT del cliente', color: 'text-green-400', bg: 'bg-green-600/10' },
+                { icon: Shield, label: 'Certificado DGI', desc: 'Uruguay', color: 'text-purple-400', bg: 'bg-purple-600/10' },
+                { icon: Zap, label: 'Tiempo real', desc: 'PDF instantáneo', color: 'text-red-400', bg: 'bg-red-600/10' },
+              ].map(({ icon: Icon, label, desc, color, bg }) => (
+                <div key={label} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+                  <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${bg}`}>
+                    <Icon className={`h-5 w-5 ${color}`} />
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-white">{label}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">{desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* PLANS */}
       <section id="plans" className="container-custom py-16 md:py-24">
