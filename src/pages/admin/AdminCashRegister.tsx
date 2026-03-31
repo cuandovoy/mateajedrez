@@ -111,17 +111,15 @@ function AdminCashRegisterContent() {
 
     try {
       setLoading(true)
-      // Fetch sessions and calculate expected_amount
       const { data, error } = await supabase
         .from('cash_sessions')
-        .select('*, branches!inner(organization_id)')
-        .eq('branches.organization_id', organizationId)
+        .select('*')
+        .eq('organization_id', organizationId)
         .order('opened_at', { ascending: false })
 
       if (error) throw error
 
-      const sessionsData = ((data || []) as Array<CashSession & { branches?: { organization_id: string } }>)
-        .map(({ branches: _branch, ...session }) => session)
+      const sessionsData = (data || []) as CashSession[]
 
       // expected_amount = apertura + ventas efectivo (excluyendo órdenes canceladas/devoluciones)
       const sessionsWithExpected = await Promise.all(
@@ -216,6 +214,7 @@ function AdminCashRegisterContent() {
 
       const sessionData: CashSessionInsert = {
         ...data,
+        organization_id: organizationId!,
         opened_by: user?.id || null,
         expected_amount: data.opening_amount, // Initially same as opening
         notes: data.notes || null,

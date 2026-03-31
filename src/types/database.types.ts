@@ -280,6 +280,7 @@ export type Database = {
           opened_at: string | null
           opened_by: string | null
           opening_amount: number
+          organization_id: string
           updated_at: string | null
         }
         Insert: {
@@ -295,6 +296,7 @@ export type Database = {
           opened_at?: string | null
           opened_by?: string | null
           opening_amount?: number
+          organization_id: string
           updated_at?: string | null
         }
         Update: {
@@ -310,6 +312,7 @@ export type Database = {
           opened_at?: string | null
           opened_by?: string | null
           opening_amount?: number
+          organization_id?: string
           updated_at?: string | null
         }
         Relationships: [
