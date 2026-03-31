@@ -5,15 +5,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { obtenerPDF, BillerApiError, descargarPDFBlob } from '@/lib/biller'
-import type { BillerConfig } from '@/types/biller'
 import { useOrganization } from '@/hooks/useOrganization'
+import { useBillerConfig } from '@/hooks/useBillerConfig'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Receipt, Search, Calendar, ChevronLeft, ChevronRight, ExternalLink, Download } from 'lucide-react'
+import { Receipt, Search, Calendar, ChevronLeft, ChevronRight, ExternalLink, Download, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type Comprobante = {
@@ -57,7 +57,7 @@ export function AdminBillerComprobantes() {
   const [loading, setLoading] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
   const [currentPage, setCurrentPage] = useState(1)
-  const [billerConfig, setBillerConfig] = useState<BillerConfig | null>(null)
+  const { config: billerConfig, loading: billerConfigLoading } = useBillerConfig(organizationId)
   const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   const todayStr = new Date().toISOString().split('T')[0]
@@ -67,20 +67,13 @@ export function AdminBillerComprobantes() {
   const [tipoFilter, setTipoFilter] = useState<'all' | '101' | '111'>('all')
   const [searchTerm, setSearchTerm] = useState('')
 
-  // Load biller config once
-  useEffect(() => {
-    if (!organizationId) return
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(supabase as any)
-      .from('biller_config')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .maybeSingle()
-      .then(({ data }: { data: BillerConfig | null }) => setBillerConfig(data ?? null))
-  }, [organizationId])
-
   const fetchComprobantes = useCallback(async () => {
-    if (!organizationId) return
+    if (!organizationId || !billerConfig) {
+      setComprobantes([])
+      setTotalCount(0)
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -124,7 +117,7 @@ export function AdminBillerComprobantes() {
     } finally {
       setLoading(false)
     }
-  }, [organizationId, currentPage, startDate, endDate, estadoFilter, tipoFilter, searchTerm, show])
+  }, [organizationId, billerConfig, currentPage, startDate, endDate, estadoFilter, tipoFilter, searchTerm, show])
 
   useEffect(() => {
     fetchComprobantes()
@@ -155,6 +148,31 @@ export function AdminBillerComprobantes() {
     setTipoFilter('all')
     setSearchTerm('')
     setCurrentPage(1)
+  }
+
+  if (billerConfigLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600" />
+      </div>
+    )
+  }
+
+  if (!billerConfig) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <Settings className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+          <h1 className="text-xl font-semibold text-gray-900">Comprobantes Fiscales</h1>
+          <p className="text-gray-500 mt-2">
+            Esta organización no tiene integración de Biller configurada.
+          </p>
+          <Link to="/organizations" className="inline-block mt-4">
+            <Button size="sm">Configurar Biller</Button>
+          </Link>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (

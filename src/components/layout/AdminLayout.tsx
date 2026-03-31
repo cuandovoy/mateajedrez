@@ -37,6 +37,7 @@ import { PermissionGate } from '@/components/features/PermissionGate'
 import { OrgAccessGate } from '@/components/features/OrgAccessGate'
 import type { Permission } from '@/lib/permissions'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { useBillerConfig } from '@/hooks/useBillerConfig'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
@@ -53,6 +54,8 @@ type NavItem = {
   planFeature?: 'transfers' | 'cash_register' | 'advanced_reports'
   /** Ocultar si la org tiene menos sucursales activas que este valor */
   minBranches?: number
+  /** Mostrar solo si la organización tiene configuración de Biller */
+  requiresBillerConfig?: boolean
 }
 
 type NavSection = {
@@ -65,6 +68,7 @@ export function AdminLayout() {
   const canCreateOrganization = profile?.role === 'admin'
   const { currentOrganization, organizations, setCurrentOrganization, fetchOrganizations, switchingOrganization } = useOrganizationStore()
   const { canUseFeature, branchCount } = usePlanLimits()
+  const { config: billerConfig, loading: billerConfigLoading } = useBillerConfig(currentOrganization?.id ?? null)
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -85,7 +89,9 @@ export function AdminLayout() {
       const next = !prev
       try {
         localStorage.setItem('admin-sidebar-collapsed', String(next))
-      } catch {}
+      } catch {
+        // Ignore storage errors (private mode / blocked localStorage).
+      }
       return next
     })
   }
@@ -123,7 +129,7 @@ export function AdminLayout() {
       title: 'Operación',
       items: [
         { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
-        { path: '/billing/comprobantes', label: 'Comprobantes CFE', icon: Receipt },
+        { path: '/billing/comprobantes', label: 'Comprobantes CFE', icon: Receipt, requiresBillerConfig: true },
         { path: '/expenses', label: 'Compras y Egresos', icon: Wallet },
         { path: '/customers', label: 'Clientes', icon: Users2, permission: 'customers:view' },
         { path: '/cash-register', label: 'Punto de Venta', icon: StoreIcon, planFeature: 'cash_register' },
@@ -366,6 +372,7 @@ export function AdminLayout() {
                       .filter((item) => {
                         if (item.adminOnly && !isAdmin) return false
                         if (item.minBranches && branchCount < item.minBranches) return false
+                        if (item.requiresBillerConfig && (billerConfigLoading || !billerConfig)) return false
                         if (section.title === 'Reportes') return true
                         return !item.planFeature || canUseFeature(item.planFeature)
                       })
