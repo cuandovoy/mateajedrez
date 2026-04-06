@@ -8,7 +8,7 @@ import { trackAuditAction } from '@/lib/audit'
 import { supabase } from '@/lib/supabase'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
-import { X } from 'lucide-react'
+import { ChevronDown, Plus, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 type SupplierLite = { id: string; name: string }
@@ -47,6 +47,7 @@ type SupplierInvoiceLite = {
   purchase_order_id: string | null
   status: string
   total_amount: number
+  paid_amount: number
   outstanding_amount: number
 }
 
@@ -242,6 +243,7 @@ export function AdminExpenses() {
     description: '',
   })
 
+  const [showNewItemForm, setShowNewItemForm] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [editItemForm, setEditItemForm] = useState({
     product_id: '',
@@ -372,7 +374,7 @@ export function AdminExpenses() {
           .order('created_at', { ascending: false })
           .limit(100),
         fromAny('supplier_invoices')
-          .select('id, invoice_number, supplier_id, purchase_order_id, status, total_amount, outstanding_amount')
+          .select('id, invoice_number, supplier_id, purchase_order_id, status, total_amount, paid_amount, outstanding_amount')
           .eq('organization_id', organizationId)
           .order('created_at', { ascending: false })
           .limit(100),
@@ -637,6 +639,7 @@ export function AdminExpenses() {
         discount_amount: '0',
         description: '',
       })
+      setShowNewItemForm(false)
 
       await fetchPageData({ silent: true })
       await fetchPurchaseOrderItems(selectedPurchaseOrder.id)
@@ -682,19 +685,14 @@ export function AdminExpenses() {
 
     const status = selectedPurchaseOrder.status
 
-    if (status === 'received' || status === 'cancelled') {
-      show(
-        status === 'cancelled'
-          ? 'No se pueden editar ítems de una orden cancelada.'
-          : 'No se pueden editar ítems de una orden ya recibida. El inventario ya fue actualizado.',
-        'error'
-      )
+    if (status === 'cancelled') {
+      show('No se pueden editar ítems de una orden cancelada.', 'error')
       return
     }
 
-    if (status === 'partially_received' && item.quantity_received > 0) {
+    if (item.quantity_received > 0) {
       show(
-        `Este ítem ya tiene ${item.quantity_received} unidades recibidas. Podés editar solo el costo y la descripción — el producto, variante y cantidad están bloqueados por movimientos de inventario existentes.`,
+        `Este ítem ya tiene ${item.quantity_received} unidades recibidas y no puede editarse. El inventario ya fue actualizado.`,
         'error'
       )
       return
@@ -1050,6 +1048,37 @@ export function AdminExpenses() {
     }
   }
 
+  const cancelSupplierInvoice = async (invoice: SupplierInvoiceLite) => {
+    if (!organizationId) return
+    if (!confirm(`¿Anular la factura ${invoice.invoice_number}? Esta acción no se puede deshacer.`)) return
+
+    try {
+      setSaving(true)
+      const { error } = await (supabase.rpc as any)('cancel_supplier_invoice', {
+        p_supplier_invoice_id: invoice.id,
+      })
+      if (error) throw error
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'supplier_invoices',
+        recordId: invoice.id,
+        action: 'UPDATE',
+        notes: `Factura ${invoice.invoice_number} anulada manualmente.`,
+        newData: { status: 'cancelled' },
+      })
+
+      await fetchPageData({ silent: true })
+      await fetchExpenseLedger()
+      show(`Factura ${invoice.invoice_number} anulada correctamente.`, 'success')
+    } catch (error: any) {
+      console.error('Error cancelling supplier invoice:', error)
+      show(error?.message || 'No se pudo anular la factura.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const fetchDirectExpenses = async () => {
     if (!organizationId) return
     setLoadingDirectExpenses(true)
@@ -1333,6 +1362,7 @@ export function AdminExpenses() {
                     onClick: () => { setPaymentModalInvoice(invoice); setPaymentForm((prev) => ({ ...prev, supplier_invoice_id: invoice.id, amount: String(invoice.outstanding_amount) })) },
                   }] : []),
                   ...(invoice.status === 'partially_paid' || invoice.status === 'paid' ? [{ label: 'Revertir ultimo pago', onClick: () => reverseLatestSupplierPayment(invoice) }] : []),
+                  ...(Number(invoice.paid_amount) === 0 ? [{ label: 'Anular factura', onClick: () => cancelSupplierInvoice(invoice) }] : []),
                 ]
                 return (
                   <div key={invoice.id} className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
@@ -1395,6 +1425,9 @@ export function AdminExpenses() {
                                 : []),
                               ...(invoice.status === 'partially_paid' || invoice.status === 'paid'
                                 ? [{ label: 'Revertir ultimo pago', onClick: () => reverseLatestSupplierPayment(invoice) }]
+                                : []),
+                              ...(Number(invoice.paid_amount) === 0
+                                ? [{ label: 'Anular factura', onClick: () => cancelSupplierInvoice(invoice) }]
                                 : []),
                             ]}
                             className="inline-flex"
@@ -1879,7 +1912,7 @@ export function AdminExpenses() {
               {/* Banners de estado */}
               {selectedPurchaseOrder.status === 'received' && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                  <strong>Orden recibida.</strong> El inventario ya fue actualizado con esta orden. No se pueden editar los ítems para evitar inconsistencias contables.
+                  <strong>Orden recibida.</strong> Los ítems ya recibidos no pueden editarse. Podés agregar nuevos ítems y editarlos hasta confirmar su recepción.
                 </div>
               )}
               {selectedPurchaseOrder.status === 'cancelled' && (
@@ -1985,7 +2018,7 @@ export function AdminExpenses() {
 
                       {purchaseOrderItems.map((item) => {
                         const isEditing = editingItemId === item.id
-                        const lineSubtotal = Number(item.quantity_ordered) * Number(item.unit_cost)
+                        const lineSubtotal = (Number(item.quantity_ordered) * Number(item.unit_cost)) + Number(item.tax_amount) - Number(item.discount_amount)
 
                         if (isEditing) {
                           const editVariants = variantsByProduct.get(editItemForm.product_id) ?? []
@@ -2145,94 +2178,111 @@ export function AdminExpenses() {
                   </table>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Producto</label>
-                    <select
-                      className="w-full min-h-[44px] px-3 border border-gray-300 rounded-lg"
-                      value={newOrderItemForm.product_id}
-                      onChange={(event) => handleNewItemProductChange(event.target.value)}
-                    >
-                      <option value="">Seleccionar producto</option>
-                      {products.map((product) => (
-                        <option key={product.id} value={product.id}>{product.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewItemForm((prev) => !prev)}
+                    className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-600 hover:border-admin-400 hover:bg-admin-50 hover:text-admin-700 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Nuevo ítem
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showNewItemForm ? 'rotate-180' : ''}`} />
+                  </button>
 
-                  {newOrderItemForm.product_id && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Variante {loadingVariants && <span className="text-xs text-gray-400">(cargando...)</span>}
-                      </label>
-                      <select
-                        className="w-full min-h-[44px] px-3 border border-gray-300 rounded-lg"
-                        value={newOrderItemForm.variant_id}
-                        onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, variant_id: event.target.value }))}
-                      >
-                        <option value="">Sin variante específica</option>
-                        {(variantsByProduct.get(newOrderItemForm.product_id) ?? []).map((v) => (
-                          <option key={v.id} value={v.id}>{v.name ?? v.sku} — {v.sku}</option>
-                        ))}
-                      </select>
+                  {showNewItemForm && (
+                    <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Producto</label>
+                          <select
+                            className="w-full min-h-[44px] px-3 border border-gray-300 rounded-lg bg-white"
+                            value={newOrderItemForm.product_id}
+                            onChange={(event) => handleNewItemProductChange(event.target.value)}
+                          >
+                            <option value="">Seleccionar producto</option>
+                            {products.map((product) => (
+                              <option key={product.id} value={product.id}>{product.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {newOrderItemForm.product_id && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Variante {loadingVariants && <span className="text-xs text-gray-400">(cargando...)</span>}
+                            </label>
+                            <select
+                              className="w-full min-h-[44px] px-3 border border-gray-300 rounded-lg bg-white"
+                              value={newOrderItemForm.variant_id}
+                              onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, variant_id: event.target.value }))}
+                            >
+                              <option value="">Sin variante específica</option>
+                              {(variantsByProduct.get(newOrderItemForm.product_id) ?? []).map((v) => (
+                                <option key={v.id} value={v.id}>{v.name ?? v.sku} — {v.sku}</option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={newOrderItemForm.quantity_ordered}
+                            onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, quantity_ordered: event.target.value }))}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Costo unitario</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.0001"
+                            value={newOrderItemForm.unit_cost}
+                            onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, unit_cost: event.target.value }))}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Impuestos</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={newOrderItemForm.tax_amount}
+                            onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, tax_amount: event.target.value }))}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Descuentos</label>
+                          <Input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={newOrderItemForm.discount_amount}
+                            onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, discount_amount: event.target.value }))}
+                          />
+                        </div>
+
+                        <div className="md:col-span-2 lg:col-span-3">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Descripción (opcional)</label>
+                          <Input
+                            value={newOrderItemForm.description}
+                            onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, description: event.target.value }))}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-1">
+                        <Button onClick={addItemToSelectedPurchaseOrder} disabled={saving}>Agregar ítem</Button>
+                        <Button variant="outline" onClick={() => setShowNewItemForm(false)} disabled={saving}>Cancelar</Button>
+                      </div>
                     </div>
                   )}
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad</label>
-                    <Input
-                      type="number"
-                      min="1"
-                      step="1"
-                      value={newOrderItemForm.quantity_ordered}
-                      onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, quantity_ordered: event.target.value }))}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Costo unitario</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.0001"
-                      value={newOrderItemForm.unit_cost}
-                      onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, unit_cost: event.target.value }))}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Impuestos</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={newOrderItemForm.tax_amount}
-                      onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, tax_amount: event.target.value }))}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Descuentos</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={newOrderItemForm.discount_amount}
-                      onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, discount_amount: event.target.value }))}
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 lg:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Descripcion (opcional)</label>
-                    <Input
-                      value={newOrderItemForm.description}
-                      onChange={(event) => setNewOrderItemForm((previous) => ({ ...previous, description: event.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3">
-                  <Button onClick={addItemToSelectedPurchaseOrder} disabled={saving}>Agregar producto a la orden</Button>
                 </div>
               </div>
 

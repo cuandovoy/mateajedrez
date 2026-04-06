@@ -59,6 +59,17 @@ type FinancialExportRow = {
 const toDateKey = (date: Date): string => date.toISOString().slice(0, 10)
 const toLocalDateKey = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
+// Construye un timestamp ISO con el offset de zona horaria local del navegador,
+// para que PostgreSQL/Supabase interprete las fechas en la zona horaria correcta.
+const toLocalTimestamp = (dateKey: string, time: string): string => {
+  const offsetMinutes = new Date().getTimezoneOffset() // positivo = oeste de UTC (ej: Uruguay = 180)
+  const sign = offsetMinutes <= 0 ? '+' : '-'
+  const absMinutes = Math.abs(offsetMinutes)
+  const hh = String(Math.floor(absMinutes / 60)).padStart(2, '0')
+  const mm = String(absMinutes % 60).padStart(2, '0')
+  return `${dateKey}T${time}${sign}${hh}:${mm}`
+}
 const asNumber = (value: unknown): number => (Number.isFinite(Number(value)) ? Number(value) : 0)
 const asString = (value: unknown): string => (typeof value === 'string' ? value : '')
 const asObject = (value: unknown): Record<string, unknown> =>
@@ -80,6 +91,7 @@ export function AdminFinancialReports() {
   const [loading, setLoading] = useState(true)
   const [refreshingAggregates, setRefreshingAggregates] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [startDate, setStartDate] = useState(() => {
@@ -138,7 +150,7 @@ export function AdminFinancialReports() {
     if (!organizationId) return
     fetchFinancialData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, selectedBranchId, startDate, endDate, asOfDate])
+  }, [organizationId, selectedBranchId, startDate, endDate, asOfDate, refreshKey])
 
   const fetchBranches = async () => {
     if (!organizationId) return
@@ -164,8 +176,8 @@ export function AdminFinancialReports() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase.rpc as any)('get_financial_report_summary', {
         p_organization_id: organizationId,
-        p_range_start: `${startDate}T00:00:00`,
-        p_range_end: `${endDate}T23:59:59`,
+        p_range_start: toLocalTimestamp(startDate, '00:00:00'),
+        p_range_end: toLocalTimestamp(endDate, '23:59:59'),
         p_branch_id: selectedBranchId || null,
         p_as_of_date: asOfDate,
       })
@@ -284,8 +296,8 @@ export function AdminFinancialReports() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data, error } = await (supabase.rpc as any)('export_financial_report_rows', {
           p_organization_id: organizationId,
-          p_range_start: `${startDate}T00:00:00`,
-          p_range_end: `${endDate}T23:59:59`,
+          p_range_start: toLocalTimestamp(startDate, '00:00:00'),
+          p_range_end: toLocalTimestamp(endDate, '23:59:59'),
           p_branch_id: selectedBranchId || null,
           p_as_of_date: asOfDate,
           p_limit: pageSize,
@@ -428,6 +440,9 @@ export function AdminFinancialReports() {
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+          {loading ? 'Actualizando...' : 'Actualizar datos'}
+        </Button>
         <Button variant="outline" onClick={exportFinancialReport} disabled={exporting}>
           <Download className="mr-2 h-4 w-4" />
           {exporting ? 'Exportando...' : 'Exportar CSV'}
