@@ -27,6 +27,7 @@ import { AdminOrders } from '@/pages/admin/AdminOrders'
 import { AdminBillerComprobantes } from '@/pages/admin/AdminBillerComprobantes'
 import { AdminProducts } from '@/pages/admin/AdminProducts'
 import { AdminRolesPermissions } from '@/pages/admin/AdminRolesPermissions'
+import { AdminStoreStats } from '@/pages/admin/AdminStoreStats'
 import { AdminSales } from '@/pages/admin/AdminSales'
 import { AdminSuppliers } from '@/pages/admin/AdminSuppliers'
 import { AdminTransfers } from '@/pages/admin/AdminTransfers'
@@ -112,6 +113,7 @@ function App() {
           <Route path="/planes" element={<AdminPlans />} />
           <Route path="/users" element={<AdminUsers />} />
           <Route path="/roles-permissions" element={<AdminRolesPermissions />} />
+          <Route path="/store/stats" element={<AdminStoreStats />} />
         </Route>
 
         {/* Ruta por defecto */}

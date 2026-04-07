@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Outlet } from 'react-router-dom'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { PublicStoreLayout } from './PublicStoreLayout'
+import { usePageViewTracker } from '@/hooks/usePageViewTracker'
 import type { Organization } from '@/types/database.types'
 
 export function PublicStoreWrapper() {
@@ -10,6 +11,8 @@ export function PublicStoreWrapper() {
   const [organization, setOrganization] = useState<Organization | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  usePageViewTracker(organization?.id, slug)
 
   useEffect(() => {
     const loadOrganization = async () => {

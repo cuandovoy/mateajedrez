@@ -16,6 +16,7 @@ import {
   Wallet,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   FileText,
   Warehouse,
   ArrowRight,
@@ -26,6 +27,8 @@ import {
   Store,
   StoreIcon,
   Receipt,
+  Share2,
+  Globe,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AdminBreadcrumbs } from '@/components/admin/AdminBreadcrumbs'
@@ -33,6 +36,7 @@ import { InstallBanner } from '@/components/admin/InstallBanner'
 import { NotificationBell } from '@/components/admin/NotificationBell'
 import { ToastContainer } from './ToastContainer'
 import { CreateOrganizationModal } from '@/components/admin/CreateOrganizationModal'
+import { ShareStoreModal } from '@/components/admin/ShareStoreModal'
 import { PermissionGate } from '@/components/features/PermissionGate'
 import { OrgAccessGate } from '@/components/features/OrgAccessGate'
 import type { Permission } from '@/lib/permissions'
@@ -56,10 +60,13 @@ type NavItem = {
   minBranches?: number
   /** Mostrar solo si la organización tiene configuración de Biller */
   requiresBillerConfig?: boolean
+  /** Acción custom en lugar de navegación */
+  onClick?: () => void
 }
 
 type NavSection = {
   title: string
+  icon: React.ComponentType<{ className?: string }>
   items: NavItem[]
 }
 
@@ -79,6 +86,24 @@ export function AdminLayout() {
       return false
     }
   })
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('admin-sidebar-sections')
+      return saved ? JSON.parse(saved) : { 'Inicio': true, 'Operación': true, 'Catálogo': false, 'Reportes': false, 'Administración': false }
+    } catch {
+      return { 'Inicio': true, 'Operación': true, 'Catálogo': false, 'Reportes': false, 'Administración': false }
+    }
+  })
+
+  const toggleSection = (title: string) => {
+    setOpenSections((prev) => {
+      const next = { ...prev, [title]: !prev[title] }
+      try { localStorage.setItem('admin-sidebar-sections', JSON.stringify(next)) } catch {}
+      return next
+    })
+  }
+
+  const [shareStoreOpen, setShareStoreOpen] = useState(false)
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false)
   const [createOrgModalOpen, setCreateOrgModalOpen] = useState(false)
   const [pendingOrgSwitch, setPendingOrgSwitch] = useState<typeof organizations[0] | null>(null)
@@ -121,12 +146,14 @@ export function AdminLayout() {
   const navSections: NavSection[] = [
     {
       title: 'Inicio',
+      icon: LayoutDashboard,
       items: [
         { path: '/', label: 'Inicio', icon: LayoutDashboard },
       ],
     },
     {
       title: 'Operación',
+      icon: ShoppingCart,
       items: [
         { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
         { path: '/billing/comprobantes', label: 'Comprobantes CFE', icon: Receipt, requiresBillerConfig: true },
@@ -138,6 +165,7 @@ export function AdminLayout() {
     },
     {
       title: 'Catálogo',
+      icon: Package,
       items: [
         { path: '/products', label: 'Productos', icon: Package },
         { path: '/categories', label: 'Categorías', icon: Folder },
@@ -148,6 +176,7 @@ export function AdminLayout() {
     },
     {
       title: 'Reportes',
+      icon: BarChart3,
       items: [
         { path: '/reports/sales', label: 'Ventas', icon: BarChart3, planFeature: 'advanced_reports' },
         { path: '/reports/financial', label: 'Finanzas', icon: Wallet, planFeature: 'advanced_reports' },
@@ -157,7 +186,30 @@ export function AdminLayout() {
       ],
     },
     {
+      title: 'Tienda',
+      icon: Globe,
+      items: [
+        ...(currentOrganization?.slug ? [{
+          path: `/${currentOrganization.slug}`,
+          label: 'Ver tienda',
+          icon: Store,
+        }] : []),
+        {
+          path: '#compartir',
+          label: 'Compartir',
+          icon: Share2,
+          onClick: () => setShareStoreOpen(true),
+        },
+        {
+          path: '/store/stats',
+          label: 'Estadísticas',
+          icon: BarChart3,
+        },
+      ],
+    },
+    {
       title: 'Administración',
+      icon: Users,
       items: [
         { path: '/organizations', label: 'Organizaciones', icon: Building2, adminOnly: true },
         { path: '/planes', label: 'Planes', icon: CreditCard },
@@ -360,98 +412,142 @@ export function AdminLayout() {
         )}>
           <nav className={cn('p-3 transition-all duration-300', sidebarCollapsed ? 'px-2 py-3' : 'py-3')}>
             <div className={cn('space-y-4', sidebarCollapsed ? 'space-y-3' : 'space-y-4')}>
-              {navSections.map((section) => (
-                <div key={section.title}>
-                  {!sidebarCollapsed && (
-                    <h3 className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5 px-2">
-                      {section.title}
-                    </h3>
-                  )}
-                  <ul className="space-y-0.5">
-                    {section.items
-                      .filter((item) => {
-                        if (item.adminOnly && !isAdmin) return false
-                        if (item.minBranches && branchCount < item.minBranches) return false
-                        if (item.requiresBillerConfig && (billerConfigLoading || !billerConfig)) return false
-                        if (section.title === 'Reportes') return true
-                        return !item.planFeature || canUseFeature(item.planFeature)
-                      })
-                      .map((item) => {
-                      const isLockedByPlan = Boolean(
-                        section.title === 'Reportes' &&
-                        item.planFeature &&
-                        !canUseFeature(item.planFeature)
-                      )
-                      const Icon = item.icon
-                      const active = !isLockedByPlan && isActive(item.path)
-                      const targetPath = isLockedByPlan
-                        ? `/planes?from=${encodeURIComponent(item.path)}`
-                        : item.path
-                      const itemTitle = sidebarCollapsed
-                        ? `${item.label}${isLockedByPlan ? ' (Disponible en Plan Profesional)' : ''}`
-                        : undefined
+              {navSections.map((section) => {
+                const isOpen = sidebarCollapsed || openSections[section.title]
+                const SectionIcon = section.icon
+                const filteredItems = section.items.filter((item) => {
+                  if (item.adminOnly && !isAdmin) return false
+                  if (item.minBranches && branchCount < item.minBranches) return false
+                  if (item.requiresBillerConfig && (billerConfigLoading || !billerConfig)) return false
+                  if (section.title === 'Reportes') return true
+                  return !item.planFeature || canUseFeature(item.planFeature)
+                })
+                if (filteredItems.length === 0) return null
 
-                      const content = (
-                        <li key={item.path}>
-                          <Link
-                            to={targetPath}
-                            onClick={() => setSidebarOpen(false)}
-                            title={itemTitle}
-                            className={cn(
-                              'flex items-center rounded-md transition-colors group',
-                              sidebarCollapsed ? 'justify-center p-2' : 'px-2 py-2 gap-2',
-                              isLockedByPlan
-                                ? 'bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-500'
-                                : active
-                                ? 'bg-admin-600 text-white'
-                                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                            )}
-                          >
-                            <Icon className={cn(
-                              'h-4 w-4 shrink-0',
-                              isLockedByPlan
-                                ? 'text-gray-400'
-                                : active
-                                ? 'text-white'
-                                : 'text-gray-500 group-hover:text-gray-600'
-                            )} />
-                            {!sidebarCollapsed && (
-                              <span className={cn(
-                                'text-sm truncate',
-                                isLockedByPlan
-                                  ? 'text-gray-500'
-                                  : active
-                                  ? 'text-white font-medium'
-                                  : 'text-gray-700'
-                              )}>
-                                {item.label}
-                              </span>
-                            )}
-                            {!sidebarCollapsed && isLockedByPlan && (
-                              <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">
-                                Pro
-                              </span>
-                            )}
-                            {!sidebarCollapsed && active && (
-                              <ChevronRight className="h-4 w-4 text-white/80 shrink-0 ml-auto" />
-                            )}
-                          </Link>
-                        </li>
-                      )
+                // Sección tiene algún ítem activo
+                const hasActiveItem = filteredItems.some((item) => isActive(item.path))
 
-                      if (item.permission) {
-                        return (
-                          <PermissionGate permission={item.permission} key={item.path}>
-                            {content}
-                          </PermissionGate>
-                        )
-                      }
+                return (
+                  <div key={section.title}>
+                    {!sidebarCollapsed && (
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(section.title)}
+                        className={cn(
+                          'w-full flex items-center gap-2 px-2 py-1.5 rounded-md mb-0.5 group transition-colors',
+                          isOpen
+                            ? hasActiveItem
+                              ? 'bg-admin-50 text-admin-700'
+                              : 'bg-gray-100 text-gray-700'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                        )}
+                      >
+                        <SectionIcon className={cn(
+                          'h-3.5 w-3.5 shrink-0',
+                          isOpen ? hasActiveItem ? 'text-admin-600' : 'text-gray-600' : 'text-gray-400'
+                        )} />
+                        <h3 className="text-[11px] font-semibold uppercase tracking-wider flex-1 text-left">
+                          {section.title}
+                        </h3>
+                        <ChevronDown className={cn(
+                          'h-3 w-3 shrink-0 transition-transform duration-200',
+                          isOpen ? 'rotate-0' : '-rotate-90',
+                          isOpen ? hasActiveItem ? 'text-admin-500' : 'text-gray-500' : 'text-gray-400'
+                        )} />
+                      </button>
+                    )}
+                    <div
+                      className={cn(
+                        'overflow-hidden transition-all duration-200 ease-in-out',
+                        isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                      )}
+                    >
+                      <ul className="space-y-0.5 pb-1">
+                        {filteredItems.map((item) => {
+                          const isLockedByPlan = Boolean(
+                            section.title === 'Reportes' &&
+                            item.planFeature &&
+                            !canUseFeature(item.planFeature)
+                          )
+                          const Icon = item.icon
+                          const active = !isLockedByPlan && isActive(item.path)
+                          const targetPath = isLockedByPlan
+                            ? `/planes?from=${encodeURIComponent(item.path)}`
+                            : item.path
+                          const itemTitle = sidebarCollapsed
+                            ? `${item.label}${isLockedByPlan ? ' (Disponible en Plan Profesional)' : ''}`
+                            : undefined
 
-                      return content
-                    })}
-                  </ul>
-                </div>
-              ))}
+                          const itemClass = cn(
+                            'flex items-center rounded-md transition-colors group w-full',
+                            sidebarCollapsed ? 'justify-center p-2' : 'px-2 py-1.5 gap-2 ml-1',
+                            isLockedByPlan
+                              ? 'bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-500'
+                              : active
+                              ? 'bg-admin-600 text-white'
+                              : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                          )
+                          const itemInner = (
+                            <>
+                              <Icon className={cn(
+                                'h-4 w-4 shrink-0',
+                                isLockedByPlan ? 'text-gray-400' : active ? 'text-white' : 'text-gray-500 group-hover:text-gray-600'
+                              )} />
+                              {!sidebarCollapsed && (
+                                <span className={cn(
+                                  'text-sm truncate',
+                                  isLockedByPlan ? 'text-gray-500' : active ? 'text-white font-medium' : 'text-gray-700'
+                                )}>
+                                  {item.label}
+                                </span>
+                              )}
+                              {!sidebarCollapsed && isLockedByPlan && (
+                                <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">Pro</span>
+                              )}
+                              {!sidebarCollapsed && active && (
+                                <ChevronRight className="h-4 w-4 text-white/80 shrink-0 ml-auto" />
+                              )}
+                            </>
+                          )
+                          const content = (
+                            <li key={item.path}>
+                              {item.onClick ? (
+                                <button
+                                  type="button"
+                                  title={itemTitle}
+                                  onClick={() => { item.onClick!(); setSidebarOpen(false) }}
+                                  className={itemClass}
+                                >
+                                  {itemInner}
+                                </button>
+                              ) : (
+                                <Link
+                                  to={targetPath}
+                                  onClick={() => setSidebarOpen(false)}
+                                  title={itemTitle}
+                                  className={itemClass}
+                                >
+                                  {itemInner}
+                                </Link>
+                              )}
+                            </li>
+                          )
+
+                          if (item.permission) {
+                            return (
+                              <PermissionGate permission={item.permission} key={item.path}>
+                                {content}
+                              </PermissionGate>
+                            )
+                          }
+
+                          return content
+                        })}
+                      </ul>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
             <button
               type="button"
@@ -527,6 +623,14 @@ export function AdminLayout() {
 
       {createOrgModalOpen && (
         <CreateOrganizationModal onClose={() => setCreateOrgModalOpen(false)} />
+      )}
+
+      {shareStoreOpen && currentOrganization?.slug && (
+        <ShareStoreModal
+          storeUrl={`${window.location.origin}/${currentOrganization.slug}`}
+          storeName={currentOrganization.name}
+          onClose={() => setShareStoreOpen(false)}
+        />
       )}
 
       <ConfirmDialog
