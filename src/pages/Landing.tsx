@@ -238,31 +238,6 @@ function ImageCarousel({
   )
 }
 
-// Placeholder component for video
-// function VideoPlaceholder({
-//   className = '',
-//   label = 'Video demo',
-// }: {
-//   className?: string
-//   label?: string
-// }) {
-//   return (
-//     <div
-//       className={`group relative flex cursor-pointer items-center justify-center overflow-hidden rounded-2xl border-2 border-dashed border-zinc-300 bg-gradient-to-br from-zinc-100 to-zinc-200 aspect-video ${className}`}
-//     >
-//       <div className="flex flex-col items-center gap-3 text-center text-zinc-400">
-//         <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-zinc-300 bg-white shadow-sm transition-transform group-hover:scale-105">
-//           <Play className="h-7 w-7 translate-x-0.5 text-zinc-500" />
-//         </div>
-//         <div>
-//           <span className="block text-sm font-semibold text-zinc-500">{label}</span>
-//           <span className="text-xs text-zinc-400">Agregá tu video de YouTube o Vimeo aquí</span>
-//         </div>
-//       </div>
-//       <div className="absolute inset-0 rounded-2xl ring-2 ring-inset ring-transparent transition group-hover:ring-red-300" />
-//     </div>
-//   )
-// }
 
 export function Landing() {
   return (
@@ -364,13 +339,15 @@ export function Landing() {
                   Probar 14 días gratis
                   <ArrowRight className="h-4 w-4" />
                 </a>
-                <Link
-                  to="/login"
+                <a
+                  href="https://calendar.app.google/uQEnHKUCMX3DWwd98"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/60 px-6 py-3.5 text-sm font-bold text-zinc-200 hover:bg-zinc-700 transition-colors"
                 >
-                  Acceder al panel
+                  Agendar demo
                   <ChevronRight className="h-4 w-4" />
-                </Link>
+                </a>
               </div>
               {/* Trust pills */}
               <div className="mt-10 flex flex-wrap gap-2">
@@ -478,7 +455,7 @@ export function Landing() {
       </section>
 
       {/* DEMO VIDEO */}
-      {/* <section id="demo" className="bg-[#12192C] text-white">
+      <section id="demo" className="bg-[#12192C] text-white">
         <div className="container-custom py-16 md:py-24">
           <div className="mb-10 text-center">
             <p className="text-sm font-bold uppercase tracking-widest text-red-400">Demo</p>
@@ -490,13 +467,18 @@ export function Landing() {
             </p>
           </div>
           <div className="mx-auto max-w-4xl">
-            <VideoPlaceholder label="Video demo de Axios — 3 minutos" />
-            <p className="mt-4 text-center text-xs text-zinc-500">
-              Reemplazá este bloque con un embed de YouTube o Vimeo
-            </p>
+            <div className="relative overflow-hidden rounded-2xl aspect-video shadow-2xl shadow-black/40">
+              <iframe
+                src="https://www.youtube.com/embed/5xjb8Ot4b0Y"
+                title="Demo de Axios"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="absolute inset-0 h-full w-full"
+              />
+            </div>
           </div>
         </div>
-      </section> */}
+      </section>
 
       {/* FEATURES */}
       <section id="features" className="container-custom py-16 md:py-24">
