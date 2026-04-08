@@ -41,25 +41,8 @@ async function sendEmail(opts: {
   subject: string
   html: string
   apiKey: string
-  templateId?: string
-  templateParams?: Record<string, unknown>
 }): Promise<{ success: boolean; error?: string }> {
   const fromEmail = Deno.env.get('FROM_EMAIL') ?? 'notificaciones@resend.dev'
-
-  const body: Record<string, unknown> = {
-    from: fromEmail,
-    to: [opts.to],
-  }
-
-  if (opts.templateId) {
-    // Resend template mode: pass template_id + params (no html/subject needed)
-    body.template_id = opts.templateId
-    body.params = opts.templateParams ?? {}
-  } else {
-    // Raw HTML fallback
-    body.subject = opts.subject
-    body.html = opts.html
-  }
 
   const res = await fetch(RESEND_API_URL, {
     method: 'POST',
@@ -67,12 +50,18 @@ async function sendEmail(opts: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${opts.apiKey}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      from: fromEmail,
+      to: [opts.to],
+      subject: opts.subject,
+      html: opts.html,
+    }),
   })
 
   if (!res.ok) {
     const err = await res.text()
-    return { success: false, error: err }
+    console.error('[sendEmail] Resend error:', res.status, err)
+    return { success: false, error: `Resend ${res.status}: ${err}` }
   }
   return { success: true }
 }
@@ -164,21 +153,9 @@ Deno.serve(async (req) => {
         .eq('id', record!.id)
     }
 
-    // Template IDs from env (set after creating templates in resend.com)
-    const templateIds = {
-      new_order:             Deno.env.get('RESEND_TEMPLATE_NEW_ORDER') || null,
-      low_stock:             Deno.env.get('RESEND_TEMPLATE_LOW_STOCK') || null,
-      order_status_customer: Deno.env.get('RESEND_TEMPLATE_ORDER_STATUS') || null,
-    }
-
-    let toEmail         = ''
-    let subject         = ''
-    let html            = ''
-    let templateId:     string | undefined
-    let templateParams: Record<string, unknown> | undefined
-
-    const appUrl   = Deno.env.get('APP_URL')   ?? 'https://axiostock.com'
-    const adminUrl = Deno.env.get('ADMIN_URL')  ?? appUrl
+    let toEmail = ''
+    let subject = ''
+    let html    = ''
 
     // ── new_order ──────────────────────────────────────────────────────────────
     if (record.type === 'new_order') {
@@ -205,23 +182,7 @@ Deno.serve(async (req) => {
       const statusLabel  = STATUS_LABELS[p.status] ?? p.status
 
       subject = `🛒 Nueva orden #${orderIdShort} — ${orgName}`
-
-      if (templateIds.new_order) {
-        templateId     = templateIds.new_order
-        templateParams = {
-          logo_url:      `${appUrl}/logo3.png`,
-          store_name:    orgName,
-          order_id_short: orderIdShort,
-          order_id:      p.order_id ?? '',
-          total:         totalFmt,
-          status_label:  statusLabel,
-          created_at:    createdAt,
-          admin_url:     adminUrl,
-          app_url:       appUrl,
-        }
-      } else {
-        html = renderNewOrder({ storeName: orgName, orderIdShort, orderId: p.order_id ?? '', total: totalFmt, statusLabel, createdAt })
-      }
+      html    = renderNewOrder({ storeName: orgName, orderIdShort, orderId: p.order_id ?? '', total: totalFmt, statusLabel, createdAt })
 
     // ── low_stock ──────────────────────────────────────────────────────────────
     } else if (record.type === 'low_stock') {
@@ -244,23 +205,7 @@ Deno.serve(async (req) => {
 
       const itemLabel = p.variant_name ? `${p.product_name} — ${p.variant_name}` : p.product_name
       subject = `⚠️ Stock bajo: ${itemLabel} (${p.stock} unidades)`
-
-      if (templateIds.low_stock) {
-        templateId     = templateIds.low_stock
-        templateParams = {
-          logo_url:     `${appUrl}/logo3.png`,
-          store_name:   orgName,
-          product_name: p.product_name,
-          variant_name: p.variant_name ?? '',
-          branch_name:  p.branch_name,
-          stock:        String(p.stock),
-          threshold:    String(p.threshold),
-          admin_url:    adminUrl,
-          app_url:      appUrl,
-        }
-      } else {
-        html = renderLowStock({ storeName: orgName, productName: p.product_name, variantName: p.variant_name, branchName: p.branch_name, stock: p.stock, threshold: p.threshold })
-      }
+      html    = renderLowStock({ storeName: orgName, productName: p.product_name, variantName: p.variant_name, branchName: p.branch_name, stock: p.stock, threshold: p.threshold })
 
     // ── order_status_customer ──────────────────────────────────────────────────
     } else if (record.type === 'order_status_customer') {
@@ -282,22 +227,7 @@ Deno.serve(async (req) => {
       const orderIdShort = (p.order_id ?? '').slice(0, 8).toUpperCase()
       const statusLabel  = STATUS_LABELS[p.new_status] ?? p.new_status
       subject = `${orgName} — Tu orden #${orderIdShort} fue actualizada: ${statusLabel}`
-
-      if (templateIds.order_status_customer) {
-        templateId     = templateIds.order_status_customer
-        templateParams = {
-          logo_url:      `${appUrl}/logo3.png`,
-          store_name:    orgName,
-          store_url:     `${appUrl}/${orgSlug}`,
-          customer_name: p.customer_name ?? 'Cliente',
-          order_id_short: orderIdShort,
-          new_status:    p.new_status,
-          status_label:  statusLabel,
-          app_url:       appUrl,
-        }
-      } else {
-        html = renderOrderStatus({ storeName: orgName, storeSlug: orgSlug, customerName: p.customer_name ?? 'Cliente', orderIdShort, newStatus: p.new_status })
-      }
+      html    = renderOrderStatus({ storeName: orgName, storeSlug: orgSlug, customerName: p.customer_name ?? 'Cliente', orderIdShort, newStatus: p.new_status })
 
     // ── unknown ────────────────────────────────────────────────────────────────
     } else {
@@ -309,7 +239,7 @@ Deno.serve(async (req) => {
     }
 
     // ── Send ───────────────────────────────────────────────────────────────────
-    const result = await sendEmail({ to: toEmail, subject, html, apiKey: resendApiKey, templateId, templateParams })
+    const result = await sendEmail({ to: toEmail, subject, html, apiKey: resendApiKey })
 
     if (result.success) {
       await supabase
