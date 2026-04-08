@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Actualización de tu orden</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="background-color:#12192C;border-radius:16px 16px 0 0;padding:28px 40px;text-align:center;">
+              <img src="{{logo_url}}" alt="Axios" width="44" height="44"
+                style="display:inline-block;vertical-align:middle;border-radius:10px;margin-right:12px;" />
+              <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">{{store_name}}</span>
+            </td>
+          </tr>
+
+          <!-- HERO BAND -->
+          <tr>
+            <td style="background-color:#2563eb;padding:20px 40px;text-align:center;">
+              <span style="font-size:32px;">{{status_emoji}}</span>
+              <h1 style="margin:8px 0 4px;color:#ffffff;font-size:20px;font-weight:700;">Tu orden fue actualizada</h1>
+              <p style="margin:0;color:#bfdbfe;font-size:13px;">Hola, {{customer_name}}</p>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="background-color:#ffffff;padding:36px 40px;">
+
+              <!-- Greeting -->
+              <p style="margin:0 0 24px;font-size:15px;color:#475569;line-height:1.6;">
+                Tenemos novedades sobre tu pedido. A continuación encontrás el estado actualizado:
+              </p>
+
+              <!-- Order + Status -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+                <tr>
+                  <td width="50%" style="padding:0 8px 0 0;vertical-align:top;">
+                    <div style="background-color:#f8fafc;border-radius:10px;padding:16px 20px;">
+                      <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;">Orden</p>
+                      <p style="margin:0;font-size:16px;font-weight:700;color:#1e293b;font-family:monospace;">#{{order_id_short}}</p>
+                    </div>
+                  </td>
+                  <td width="50%" style="padding:0 0 0 8px;vertical-align:top;">
+                    <div style="background-color:{{status_bg}};border-radius:10px;padding:16px 20px;text-align:center;">
+                      <p style="margin:0 0 4px;font-size:11px;color:{{status_color_muted}};font-weight:600;text-transform:uppercase;letter-spacing:0.6px;">Nuevo estado</p>
+                      <p style="margin:0;font-size:15px;font-weight:800;color:{{status_color}};">{{status_label}}</p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Status description -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
+                <tr>
+                  <td style="background-color:#f8fafc;border-left:4px solid {{status_color}};border-radius:0 8px 8px 0;padding:16px 20px;">
+                    <p style="margin:0;font-size:14px;color:#475569;line-height:1.5;">{{status_description}}</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center">
+                    <a href="{{store_url}}"
+                      style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 32px;border-radius:10px;letter-spacing:0.2px;">
+                      Visitar tienda →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Divider -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:32px;">
+                <tr>
+                  <td style="border-top:1px solid #f1f5f9;padding-top:20px;">
+                    <p style="margin:0;font-size:12px;color:#94a3b8;text-align:center;">
+                      Si tenés dudas, contactanos respondiendo este email o a través de nuestra tienda.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background-color:#f8fafc;border-radius:0 0 16px 16px;padding:20px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+              <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">Gestionado con</p>
+              <p style="margin:0;font-size:12px;color:#64748b;font-weight:600;">Axios · <a href="{{app_url}}" style="color:#2563eb;text-decoration:none;">axiostock.com</a></p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

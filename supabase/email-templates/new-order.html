@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Nueva orden recibida</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="background-color:#12192C;border-radius:16px 16px 0 0;padding:28px 40px;text-align:center;">
+              <img src="{{logo_url}}" alt="Axios" width="44" height="44"
+                style="display:inline-block;vertical-align:middle;border-radius:10px;margin-right:12px;" />
+              <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Axios</span>
+            </td>
+          </tr>
+
+          <!-- HERO BAND -->
+          <tr>
+            <td style="background-color:#2563eb;padding:20px 40px;text-align:center;">
+              <span style="font-size:32px;">🛒</span>
+              <h1 style="margin:8px 0 4px;color:#ffffff;font-size:20px;font-weight:700;">¡Nueva orden recibida!</h1>
+              <p style="margin:0;color:#bfdbfe;font-size:13px;">{{store_name}}</p>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="background-color:#ffffff;padding:36px 40px;">
+
+              <!-- Order ID badge -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+                <tr>
+                  <td style="background-color:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px 20px;">
+                    <p style="margin:0 0 4px;font-size:11px;color:#60a5fa;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;">Orden</p>
+                    <p style="margin:0;font-size:18px;font-weight:700;color:#1e3a8a;font-family:monospace;">#{{order_id_short}}</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Details grid -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td width="50%" style="padding:0 8px 16px 0;vertical-align:top;">
+                    <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;">Total</p>
+                    <p style="margin:0;font-size:22px;font-weight:700;color:#15803d;">$&nbsp;{{total}}</p>
+                  </td>
+                  <td width="50%" style="padding:0 0 16px 8px;vertical-align:top;">
+                    <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;">Estado</p>
+                    <p style="margin:0;">
+                      <span style="display:inline-block;background-color:#dcfce7;color:#166534;font-size:12px;font-weight:700;padding:4px 12px;border-radius:999px;">{{status_label}}</span>
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="border-top:1px solid #f1f5f9;padding-top:16px;">
+                    <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;">Fecha y hora</p>
+                    <p style="margin:0;font-size:14px;color:#334155;">{{created_at}}</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:32px;">
+                <tr>
+                  <td align="center">
+                    <a href="{{admin_url}}/orders/{{order_id}}"
+                      style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 32px;border-radius:10px;letter-spacing:0.2px;">
+                      Ver orden →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background-color:#f8fafc;border-radius:0 0 16px 16px;padding:20px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+              <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">Este email fue enviado automáticamente por</p>
+              <p style="margin:0;font-size:12px;color:#64748b;font-weight:600;">Axios · <a href="{{app_url}}" style="color:#2563eb;text-decoration:none;">axiostock.com</a></p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

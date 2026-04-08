@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Alerta de stock bajo</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f1f5f9;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+
+          <!-- HEADER -->
+          <tr>
+            <td style="background-color:#12192C;border-radius:16px 16px 0 0;padding:28px 40px;text-align:center;">
+              <img src="{{logo_url}}" alt="Axios" width="44" height="44"
+                style="display:inline-block;vertical-align:middle;border-radius:10px;margin-right:12px;" />
+              <span style="display:inline-block;vertical-align:middle;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Axios</span>
+            </td>
+          </tr>
+
+          <!-- HERO BAND - warning amber -->
+          <tr>
+            <td style="background-color:#d97706;padding:20px 40px;text-align:center;">
+              <span style="font-size:32px;">⚠️</span>
+              <h1 style="margin:8px 0 4px;color:#ffffff;font-size:20px;font-weight:700;">Stock bajo detectado</h1>
+              <p style="margin:0;color:#fef3c7;font-size:13px;">{{store_name}}</p>
+            </td>
+          </tr>
+
+          <!-- BODY -->
+          <tr>
+            <td style="background-color:#ffffff;padding:36px 40px;">
+
+              <!-- Product card -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+                <tr>
+                  <td style="background-color:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:20px 24px;">
+                    <p style="margin:0 0 6px;font-size:11px;color:#b45309;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;">Producto</p>
+                    <p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#1e293b;">{{product_name}}</p>
+                    {{#if variant_name}}
+                    <p style="margin:0;font-size:13px;color:#78716c;">Variante: {{variant_name}}</p>
+                    {{/if}}
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Stock meters -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:28px;">
+                <tr>
+                  <td width="50%" style="padding:0 8px 0 0;vertical-align:top;">
+                    <div style="background-color:#fef2f2;border-radius:10px;padding:16px 20px;text-align:center;">
+                      <p style="margin:0 0 4px;font-size:11px;color:#fca5a5;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;">Stock actual</p>
+                      <p style="margin:0;font-size:36px;font-weight:800;color:#dc2626;line-height:1;">{{stock}}</p>
+                      <p style="margin:4px 0 0;font-size:12px;color:#f87171;">unidades</p>
+                    </div>
+                  </td>
+                  <td width="50%" style="padding:0 0 0 8px;vertical-align:top;">
+                    <div style="background-color:#f8fafc;border-radius:10px;padding:16px 20px;text-align:center;">
+                      <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;">Umbral mínimo</p>
+                      <p style="margin:0;font-size:36px;font-weight:800;color:#64748b;line-height:1;">{{threshold}}</p>
+                      <p style="margin:4px 0 0;font-size:12px;color:#94a3b8;">unidades</p>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Branch info -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px;">
+                <tr>
+                  <td style="border-top:1px solid #f1f5f9;padding-top:20px;">
+                    <p style="margin:0 0 4px;font-size:11px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;">Sucursal</p>
+                    <p style="margin:0;font-size:14px;color:#334155;font-weight:600;">📍 {{branch_name}}</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- CTA -->
+              <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td align="center">
+                    <a href="{{admin_url}}/inventory"
+                      style="display:inline-block;background-color:#d97706;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:14px 32px;border-radius:10px;letter-spacing:0.2px;">
+                      Gestionar inventario →
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- FOOTER -->
+          <tr>
+            <td style="background-color:#f8fafc;border-radius:0 0 16px 16px;padding:20px 40px;text-align:center;border-top:1px solid #e2e8f0;">
+              <p style="margin:0 0 4px;font-size:12px;color:#94a3b8;">Este email fue enviado automáticamente por</p>
+              <p style="margin:0;font-size:12px;color:#64748b;font-weight:600;">Axios · <a href="{{app_url}}" style="color:#2563eb;text-decoration:none;">axiostock.com</a></p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>

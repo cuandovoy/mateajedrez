@@ -3,6 +3,12 @@
 // Invoked by Database Webhook on notification_queue INSERT.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import {
+  renderNewOrder,
+  renderLowStock,
+  renderOrderStatus,
+  STATUS_LABELS,
+} from './email-templates.ts'
 
 const RESEND_API_URL = 'https://api.resend.com/emails'
 
@@ -13,44 +19,55 @@ interface NotificationRecord {
   payload: Record<string, unknown>
   metadata: Record<string, unknown> | null
   status: string
+  attempts: number
 }
 
 interface WebhookPayload {
   type?: string
   table?: string
   record?: NotificationRecord
+  id?: string
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'Pendiente',
-  processing: 'En Proceso',
-  shipped: 'Enviado',
-  delivered: 'Entregado',
-  cancelled: 'Cancelado',
-}
+// ─── Resend send ──────────────────────────────────────────────────────────────
 
-function getStatusLabel(status: string): string {
-  return STATUS_LABELS[status] ?? status
-}
-
-async function sendEmail(
-  to: string,
-  subject: string,
-  html: string,
+/**
+ * Sends an email via Resend.
+ * - If `templateId` is provided → uses Resend template with `params` as variables.
+ * - Otherwise → sends raw `html` (fallback for local/dev or when template not set).
+ */
+async function sendEmail(opts: {
+  to: string
+  subject: string
+  html: string
   apiKey: string
-): Promise<{ success: boolean; error?: string }> {
+  templateId?: string
+  templateParams?: Record<string, unknown>
+}): Promise<{ success: boolean; error?: string }> {
+  const fromEmail = Deno.env.get('FROM_EMAIL') ?? 'notificaciones@resend.dev'
+
+  const body: Record<string, unknown> = {
+    from: fromEmail,
+    to: [opts.to],
+  }
+
+  if (opts.templateId) {
+    // Resend template mode: pass template_id + params (no html/subject needed)
+    body.template_id = opts.templateId
+    body.params = opts.templateParams ?? {}
+  } else {
+    // Raw HTML fallback
+    body.subject = opts.subject
+    body.html = opts.html
+  }
+
   const res = await fetch(RESEND_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${opts.apiKey}`,
     },
-    body: JSON.stringify({
-      from: Deno.env.get('FROM_EMAIL') ?? 'notificaciones@resend.dev',
-      to: [to],
-      subject,
-      html,
-    }),
+    body: JSON.stringify(body),
   })
 
   if (!res.ok) {
@@ -59,6 +76,8 @@ async function sendEmail(
   }
   return { success: true }
 }
+
+// ─── Handler ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -78,9 +97,9 @@ Deno.serve(async (req) => {
     })
   }
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+  const supabaseUrl        = Deno.env.get('SUPABASE_URL')!
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  const resendApiKey = Deno.env.get('RESEND_API_KEY')
+  const resendApiKey       = Deno.env.get('RESEND_API_KEY')
 
   if (!resendApiKey) {
     console.error('RESEND_API_KEY not set')
@@ -125,112 +144,184 @@ Deno.serve(async (req) => {
       })
     }
 
+    // Load org info
     const { data: org } = await supabase
       .from('organizations')
-      .select('name, settings')
+      .select('name, slug, settings')
       .eq('id', record.organization_id)
       .single()
 
-    const settings = (org?.settings as Record<string, unknown>) ?? {}
+    const settings          = (org?.settings as Record<string, unknown>) ?? {}
     const notificationEmail = settings.notification_email as string | undefined
+    const orgName           = (org?.name as string) ?? 'La tienda'
+    const orgSlug           = (org?.slug as string) ?? ''
 
-    let toEmail: string
-    let subject: string
-    let html: string
+    // ── Helpers ──
+    const failRecord = async (reason: string) => {
+      await supabase
+        .from('notification_queue')
+        .update({ status: 'failed', attempts: record!.attempts + 1, last_error: reason })
+        .eq('id', record!.id)
+    }
 
+    // Template IDs from env (set after creating templates in resend.com)
+    const templateIds = {
+      new_order:             Deno.env.get('RESEND_TEMPLATE_NEW_ORDER') || null,
+      low_stock:             Deno.env.get('RESEND_TEMPLATE_LOW_STOCK') || null,
+      order_status_customer: Deno.env.get('RESEND_TEMPLATE_ORDER_STATUS') || null,
+    }
+
+    let toEmail         = ''
+    let subject         = ''
+    let html            = ''
+    let templateId:     string | undefined
+    let templateParams: Record<string, unknown> | undefined
+
+    const appUrl   = Deno.env.get('APP_URL')   ?? 'https://axiostock.com'
+    const adminUrl = Deno.env.get('ADMIN_URL')  ?? appUrl
+
+    // ── new_order ──────────────────────────────────────────────────────────────
     if (record.type === 'new_order') {
-      const payload = record.payload as { order_id: string; total: number; status: string; created_at: string }
+      const p = record.payload as {
+        order_id: string
+        total: number
+        status: string
+        created_at: string
+      }
       toEmail = notificationEmail ?? ''
       if (!toEmail) {
-        await supabase
-          .from('notification_queue')
-          .update({
-            status: 'failed',
-            attempts: record.attempts + 1,
-            last_error: 'notification_email not configured',
-          })
-          .eq('id', record.id)
+        await failRecord('notification_email not configured')
         return new Response(JSON.stringify({ error: 'notification_email not configured' }), {
           status: 400,
           headers: { 'Content-Type': 'application/json' },
         })
       }
-      subject = `Nueva orden #${(payload.order_id ?? '').slice(0, 8)}`
-      html = `
-        <h2>Nueva orden recibida</h2>
-        <p><strong>Orden:</strong> ${payload.order_id}</p>
-        <p><strong>Total:</strong> ${payload.total}</p>
-        <p><strong>Estado:</strong> ${payload.status}</p>
-        <p><strong>Fecha:</strong> ${payload.created_at ?? 'N/A'}</p>
-      `
+
+      const orderIdShort = (p.order_id ?? '').slice(0, 8).toUpperCase()
+      const createdAt    = p.created_at
+        ? new Date(p.created_at).toLocaleString('es-UY', { timeZone: 'America/Montevideo' })
+        : 'N/A'
+      const totalFmt     = new Intl.NumberFormat('es-UY').format(p.total ?? 0)
+      const statusLabel  = STATUS_LABELS[p.status] ?? p.status
+
+      subject = `🛒 Nueva orden #${orderIdShort} — ${orgName}`
+
+      if (templateIds.new_order) {
+        templateId     = templateIds.new_order
+        templateParams = {
+          logo_url:      `${appUrl}/logo3.png`,
+          store_name:    orgName,
+          order_id_short: orderIdShort,
+          order_id:      p.order_id ?? '',
+          total:         totalFmt,
+          status_label:  statusLabel,
+          created_at:    createdAt,
+          admin_url:     adminUrl,
+          app_url:       appUrl,
+        }
+      } else {
+        html = renderNewOrder({ storeName: orgName, orderIdShort, orderId: p.order_id ?? '', total: totalFmt, statusLabel, createdAt })
+      }
+
+    // ── low_stock ──────────────────────────────────────────────────────────────
+    } else if (record.type === 'low_stock') {
+      const p = record.payload as {
+        product_name: string
+        variant_name?: string | null
+        branch_name: string
+        stock: number
+        threshold: number
+        notification_email: string
+      }
+      toEmail = p.notification_email || notificationEmail || ''
+      if (!toEmail) {
+        await failRecord('notification_email not configured')
+        return new Response(JSON.stringify({ error: 'notification_email not configured' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      const itemLabel = p.variant_name ? `${p.product_name} — ${p.variant_name}` : p.product_name
+      subject = `⚠️ Stock bajo: ${itemLabel} (${p.stock} unidades)`
+
+      if (templateIds.low_stock) {
+        templateId     = templateIds.low_stock
+        templateParams = {
+          logo_url:     `${appUrl}/logo3.png`,
+          store_name:   orgName,
+          product_name: p.product_name,
+          variant_name: p.variant_name ?? '',
+          branch_name:  p.branch_name,
+          stock:        String(p.stock),
+          threshold:    String(p.threshold),
+          admin_url:    adminUrl,
+          app_url:      appUrl,
+        }
+      } else {
+        html = renderLowStock({ storeName: orgName, productName: p.product_name, variantName: p.variant_name, branchName: p.branch_name, stock: p.stock, threshold: p.threshold })
+      }
+
+    // ── order_status_customer ──────────────────────────────────────────────────
     } else if (record.type === 'order_status_customer') {
-      const payload = record.payload as {
+      const p = record.payload as {
         order_id: string
         new_status: string
         customer_email: string
         customer_name: string
       }
-      toEmail = payload.customer_email ?? ''
+      toEmail = p.customer_email ?? ''
       if (!toEmail) {
-        await supabase
-          .from('notification_queue')
-          .update({
-            status: 'failed',
-            attempts: record.attempts + 1,
-            last_error: 'customer_email missing',
-          })
-          .eq('id', record.id)
+        await failRecord('customer_email missing')
         return new Response(JSON.stringify({ error: 'customer_email missing' }), {
           status: 400,
           headers: { 'Content-Type': 'application/json' },
         })
       }
-      const orgName = (org?.name as string) ?? 'La tienda'
-      subject = `Actualización de tu orden - ${orgName}`
-      html = `
-        <h2>Hola ${payload.customer_name ?? 'Cliente'}</h2>
-        <p>Tu orden <strong>#${(payload.order_id ?? '').slice(0, 8)}</strong> ha sido actualizada.</p>
-        <p><strong>Nuevo estado:</strong> ${getStatusLabel(payload.new_status)}</p>
-        <p>Gracias por tu compra.</p>
-      `
+
+      const orderIdShort = (p.order_id ?? '').slice(0, 8).toUpperCase()
+      const statusLabel  = STATUS_LABELS[p.new_status] ?? p.new_status
+      subject = `${orgName} — Tu orden #${orderIdShort} fue actualizada: ${statusLabel}`
+
+      if (templateIds.order_status_customer) {
+        templateId     = templateIds.order_status_customer
+        templateParams = {
+          logo_url:      `${appUrl}/logo3.png`,
+          store_name:    orgName,
+          store_url:     `${appUrl}/${orgSlug}`,
+          customer_name: p.customer_name ?? 'Cliente',
+          order_id_short: orderIdShort,
+          new_status:    p.new_status,
+          status_label:  statusLabel,
+          app_url:       appUrl,
+        }
+      } else {
+        html = renderOrderStatus({ storeName: orgName, storeSlug: orgSlug, customerName: p.customer_name ?? 'Cliente', orderIdShort, newStatus: p.new_status })
+      }
+
+    // ── unknown ────────────────────────────────────────────────────────────────
     } else {
-      await supabase
-        .from('notification_queue')
-        .update({
-          status: 'failed',
-          attempts: record.attempts + 1,
-          last_error: `Unknown type: ${record.type}`,
-        })
-        .eq('id', record.id)
+      await failRecord(`Unknown type: ${record.type}`)
       return new Response(JSON.stringify({ error: `Unknown type: ${record.type}` }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
-    const result = await sendEmail(toEmail, subject, html, resendApiKey)
+    // ── Send ───────────────────────────────────────────────────────────────────
+    const result = await sendEmail({ to: toEmail, subject, html, apiKey: resendApiKey, templateId, templateParams })
 
     if (result.success) {
       await supabase
         .from('notification_queue')
-        .update({
-          status: 'sent',
-          processed_at: new Date().toISOString(),
-        })
+        .update({ status: 'sent', processed_at: new Date().toISOString() })
         .eq('id', record.id)
       return new Response(JSON.stringify({ ok: true }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     } else {
-      await supabase
-        .from('notification_queue')
-        .update({
-          status: 'failed',
-          attempts: record.attempts + 1,
-          last_error: result.error ?? 'Send failed',
-        })
-        .eq('id', record.id)
+      await failRecord(result.error ?? 'Send failed')
       return new Response(
         JSON.stringify({ error: result.error ?? 'Send failed' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
@@ -241,13 +332,9 @@ Deno.serve(async (req) => {
     if (record?.id) {
       try {
         await supabase
-        .from('notification_queue')
-        .update({
-          status: 'failed',
-          attempts: (record.attempts ?? 0) + 1,
-          last_error: String(err),
-        })
-        .eq('id', record.id)
+          .from('notification_queue')
+          .update({ status: 'failed', attempts: (record.attempts ?? 0) + 1, last_error: String(err) })
+          .eq('id', record.id)
       } catch (updateErr) {
         console.error('Failed to update queue on error:', updateErr)
       }
