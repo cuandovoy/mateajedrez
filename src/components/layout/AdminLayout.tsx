@@ -67,7 +67,8 @@ type NavItem = {
 type NavSection = {
   title: string
   icon: React.ComponentType<{ className?: string }>
-  items: NavItem[]
+  path?: string
+  items?: NavItem[]
 }
 
 export function AdminLayout() {
@@ -89,9 +90,9 @@ export function AdminLayout() {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem('admin-sidebar-sections')
-      return saved ? JSON.parse(saved) : { 'Inicio': true, 'Operación': true, 'Catálogo': false, 'Reportes': false, 'Administración': false }
+      return saved ? JSON.parse(saved) : { 'Operación': true, 'Catálogo': false, 'Reportes': false, 'Administración': false }
     } catch {
-      return { 'Inicio': true, 'Operación': true, 'Catálogo': false, 'Reportes': false, 'Administración': false }
+      return { 'Operación': true, 'Catálogo': false, 'Reportes': false, 'Administración': false }
     }
   })
 
@@ -147,9 +148,7 @@ export function AdminLayout() {
     {
       title: 'Inicio',
       icon: LayoutDashboard,
-      items: [
-        { path: '/', label: 'Inicio', icon: LayoutDashboard },
-      ],
+      path: '/',
     },
     {
       title: 'Operación',
@@ -406,25 +405,60 @@ export function AdminLayout() {
 
         {/* Admin Sidebar - más compacto */}
         <aside className={cn(
-          'fixed left-0 top-[52px] h-[calc(100vh-52px)] bg-white border-r border-gray-200 overflow-y-auto z-20 transition-all duration-300 ease-in-out',
+          'fixed left-0 top-[52px] h-[calc(100vh-52px)] bg-white/95 backdrop-blur-xl border-r border-slate-200 shadow-sm overflow-y-auto z-20 transition-all duration-300 ease-in-out',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
-          sidebarCollapsed ? 'lg:w-14' : 'w-56 lg:w-56'
+          sidebarCollapsed ? 'lg:w-14' : 'w-64 lg:w-64'
         )}>
           <nav className={cn('p-3 transition-all duration-300', sidebarCollapsed ? 'px-2 py-3' : 'py-3')}>
             <div className={cn('space-y-4', sidebarCollapsed ? 'space-y-3' : 'space-y-4')}>
               {navSections.map((section) => {
-                const isOpen = sidebarCollapsed || openSections[section.title]
                 const SectionIcon = section.icon
-                const filteredItems = section.items.filter((item) => {
+                const isStandaloneLink = Boolean(section.path && !section.items)
+                const filteredItems = section.items?.filter((item) => {
                   if (item.adminOnly && !isAdmin) return false
                   if (item.minBranches && branchCount < item.minBranches) return false
                   if (item.requiresBillerConfig && (billerConfigLoading || !billerConfig)) return false
                   if (section.title === 'Reportes') return true
                   return !item.planFeature || canUseFeature(item.planFeature)
-                })
-                if (filteredItems.length === 0) return null
+                }) ?? []
 
-                // Sección tiene algún ítem activo
+                if (isStandaloneLink) {
+                  const active = isActive(section.path!)
+                  return (
+                    <div key={section.title}>
+                      <Link
+                        to={section.path!}
+                        onClick={() => setSidebarOpen(false)}
+                        className={cn(
+                          'flex items-center rounded-2xl transition-colors group w-full border-l-4 border-transparent',
+                          sidebarCollapsed ? 'justify-center p-2' : 'px-3 py-2 gap-3',
+                          active
+                            ? 'bg-admin-600 text-white border-admin-600 shadow-sm'
+                            : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                        )}
+                      >
+                        <SectionIcon className={cn(
+                          'h-4 w-4 shrink-0',
+                          active ? 'text-white' : 'text-gray-500 group-hover:text-gray-600'
+                        )} />
+                        {!sidebarCollapsed && (
+                          <span className={cn(
+                            'text-sm truncate',
+                            active ? 'text-white font-medium' : 'text-gray-700'
+                          )}>
+                            {section.title}
+                          </span>
+                        )}
+                        {!sidebarCollapsed && active && (
+                          <ChevronRight className="h-4 w-4 text-white/80 shrink-0 ml-auto" />
+                        )}
+                      </Link>
+                    </div>
+                  )
+                }
+
+                if (filteredItems.length === 0) return null
+                const isOpen = sidebarCollapsed || openSections[section.title]
                 const hasActiveItem = filteredItems.some((item) => isActive(item.path))
 
                 return (
@@ -434,12 +468,12 @@ export function AdminLayout() {
                         type="button"
                         onClick={() => toggleSection(section.title)}
                         className={cn(
-                          'w-full flex items-center gap-2 px-2 py-1.5 rounded-md mb-0.5 group transition-colors',
+                          'w-full flex items-center gap-2 px-3 py-2 rounded-2xl mb-1 group transition-colors',
                           isOpen
                             ? hasActiveItem
-                              ? 'bg-admin-50 text-admin-700'
-                              : 'bg-gray-100 text-gray-700'
-                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                              ? 'bg-admin-50 text-admin-700 shadow-sm'
+                              : 'bg-slate-50 text-slate-700'
+                            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
                         )}
                       >
                         <SectionIcon className={cn(
@@ -479,13 +513,13 @@ export function AdminLayout() {
                             : undefined
 
                           const itemClass = cn(
-                            'flex items-center rounded-md transition-colors group w-full',
-                            sidebarCollapsed ? 'justify-center p-2' : 'px-2 py-1.5 gap-2 ml-1',
+                            'flex items-center rounded-2xl transition-colors group w-full border-l-4 border-transparent',
+                            sidebarCollapsed ? 'justify-center p-2' : 'px-3 py-2 gap-3 ml-1',
                             isLockedByPlan
-                              ? 'bg-gray-50 text-gray-400 hover:bg-gray-100 hover:text-gray-500'
+                              ? 'bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-500'
                               : active
-                              ? 'bg-admin-600 text-white'
-                              : 'bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                              ? 'bg-admin-600 text-white border-admin-600 shadow-sm'
+                              : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                           )
                           const itemInner = (
                             <>
@@ -564,10 +598,21 @@ export function AdminLayout() {
           </nav>
         </aside>
 
+        {sidebarCollapsed && (
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            aria-label="Expandir barra lateral"
+            className="hidden lg:flex fixed left-14 top-24 z-30 h-10 w-10 items-center justify-center rounded-r-full border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
+
         {/* Admin Content */}
         <main className={cn(
           'flex-1 min-w-0 bg-gray-50 min-h-[calc(100vh-52px)] relative transition-all duration-300',
-          sidebarCollapsed ? 'lg:ml-14' : 'lg:ml-56'
+          sidebarCollapsed ? 'lg:ml-14' : 'lg:ml-64'
         )}>
           {switchingOrganization && (
             <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
