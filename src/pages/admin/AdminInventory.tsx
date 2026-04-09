@@ -115,7 +115,7 @@ export function AdminInventory() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [totalCount, setTotalCount] = useState(0)
+  const [_totalCount, setTotalCount] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false)
