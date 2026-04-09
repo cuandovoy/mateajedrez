@@ -116,8 +116,8 @@ function MetricCard({ icon, iconBgClass, label, value, badge, subtitle, info, on
       className={`transition-shadow hover:shadow-lg ${onClick ? 'cursor-pointer' : ''}`}
       onClick={onClick}
     >
-      <CardContent className="relative p-6 flex flex-col gap-3">
-        <div className={`absolute top-4 right-4 h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${iconBgClass ?? 'bg-admin-100'}`}>
+      <CardContent className="p-6 flex flex-col gap-3">
+        <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${iconBgClass ?? 'bg-admin-100'}`}>
           {icon}
         </div>
         <div className="flex items-center gap-1.5">
@@ -279,7 +279,7 @@ function OperationalSection({ data, loading }: { data: OperationalMetrics | null
               <span className="text-xs text-gray-400">Stock en orden</span>
             )
           }
-          onClick={data.lowStockCount > 0 ? () => navigate('/inventory') : undefined}
+          onClick={data.lowStockCount > 0 ? () => navigate('/inventory?low_stock=true') : undefined}
         />
         <MetricCard
           icon={<UserPlus className="h-5 w-5 text-violet-600" />}

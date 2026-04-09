@@ -32,7 +32,7 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 const DEFAULT_PAGE_SIZE = 25
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
@@ -118,6 +118,7 @@ export function AdminInventory() {
   const [totalCount, setTotalCount] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [showOnlyLowStock, setShowOnlyLowStock] = useState(false)
   const fetchInventoryRequestId = useRef(0)
 
   useEffect(() => {
@@ -141,6 +142,17 @@ export function AdminInventory() {
   }, [searchInput])
 
   useEffect(() => {
+    const lowStockParam = searchParams.get('low_stock') === 'true'
+    setShowOnlyLowStock(lowStockParam)
+    if (lowStockParam) {
+      setPage(0)
+      setPageSize(10000) // show all when filtered
+    } else {
+      setPageSize(DEFAULT_PAGE_SIZE)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
     if (organizationId) {
       fetchBranches()
       checkMissingProducts()
@@ -158,6 +170,11 @@ export function AdminInventory() {
       checkUnsyncedItems()
     }
   }, [organizationId, selectedBranch])
+
+  const filteredInventory = useMemo(() => {
+    if (!showOnlyLowStock) return inventory
+    return inventory.filter(item => item.is_low_stock)
+  }, [inventory, showOnlyLowStock])
 
   const fetchInventory = useCallback(async () => {
     if (!organizationId) return
@@ -1039,12 +1056,15 @@ export function AdminInventory() {
     }
   }
 
-  const lowStockCount = inventory.filter((item) => item.is_low_stock).length
-  const fromItem = totalCount === 0 ? 0 : page * pageSize + 1
-  const toItem = Math.min((page + 1) * pageSize, totalCount)
-  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
-  const hasPrev = page > 0
-  const hasNext = page < totalPages - 1
+  const lowStockCount = filteredInventory.filter((item) => item.is_low_stock).length
+  const isPaginated = !showOnlyLowStock
+  const displayInventory = isPaginated ? filteredInventory.slice(page * pageSize, (page + 1) * pageSize) : filteredInventory
+  const displayTotalCount = filteredInventory.length
+  const fromItem = displayTotalCount === 0 ? 0 : (isPaginated ? page * pageSize + 1 : 1)
+  const toItem = isPaginated ? Math.min((page + 1) * pageSize, displayTotalCount) : displayTotalCount
+  const totalPages = isPaginated ? Math.max(1, Math.ceil(displayTotalCount / pageSize)) : 1
+  const hasPrev = isPaginated && page > 0
+  const hasNext = isPaginated && page < totalPages - 1
   
   return (
     <div className="space-y-6">
@@ -1369,7 +1389,7 @@ export function AdminInventory() {
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <Package className="h-5 w-5" />
-            <span>Inventario ({totalCount} producto{totalCount !== 1 ? 's' : ''} en total)</span>
+            <span>Inventario ({displayTotalCount} producto{displayTotalCount !== 1 ? 's' : ''} en total)</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1377,7 +1397,7 @@ export function AdminInventory() {
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600"></div>
             </div>
-          ) : inventory.length === 0 ? (
+          ) : displayInventory.length === 0 ? (
             <div className="text-center py-12 text-gray-500">
               <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
               <p>No se encontraron productos en el inventario</p>
@@ -1386,7 +1406,7 @@ export function AdminInventory() {
             <>
               {/* Mobile cards */}
               <div className="md:hidden divide-y">
-                {inventory.map((item) => {
+                {displayInventory.map((item) => {
                   const isLow = item.is_low_stock
                   const isOut = item.stock === 0
                   return (
@@ -1470,7 +1490,7 @@ export function AdminInventory() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {inventory.map((item) => (
+                  {displayInventory.map((item) => (
                     <tr
                       key={item.id}
                       className={`hover:bg-gray-50 ${item.is_low_stock ? 'bg-yellow-50' : ''}`}
@@ -1650,10 +1670,10 @@ export function AdminInventory() {
           )}
 
           {/* Paginación */}
-          {!loading && totalCount > 0 && (
+          {!loading && displayTotalCount > 0 && isPaginated && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 pt-4 border-t border-gray-200">
               <p className="text-sm text-gray-600">
-                Mostrando {fromItem}-{toItem} de {totalCount}
+                Mostrando {fromItem}-{toItem} de {displayTotalCount}
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -1680,6 +1700,15 @@ export function AdminInventory() {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
+            </div>
+          )}
+
+          {/* Mostrando todos cuando filtrado */}
+          {!loading && displayTotalCount > 0 && !isPaginated && (
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <p className="text-sm text-gray-600 text-center">
+                Mostrando {displayTotalCount} producto{displayTotalCount !== 1 ? 's' : ''} con stock bajo
+              </p>
             </div>
           )}
         </CardContent>

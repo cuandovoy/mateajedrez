@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
-import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone } from 'lucide-react'
+import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone, Download } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
 
 const getStatusLabel = (status: string | null): string => {
@@ -118,6 +118,117 @@ export function OrderConfirmation() {
 
   const whatsappDigits = transferContactPhone.replace(/\D/g, '')
   const whatsappHref = whatsappDigits ? `https://wa.me/${whatsappDigits}` : ''
+
+  const handleDownloadReceipt = () => {
+    if (!order) return
+
+    const addr = order.shipping_address as Record<string, string> | null
+    const orderRef = order.order_number ? `#${order.order_number}` : `#${order.id.slice(0, 8).toUpperCase()}`
+    const createdAt = order.created_at
+      ? new Date(order.created_at).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric' })
+      : ''
+
+    const itemsHtml = order.order_items
+      .map((item) => {
+        const variantLabel = item.variant?.name
+          ? ` <span style="color:#6b7280;font-size:12px;">(${item.variant.name})</span>`
+          : ''
+        return `
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">${capitalizeFirst(item.product.name)}${variantLabel}</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:center;">${item.quantity}</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;">${formatPrice(item.price, settings)}</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;">${formatPrice(item.price * item.quantity, settings)}</td>
+          </tr>`
+      })
+      .join('')
+
+    const addressHtml = addr
+      ? `<p style="margin:2px 0;">${addr.fullName ?? ''}</p>
+         <p style="margin:2px 0;">${addr.address ?? ''}, ${addr.city ?? ''}</p>
+         ${addr.email ? `<p style="margin:2px 0;">${addr.email}</p>` : ''}
+         ${addr.phone ? `<p style="margin:2px 0;">Tel: ${addr.phone}</p>` : ''}`
+      : ''
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Comprobante ${orderRef}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 32px; }
+    h1 { font-size: 22px; margin-bottom: 4px; }
+    h2 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #374151; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 28px; }
+    .org-name { font-size: 20px; font-weight: 700; }
+    .badge { background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .section { margin-bottom: 20px; padding: 14px; border: 1px solid #e5e7eb; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { font-size: 11px; text-transform: uppercase; color: #6b7280; font-weight: 600; text-align: left; padding-bottom: 6px; border-bottom: 2px solid #e5e7eb; }
+    thead th:nth-child(2) { text-align: center; }
+    thead th:nth-child(3), thead th:nth-child(4) { text-align: right; }
+    .total-row td { padding-top: 12px; font-size: 15px; font-weight: 700; }
+    .total-row td:last-child { text-align: right; }
+    .footer { margin-top: 32px; font-size: 11px; color: #9ca3af; text-align: center; }
+    @media print {
+      body { padding: 16px; }
+      @page { margin: 1.5cm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <div class="org-name">${order.organization ? '' : ''}Comprobante de compra</div>
+      <div style="color:#6b7280;margin-top:4px;">Orden ${orderRef} · ${createdAt}</div>
+    </div>
+    <div class="badge">✓ Confirmada</div>
+  </div>
+
+  ${addr ? `<div class="section">
+    <h2>Datos del comprador</h2>
+    <div style="color:#374151;line-height:1.6;">${addressHtml}</div>
+  </div>` : ''}
+
+  <div class="section">
+    <h2>Productos</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th style="text-align:center;">Cant.</th>
+          <th style="text-align:right;">Precio unit.</th>
+          <th style="text-align:right;">Subtotal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+        <tr class="total-row">
+          <td colspan="3">Total</td>
+          <td>${formatPrice(order.total, settings)}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Pago</h2>
+    <p>${order.payment_method === 'transfer' ? 'Transferencia bancaria' : order.payment_method === 'mercadopago' ? 'Mercado Pago' : capitalizeFirst(order.payment_method ?? '')}</p>
+    <p style="margin-top:4px;color:#6b7280;">Estado: ${getStatusLabel(order.status)}</p>
+  </div>
+
+  <div class="footer">Generado el ${new Date().toLocaleString('es-UY')} · ${window.location.origin}</div>
+</body>
+</html>`
+
+    const win = window.open('', '_blank', 'width=800,height=700')
+    if (!win) return
+    win.document.write(html)
+    win.document.close()
+    win.focus()
+    setTimeout(() => win.print(), 400)
+  }
 
   if (loading) {
     return (
@@ -336,11 +447,17 @@ export function OrderConfirmation() {
           </Card>
         )}
 
-        <div className="mt-8 flex justify-center space-x-4">
+        <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
+          <Button
+            variant="outline"
+            onClick={handleDownloadReceipt}
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Descargar comprobante
+          </Button>
           <Link to={slug ? `/${slug}` : '/'}>
             <Button
-              variant="outline"
-              className="text-white"
+              className="text-white w-full sm:w-auto"
               style={{ backgroundColor: primaryColor, borderColor: primaryColor }}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
