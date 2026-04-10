@@ -23,7 +23,7 @@ export const PAYMENT_METHOD_CONFIG_SCHEMAS: Record<string, ConfigField[]> = {
       type: 'password',
       placeholder: 'APP_USR-xxxx...',
       required: true,
-      help: 'Token privado para el backend. Obtenerlo en Mercado Pago Developers.',
+      help: 'Token privado para el backend. Obtenerlo en MP Developers → Tu app → Credenciales de producción.',
     },
     {
       key: 'public_key',
@@ -31,13 +31,21 @@ export const PAYMENT_METHOD_CONFIG_SCHEMAS: Record<string, ConfigField[]> = {
       type: 'text',
       placeholder: 'APP_USR-xxxx...',
       required: true,
-      help: 'Clave pública para el frontend (Checkout Pro, etc).',
+      help: 'Clave pública para el frontend. MP Developers → Tu app → Credenciales de producción.',
+    },
+    {
+      key: 'webhook_secret',
+      label: 'Webhook Secret Key',
+      type: 'password',
+      placeholder: 'abc123...',
+      required: true,
+      help: 'Clave secreta para verificar webhooks. MP Developers → Tu app → Webhooks → Clave secreta.',
     },
     {
       key: 'sandbox',
-      label: 'Modo prueba',
+      label: 'Modo prueba (sandbox)',
       type: 'boolean',
-      help: 'Activar para usar credenciales de prueba.',
+      help: 'Activar para usar credenciales de prueba. Desactivar en producción.',
     },
   ],
   paypal: [

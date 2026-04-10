@@ -1439,26 +1439,50 @@ export function AdminOrderDetail() {
                 <div>
                   <p className="text-sm text-gray-600 mb-2">Cobros registrados</p>
                   <div className="space-y-1">
-                    {orderPayments.map((payment) => (
-                      <div key={payment.id} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
-                        <span className="text-gray-700">
-                          {paymentMethods.find((m) => m.key === (payment.payment_method ?? ''))?.name ?? payment.payment_method ?? 'Sin método'}
-                          {' · '}
-                          {formatDateTime(payment.created_at, settings)}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">{formatPrice(payment.amount, settings)}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => setPaymentToDelete(payment)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                    {orderPayments.map((payment) => {
+                      const mpStatusLabel: Record<string, { label: string; color: string }> = {
+                        approved:     { label: 'Aprobado',    color: 'bg-green-100 text-green-700' },
+                        pending:      { label: 'Pendiente',   color: 'bg-yellow-100 text-yellow-700' },
+                        in_process:   { label: 'En proceso',  color: 'bg-blue-100 text-blue-700' },
+                        rejected:     { label: 'Rechazado',   color: 'bg-red-100 text-red-700' },
+                        cancelled:    { label: 'Cancelado',   color: 'bg-gray-100 text-gray-600' },
+                        refunded:     { label: 'Reembolsado', color: 'bg-purple-100 text-purple-700' },
+                        charged_back: { label: 'Contracargo', color: 'bg-orange-100 text-orange-700' },
+                      }
+                      const mpInfo = payment.mp_status ? mpStatusLabel[payment.mp_status] : null
+                      return (
+                        <div key={payment.id} className="rounded border px-2 py-1 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="text-gray-700">
+                              {paymentMethods.find((m) => m.key === (payment.payment_method ?? ''))?.name ?? payment.payment_method ?? 'Sin método'}
+                              {' · '}
+                              {formatDateTime(payment.created_at, settings)}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900">{formatPrice(payment.amount, settings)}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => setPaymentToDelete(payment)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          {payment.mp_payment_id && (
+                            <div className="mt-1 flex items-center gap-2 flex-wrap">
+                              <span className="text-xs text-gray-500">ID MP: {payment.mp_payment_id}</span>
+                              {mpInfo && (
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${mpInfo.color}`}>
+                                  {mpInfo.label}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               )}

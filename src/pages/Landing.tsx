@@ -19,9 +19,141 @@ import {
   X,
   Zap
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { Link } from 'react-router-dom'
+
+const BUSINESS_TYPES = [
+  'Tienda de ropa y accesorios',
+  'Ferretería / Materiales de construcción',
+  'Farmacia / Perfumería',
+  'Supermercado / Almacén',
+  'Librería / Papelería',
+  'Electrodomésticos / Tecnología',
+  'Joyería / Relojería',
+  'Distribuidora / Mayorista',
+  'Restaurante / Bar',
+  'Otro',
+]
+
+const WA_NUMBER = '59898157459'
+
+function buildWaUrl(fields: { name: string; lastName: string; phone: string; business: string }, plan?: string) {
+  const lines = [
+    `Hola, me interesa Axios${plan ? ` (plan ${plan})` : ''}.`,
+    `Nombre: ${fields.name} ${fields.lastName}`,
+    `Teléfono: ${fields.phone}`,
+    `Tipo de negocio: ${fields.business}`,
+  ]
+  return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(lines.join('\n'))}`
+}
+
+function ContactModal({ onClose, plan }: { onClose: () => void; plan?: string }) {
+  const [name, setName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [business, setBusiness] = useState('')
+  const [customBusiness, setCustomBusiness] = useState('')
+  const firstRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { firstRef.current?.focus() }, [])
+
+  const isOther = business === 'Otro'
+  const finalBusiness = isOther ? customBusiness.trim() : business
+
+  const canSubmit = name.trim() && lastName.trim() && phone.trim() && finalBusiness
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!canSubmit) return
+    const url = buildWaUrl({ name: name.trim(), lastName: lastName.trim(), phone: phone.trim(), business: finalBusiness }, plan)
+    window.open(url, '_blank', 'noopener,noreferrer')
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md rounded-2xl bg-white p-8 shadow-2xl">
+        <button onClick={onClose} className="absolute right-4 top-4 rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors">
+          <X className="h-5 w-5" />
+        </button>
+        <h2 className="text-xl font-bold text-zinc-900">Empezar con Axios</h2>
+        <p className="mt-1 text-sm text-zinc-500">Completá tus datos y te contactamos por WhatsApp.</p>
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-700">Nombre</label>
+              <input
+                ref={firstRef}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Juan"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                required
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-700">Apellido</label>
+              <input
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="García"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                required
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-700">Teléfono / WhatsApp</label>
+            <input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+598 99 000 000"
+              type="tel"
+              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-zinc-700">Tipo de negocio</label>
+            <select
+              value={business}
+              onChange={(e) => setBusiness(e.target.value)}
+              className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20 bg-white"
+              required
+            >
+              <option value="">Seleccioná una opción</option>
+              {BUSINESS_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+          {isOther && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-zinc-700">¿Cuál es tu negocio?</label>
+              <input
+                value={customBusiness}
+                onChange={(e) => setCustomBusiness(e.target.value)}
+                placeholder="Describí tu negocio"
+                className="w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
+                required
+              />
+            </div>
+          )}
+          <button
+            type="submit"
+            disabled={!canSubmit}
+            className="mt-2 w-full rounded-lg bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md shadow-red-600/20"
+          >
+            Contactar por WhatsApp
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 const modules = [
   {
@@ -240,8 +372,14 @@ function ImageCarousel({
 
 
 export function Landing() {
+  const [contactModal, setContactModal] = useState<{ open: boolean; plan?: string }>({ open: false })
+  const openContact = (plan?: string) => setContactModal({ open: true, plan })
+
   return (
     <div className="bg-white text-zinc-900">
+      {contactModal.open && (
+        <ContactModal plan={contactModal.plan} onClose={() => setContactModal({ open: false })} />
+      )}
       <Helmet>
         <title>Axios — Control de Stock y Gestión Comercial para tu Negocio</title>
         <meta name="description" content="Tienda online, inventario multi sucursal, caja, órdenes, clientes y reportes. Todo conectado en una sola plataforma para que vendas más y operes sin caos." />
@@ -330,15 +468,13 @@ export function Landing() {
                 Tienda online, inventario multi sucursal, caja, órdenes, clientes y reportes. Todo conectado para que vendas más y operes sin caos.
               </p>
               <div className="mt-8 flex flex-wrap gap-4">
-                <a
-                  href="https://wa.me/59898157459?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20Axios"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={() => openContact()}
                   className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3.5 text-sm font-bold text-white hover:bg-red-500 transition-colors shadow-lg shadow-red-600/25"
                 >
                   Probar 14 días gratis
                   <ArrowRight className="h-4 w-4" />
-                </a>
+                </button>
                 <a
                   href="https://calendar.app.google/uQEnHKUCMX3DWwd98"
                   target="_blank"
@@ -877,14 +1013,12 @@ export function Landing() {
                 </li>
               ))}
             </ul>
-            <a
-              href="https://wa.me/59898157459?text=Hola%2C%20quiero%20empezar%20con%20el%20plan%20Starter"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => openContact('Starter')}
               className="mt-8 inline-flex w-full items-center justify-center rounded-lg border border-zinc-300 bg-white px-6 py-3 text-sm font-semibold text-zinc-800 hover:bg-zinc-50 transition-colors"
             >
               Comenzar con Starter
-            </a>
+            </button>
           </div>
 
           {/* PROFESIONAL */}
@@ -911,14 +1045,12 @@ export function Landing() {
                 </li>
               ))}
             </ul>
-            <a
-              href="https://wa.me/59898157459?text=Hola%2C%20quiero%20empezar%20con%20el%20plan%20Profesional"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => openContact('Profesional')}
               className="mt-8 inline-flex w-full items-center justify-center rounded-lg bg-red-600 px-6 py-3 text-sm font-semibold text-white hover:bg-red-500 transition-colors shadow-md shadow-red-600/30"
             >
               Comenzar con Profesional
-            </a>
+            </button>
           </div>
         </div>
       </section>
@@ -945,14 +1077,12 @@ export function Landing() {
                 Ver la tienda demo
                 <ArrowRight className="h-4 w-4" />
               </a>
-              <a
-                href="https://wa.me/59898157459?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20Axios"
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => openContact()}
                 className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/60 px-7 py-3.5 text-sm font-bold text-zinc-200 hover:bg-zinc-700 transition-colors"
               >
                 Contactar por WhatsApp
-              </a>
+              </button>
             </div>
             <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-xs text-zinc-500">
               {['Sin tarjeta requerida', 'Configuración en minutos', 'Soporte incluido'].map((item) => (

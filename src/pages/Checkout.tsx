@@ -504,6 +504,37 @@ export function Checkout() {
         throw itemsError
       }
 
+      // -----------------------------------------------------------------------
+      // Mercado Pago: create preference and redirect — skip remaining steps
+      // -----------------------------------------------------------------------
+      if (paymentMethod === 'mercadopago') {
+        const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-mp-preference`
+        const { data: { session } } = await supabase.auth.getSession()
+        const mpRes = await fetch(fnUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            order_id:        (order as { id: string }).id,
+            organization_id: organizationId,
+          }),
+        })
+
+        if (!mpRes.ok) {
+          const err = await mpRes.json().catch(() => ({}))
+          throw new Error((err as { error?: string }).error ?? 'Error al iniciar el pago con Mercado Pago')
+        }
+
+        const { init_point } = await mpRes.json() as { init_point: string }
+
+        await clearCart()
+        // Redirect to MP checkout — MP will redirect back to order-confirmation
+        window.location.href = init_point
+        return
+      }
+
       // Create order_payment record
       // If payment is cash, link it to the open cash session for this branch
       const selectedMethod = paymentMethods.find((m) => m.key === paymentMethod)
