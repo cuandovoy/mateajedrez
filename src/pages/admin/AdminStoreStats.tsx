@@ -2,6 +2,15 @@ import { useEffect, useState } from 'react'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { supabase } from '@/lib/supabase'
 import { BarChart3, Users, Eye, FileText, Monitor, Smartphone, Tablet, RefreshCw } from 'lucide-react'
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts'
 
 type Period = 'hour' | 'day' | 'week' | 'month'
 
@@ -79,9 +88,6 @@ export function AdminStoreStats() {
   }, [currentOrganization?.id, period])
 
   const summary = data?.summary
-  const maxViews = data?.time_series.length
-    ? Math.max(...data.time_series.map((p) => p.views), 1)
-    : 1
 
   return (
     <div className="space-y-6">
@@ -152,39 +158,84 @@ export function AdminStoreStats() {
             <BarChart3 className="h-4 w-4 text-gray-400" />
             <h2 className="text-sm font-semibold text-gray-700">Visitas en el tiempo</h2>
           </div>
+          {/* Legend */}
+          <div className="flex items-center gap-5 mb-4">
+            <span className="flex items-center gap-1.5 text-xs text-gray-500">
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: '#8F5F2C' }} />
+              Visitas
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-gray-500">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              Únicos
+            </span>
+          </div>
+
           {loading ? (
-            <div className="h-40 flex items-center justify-center text-gray-400 text-sm">Cargando…</div>
+            <div className="h-52 flex items-center justify-center text-gray-400 text-sm">Cargando…</div>
           ) : !data?.time_series?.length ? (
-            <div className="h-40 flex items-center justify-center text-gray-400 text-sm">Sin datos para este período</div>
+            <div className="h-52 flex items-center justify-center text-gray-400 text-sm">Sin datos para este período</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left text-xs font-medium text-gray-500 pb-2">Período</th>
-                    <th className="text-right text-xs font-medium text-gray-500 pb-2">Visitas</th>
-                    <th className="text-right text-xs font-medium text-gray-500 pb-2">Únicos</th>
-                    <th className="w-32 pb-2" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {data.time_series.map((row) => (
-                    <tr key={row.bucket}>
-                      <td className="py-1.5 text-gray-700 font-mono text-xs">{row.bucket}</td>
-                      <td className="py-1.5 text-right text-gray-900 font-medium">{row.views}</td>
-                      <td className="py-1.5 text-right text-gray-500">{row.visitors}</td>
-                      <td className="py-1.5 pl-3">
-                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-admin-500 rounded-full"
-                            style={{ width: `${Math.round((row.views / maxViews) * 100)}%` }}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="h-52">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={data.time_series} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gradViews" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8F5F2C" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="#8F5F2C" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gradVisitors" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <XAxis
+                    dataKey="bucket"
+                    tick={{ fontSize: 10, fill: '#9ca3af', fontFamily: 'monospace' }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: '#9ca3af' }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '10px',
+                      border: '1px solid #e5d1bc',
+                      fontSize: '12px',
+                      boxShadow: '0 4px 16px rgba(143,95,44,0.10)',
+                      background: '#fff',
+                    }}
+                    labelStyle={{ fontWeight: 600, color: '#374151', marginBottom: '4px', fontFamily: 'monospace' }}
+                    itemStyle={{ color: '#6b7280' }}
+                    cursor={{ stroke: '#d4b596', strokeWidth: 1, strokeDasharray: '4 2' }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="views"
+                    name="Visitas"
+                    stroke="#8F5F2C"
+                    strokeWidth={2}
+                    fill="url(#gradViews)"
+                    dot={false}
+                    activeDot={{ r: 4, fill: '#8F5F2C', strokeWidth: 0 }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="visitors"
+                    name="Únicos"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    fill="url(#gradVisitors)"
+                    dot={false}
+                    activeDot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
             </div>
           )}
         </div>
@@ -229,14 +280,23 @@ export function AdminStoreStats() {
               <p className="text-sm text-gray-400">Sin datos</p>
             ) : (
               <ul className="space-y-2">
-                {data.top_pages.map((p) => (
-                  <li key={p.page_path} className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-mono text-gray-500 truncate flex-1">
-                      {p.page_path || '/'}
-                    </span>
-                    <span className="text-sm font-medium text-gray-900 shrink-0">{p.views}</span>
-                  </li>
-                ))}
+                {data.top_pages.map((p) => {
+                  const href = `${window.location.origin}/${currentOrganization?.slug}${p.page_path || '/'}`
+                  return (
+                    <li key={p.page_path} className="flex items-center gap-2 min-w-0">
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-mono text-admin-600 hover:text-admin-800 hover:underline truncate flex-1 transition-colors"
+                        title={href}
+                      >
+                        {p.page_path || '/'}
+                      </a>
+                      <span className="text-sm font-medium text-gray-900 shrink-0">{p.views}</span>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>

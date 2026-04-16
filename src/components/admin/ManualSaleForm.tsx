@@ -42,6 +42,7 @@ interface SaleLine {
   quantity: number
   available_stock?: number
   is_editing_price?: boolean
+  is_editing_quantity?: boolean
 }
 
 type DiscountKind = 'percentage' | 'fixed_amount' | 'price_override'
@@ -114,6 +115,11 @@ export function ManualSaleForm({
   const [customerPickerLoading, setCustomerPickerLoading] = useState(false)
   const [customerPickerResults, setCustomerPickerResults] = useState<CustomerLite[]>([])
   const [showOptionalCustomerData, setShowOptionalCustomerData] = useState(false)
+  const [saleDate, setSaleDate] = useState<string>(() => {
+    const now = new Date()
+    now.setSeconds(0, 0)
+    return now.toISOString().slice(0, 16)
+  })
   const [newLineDescription, setNewLineDescription] = useState('')
   const [newLinePrice, setNewLinePrice] = useState('')
   const [newLineQuantity, setNewLineQuantity] = useState('1')
@@ -140,6 +146,30 @@ export function ManualSaleForm({
   useEffect(() => {
     setBranchId(initialBranchId)
   }, [initialBranchId])
+
+  // Refresh stock for all product lines when branch changes
+  useEffect(() => {
+    const productLines = saleLines.filter((l) => l.type === 'product' && l.product_id)
+    if (productLines.length === 0) return
+    let cancelled = false
+    ;(async () => {
+      const updates = await Promise.all(
+        productLines.map(async (line) => ({
+          id: line.id,
+          stock: await getAvailableStock(line.product_id!, line.variant_id, branchId),
+        }))
+      )
+      if (cancelled) return
+      setSaleLines((prev) =>
+        prev.map((line) => {
+          const update = updates.find((u) => u.id === line.id)
+          return update ? { ...line, available_stock: update.stock } : line
+        })
+      )
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchId])
 
   const defaultPaymentMethod = (() => {
     const cashMethod = paymentMethods.find((m) => m.requires_cash_session && m.key === 'cash')
@@ -562,6 +592,36 @@ export function ManualSaleForm({
     )
   }
 
+  const handleStartEditQuantity = (id: string) => {
+    setSaleLines(
+      saleLines.map((line) =>
+        line.id === id ? { ...line, is_editing_quantity: true } : line
+      )
+    )
+  }
+
+  const handleEditQuantity = (id: string, rawValue: string) => {
+    const parsed = parseInt(rawValue, 10)
+    const newQuantity = Number.isFinite(parsed) && parsed >= 1 ? parsed : 1
+    const line = saleLines.find((l) => l.id === id)
+    if (line && line.available_stock !== undefined && newQuantity > line.available_stock) {
+      show('La cantidad supera el stock disponible. Podrás registrar la venta igual.', 'info')
+    }
+    setSaleLines(
+      saleLines.map((l) =>
+        l.id === id ? { ...l, quantity: newQuantity, is_editing_quantity: false } : l
+      )
+    )
+  }
+
+  const handleCancelEditQuantity = (id: string) => {
+    setSaleLines(
+      saleLines.map((line) =>
+        line.id === id ? { ...line, is_editing_quantity: false } : line
+      )
+    )
+  }
+
   const onSubmit = async (data: ManualSaleForm) => {
     if (saleLines.length === 0) {
       show('Agrega al menos una línea a la venta', 'error')
@@ -756,6 +816,7 @@ export function ManualSaleForm({
         tax_total: 0,
         discount_metadata: (discountMetadata as any) ?? null,
         status: 'delivered',
+        created_at: new Date(saleDate).toISOString(),
         shipping_address: {
           fullName: shippingFullName,
           email: shippingEmail,
@@ -935,6 +996,7 @@ export function ManualSaleForm({
       setSelectedDiscountRuleId('')
       setLinkedCustomer(null)
       setShowOptionalCustomerData(false)
+      const nowReset = new Date(); nowReset.setSeconds(0, 0); setSaleDate(nowReset.toISOString().slice(0, 16))
       onSaleCreated()
       onClose()
     } catch (error) {
@@ -1168,35 +1230,71 @@ export function ManualSaleForm({
                             {line.variant_name && (
                               <p className="text-xs text-gray-500">{line.variant_name}</p>
                             )}
-                            {line.type === 'product' && line.available_stock !== undefined && (
-                              <p className={
-                                line.available_stock === 0 || line.quantity > line.available_stock
-                                  ? 'text-xs font-medium text-red-600'
-                                  : 'text-xs text-gray-400'
-                              }>
-                                Stock disponible: {line.available_stock}
-                              </p>
-                            )}
                           </td>
                           <td className="px-3 py-2.5 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              <Button
-                                type="button" variant="ghost" size="sm"
-                                onClick={() => handleUpdateQuantity(line.id, line.quantity - 1)}
-                                disabled={line.quantity <= 1}
-                                className="h-7 w-7 p-0 rounded-full"
-                              >
-                                <Minus className="h-3 w-3" />
-                              </Button>
-                              <span className="w-8 text-center font-semibold">{line.quantity}</span>
-                              <Button
-                                type="button" variant="ghost" size="sm"
-                                onClick={() => handleUpdateQuantity(line.id, line.quantity + 1)}
-                                className="h-7 w-7 p-0 rounded-full"
-                              >
-                                <Plus className="h-3 w-3" />
-                              </Button>
-                            </div>
+                            {line.is_editing_quantity ? (
+                              <div className="flex flex-col items-center gap-1">
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  defaultValue={line.quantity}
+                                  autoFocus
+                                  onBlur={(e) => handleEditQuantity(line.id, e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleEditQuantity(line.id, (e.target as HTMLInputElement).value)
+                                    else if (e.key === 'Escape') handleCancelEditQuantity(line.id)
+                                  }}
+                                  className="w-20 text-center text-sm py-1"
+                                />
+                                {line.type === 'product' && line.available_stock !== undefined && (
+                                  <span className="text-xs text-gray-400">
+                                    Stock: {line.available_stock}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center gap-1">
+                                <div className="inline-flex items-center border border-gray-200 rounded-lg overflow-hidden bg-white">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateQuantity(line.id, line.quantity - 1)}
+                                    disabled={line.quantity <= 1}
+                                    className="px-2 py-1 text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors text-sm font-medium leading-none"
+                                  >
+                                    −
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEditQuantity(line.id)}
+                                    className="px-3 py-1 text-sm font-semibold text-gray-900 border-x border-gray-200 hover:bg-admin-50 hover:text-admin-700 transition-colors min-w-[2rem]"
+                                    title="Click para editar"
+                                  >
+                                    {line.quantity}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateQuantity(line.id, line.quantity + 1)}
+                                    className="px-2 py-1 text-gray-500 hover:bg-gray-100 transition-colors text-sm font-medium leading-none"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                                {line.type === 'product' && line.available_stock !== undefined && (() => {
+                                  const remaining = line.available_stock - line.quantity
+                                  if (line.available_stock === 0) {
+                                    return <span className="text-xs font-medium text-red-500">Sin stock</span>
+                                  }
+                                  if (remaining < 0) {
+                                    return <span className="text-xs font-medium text-red-500">Excede en {Math.abs(remaining)}</span>
+                                  }
+                                  if (remaining === 0) {
+                                    return <span className="text-xs font-medium text-orange-500">Último</span>
+                                  }
+                                  return <span className="text-xs text-gray-400">Quedan {remaining}</span>
+                                })()}
+                              </div>
+                            )}
                           </td>
                           <td className="px-3 py-2.5 text-right">
                             {line.is_editing_price ? (
@@ -1338,6 +1436,19 @@ export function ManualSaleForm({
                   ))}
                 </select>
               )}
+            </div>
+
+            {/* Sale Date */}
+            <div className="rounded-xl bg-white border border-gray-200 p-4 space-y-2">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Fecha de la venta</p>
+              <input
+                type="datetime-local"
+                value={saleDate}
+                max={new Date().toISOString().slice(0, 16)}
+                onChange={(e) => setSaleDate(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+              />
+              <p className="text-xs text-gray-400">Podés cargar ventas con fecha anterior.</p>
             </div>
 
             {/* Payment */}
