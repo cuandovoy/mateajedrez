@@ -13,10 +13,23 @@ import {
   CreditCard,
   Download,
   DollarSign,
+  Info,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span className="relative group inline-flex items-center ml-1 cursor-default">
+      <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors" />
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-relaxed">
+        {text}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+      </span>
+    </span>
+  )
+}
 
 type PeriodMode = 'month' | 'custom'
 
@@ -424,7 +437,7 @@ export function AdminSales() {
     rows.push([
       'Ventas brutas',
       'Descuentos otorgados',
-      'Ventas netas (devengadas)',
+      'Ventas netas del período',
       'Órdenes',
       'Ticket promedio',
       'Margen bruto',
@@ -616,7 +629,7 @@ export function AdminSales() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Ventas netas (devengadas)</p>
+                <p className="text-sm text-gray-500">Ventas netas del período</p>
                 <p className="text-2xl font-bold text-gray-900">{formatPrice(currentSummary.netSales, settings)}</p>
                 <p className="text-xs text-gray-500 mt-1">
                   Brutas: {formatPrice(currentSummary.grossSales, settings)} · Desc.: {formatPrice(currentSummary.discountsGranted, settings)}
@@ -655,10 +668,13 @@ export function AdminSales() {
           <CardContent className="p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-500">Margen bruto (costo trazado)</p>
+                <p className="text-sm text-gray-500 flex items-center">
+                  Margen bruto
+                  <InfoTooltip text="Diferencia entre lo que vendiste y lo que te costó la mercadería. Solo considera los productos donde el sistema tiene el costo de compra registrado." />
+                </p>
                 <p className="text-2xl font-bold text-gray-900">{formatPrice(currentMargin.grossMargin, settings)}</p>
                 <p className="text-xs text-gray-500 mt-1">
-                  {currentMargin.marginPct.toFixed(2)}% · Cobertura {marginCoveragePct.toFixed(1)}%
+                  {currentMargin.marginPct.toFixed(2)}% · {marginCoveragePct.toFixed(1)}% de productos con costo
                 </p>
               </div>
               <TrendingUp className="h-6 w-6 text-emerald-600" />
@@ -708,7 +724,10 @@ export function AdminSales() {
             </div>
 
             <div className="p-4 rounded-lg border border-gray-200 md:col-span-2">
-              <p className="text-sm text-gray-500">Margen bruto (costo trazado)</p>
+              <p className="text-sm text-gray-500 flex items-center">
+                Margen bruto
+                <InfoTooltip text="Diferencia entre lo que vendiste y lo que te costó la mercadería. Solo considera los productos donde el sistema tiene el costo de compra registrado." />
+              </p>
               <div className="mt-2 flex items-center gap-2">
                 {comparisonSummary.marginChange >= 0 ? (
                   <TrendingUp className="h-4 w-4 text-green-600" />
@@ -723,7 +742,7 @@ export function AdminSales() {
                 Actual: {formatPrice(currentMargin.grossMargin, settings)} | Anterior: {formatPrice(comparisonSummary.prevMargin, settings)}
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                Cobertura actual: {currentMargin.trackedItems} de {currentMargin.totalItems} items con costo trazado.
+                Productos con costo registrado: {currentMargin.trackedItems} de {currentMargin.totalItems}.
               </p>
             </div>
           </div>
@@ -735,7 +754,7 @@ export function AdminSales() {
           <CardContent className="p-4">
             <p className="text-sm font-semibold text-amber-900">Advertencia de cobertura de costo</p>
             <p className="mt-1 text-sm text-amber-800">
-              Hay {currentMargin.missingItems} items de venta sin costo trazado en el período seleccionado.
+              Hay {currentMargin.missingItems} productos vendidos sin costo de compra registrado en el sistema. El margen bruto puede estar incompleto.
             </p>
             <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-amber-900 md:grid-cols-3">
               <div>Sin sucursal en orden: {currentMargin.branchMissingItems}</div>

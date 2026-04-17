@@ -7,8 +7,20 @@ import { supabase } from '@/lib/supabase'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch } from '@/types'
-import { Calendar, Download, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { Calendar, Download, Info, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <span className="relative group inline-flex items-center ml-1 cursor-default">
+      <Info className="h-3.5 w-3.5 text-gray-400 group-hover:text-gray-600 transition-colors" />
+      <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 rounded-lg bg-gray-800 px-3 py-2 text-xs text-white opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg leading-relaxed">
+        {text}
+        <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+      </span>
+    </span>
+  )
+}
 
 type Summary = {
   salesRevenue: number
@@ -501,48 +513,74 @@ export function AdminFinancialReports() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-gray-500">Ventas netas (devengadas)</p>
+            <p className="text-sm text-gray-500 flex items-center">
+              Ventas del período
+              <InfoTooltip text="Total de ventas registradas en el período seleccionado, descontando devoluciones y descuentos otorgados." />
+            </p>
             <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.netSales || summary.salesRevenue, settings)}</p>
-            <p className="text-xs text-gray-500">{summary.salesOrders} órdenes · Neto</p>
+            <p className="text-xs text-gray-500">{summary.salesOrders} órdenes</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-gray-500">Descuentos otorgados</p>
+            <p className="text-sm text-gray-500 flex items-center">
+              Descuentos otorgados
+              <InfoTooltip text="Suma total de todos los descuentos aplicados en las ventas del período. Las ventas brutas son el total antes de descontar." />
+            </p>
             <p className="text-2xl font-bold text-red-700">{formatPrice(summary.discountsGranted, settings)}</p>
-            <p className="text-xs text-gray-500">Sobre ventas brutas: {formatPrice(summary.grossSales, settings)}</p>
+            <p className="text-xs text-gray-500">Ventas brutas: {formatPrice(summary.grossSales, settings)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-gray-500">Cobros</p>
+            <p className="text-sm text-gray-500 flex items-center">
+              Dinero cobrado
+              <InfoTooltip text="Plata efectivamente recibida en el período: ventas al contado y pagos recibidos. No incluye ventas a crédito que todavía no fueron cobradas." />
+            </p>
             <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.collectedIncome, settings)}</p>
-            <p className="text-xs text-gray-500">No incluye ventas a crédito sin cobrar</p>
+            <p className="text-xs text-gray-500">Solo cobros efectivos del período</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <p className="text-sm text-gray-500">Egresos caja</p>
+            <p className="text-sm text-gray-500 flex items-center">
+              Gastos del período
+              <InfoTooltip text="Total de egresos registrados en caja durante el período: compras, sueldos, servicios y otros gastos pagados." />
+            </p>
             <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.cashExpense, settings)}</p>
+            <p className="text-xs text-gray-500">Egresos de caja registrados</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Flujo neto</p>
-                <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.netCashflow, settings)}</p>
-                <p className="text-xs text-gray-500">Cobros - Egresos de caja · {selectedBranch?.name || 'Todas las sucursales'}</p>
-              </div>
+            <p className="text-sm text-gray-500 flex items-center">
+              Ganancia del período
+              <InfoTooltip text="Diferencia entre el dinero cobrado y los gastos pagados en el período. Refleja cuánto quedó en caja luego de cubrir todos los egresos." />
+            </p>
+            <div className="flex items-center justify-between mt-0.5">
+              <p className={`text-2xl font-bold ${summary.netCashflow >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                {formatPrice(summary.netCashflow, settings)}
+              </p>
               {summary.netCashflow >= 0 ? (
                 <TrendingUp className="h-6 w-6 text-green-600" />
               ) : (
                 <TrendingDown className="h-6 w-6 text-red-600" />
               )}
             </div>
+            <p className="text-xs text-gray-500">{selectedBranch?.name || 'Todas las sucursales'}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-5">
+            <p className="text-sm text-gray-500 flex items-center">
+              Margen bruto
+              <InfoTooltip text="Diferencia entre las ventas y el costo directo de los productos vendidos (lo que pagaste para tener ese stock). Muestra cuánto ganás sobre cada venta antes de contar gastos operativos como sueldos o alquiler." />
+            </p>
+            <p className="text-2xl font-bold text-gray-900">{formatPrice(summary.grossMargin, settings)}</p>
+            <p className="text-xs text-gray-500">Ventas − costo directo de mercadería</p>
           </CardContent>
         </Card>
       </div>

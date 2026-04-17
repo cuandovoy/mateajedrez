@@ -29,6 +29,7 @@ import {
   Receipt,
   Share2,
   Globe,
+  Settings,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AdminBreadcrumbs } from '@/components/admin/AdminBreadcrumbs'
@@ -37,6 +38,7 @@ import { NotificationBell } from '@/components/admin/NotificationBell'
 import { ToastContainer } from './ToastContainer'
 import { CreateOrganizationModal } from '@/components/admin/CreateOrganizationModal'
 import { ShareStoreModal } from '@/components/admin/ShareStoreModal'
+import { EditOrganizationModal } from '@/components/admin/EditOrganizationModal'
 import { PermissionGate } from '@/components/features/PermissionGate'
 import { OrgAccessGate } from '@/components/features/OrgAccessGate'
 import type { Permission } from '@/lib/permissions'
@@ -105,6 +107,7 @@ export function AdminLayout() {
   }
 
   const [shareStoreOpen, setShareStoreOpen] = useState(false)
+  const [orgSettingsOpen, setOrgSettingsOpen] = useState(false)
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false)
   const [createOrgModalOpen, setCreateOrgModalOpen] = useState(false)
   const [pendingOrgSwitch, setPendingOrgSwitch] = useState<typeof organizations[0] | null>(null)
@@ -214,6 +217,12 @@ export function AdminLayout() {
         { path: '/planes', label: 'Planes', icon: CreditCard },
         { path: '/users', label: 'Usuarios', icon: Users, adminOnly: true },
         { path: '/roles-permissions', label: 'Roles', icon: FileText, permission: 'settings:manage_roles' },
+        {
+          path: '#configuraciones',
+          label: 'Configuraciones',
+          icon: Settings,
+          onClick: () => setOrgSettingsOpen(true),
+        },
       ],
     },
   ]
@@ -668,6 +677,14 @@ export function AdminLayout() {
 
       {createOrgModalOpen && (
         <CreateOrganizationModal onClose={() => setCreateOrgModalOpen(false)} />
+      )}
+
+      {orgSettingsOpen && currentOrganization && (
+        <EditOrganizationModal
+          organization={currentOrganization}
+          onClose={() => setOrgSettingsOpen(false)}
+          hiddenTabs={['formato', 'suscripcion', 'facturacion']}
+        />
       )}
 
       {shareStoreOpen && currentOrganization?.slug && (

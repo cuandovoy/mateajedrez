@@ -134,12 +134,15 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
+type TabValue = 'general' | 'estilos' | 'formato' | 'pagos' | 'notificaciones' | 'vitrina' | 'suscripcion' | 'facturacion'
+
 type Props = {
   organization: Organization
   onClose: () => void
+  hiddenTabs?: TabValue[]
 }
 
-export function EditOrganizationModal({ organization, onClose }: Props) {
+export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }: Props) {
   const { fetchOrganizations, setCurrentOrganization, currentOrganization } = useOrganizationStore()
   const { show } = useToastStore()
   const canUseNotifications = canUseFeature(organization.subscription_tier ?? 'starter', 'notifications_config')
@@ -942,38 +945,54 @@ export function EditOrganizationModal({ organization, onClose }: Props) {
           <form onSubmit={handleSubmit} className="flex flex-col h-full min-h-0">
             <Tabs defaultValue="general" className="flex-1 min-h-0 min-w-0" orientation="vertical" onValueChange={(v: string) => { if (v === 'suscripcion') fetchPayments(); if (v === 'facturacion') fetchBillerConfig() }}>
               <TabsList>
-                <TabsTrigger value="general">
-                  <Building2 className="h-4 w-4 shrink-0 text-gray-400" />
-                  General
-                </TabsTrigger>
-                <TabsTrigger value="estilos">
-                  <span className="h-4 w-4 shrink-0 flex items-center justify-center text-gray-400 text-xs">🎨</span>
-                  Estilos
-                </TabsTrigger>
-                <TabsTrigger value="formato">
-                  <Globe className="h-4 w-4 shrink-0 text-gray-400" />
-                  Formato
-                </TabsTrigger>
-                <TabsTrigger value="pagos">
-                  <CreditCard className="h-4 w-4 shrink-0 text-gray-400" />
-                  Métodos de pago
-                </TabsTrigger>
-                <TabsTrigger value="notificaciones">
-                  <Bell className="h-4 w-4 shrink-0 text-gray-400" />
-                  Notificaciones
-                </TabsTrigger>
-                <TabsTrigger value="vitrina">
-                  <Store className="h-4 w-4 shrink-0 text-gray-400" />
-                  Hero
-                </TabsTrigger>
-                <TabsTrigger value="suscripcion">
-                  <DollarSign className="h-4 w-4 shrink-0 text-gray-400" />
-                  Suscripción
-                </TabsTrigger>
-                <TabsTrigger value="facturacion">
-                  <Receipt className="h-4 w-4 shrink-0 text-gray-400" />
-                  Facturación
-                </TabsTrigger>
+                {!hiddenTabs.includes('general') && (
+                  <TabsTrigger value="general">
+                    <Building2 className="h-4 w-4 shrink-0 text-gray-400" />
+                    General
+                  </TabsTrigger>
+                )}
+                {!hiddenTabs.includes('estilos') && (
+                  <TabsTrigger value="estilos">
+                    <span className="h-4 w-4 shrink-0 flex items-center justify-center text-gray-400 text-xs">🎨</span>
+                    Estilos
+                  </TabsTrigger>
+                )}
+                {!hiddenTabs.includes('formato') && (
+                  <TabsTrigger value="formato">
+                    <Globe className="h-4 w-4 shrink-0 text-gray-400" />
+                    Formato
+                  </TabsTrigger>
+                )}
+                {!hiddenTabs.includes('pagos') && (
+                  <TabsTrigger value="pagos">
+                    <CreditCard className="h-4 w-4 shrink-0 text-gray-400" />
+                    Métodos de pago
+                  </TabsTrigger>
+                )}
+                {!hiddenTabs.includes('notificaciones') && (
+                  <TabsTrigger value="notificaciones">
+                    <Bell className="h-4 w-4 shrink-0 text-gray-400" />
+                    Notificaciones
+                  </TabsTrigger>
+                )}
+                {!hiddenTabs.includes('vitrina') && (
+                  <TabsTrigger value="vitrina">
+                    <Store className="h-4 w-4 shrink-0 text-gray-400" />
+                    Hero
+                  </TabsTrigger>
+                )}
+                {!hiddenTabs.includes('suscripcion') && (
+                  <TabsTrigger value="suscripcion">
+                    <DollarSign className="h-4 w-4 shrink-0 text-gray-400" />
+                    Suscripción
+                  </TabsTrigger>
+                )}
+                {!hiddenTabs.includes('facturacion') && (
+                  <TabsTrigger value="facturacion">
+                    <Receipt className="h-4 w-4 shrink-0 text-gray-400" />
+                    Facturación
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="general" className="p-6 space-y-6">
