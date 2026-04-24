@@ -143,6 +143,7 @@ export function AdminOrderDetail() {
   const [billerConfig, setBillerConfig] = useState<BillerConfig | null>(null)
   const [downloadingPDF, setDownloadingPDF] = useState(false)
   const [annullingCFE, setAnnullingCFE] = useState(false)
+  const [orderManualItems, setOrderManualItems] = useState<{ id: string; description: string; quantity: number; price: number; created_at: string }[]>([])
 
   const fetchOrder = useCallback(async () => {
     if (!id) return
@@ -222,6 +223,14 @@ export function AdminOrderDetail() {
         user_profile: userProfile,
         customer,
       })
+
+      // Load manual items for this order
+      const { data: manualItemsData } = await (supabase as any)
+        .from('order_manual_items')
+        .select('id, description, quantity, price, created_at')
+        .eq('order_id', id)
+        .order('created_at', { ascending: true })
+      setOrderManualItems(manualItemsData ?? [])
 
       // Load CFE comprobante for this order
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1641,6 +1650,24 @@ export function AdminOrderDetail() {
                     </div>
                   )
                 })}
+                {orderManualItems.length > 0 && (
+                  <div className="mt-4 pt-4 border-t border-dashed border-gray-200">
+                    <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Líneas manuales</p>
+                    {orderManualItems.map((item) => (
+                      <div key={item.id} className="flex items-center justify-between py-2 gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800">{item.description}</p>
+                          <p className="text-xs text-gray-500">
+                            {item.quantity} × {formatPrice(item.price, settings)}
+                          </p>
+                        </div>
+                        <p className="font-semibold text-gray-900 shrink-0">
+                          {formatPrice(item.price * item.quantity, settings)}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="border-t mt-4 pt-4">
                 <div className="space-y-1">

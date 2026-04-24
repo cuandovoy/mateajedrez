@@ -119,6 +119,7 @@ export function AdminInventory() {
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false)
+  const [hideOutOfStock, setHideOutOfStock] = useState(false)
   const fetchInventoryRequestId = useRef(0)
 
   useEffect(() => {
@@ -172,9 +173,11 @@ export function AdminInventory() {
   }, [organizationId, selectedBranch])
 
   const filteredInventory = useMemo(() => {
-    if (!showOnlyLowStock) return inventory
-    return inventory.filter(item => item.is_low_stock)
-  }, [inventory, showOnlyLowStock])
+    let result = inventory
+    if (showOnlyLowStock) result = result.filter(item => item.is_low_stock)
+    if (hideOutOfStock) result = result.filter(item => item.stock > 0)
+    return result
+  }, [inventory, showOnlyLowStock, hideOutOfStock])
 
   const fetchInventory = useCallback(async () => {
     if (!organizationId) return
@@ -406,9 +409,6 @@ export function AdminInventory() {
       if (error) throw error
       const branchesData = (data || []) as Branch[]
       setBranches(branchesData)
-      if (branchesData.length > 0 && !selectedBranch) {
-        setSelectedBranch(branchesData[0].id)
-      }
     } catch (error) {
       console.error('Error fetching branches:', error)
     }
@@ -1339,6 +1339,18 @@ export function AdminInventory() {
               </div>
             </div>
 
+            <div className="flex flex-wrap gap-6 pt-2">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={hideOutOfStock}
+                  onChange={(e) => { setHideOutOfStock(e.target.checked); setPage(0) }}
+                  className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                />
+                <span className="text-sm text-gray-700">Ocultar sin stock (= 0)</span>
+              </label>
+            </div>
+
             <div className="pt-4 border-t border-gray-200">
               <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
                 Ordenamiento
@@ -1365,7 +1377,7 @@ export function AdminInventory() {
               </div>
             </div>
 
-            {(selectedBranch || searchInput || sortDirection !== 'asc') && (
+            {(selectedBranch || searchInput || sortDirection !== 'asc' || hideOutOfStock) && (
               <div className="pt-1">
                 <Button
                   variant="outline"
@@ -1373,6 +1385,7 @@ export function AdminInventory() {
                     setSelectedBranch('')
                     setSearchInput('')
                     setSortDirection('asc')
+                    setHideOutOfStock(false)
                     setPage(0)
                   }}
                 >

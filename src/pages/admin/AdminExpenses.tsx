@@ -78,8 +78,16 @@ type DirectExpense = {
   amount: number
   payment_method: string
   branch_id: string | null
+  cash_session_id: string | null
   notes: string | null
   created_at: string
+}
+
+type CashSessionLite = {
+  id: string
+  branch_id: string
+  opened_at: string
+  closed_at: string | null
 }
 
 const EXPENSE_CATEGORIES: { value: string; label: string }[] = [
@@ -186,6 +194,7 @@ export function AdminExpenses() {
   const [activeView, setActiveView] = useState<ExpenseView>('purchase_orders')
 
   const [directExpenses, setDirectExpenses] = useState<DirectExpense[]>([])
+  const [cashSessions, setCashSessions] = useState<CashSessionLite[]>([])
   const [directExpenseForm, setDirectExpenseForm] = useState({
     occurred_at: new Date().toISOString().slice(0, 10),
     category: 'varios',
@@ -194,8 +203,11 @@ export function AdminExpenses() {
     payment_method: 'cash',
     branch_id: '',
     notes: '',
+    apply_to_cash_session: false,
+    cash_session_id: '',
   })
   const [loadingDirectExpenses, setLoadingDirectExpenses] = useState(false)
+  const [cashSessionDateFilter, setCashSessionDateFilter] = useState('')
   const [createOrderModalOpen, setCreateOrderModalOpen] = useState(false)
   const [editOrderModalOpen, setEditOrderModalOpen] = useState(false)
   const [ledgerDetailEntry, setLedgerDetailEntry] = useState<ExpenseLedgerEntry | null>(null)
@@ -358,6 +370,13 @@ export function AdminExpenses() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizationId, activeView])
+
+  useEffect(() => {
+    if (organizationId && activeView === 'direct_expenses' && branches.length > 0) {
+      fetchCashSessions()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationId, activeView, branches])
 
   const fetchPageData = async (options?: { silent?: boolean }) => {
     if (!organizationId) return
@@ -1079,12 +1098,31 @@ export function AdminExpenses() {
     }
   }
 
+  const fetchCashSessions = async () => {
+    if (!organizationId) return
+    try {
+      const { data, error } = await fromAny('cash_sessions')
+        .select('id, branch_id, opened_at, closed_at')
+        .in('branch_id',
+          branches.length > 0
+            ? branches.map((b) => b.id)
+            : ['00000000-0000-0000-0000-000000000000']
+        )
+        .order('opened_at', { ascending: false })
+        .limit(60)
+      if (error) throw error
+      setCashSessions((data || []) as CashSessionLite[])
+    } catch (error) {
+      console.error('Error loading cash sessions:', error)
+    }
+  }
+
   const fetchDirectExpenses = async () => {
     if (!organizationId) return
     setLoadingDirectExpenses(true)
     try {
       const { data, error } = await fromAny('direct_expenses')
-        .select('id, occurred_at, category, description, amount, payment_method, branch_id, notes, created_at')
+        .select('id, occurred_at, category, description, amount, payment_method, branch_id, cash_session_id, notes, created_at')
         .eq('organization_id', organizationId)
         .order('occurred_at', { ascending: false })
         .limit(200)
@@ -1122,6 +1160,7 @@ export function AdminExpenses() {
           amount,
           payment_method: directExpenseForm.payment_method,
           notes: directExpenseForm.notes || null,
+          cash_session_id: directExpenseForm.apply_to_cash_session && directExpenseForm.cash_session_id ? directExpenseForm.cash_session_id : null,
           created_by: authData.user?.id || null,
         })
         .select('id')
@@ -1149,7 +1188,10 @@ export function AdminExpenses() {
         payment_method: 'cash',
         branch_id: '',
         notes: '',
+        apply_to_cash_session: false,
+        cash_session_id: '',
       })
+      setCashSessionDateFilter('')
       await fetchDirectExpenses()
       show('Gasto registrado correctamente.', 'success')
     } catch (error) {
@@ -1711,6 +1753,68 @@ export function AdminExpenses() {
                     onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, notes: e.target.value }))}
                   />
                 </div>
+
+                <div className="sm:col-span-2 lg:col-span-3">
+                  <label className="flex items-center gap-2 cursor-pointer select-none mb-3">
+                    <input
+                      type="checkbox"
+                      checked={directExpenseForm.apply_to_cash_session}
+                      onChange={(e) => {
+                        setDirectExpenseForm((prev) => ({
+                          ...prev,
+                          apply_to_cash_session: e.target.checked,
+                          cash_session_id: '',
+                        }))
+                        setCashSessionDateFilter(e.target.checked ? (directExpenseForm.occurred_at || new Date().toISOString().slice(0, 10)) : '')
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Registrar en sesión de caja</span>
+                  </label>
+                  {directExpenseForm.apply_to_cash_session && (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs text-gray-500">Fecha de la sesión</label>
+                        <Input
+                          type="date"
+                          value={cashSessionDateFilter}
+                          onChange={(e) => {
+                            setCashSessionDateFilter(e.target.value)
+                            setDirectExpenseForm((prev) => ({ ...prev, cash_session_id: '' }))
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs text-gray-500">Sesión de caja</label>
+                        {(() => {
+                          const sessionsForDate = cashSessions.filter((s) => s.opened_at.slice(0, 10) === cashSessionDateFilter)
+                          return (
+                            <select
+                              className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3 disabled:opacity-50"
+                              value={directExpenseForm.cash_session_id}
+                              onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, cash_session_id: e.target.value }))}
+                              disabled={!cashSessionDateFilter || sessionsForDate.length === 0}
+                            >
+                              {!cashSessionDateFilter && <option value="">Seleccioná una fecha primero</option>}
+                              {cashSessionDateFilter && sessionsForDate.length === 0 && <option value="">Sin cajas para ese día</option>}
+                              {cashSessionDateFilter && sessionsForDate.length > 0 && <option value="">Seleccionar caja</option>}
+                              {sessionsForDate.map((s) => {
+                                const branchName = branchNameById.get(s.branch_id) || 'Sucursal'
+                                const status = s.closed_at ? 'Cerrada' : 'Abierta'
+                                const openHour = s.opened_at.slice(11, 16)
+                                return (
+                                  <option key={s.id} value={s.id}>
+                                    {branchName} — abierta {openHour} ({status})
+                                  </option>
+                                )
+                              })}
+                            </select>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="mt-4">
@@ -1743,6 +1847,7 @@ export function AdminExpenses() {
                           <th className="px-2 py-2 text-left text-xs uppercase text-gray-500">Descripción</th>
                           <th className="px-2 py-2 text-left text-xs uppercase text-gray-500">Método</th>
                           <th className="px-2 py-2 text-left text-xs uppercase text-gray-500">Sucursal</th>
+                          <th className="px-2 py-2 text-left text-xs uppercase text-gray-500">Caja</th>
                           <th className="px-2 py-2 text-right text-xs uppercase text-gray-500">Monto</th>
                           <th className="px-2 py-2 text-right text-xs uppercase text-gray-500">Acciones</th>
                         </tr>
@@ -1755,6 +1860,19 @@ export function AdminExpenses() {
                             <td className="px-2 py-2 text-sm text-gray-600">{expense.description ?? '—'}</td>
                             <td className="px-2 py-2 text-sm text-gray-600 capitalize">{expense.payment_method}</td>
                             <td className="px-2 py-2 text-sm text-gray-600">{expense.branch_id ? (branchNameById.get(expense.branch_id) ?? '—') : '—'}</td>
+                            <td className="px-2 py-2 text-sm text-gray-600">
+                              {expense.cash_session_id ? (
+                                (() => {
+                                  const session = cashSessions.find((s) => s.id === expense.cash_session_id)
+                                  if (!session) return <span className="text-xs text-gray-400">Sí</span>
+                                  return (
+                                    <span className="text-xs">
+                                      {branchNameById.get(session.branch_id) || '—'} {session.opened_at.slice(0, 10)}
+                                    </span>
+                                  )
+                                })()
+                              ) : '—'}
+                            </td>
                             <td className="px-2 py-2 text-right text-sm font-semibold text-gray-900">{formatPrice(Number(expense.amount), settings)}</td>
                             <td className="px-2 py-2 text-right">
                               <button
@@ -1771,7 +1889,7 @@ export function AdminExpenses() {
                         ))}
                         {directExpenses.length === 0 && (
                           <tr>
-                            <td colSpan={7} className="py-8 text-center text-sm text-gray-500">
+                            <td colSpan={8} className="py-8 text-center text-sm text-gray-500">
                               No hay gastos registrados todavía.
                             </td>
                           </tr>
@@ -1793,6 +1911,14 @@ export function AdminExpenses() {
                             {expense.description && <p className="text-xs text-gray-600">{expense.description}</p>}
                             <p className="text-xs text-gray-500">{formatDateShort(expense.occurred_at, settings)} · {expense.payment_method}</p>
                             {expense.branch_id && <p className="text-xs text-gray-500">{branchNameById.get(expense.branch_id)}</p>}
+                            {expense.cash_session_id && (
+                              <p className="text-xs text-blue-600">
+                                En caja {(() => {
+                                  const s = cashSessions.find((c) => c.id === expense.cash_session_id)
+                                  return s ? `${branchNameById.get(s.branch_id) || ''} ${s.opened_at.slice(0, 10)}` : ''
+                                })()}
+                              </p>
+                            )}
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             <span className="text-sm font-bold text-gray-900">{formatPrice(Number(expense.amount), settings)}</span>

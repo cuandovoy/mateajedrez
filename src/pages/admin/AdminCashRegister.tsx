@@ -353,10 +353,26 @@ function AdminCashRegisterContent() {
           <h1 className="text-3xl font-bold text-gray-900">Punto de Venta</h1>
           <p className="text-gray-500 mt-1 text-sm">Gestiona las cajas abiertas y el historial de sesiones</p>
         </div>
-        <Button onClick={handleNew} size="sm">
-          <Plus className="h-4 w-4 mr-2" />
-          Abrir Caja
-        </Button>
+        <div className="flex items-center gap-2">
+          {branches.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const defaultBranch = openSessions[0]?.branch_id || branches[0]?.id || ''
+                setSelectedBranchForSale(defaultBranch)
+                setIsManualSaleOpen(true)
+              }}
+            >
+              <ShoppingCart className="h-4 w-4 mr-2" />
+              Nueva Venta
+            </Button>
+          )}
+          <Button onClick={handleNew} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Abrir Caja
+          </Button>
+        </div>
       </div>
 
       {/* ── Cajas abiertas ahora ── */}

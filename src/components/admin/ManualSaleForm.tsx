@@ -9,12 +9,12 @@ import { trackAuditAction } from '@/lib/audit'
 import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
 import { supabase } from '@/lib/supabase'
-import { capitalizeFirst, formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice, getProductImageUrl } from '@/lib/utils'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { CashSession, Product } from '@/types'
 import type { CheckoutBillerState } from '@/types/biller'
-import type { OrderInsert, OrderPaymentInsert } from '@/types/database.types'
+import type { OrderPaymentInsert } from '@/types/database.types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ChevronDown, ChevronUp, DollarSign, Edit2, Plus, Search, ShoppingCart, Trash2, UserCheck, Users, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -38,6 +38,8 @@ interface SaleLine {
   variant_id?: string | null
   product_name: string
   variant_name?: string | null
+  image_url?: string | null
+  sku?: string | null
   price: number
   quantity: number
   available_stock?: number
@@ -133,7 +135,6 @@ export function ManualSaleForm({
   
   
   const { config: billerConfig } = useBillerConfig(organizationId ?? null)
-  console.log("billerConfig: ", billerConfig);
   const [billerState, setBillerState] = useState<CheckoutBillerState>({
     emitirCFE: false,
     tipoComprobante: 'ticket',
@@ -251,7 +252,7 @@ export function ManualSaleForm({
     try {
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select('*, product_images(id, image_url, display_order, is_primary)')
         .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name')
@@ -491,6 +492,8 @@ export function ManualSaleForm({
           variant_id: null,
           product_name: product.name,
           variant_name: null,
+          image_url: getProductImageUrl(product as any, null),
+          sku: (product as any).sku ?? null,
           price,
           quantity: 1,
           available_stock: availableStock,
@@ -806,7 +809,8 @@ export function ManualSaleForm({
       const shippingPhone = normalizedPhone || resolvedCustomer?.phone || ''
       const shippingRut = normalizedRut || resolvedCustomer?.rut || undefined
 
-      const orderData: OrderInsert = {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const orderData: any = {
         organization_id: organizationId,
         user_id: null,
         customer_id: resolvedCustomer?.id || null,
@@ -816,6 +820,7 @@ export function ManualSaleForm({
         tax_total: 0,
         discount_metadata: (discountMetadata as any) ?? null,
         status: 'delivered',
+        source: 'manual',
         created_at: new Date(saleDate).toISOString(),
         shipping_address: {
           fullName: shippingFullName,
@@ -888,6 +893,22 @@ export function ManualSaleForm({
             return
           }
           throw itemsError
+        }
+      }
+
+      // Save manual lines to order_manual_items
+      const manualLines = saleLines.filter((line) => line.type === 'manual')
+      if (manualLines.length > 0) {
+        const manualItems = manualLines.map((line) => ({
+          organization_id: organizationId,
+          order_id: (order as { id: string }).id,
+          description: line.product_name,
+          quantity: line.quantity,
+          price: line.price,
+        }))
+        const { error: manualItemsError } = await (supabase as any).from('order_manual_items').insert(manualItems)
+        if (manualItemsError) {
+          console.error('Error saving manual items:', manualItemsError)
         }
       }
 
@@ -1139,12 +1160,23 @@ export function ManualSaleForm({
                       key={product.id}
                       type="button"
                       onClick={() => handleAddProduct(product)}
-                      className="w-full px-4 py-2.5 text-left hover:bg-admin-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                      className="w-full px-3 py-2 text-left hover:bg-admin-50 border-b border-gray-100 last:border-b-0 transition-colors"
                     >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">{capitalizeFirst(product.name)}</p>
-                          <p className="text-xs text-gray-500">{formatPrice(product.price, settings)}</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-shrink-0 h-9 w-9 rounded border border-gray-200 overflow-hidden bg-gray-50">
+                          {(() => {
+                            const imgUrl = getProductImageUrl(product as any, null)
+                            return imgUrl
+                              ? <img src={imgUrl} alt={product.name} className="h-full w-full object-cover" />
+                              : <div className="h-full w-full flex items-center justify-center text-gray-300 text-[10px]">—</div>
+                          })()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 text-sm leading-tight truncate">{capitalizeFirst(product.name)}</p>
+                          <p className="text-xs text-gray-500 leading-tight">
+                            {formatPrice(product.price, settings)}
+                            {(product as any).sku && <span className="ml-2 text-gray-400 font-mono">{(product as any).sku}</span>}
+                          </p>
                         </div>
                         <Plus className="h-4 w-4 text-admin-600 flex-shrink-0" />
                       </div>
@@ -1226,10 +1258,32 @@ export function ManualSaleForm({
                           className={hasNoStock ? 'bg-red-50 border-l-4 border-l-red-400' : 'hover:bg-gray-50'}
                         >
                           <td className="px-3 py-2.5">
-                            <p className="font-medium text-gray-900">{line.product_name}</p>
-                            {line.variant_name && (
-                              <p className="text-xs text-gray-500">{line.variant_name}</p>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {line.type === 'product' && (
+                                <div className="relative flex-shrink-0 group">
+                                  {line.image_url ? (
+                                    <img
+                                      src={line.image_url}
+                                      alt={line.product_name}
+                                      className="h-8 w-8 rounded object-cover border border-gray-200 transition-transform duration-150 group-hover:scale-[2.5] group-hover:z-10 group-hover:shadow-lg"
+                                    />
+                                  ) : (
+                                    <div className="h-8 w-8 rounded border border-gray-200 bg-gray-100 flex items-center justify-center text-gray-300 text-[10px]">
+                                      —
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-medium text-gray-900 leading-tight">{capitalizeFirst(line.product_name)}</p>
+                                {line.variant_name && (
+                                  <p className="text-xs text-gray-500 leading-tight">{line.variant_name}</p>
+                                )}
+                                {line.sku && (
+                                  <p className="text-[10px] text-gray-400 font-mono leading-tight">{line.sku}</p>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="px-3 py-2.5 text-center">
                             {line.is_editing_quantity ? (

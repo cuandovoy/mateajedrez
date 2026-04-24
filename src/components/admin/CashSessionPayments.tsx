@@ -5,7 +5,7 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { supabase } from '@/lib/supabase'
 import { formatDateShort, formatPrice, formatTime } from '@/lib/utils'
 import type { Order, OrderPayment } from '@/types'
-import { DollarSign, ExternalLink, Receipt, ShoppingCart, X } from 'lucide-react'
+import { DollarSign, ExternalLink, MinusCircle, Receipt, ShoppingCart, X } from 'lucide-react'
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -22,6 +22,15 @@ interface OtherMethodOrder {
   order: Order
   paymentMethod: string
   amount: number
+}
+
+interface SessionDirectExpense {
+  id: string
+  occurred_at: string
+  category: string
+  description: string | null
+  amount: number
+  payment_method: string
 }
 
 const formatOrderDisplayNumber = (order: { id: string; order_number?: number | null }): string => {
@@ -52,6 +61,7 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
   const settings = useOrgSettings()
   const [payments, setPayments] = useState<PaymentWithOrder[]>([])
   const [otherOrders, setOtherOrders] = useState<OtherMethodOrder[]>([])
+  const [directExpenses, setDirectExpenses] = useState<SessionDirectExpense[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchPayments = useCallback(async () => {
@@ -161,6 +171,13 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
           setOtherOrders([])
         }
       }
+      // ── 3. Gastos directos vinculados a esta sesión ────────────────────────
+      const { data: expensesData } = await (supabase.from as any)('direct_expenses')
+        .select('id, occurred_at, category, description, amount, payment_method')
+        .eq('cash_session_id', sessionId)
+        .order('occurred_at', { ascending: true })
+
+      setDirectExpenses((expensesData || []) as SessionDirectExpense[])
     } catch (error) {
       console.error('Error fetching payments:', error)
     } finally {
@@ -178,7 +195,20 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
   const totalValidCash = validPayments.reduce((sum, p) => sum + p.amount, 0)
   const totalCancelledCash = cancelledPayments.reduce((sum, p) => sum + p.amount, 0)
   const totalOtherMethods = otherOrders.reduce((sum, o) => sum + o.amount, 0)
+  const totalDirectExpenses = directExpenses.reduce((sum, e) => sum + Number(e.amount), 0)
   const paymentCount = validPayments.length
+
+  const EXPENSE_CATEGORY_LABEL: Record<string, string> = {
+    combustible: 'Combustible',
+    transporte: 'Transporte',
+    alimentacion: 'Alimentación',
+    papeleria: 'Papelería',
+    servicios: 'Servicios',
+    alquiler: 'Alquiler',
+    mantenimiento: 'Mantenimiento',
+    marketing: 'Marketing',
+    varios: 'Varios',
+  }
 
   if (loading) {
     return (
@@ -205,7 +235,7 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
         <CardContent className="flex-1 overflow-y-auto px-4 py-4">
 
           {/* Summary */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
             <Card>
               <CardContent className="p-3">
                 <p className="text-xs text-gray-500 mb-1">Efectivo válido</p>
@@ -237,6 +267,15 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                 <p className="text-lg font-bold text-gray-900">{paymentCount}</p>
                 <p className="text-xs text-gray-400 mt-0.5">
                   {paymentCount > 0 ? `Promedio ${formatPrice(totalValidCash / paymentCount, settings)}` : '—'}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-3">
+                <p className="text-xs text-gray-500 mb-1">Gastos de caja</p>
+                <p className="text-lg font-bold text-red-600">- {formatPrice(totalDirectExpenses, settings)}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {directExpenses.length === 0 ? 'Sin gastos' : `${directExpenses.length} gasto${directExpenses.length !== 1 ? 's' : ''}`}
                 </p>
               </CardContent>
             </Card>
@@ -366,6 +405,45 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                         </td>
                       </tr>
                     ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Direct expenses */}
+          <div className="space-y-2 mt-6">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <MinusCircle className="h-4 w-4 text-red-500" />
+              Gastos de caja
+              <span className="text-xs font-normal text-gray-400">(restan del efectivo)</span>
+            </h3>
+            {directExpenses.length === 0 ? (
+              <p className="text-sm text-gray-400 pl-6">No hay gastos registrados en esta sesión</p>
+            ) : (
+              <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200 text-xs sm:text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase">Fecha</th>
+                      <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase">Categoría</th>
+                      <th className="px-3 py-2 text-left text-[11px] font-medium text-gray-500 uppercase">Descripción</th>
+                      <th className="px-3 py-2 text-right text-[11px] font-medium text-gray-500 uppercase">Monto</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {directExpenses.map((expense) => (
+                      <tr key={expense.id} className="hover:bg-red-50/30">
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-700">{formatDateShort(expense.occurred_at, settings)}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-gray-700">{EXPENSE_CATEGORY_LABEL[expense.category] ?? expense.category}</td>
+                        <td className="px-3 py-2 text-gray-600">{expense.description ?? '—'}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-right font-semibold text-red-600">- {formatPrice(Number(expense.amount), settings)}</td>
+                      </tr>
+                    ))}
+                    <tr className="bg-red-50">
+                      <td colSpan={3} className="px-3 py-2 text-right text-xs font-semibold text-red-700">Total gastos</td>
+                      <td className="px-3 py-2 text-right font-bold text-red-700">- {formatPrice(totalDirectExpenses, settings)}</td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
