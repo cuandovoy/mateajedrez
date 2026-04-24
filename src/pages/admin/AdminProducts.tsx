@@ -18,12 +18,12 @@ import { Input } from '@/components/ui/Input'
 import { deleteImage, uploadProductImage } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { capitalizeFirst, formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice, getEffectivePrice, formatDateShort } from '@/lib/utils'
 import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, ProductVariant, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { productSchema } from '@/lib/schemas'
 import type { ProductForm } from '@/lib/schemas'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Edit, Filter, Grid3x3, List, Package, Plus, ScanLine, Star, Trash2, Truck, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Edit, Filter, Grid3x3, List, Package, Percent, Plus, ScanLine, Star, Trash2, Truck, Upload, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { getMaxProductImages } from '@/lib/planLimits'
@@ -52,6 +52,7 @@ interface ProductWithImages extends Product {
   product_images?: ProductImage[]
   category?: Category | null
   inventory_stock?: number
+  product_categories?: { category_id: string; category?: Category | null }[]
 }
 
 interface ProductVariantWithInventory extends ProductVariant {
@@ -76,6 +77,382 @@ interface ProductFilters {
   sortDirection: SortDirection
 }
 
+// ─── Discounts Tab Component ───────────────────────────────────────────────
+
+interface DiscountFormState {
+  productId: string
+  percentage: string
+  expiresAt: string
+}
+
+interface DiscountsTabProps {
+  products: ProductWithImages[]
+  allProducts: ProductWithImages[]
+  loading: boolean
+  settings: ReturnType<typeof import('@/hooks/useOrgSettings').useOrgSettings>
+  onRefresh: () => void
+}
+
+function DiscountsTab({ products, allProducts, loading, settings, onRefresh }: DiscountsTabProps) {
+  const { show } = useToastStore()
+  const now = new Date()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [removing, setRemoving] = useState(false)
+  const [productSearch, setProductSearch] = useState('')
+  const [form, setForm] = useState<DiscountFormState>({ productId: '', percentage: '', expiresAt: '' })
+
+  const active = products.filter((p) => !p.discount_expires_at || new Date(p.discount_expires_at) >= now)
+  const expired = products.filter((p) => p.discount_expires_at && new Date(p.discount_expires_at) < now)
+
+  const editingProduct = form.productId ? allProducts.find((p) => p.id === form.productId) ?? null : null
+
+  const filteredAllProducts = useMemo(() => {
+    const q = productSearch.toLowerCase().trim()
+    if (!q) return allProducts
+    return allProducts.filter(
+      (p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)
+    )
+  }, [allProducts, productSearch])
+
+  const openNew = () => {
+    setForm({ productId: '', percentage: '', expiresAt: '' })
+    setProductSearch('')
+    setModalOpen(true)
+  }
+
+  const openEdit = (p: ProductWithImages) => {
+    setForm({
+      productId: p.id,
+      percentage: p.discount_percentage != null ? String(p.discount_percentage) : '',
+      expiresAt: p.discount_expires_at ? p.discount_expires_at.slice(0, 16) : '',
+    })
+    setProductSearch('')
+    setModalOpen(true)
+  }
+
+  const closeModal = () => { setModalOpen(false); setProductSearch('') }
+
+  const handleSave = async () => {
+    if (!form.productId) { show('Seleccioná un producto', 'error'); return }
+    const pct = parseFloat(form.percentage)
+    if (isNaN(pct) || pct <= 0 || pct > 100) { show('El descuento debe ser entre 1 y 100', 'error'); return }
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({
+          discount_percentage: pct,
+          discount_expires_at: form.expiresAt ? new Date(form.expiresAt).toISOString() : null,
+        })
+        .eq('id', form.productId)
+      if (error) throw error
+      show('Descuento guardado', 'success')
+      closeModal()
+      onRefresh()
+    } catch (err: any) {
+      show(err?.message ?? 'Error al guardar el descuento', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRemove = async () => {
+    if (!form.productId) return
+    if (!confirm('¿Quitar el descuento de este producto?')) return
+    setRemoving(true)
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ discount_percentage: null, discount_expires_at: null })
+        .eq('id', form.productId)
+      if (error) throw error
+      show('Descuento eliminado', 'success')
+      closeModal()
+      onRefresh()
+    } catch (err: any) {
+      show(err?.message ?? 'Error al eliminar el descuento', 'error')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
+  const renderRows = (rows: ProductWithImages[], variant: 'active' | 'expired') =>
+    rows.map((p) => {
+      const effectivePrice = getEffectivePrice(p)
+      const expiresAt = p.discount_expires_at ? new Date(p.discount_expires_at) : null
+      const isExpired = expiresAt ? expiresAt < now : false
+      return (
+        <tr key={p.id} className={`border-b border-gray-100 hover:bg-gray-50 ${isExpired ? 'opacity-70' : ''}`}>
+          <td className="px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900 line-clamp-1">{p.name}</p>
+              <p className="text-xs text-gray-400">{p.sku}</p>
+            </div>
+          </td>
+          <td className="px-4 py-3 text-sm text-gray-700 text-right whitespace-nowrap">
+            {formatPrice(p.price, settings)}
+          </td>
+          <td className="px-4 py-3 text-center">
+            <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded ${
+              variant === 'active' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+            }`}>
+              -{p.discount_percentage}%
+            </span>
+          </td>
+          <td className="px-4 py-3 text-sm font-semibold text-right whitespace-nowrap"
+            style={{ color: variant === 'active' ? '#16a34a' : '#ea580c' }}>
+            {formatPrice(effectivePrice, settings)}
+          </td>
+          <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
+            {expiresAt
+              ? formatDateShort(p.discount_expires_at, settings)
+              : <span className="text-gray-400 italic text-xs">Sin límite</span>}
+          </td>
+          <td className="px-4 py-3 text-center">
+            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ${
+              variant === 'active' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${variant === 'active' ? 'bg-green-500' : 'bg-orange-500'}`} />
+              {variant === 'active' ? 'Vigente' : 'Vencido'}
+            </span>
+          </td>
+          <td className="px-4 py-3 text-center">
+            <button
+              onClick={() => openEdit(p)}
+              className="p-1.5 text-gray-400 hover:text-admin-600 hover:bg-admin-50 rounded transition-colors"
+              title="Editar descuento"
+            >
+              <Edit className="h-4 w-4" />
+            </button>
+          </td>
+        </tr>
+      )
+    })
+
+  const tableHead = (lastColLabel: string) => (
+    <thead className="bg-gray-50 border-b border-gray-100">
+      <tr>
+        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Precio original</th>
+        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Descuento</th>
+        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Precio final</th>
+        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{lastColLabel}</th>
+        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
+        <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Editar</th>
+      </tr>
+    </thead>
+  )
+
+  return (
+    <>
+      {/* Header row with button */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-500">
+          {products.length === 0 ? 'Sin descuentos configurados' : `${active.length} vigente${active.length !== 1 ? 's' : ''}, ${expired.length} vencido${expired.length !== 1 ? 's' : ''}`}
+        </p>
+        <Button onClick={openNew} size="sm">
+          <Plus className="h-4 w-4 mr-1.5" />
+          Nuevo descuento
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600" />
+        </div>
+      ) : products.length === 0 ? (
+        <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-lg">
+          <Percent className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+          <p className="font-medium text-gray-500">No hay descuentos configurados</p>
+          <p className="text-sm text-gray-400 mt-1 mb-4">Creá tu primer descuento con el botón de arriba.</p>
+          <Button onClick={openNew} size="sm" variant="outline">
+            <Plus className="h-4 w-4 mr-1.5" />
+            Nuevo descuento
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span className="h-2.5 w-2.5 rounded-full bg-green-500" />
+                Vigentes
+                <span className="text-sm font-normal text-gray-500">({active.length})</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              {active.length === 0 ? (
+                <p className="px-6 py-4 text-sm text-gray-400">No hay descuentos vigentes.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    {tableHead('Válido hasta')}
+                    <tbody>{renderRows(active, 'active')}</tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {expired.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <span className="h-2.5 w-2.5 rounded-full bg-orange-400" />
+                  Vencidos
+                  <span className="text-sm font-normal text-gray-500">({expired.length})</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    {tableHead('Venció el')}
+                    <tbody>{renderRows(expired, 'expired')}</tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* Discount Modal */}
+      {modalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <Percent className="h-5 w-5 text-admin-600" />
+                <h2 className="text-base font-semibold text-gray-900">
+                  {editingProduct ? 'Editar descuento' : 'Nuevo descuento'}
+                </h2>
+              </div>
+              <button
+                onClick={closeModal}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Product selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Producto</label>
+                {editingProduct ? (
+                  <div className="flex items-center gap-3 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{editingProduct.name}</p>
+                      <p className="text-xs text-gray-400">{editingProduct.sku} · {formatPrice(editingProduct.price, settings)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, productId: '' }))}
+                      className="text-xs text-admin-600 hover:underline shrink-0"
+                    >
+                      Cambiar
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Buscar por nombre o SKU…"
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 mb-1.5"
+                    />
+                    <select
+                      value={form.productId}
+                      onChange={(e) => setForm((f) => ({ ...f, productId: e.target.value }))}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      size={5}
+                    >
+                      <option value="">— Seleccioná un producto —</option>
+                      {filteredAllProducts.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.sku}) · {formatPrice(p.price, settings)}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+
+              {/* Percentage + expiry */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Descuento (%)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      step={1}
+                      placeholder="ej: 20"
+                      value={form.percentage}
+                      onChange={(e) => setForm((f) => ({ ...f, percentage: e.target.value }))}
+                      className="w-full pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                  </div>
+                  {form.productId && form.percentage && editingProduct && !isNaN(parseFloat(form.percentage)) && (
+                    <p className="mt-1 text-xs text-green-600 font-medium">
+                      Precio final: {formatPrice(
+                        Math.round(editingProduct.price * (1 - parseFloat(form.percentage) / 100) * 100) / 100,
+                        settings
+                      )}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Válido hasta
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={form.expiresAt}
+                    onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">Opcional — vacío = sin límite</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center gap-2 px-6 py-4 border-t border-gray-100 bg-gray-50 rounded-b-xl">
+              {editingProduct && (
+                <button
+                  type="button"
+                  onClick={handleRemove}
+                  disabled={removing}
+                  className="text-sm text-red-500 hover:text-red-700 mr-auto disabled:opacity-50"
+                >
+                  {removing ? 'Quitando…' : 'Quitar descuento'}
+                </button>
+              )}
+              <Button variant="outline" onClick={closeModal} className="ml-auto">
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} isLoading={saving} disabled={saving || removing}>
+                Guardar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+
 function AdminProductsContent() {
   const navigate = useNavigate()
   const { organizationId } = useOrganization()
@@ -88,6 +465,9 @@ function AdminProductsContent() {
   const [categories, setCategories] = useState<Category[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
+  const [activeTab, setActiveTab] = useState<'products' | 'discounts'>('products')
+  const [discountedProducts, setDiscountedProducts] = useState<ProductWithImages[]>([])
+  const [loadingDiscounts, setLoadingDiscounts] = useState(false)
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithImages | null>(null)
@@ -98,6 +478,7 @@ function AdminProductsContent() {
   const [barcodeManagerVariant, setBarcodeManagerVariant] = useState<{ productId: string; variantId: string } | null>(null)
   const [supplierManagerProduct, setSupplierManagerProduct] = useState<Product | null>(null)
   const [initialBranchId, setInitialBranchId] = useState<string>('')
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [filtersCollapsed, setFiltersCollapsed] = useState(true)
   const [exportingPdf, setExportingPdf] = useState(false)
@@ -178,6 +559,13 @@ function AdminProductsContent() {
           category:categories (
             id,
             name
+          ),
+          product_categories (
+            category_id,
+            category:categories (
+              id,
+              name
+            )
           )
         `)
         .eq('organization_id', organizationId)
@@ -217,7 +605,7 @@ function AdminProductsContent() {
       const { data, error } = await query.order('created_at', { ascending: false })
 
       if (error) throw error
-      const productsData = (data || []) as ProductWithImages[]
+      const productsData = (data || []) as unknown as ProductWithImages[]
 
       const loadedProductIds = productsData.map((p) => p.id)
       let inventoryStockByProduct = new Map<string, number>()
@@ -435,6 +823,33 @@ function AdminProductsContent() {
     }
   }
 
+  const fetchDiscountedProducts = useCallback(async () => {
+    if (!organizationId) return
+    try {
+      setLoadingDiscounts(true)
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          product_images (id, image_url, display_order, is_primary),
+          category:categories (id, name)
+        `)
+        .eq('organization_id', organizationId)
+        .not('discount_percentage', 'is', null)
+        .order('discount_expires_at', { ascending: true, nullsFirst: false })
+      if (error) throw error
+      setDiscountedProducts((data || []) as unknown as ProductWithImages[])
+    } catch (err) {
+      console.error('Error fetching discounted products:', err)
+    } finally {
+      setLoadingDiscounts(false)
+    }
+  }, [organizationId])
+
+  useEffect(() => {
+    if (organizationId) fetchDiscountedProducts()
+  }, [fetchDiscountedProducts])
+
   const handleImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
@@ -549,6 +964,11 @@ function AdminProductsContent() {
       return
     }
 
+    if (selectedCategoryIds.length === 0) {
+      show('Seleccioná al menos una categoría.', 'error')
+      return
+    }
+
     // When creating with stock > 0, branch is required for inventory
     if (!editingProduct && data.stock > 0) {
       if (branches.length === 0) {
@@ -572,10 +992,13 @@ function AdminProductsContent() {
     try {
       setUploadingImage(true)
 
-      const { stock, ...restData } = data
+      const { stock, category_id: _cid, discount_expires_at, ...restData } = data
       const baseProductData = {
         ...restData,
-        image_url: null, // We'll use product_images table instead
+        category_id: selectedCategoryIds[0] || undefined,
+        image_url: null as null,
+        discount_percentage: restData.discount_percentage ?? null,
+        discount_expires_at: discount_expires_at ? new Date(discount_expires_at).toISOString() : null,
       }
 
       let productId: string
@@ -595,6 +1018,7 @@ function AdminProductsContent() {
       } else {
         const productData: ProductInsert = {
           ...baseProductData,
+          category_id: selectedCategoryIds[0] ?? '',
           stock,
           organization_id: organizationId!,
         }
@@ -646,6 +1070,20 @@ function AdminProductsContent() {
             }
           }
         }
+      }
+
+      // Save multi-category associations (table not yet in generated types, cast needed)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any
+      await sb.from('product_categories').delete().eq('product_id', productId)
+      if (selectedCategoryIds.length > 0) {
+        await sb.from('product_categories').insert(
+          selectedCategoryIds.map((catId) => ({
+            product_id: productId,
+            category_id: catId,
+            organization_id: organizationId!,
+          }))
+        )
       }
 
       // Handle product images
@@ -815,6 +1253,7 @@ function AdminProductsContent() {
       setProductImages([])
       reset()
       await fetchProducts()
+      fetchDiscountedProducts()
     } catch (error) {
       console.error('Error saving product:', error)
       alert('Error al guardar el producto')
@@ -887,7 +1326,6 @@ function AdminProductsContent() {
   const handleEdit = (product: ProductWithImages) => {
     setEditingProduct(product)
 
-    // Load existing images
     const existingImages: ProductImageItem[] = (product.product_images || [])
       .sort((a, b) => a.display_order - b.display_order)
       .map((img) => ({
@@ -899,6 +1337,9 @@ function AdminProductsContent() {
 
     setProductImages(existingImages)
 
+    const existingCatIds = (product.product_categories || []).map((pc) => pc.category_id)
+    setSelectedCategoryIds(existingCatIds.length > 0 ? existingCatIds : product.category_id ? [product.category_id] : [])
+
     reset({
       name: product.name,
       description: product.description || '',
@@ -907,6 +1348,10 @@ function AdminProductsContent() {
       category_id: product.category_id,
       sku: product.sku,
       is_active: product.is_active ?? true,
+      discount_percentage: product.discount_percentage ?? null,
+      discount_expires_at: product.discount_expires_at
+        ? product.discount_expires_at.slice(0, 16)
+        : null,
     })
     setIsModalOpen(true)
   }
@@ -936,6 +1381,7 @@ function AdminProductsContent() {
     setEditingProduct(null)
     setProductImages([])
     setInitialBranchId('')
+    setSelectedCategoryIds([])
     reset()
     setIsModalOpen(true)
   }
@@ -1104,7 +1550,7 @@ function AdminProductsContent() {
 
   return (
     <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Productos</h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
@@ -1147,6 +1593,49 @@ function AdminProductsContent() {
           </Button>
         </div>
       </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200 mb-6">
+        <button
+          onClick={() => setActiveTab('products')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'products'
+              ? 'border-admin-600 text-admin-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Productos
+        </button>
+        <button
+          onClick={() => setActiveTab('discounts')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 ${
+            activeTab === 'discounts'
+              ? 'border-admin-600 text-admin-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Descuentos
+          {discountedProducts.length > 0 && (
+            <span className="bg-gray-100 text-gray-600 text-xs rounded-full px-2 py-0.5">
+              {discountedProducts.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── DISCOUNTS TAB ── */}
+      {activeTab === 'discounts' && (
+        <DiscountsTab
+          products={discountedProducts}
+          allProducts={products}
+          loading={loadingDiscounts}
+          settings={settings}
+          onRefresh={fetchDiscountedProducts}
+        />
+      )}
+
+      {activeTab === 'products' && (
+      <>
 
       {/* Mobile search */}
       <div className="md:hidden mb-4">
@@ -1544,6 +2033,9 @@ function AdminProductsContent() {
         </div>
       )}
 
+      </> /* end activeTab === 'products' */
+      )}
+
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1559,6 +2051,7 @@ function AdminProductsContent() {
                     setEditingProduct(null)
                     setProductImages([])
                     setInitialBranchId('')
+                    setSelectedCategoryIds([])
                     reset()
                   }}
                   className="p-1 hover:bg-gray-100 rounded-full transition-colors"
@@ -1648,24 +2141,34 @@ function AdminProductsContent() {
                   </div>
                 )}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Categoría
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Categorías
+                    <span className="ml-1 text-xs font-normal text-gray-500">(seleccioná una o más)</span>
                   </label>
-                  <select
-                    {...register('category_id')}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                  >
-                    <option value="">Seleccionar categoría</option>
+                  <div className="border border-gray-300 rounded-lg p-3 max-h-40 overflow-y-auto space-y-1">
                     {categories.map((cat) => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
+                      <label key={cat.id} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-1 py-0.5 rounded">
+                        <input
+                          type="checkbox"
+                          checked={selectedCategoryIds.includes(cat.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedCategoryIds((prev) => [...prev, cat.id])
+                            } else {
+                              setSelectedCategoryIds((prev) => prev.filter((id) => id !== cat.id))
+                            }
+                          }}
+                          className="h-4 w-4 text-admin-600 focus:ring-admin-500 border-gray-300 rounded"
+                        />
+                        <span className="text-sm text-gray-700">{cat.name}</span>
+                      </label>
                     ))}
-                  </select>
-                  {errors.category_id && (
-                    <p className="mt-1 text-sm text-red-600">
-                      {errors.category_id.message}
-                    </p>
+                    {categories.length === 0 && (
+                      <p className="text-sm text-gray-500">No hay categorías disponibles</p>
+                    )}
+                  </div>
+                  {selectedCategoryIds.length === 0 && (
+                    <p className="mt-1 text-sm text-red-600">Seleccioná al menos una categoría</p>
                   )}
                 </div>
                 <div>
@@ -1832,6 +2335,33 @@ function AdminProductsContent() {
                     </p>
                   )}
                 </div>
+                <div className="border border-gray-200 rounded-lg p-4 bg-amber-50/50">
+                  <p className="text-sm font-medium text-gray-700 mb-3">Descuento</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Porcentaje (%)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
+                        placeholder="ej: 20"
+                        {...register('discount_percentage', { valueAsNumber: true })}
+                        error={errors.discount_percentage?.message}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-1">Válido hasta</label>
+                      <input
+                        type="datetime-local"
+                        {...register('discount_expires_at')}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                      />
+                      <p className="mt-1 text-xs text-gray-400">Dejá vacío para descuento sin límite</p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-center">
                   <input
                     type="checkbox"
@@ -1854,6 +2384,7 @@ function AdminProductsContent() {
                       setEditingProduct(null)
                       setProductImages([])
                       setInitialBranchId('')
+                      setSelectedCategoryIds([])
                       reset()
                     }}
                     className="flex-1"

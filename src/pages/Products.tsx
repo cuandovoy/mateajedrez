@@ -10,13 +10,15 @@ import { useFilteredProducts } from '@/hooks/usePublicProducts'
 import type { Product } from '@/types'
 import { Filter, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 
 const DEFAULT_STORE_SLUG = 'default'
 
 export function Products() {
   const { organization, isPublicStore, slug } = useCurrentOrganization()
   const fetchOrgBySlug = useOrganizationStore((s) => s.fetchOrgBySlug)
-  const [searchTerm, setSearchTerm] = useState('')
+  const [searchParams] = useSearchParams()
+  const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') ?? '')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })

@@ -3,7 +3,7 @@ import { ShoppingCart } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { capitalizeFirst, formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { Product, ProductImage } from '@/types'
 import { useState, useEffect } from 'react'
@@ -134,9 +134,21 @@ export function ProductListItem({
               {capitalizeFirst(product.description) || 'Sin descripción'}
             </p>
             <div className="flex items-center space-x-4">
-              <span className="text-2xl font-bold" style={{ color: 'var(--org-primary-color,rgb(0, 0, 0))' }}>
-                {formatPrice(product.price, settings)}
-              </span>
+              <div className="flex flex-col gap-0.5">
+                {hasActiveDiscount(product) && (
+                  <div className="flex items-center gap-2">
+                    <span className="inline-block bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded">
+                      -{product.discount_percentage}%
+                    </span>
+                    <span className="text-sm text-gray-400 line-through">
+                      {formatPrice(product.price, settings)}
+                    </span>
+                  </div>
+                )}
+                <span className="text-2xl font-bold" style={{ color: 'var(--org-primary-color,rgb(0, 0, 0))' }}>
+                  {formatPrice(getEffectivePrice(product), settings)}
+                </span>
+              </div>
               {stock === null ? (
                 <span className="text-sm text-gray-400 font-medium">Cargando...</span>
               ) : hasStock ? (

@@ -3,8 +3,8 @@ import { Dropdown } from '@/components/ui/Dropdown'
 import { useCartStore } from '@/store/cartStore'
 import { Organization } from '@/types/database.types'
 import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
-import { Menu, ShoppingCart, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Menu, Search, ShoppingCart, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 interface PublicStoreHeaderProps {
@@ -17,6 +17,9 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
   const navigate = useNavigate()
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
 
   const { categoriesWithSubs } = usePublicCategoriesForMenu(organization.id)
 
@@ -31,6 +34,24 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
       setIsMobileMenuOpen(false)
     }
   }
+
+  const handleSearch = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    const q = searchQuery.trim()
+    if (q) {
+      navigate(`/${slug}/products?search=${encodeURIComponent(q)}`)
+    } else {
+      navigate(`/${slug}/products`)
+    }
+    setIsSearchOpen(false)
+    setIsMobileMenuOpen(false)
+  }
+
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchInputRef.current?.focus()
+    }
+  }, [isSearchOpen])
 
   const settings = (organization.settings as Record<string, unknown>) ?? {}
   const minimalLogoUrl =
@@ -74,7 +95,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
             </Link>
           </div>
 
-          <div className="flex-1 flex justify-center">
+          <div className="flex-1 flex justify-center items-center gap-3">
             {categoriesWithSubs.length > 0 && (
               <Dropdown
                 options={categoriesWithSubs}
@@ -84,6 +105,29 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
                 darkBackground={true}
               />
             )}
+            <form onSubmit={handleSearch} className="flex items-center">
+              <div className="flex items-center bg-white/20 hover:bg-white/30 focus-within:bg-white/30 rounded-full px-3 py-1.5 transition-colors">
+                <Search className="h-4 w-4 text-white/80 shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="Buscar productos…"
+                  className="bg-transparent text-white placeholder-white/60 text-sm outline-none ml-2 w-40 focus:w-56 transition-all duration-300"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="ml-1 text-white/60 hover:text-white"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </form>
           </div>
 
           <div className="flex-1 flex justify-end items-center space-x-4">
@@ -136,7 +180,15 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
             </Link>
           </div>
 
-          <div className="flex-1 flex justify-end">
+          <div className="flex-1 flex justify-end items-center gap-1">
+            <Button
+              variant="ghost"
+              className="text-white hover:text-white/80"
+              size="sm"
+              onClick={() => { setIsSearchOpen((p) => !p); setIsMobileMenuOpen(false) }}
+            >
+              <Search className="h-5 w-5" />
+            </Button>
             <Link to={`/${slug}/cart`} className="relative" onClick={() => setIsMobileMenuOpen(false)}>
               <Button variant="ghost" className="text-white hover:text-white/80" size="sm">
                 <ShoppingCart className="h-5 w-5" />
@@ -149,6 +201,34 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
             </Link>
           </div>
         </div>
+
+        {/* Mobile Search Bar */}
+        {isSearchOpen && (
+          <div className="lg:hidden border-t px-4 py-3" style={{ borderColor: `${primaryColor}dd`, backgroundColor: primaryColor }}>
+            <form onSubmit={handleSearch} className="flex items-center gap-2">
+              <div className="flex-1 flex items-center bg-white/20 focus-within:bg-white/30 rounded-full px-3 py-2">
+                <Search className="h-4 w-4 text-white/80 shrink-0" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar productos…"
+                  className="bg-transparent text-white placeholder-white/60 text-sm outline-none ml-2 flex-1"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button type="button" onClick={() => setSearchQuery('')} className="text-white/60 hover:text-white">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              <Button type="submit" variant="ghost" size="sm" className="text-white hover:text-white/80 shrink-0">
+                Buscar
+              </Button>
+            </form>
+          </div>
+        )}
 
         {/* Mobile Menu Dropdown */}
         {isMobileMenuOpen && (

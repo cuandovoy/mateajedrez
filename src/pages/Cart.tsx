@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { capitalizeFirst, cn, formatPrice, getProductImageUrl } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, getProductImageUrl, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
@@ -280,9 +280,16 @@ function CartContent() {
                             )}
                           </div>
                         )}
-                        <p className="text-primary-600 font-bold mt-2 text-sm sm:text-base">
-                          {formatPrice(item.variant?.price ?? item.product.price, settings)}
-                        </p>
+                        <div className="mt-2">
+                          {!item.variant && hasActiveDiscount(item.product) && (
+                            <p className="text-xs text-gray-400 line-through leading-none">
+                              {formatPrice(item.product.price, settings)}
+                            </p>
+                          )}
+                          <p className="text-primary-600 font-bold text-sm sm:text-base">
+                            {formatPrice(item.variant?.price ?? getEffectivePrice(item.product), settings)}
+                          </p>
+                        </div>
                         {itemStocks[item.id] !== undefined && itemStocks[item.id] > 0 && (
                           <p className="text-xs text-gray-500 mt-1">
                             Stock disponible: {itemStocks[item.id]} {item.variant?.unit || item.product.unit || 'unidad'}
@@ -315,7 +322,7 @@ function CartContent() {
                       </div>
                       <div className="flex flex-col items-end sm:items-end gap-2">
                         <p className="text-base sm:text-lg font-bold text-gray-900">
-                          {formatPrice((item.variant?.price ?? item.product.price) * item.quantity, settings)}
+                          {formatPrice((item.variant?.price ?? getEffectivePrice(item.product)) * item.quantity, settings)}
                         </p>
                         <Button
                           variant="ghost"

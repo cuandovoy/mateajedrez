@@ -1,0 +1,6 @@
+projectKey=AxiosStock
+serverUrl=http://localhost:9000
+serverVersion=26.4.0.121862
+dashboardUrl=http://localhost:9000/dashboard?id=AxiosStock
+ceTaskId=15db2111-378a-4bf4-b77e-4c8803989509
+ceTaskUrl=http://localhost:9000/api/ce/task?id=15db2111-378a-4bf4-b77e-4c8803989509

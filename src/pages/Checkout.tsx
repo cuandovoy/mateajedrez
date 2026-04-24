@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { capitalizeFirst, formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice, getEffectivePrice, hasActiveDiscount } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { useOrganizationStore } from '@/store/organizationStore'
@@ -475,8 +475,7 @@ export function Checkout() {
       // Create order items (include variant_id if available)
       const orderItems = items.map((item) => {
         const cartItem = item as CartItemWithProduct & { product_id: string; quantity: number; variant_id?: string | null }
-        // Use variant price if available, otherwise product price
-        const price = item.variant?.price ?? item.product.price
+        const price = item.variant?.price ?? getEffectivePrice(item.product)
         return {
           order_id: (order as { id: string }).id,
           product_id: cartItem.product_id,
@@ -603,7 +602,7 @@ export function Checkout() {
             product_id: item.product_id,
             variant_id: item.variant_id || null,
             quantity: item.quantity,
-            price: item.variant?.price ?? item.product.price,
+            price: item.variant?.price ?? getEffectivePrice(item.product),
             name: item.product.name,
           }))
 
@@ -681,7 +680,9 @@ export function Checkout() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
-                {items.map((item) => (
+                {items.map((item) => {
+                  const unitPrice = item.variant?.price ?? getEffectivePrice(item.product)
+                  return (
                   <div key={item.id} className="flex items-center space-x-3">
                     {item.product.image_url && (
                       <img
@@ -697,12 +698,20 @@ export function Checkout() {
                       <p className="text-xs text-gray-600">
                         Cantidad: {item.quantity}
                       </p>
-                      <p className="text-sm font-semibold text-primary-200">
-                        {formatPrice(item.product.price * item.quantity)}
-                      </p>
+                      <div className="mt-0.5">
+                        {!item.variant && hasActiveDiscount(item.product) && (
+                          <p className="text-xs text-gray-400 line-through leading-none">
+                            {formatPrice(item.product.price * item.quantity, settings)}
+                          </p>
+                        )}
+                        <p className="text-sm font-semibold text-primary-600">
+                          {formatPrice(unitPrice * item.quantity, settings)}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
               <div className="border-t pt-4 space-y-2">
                 <div className="flex justify-between text-sm">

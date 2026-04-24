@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
-import { ArrowRight, Package, CheckCircle, Clock, Search } from 'lucide-react'
+import { ArrowRight, Package, CheckCircle, Clock, Search, XCircle } from 'lucide-react'
 import { PlanGate } from '@/components/features/PlanGate'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
@@ -92,7 +92,6 @@ export function AdminTransfers() {
     }
 
     try {
-      // Type assertion needed because PostgREST types may not be updated after migration 028
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase.rpc as any)('complete_inventory_transfer', {
         p_transfer_id: transferId,
@@ -105,6 +104,28 @@ export function AdminTransfers() {
     } catch (error: unknown) {
       console.error('Error completing transfer:', error)
       const message = error instanceof Error ? error.message : 'Error al completar la transferencia'
+      show(message, 'error')
+    }
+  }
+
+  const handleCancelTransfer = async (transferId: string) => {
+    if (!confirm('¿Cancelar esta transferencia? El stock será devuelto a la sucursal origen.')) {
+      return
+    }
+
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('cancel_inventory_transfer', {
+        p_transfer_id: transferId,
+      })
+
+      if (error) throw error
+
+      show('Transferencia cancelada. Stock restituido a la sucursal origen.', 'success')
+      fetchTransfers()
+    } catch (error: unknown) {
+      console.error('Error cancelling transfer:', error)
+      const message = error instanceof Error ? error.message : 'Error al cancelar la transferencia'
       show(message, 'error')
     }
   }
@@ -296,6 +317,12 @@ export function AdminTransfers() {
                                 label: 'Completar Transferencia',
                                 icon: <CheckCircle className="h-4 w-4" />,
                                 onClick: () => handleCompleteTransfer(transfer.id),
+                              },
+                              {
+                                label: 'Cancelar Transferencia',
+                                icon: <XCircle className="h-4 w-4" />,
+                                onClick: () => handleCancelTransfer(transfer.id),
+                                variant: 'danger',
                               },
                             ]}
                           />

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { capitalizeFirst, formatPrice } from '@/lib/utils'
+import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
 import type { Product, ProductWithCategory, ProductImage } from '@/types'
@@ -414,12 +414,27 @@ export function ProductDetail() {
             >
               {capitalizeFirst(product.name)}
             </h1>
-            <p
-              className="text-2xl font-bold mb-4"
-              style={{ color: 'var(--org-primary-color, #6366f1)' }}
-            >
-              {formatPrice(selectedVariant?.price ?? product.price, settings)}
-            </p>
+            <div className="mb-4">
+              {!selectedVariant && hasActiveDiscount(product) && (
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="bg-red-500 text-white text-sm font-bold px-2 py-0.5 rounded">
+                    -{product.discount_percentage}% OFF
+                  </span>
+                  <span className="text-lg text-gray-400 line-through">
+                    {formatPrice(product.price, settings)}
+                  </span>
+                </div>
+              )}
+              <p
+                className="text-2xl font-bold"
+                style={{ color: 'var(--org-primary-color, #6366f1)' }}
+              >
+                {formatPrice(
+                  selectedVariant ? (selectedVariant.price ?? product.price) : getEffectivePrice(product),
+                  settings
+                )}
+              </p>
+            </div>
           </div>
 
           <div className="mb-6">

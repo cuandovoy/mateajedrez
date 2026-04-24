@@ -6,9 +6,11 @@ export const productSchema = z.object({
   description: z.string().optional(),
   price: z.number().min(0, 'El precio debe ser mayor a 0'),
   stock: z.number().min(0, 'El stock debe ser mayor o igual a 0'),
-  category_id: z.string().min(1, 'La categoría es requerida'),
+  category_id: z.string().optional(),
   sku: z.string().min(1, 'El SKU es requerido'),
   is_active: z.boolean().default(true),
+  discount_percentage: z.number().min(0).max(100).nullable().optional(),
+  discount_expires_at: z.string().nullable().optional(),
 })
 
 export const categorySchema = z.object({

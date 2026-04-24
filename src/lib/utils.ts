@@ -2,6 +2,19 @@ import { type ClassValue, clsx } from 'clsx'
 import type { Product, ProductImage } from '@/types'
 import type { OrganizationSettings } from '@/types/database.types'
 
+/** Returns true if the product has an active (non-expired) discount. */
+export function hasActiveDiscount(product: Pick<Product, 'discount_percentage' | 'discount_expires_at'>): boolean {
+  if (!product.discount_percentage || product.discount_percentage <= 0) return false
+  if (product.discount_expires_at && new Date(product.discount_expires_at) < new Date()) return false
+  return true
+}
+
+/** Returns the discounted price if active, otherwise returns the original price. */
+export function getEffectivePrice(product: Pick<Product, 'price' | 'discount_percentage' | 'discount_expires_at'>): number {
+  if (!hasActiveDiscount(product)) return product.price
+  return Math.round(product.price * (1 - (product.discount_percentage ?? 0) / 100) * 100) / 100
+}
+
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs)
 }

@@ -1,4 +1,4 @@
-import { capitalizeFirst } from '@/lib/utils'
+import { capitalizeFirst, getEffectivePrice } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { getProductStock } from '@/lib/stock'
 import type { CartItem, CartItemWithProduct, Product, ProductVariant } from '@/types'
@@ -546,8 +546,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   getTotal: () => {
     return get().items.reduce((total, item) => {
-      // Use variant price if available, otherwise product price
-      const price = item.variant?.price ?? item.product.price
+      const price = item.variant?.price ?? getEffectivePrice(item.product)
       return total + price * item.quantity
     }, 0)
   },

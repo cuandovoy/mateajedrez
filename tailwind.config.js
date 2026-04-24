@@ -15,17 +15,17 @@ export default {
       },
       colors: {
         primary: {
-          50: '#f5f0f9',
-          100: '#e8ddf0',
-          200: '#d4bddb',
-          300: '#b895c3',
-          400: '#9d6fa8',
-          500: '#85508f',
-          600: '#6d3f75',
-          700: '#5a3360',
-          800: '#4a2a4f',
-          900: '#3d2341',
-          DEFAULT: '#d4bddb',
+           50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          DEFAULT: '#3b82f6',
         },
         // Paleta de colores para Admin Panel (azul profesional)
         admin: {
