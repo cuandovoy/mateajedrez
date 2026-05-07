@@ -22,6 +22,7 @@ import { AdminExpenses } from '@/pages/admin/AdminExpenses'
 import { AdminFinancialReports } from '@/pages/admin/AdminFinancialReports'
 import { AdminInventory } from '@/pages/admin/AdminInventory'
 import { AdminInventoryReports } from '@/pages/admin/AdminInventoryReports'
+import { AdminLots } from '@/pages/admin/AdminLots'
 import { AdminOrderDetail } from '@/pages/admin/AdminOrderDetail'
 import { AdminOrders } from '@/pages/admin/AdminOrders'
 import { AdminBillerComprobantes } from '@/pages/admin/AdminBillerComprobantes'
@@ -107,6 +108,7 @@ function App() {
           <Route path="/reports/inventory" element={<ReportsRouteGuard><AdminInventoryReports /></ReportsRouteGuard>} />
           <Route path="/branches" element={<AdminBranches />} />
           <Route path="/inventory" element={<AdminInventory />} />
+          <Route path="/inventory/lots" element={<AdminLots />} />
           <Route path="/transfers" element={<AdminTransfers />} />
           <Route path="/cash-register" element={<AdminCashRegister />} />
           <Route path="/organizations" element={<AdminOrganizations />} />

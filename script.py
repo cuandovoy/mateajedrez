@@ -5,20 +5,19 @@ import time
 # ============================================================
 # CONFIGURACIÓN - Poné tu API Key de Google Places acá
 # ============================================================
-API_KEY = "AIzaSyCXaODDrMinKeQzmHOrBczI3WXeIg2sBG4"
+API_KEY = "AIzaSyBA2QqK0Aw7B8rRwo4FOBJa6k7DdLvfQ-g"
 
 # Rubros a buscar (podés agregar o sacar los que quieras)
 RUBROS = [
-    # "kiosco",
-    # "minimercado",
-    "ferretería",
-    "tienda de ropa",
-    "librería",
-    # "carnicería",
-    # "verdulería",
-    # "farmacia independiente",
-    "bazar",
-    "perfumería",
+    "casa de decoración",
+    "decoración del hogar",
+    "tienda de muebles",
+    "bazar decoración",
+    "tienda de regalos",
+    "decoración interior",
+    "artículos para el hogar",
+    "cuadros y marcos",
+    "iluminación decorativa",
 ]
 
 # Zona de búsqueda: centro de Montevideo
@@ -49,7 +48,7 @@ def buscar_lugares(query):
         data = response.json()
 
         if data.get("status") not in ["OK", "ZERO_RESULTS"]:
-            print(f"  ⚠️  Error en búsqueda '{query}': {data.get('status')}")
+            print(f"  ⚠️  Error en búsqueda '{query}': {data.get('status')} — {data.get('error_message', 'sin detalle')}")
             break
 
         for place in data.get("results", []):

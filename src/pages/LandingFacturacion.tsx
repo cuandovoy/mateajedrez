@@ -148,15 +148,15 @@ const steps = [
 const faqs = [
   {
     q: '¿Necesito tener cuenta en Biller?',
-    a: 'Sí. Biller es la plataforma certificada por DGI que procesa los CFE. Necesitás crear tu cuenta en biller.uy y obtener tu token de API para configurarlo en Axios.',
+    a: 'Sí. Biller es la plataforma certificada por DGI que procesa los CFE. Necesitás crear tu cuenta en biller.uy y obtener tu token de API para configurarlo en Axiostock.',
   },
   {
     q: '¿Tiene costo adicional la facturación electrónica?',
-    a: 'La integración con Biller está incluida en Axios sin costo extra. Biller puede tener sus propios costos según el volumen de comprobantes. Consultá directamente en biller.uy.',
+    a: 'La integración con Biller está incluida en Axiostock sin costo extra. Biller puede tener sus propios costos según el volumen de comprobantes. Consultá directamente en biller.uy.',
   },
   {
     q: '¿Funciona tanto para ventas online como presenciales?',
-    a: 'Sí. Podés emitir CFE desde el checkout de tu tienda online y también desde el punto de venta presencial (caja) de Axios.',
+    a: 'Sí. Podés emitir CFE desde el checkout de tu tienda online y también desde el punto de venta presencial (caja) de Axiostock.',
   },
   {
     q: '¿Qué pasa si falla la conexión con DGI?',
@@ -180,23 +180,23 @@ export function LandingFacturacion() {
   return (
     <div className="bg-white text-zinc-900">
       <Helmet>
-        <title>Facturación Electrónica para tu Negocio en Uruguay | Axios</title>
+        <title>Facturación Electrónica para tu Negocio en Uruguay | Axiostock</title>
         <meta name="description" content="Emití e-Tickets y e-Facturas certificadas por DGI directamente desde tu flujo de ventas. Integrado con Biller v2. Sin sistemas separados, sin exportar archivos." />
         <meta name="keywords" content="facturación electrónica Uruguay, CFE, e-Ticket, e-Factura, DGI Uruguay, Biller, comprobante fiscal electrónico, factura electrónica negocio" />
         <link rel="canonical" href="https://axiostock.com/facturacion-electronica" />
         {/* Open Graph */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://axiostock.com/facturacion-electronica" />
-        <meta property="og:title" content="Facturación Electrónica para tu Negocio en Uruguay | Axios" />
+        <meta property="og:title" content="Facturación Electrónica para tu Negocio en Uruguay | Axiostock" />
         <meta property="og:description" content="Emití e-Tickets y e-Facturas certificadas por DGI desde tu venta. Integrado con Biller v2. Un clic y el CFE llega a DGI en tiempo real." />
         <meta property="og:image" content="https://axiostock.com/adminPanel3.png" />
         <meta property="og:image:width" content="1280" />
         <meta property="og:image:height" content="720" />
         <meta property="og:locale" content="es_UY" />
-        <meta property="og:site_name" content="Axios" />
+        <meta property="og:site_name" content="Axiostock" />
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Facturación Electrónica para Uruguay | Axios" />
+        <meta name="twitter:title" content="Facturación Electrónica para Uruguay | Axiostock" />
         <meta name="twitter:description" content="e-Tickets y e-Facturas certificadas por DGI desde tu flujo de ventas. Integrado con Biller v2." />
         <meta name="twitter:image" content="https://axiostock.com/adminPanel3.png" />
         {/* JSON-LD */}
@@ -204,12 +204,12 @@ export function LandingFacturacion() {
           "@context": "https://schema.org",
           "@type": "WebPage",
           "name": "Facturación Electrónica para tu Negocio en Uruguay",
-          "description": "Emití e-Tickets y e-Facturas certificadas por DGI directamente desde tu flujo de ventas con Axios.",
+          "description": "Emití e-Tickets y e-Facturas certificadas por DGI directamente desde tu flujo de ventas con Axiostock.",
           "url": "https://axiostock.com/facturacion-electronica",
-          "publisher": { "@type": "Organization", "name": "Axios", "url": "https://axiostock.com" },
+          "publisher": { "@type": "Organization", "name": "Axiostock", "url": "https://axiostock.com" },
           "about": {
             "@type": "SoftwareApplication",
-            "name": "Axios — Facturación Electrónica",
+            "name": "Axiostock — Facturación Electrónica",
             "featureList": ["e-Ticket DGI Uruguay", "e-Factura DGI Uruguay", "Integración Biller v2", "PDF automático", "Historial de comprobantes", "Anulación en línea"],
             "applicationCategory": "BusinessApplication",
             "operatingSystem": "Web"
@@ -227,9 +227,9 @@ export function LandingFacturacion() {
           "@context": "https://schema.org",
           "@type": "FAQPage",
           "mainEntity": [
-            { "@type": "Question", "name": "¿Necesito tener cuenta en Biller?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Biller es la plataforma certificada por DGI que procesa los CFE. Necesitás crear tu cuenta en biller.uy y obtener tu token de API para configurarlo en Axios." } },
-            { "@type": "Question", "name": "¿Tiene costo adicional la facturación electrónica?", "acceptedAnswer": { "@type": "Answer", "text": "La integración con Biller está incluida en Axios sin costo extra. Biller puede tener sus propios costos según el volumen de comprobantes." } },
-            { "@type": "Question", "name": "¿Funciona tanto para ventas online como presenciales?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Podés emitir CFE desde el checkout de tu tienda online y también desde el punto de venta presencial de Axios." } },
+            { "@type": "Question", "name": "¿Necesito tener cuenta en Biller?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Biller es la plataforma certificada por DGI que procesa los CFE. Necesitás crear tu cuenta en biller.uy y obtener tu token de API para configurarlo en Axiostock." } },
+            { "@type": "Question", "name": "¿Tiene costo adicional la facturación electrónica?", "acceptedAnswer": { "@type": "Answer", "text": "La integración con Biller está incluida en Axiostock sin costo extra. Biller puede tener sus propios costos según el volumen de comprobantes." } },
+            { "@type": "Question", "name": "¿Funciona tanto para ventas online como presenciales?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Podés emitir CFE desde el checkout de tu tienda online y también desde el punto de venta presencial de Axiostock." } },
             { "@type": "Question", "name": "¿Puedo anular un comprobante ya emitido?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Desde el detalle de la orden podés anular el CFE en línea. El sistema notifica a DGI y registra la anulación con fecha y usuario." } }
           ]
         })}</script>
@@ -239,7 +239,7 @@ export function LandingFacturacion() {
       <header className="sticky top-0 z-50 border-b border-zinc-100 bg-white/95 backdrop-blur-sm">
         <div className="container-custom flex h-16 items-center justify-between">
           <Link to="/landing/app" className="flex items-center gap-2">
-            <img src="/logo2.png" alt="Axios" className="h-14 w-auto" />
+            <img src="/logo2.png" alt="Axiostock" className="h-14 w-auto" />
           </Link>
           <nav className="hidden items-center gap-6 text-sm text-zinc-500 md:flex">
             <a href="#beneficios" className="hover:text-zinc-900 transition-colors">Beneficios</a>
@@ -255,7 +255,7 @@ export function LandingFacturacion() {
               Iniciar sesión
             </Link>
             <a
-              href="https://wa.me/59898157459?text=Hola%2C%20quiero%20info%20sobre%20facturaci%C3%B3n%20electr%C3%B3nica%20en%20Axios"
+              href="https://wa.me/59898157459?text=Hola%2C%20quiero%20info%20sobre%20facturaci%C3%B3n%20electr%C3%B3nica%20en%20Axiostock"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-500 transition-colors"
@@ -290,7 +290,7 @@ export function LandingFacturacion() {
 
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <a
-                href="https://wa.me/59898157459?text=Hola%2C%20quiero%20info%20sobre%20facturaci%C3%B3n%20electr%C3%B3nica%20en%20Axios"
+                href="https://wa.me/59898157459?text=Hola%2C%20quiero%20info%20sobre%20facturaci%C3%B3n%20electr%C3%B3nica%20en%20Axiostock"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-7 py-3.5 text-sm font-bold text-white hover:bg-red-500 transition-colors shadow-lg shadow-red-600/25"
@@ -391,7 +391,7 @@ export function LandingFacturacion() {
             </div>
             <div className="flex-shrink-0">
               <a
-                href="https://wa.me/59898157459?text=Hola%2C%20quiero%20info%20sobre%20facturaci%C3%B3n%20electr%C3%B3nica%20en%20Axios"
+                href="https://wa.me/59898157459?text=Hola%2C%20quiero%20info%20sobre%20facturaci%C3%B3n%20electr%C3%B3nica%20en%20Axiostock"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3 text-sm font-bold text-white hover:bg-red-500 transition-colors whitespace-nowrap"
@@ -548,7 +548,7 @@ export function LandingFacturacion() {
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <a
-                href="https://wa.me/59898157459?text=Hola%2C%20quiero%20activar%20facturaci%C3%B3n%20electr%C3%B3nica%20en%20Axios"
+                href="https://wa.me/59898157459?text=Hola%2C%20quiero%20activar%20facturaci%C3%B3n%20electr%C3%B3nica%20en%20Axiostock"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-7 py-3.5 text-sm font-bold text-white hover:bg-red-500 transition-colors shadow-lg shadow-red-600/25"
@@ -581,7 +581,7 @@ export function LandingFacturacion() {
         <div className="container-custom py-10">
           <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
             <Link to="/landing/app">
-              <img src="/logo1.png" alt="Axios" className="h-8 w-auto brightness-0 invert opacity-70" />
+              <img src="/logo1.png" alt="Axiostock" className="h-8 w-auto brightness-0 invert opacity-70" />
             </Link>
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-zinc-500">
               <Link to="/landing/app" className="hover:text-zinc-300 transition-colors">Inicio</Link>
@@ -599,7 +599,7 @@ export function LandingFacturacion() {
             </a>
           </div>
           <div className="mt-6 border-t border-zinc-800 pt-6 text-center text-xs text-zinc-700">
-            © {new Date().getFullYear()} Axios — Facturación Electrónica para Uruguay
+            © {new Date().getFullYear()} Axiostock — Facturación Electrónica para Uruguay
           </div>
         </div>
       </footer>

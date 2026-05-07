@@ -64,6 +64,8 @@ type NavItem = {
   requiresBillerConfig?: boolean
   /** Acción custom en lugar de navegación */
   onClick?: () => void
+  /** Subitems expandibles dentro del ítem */
+  subItems?: Array<{ path: string; label: string }>
 }
 
 type NavSection = {
@@ -171,7 +173,15 @@ export function AdminLayout() {
       items: [
         { path: '/products', label: 'Productos', icon: Package },
         { path: '/categories', label: 'Categorías', icon: Folder },
-        { path: '/inventory', label: 'Inventario', icon: Warehouse },
+        {
+          path: '/inventory',
+          label: 'Inventario',
+          icon: Warehouse,
+          subItems: [
+            { path: '/inventory', label: 'Stock actual' },
+            { path: '/inventory/lots', label: 'Lotes' },
+          ],
+        },
         { path: '/suppliers', label: 'Proveedores', icon: Truck },
         { path: '/branches', label: 'Sucursales', icon: Building2 },
       ],
@@ -439,27 +449,24 @@ export function AdminLayout() {
                         to={section.path!}
                         onClick={() => setSidebarOpen(false)}
                         className={cn(
-                          'flex items-center rounded-2xl transition-colors group w-full border-l-4 border-transparent',
+                          'flex items-center rounded-md transition-colors group w-full border-l-2 border-transparent',
                           sidebarCollapsed ? 'justify-center p-2' : 'px-3 py-2 gap-3',
                           active
-                            ? 'bg-admin-600 text-white border-admin-600 shadow-sm'
-                            : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            ? 'bg-admin-50 text-admin-700 border-admin-500'
+                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                         )}
                       >
                         <SectionIcon className={cn(
                           'h-4 w-4 shrink-0',
-                          active ? 'text-white' : 'text-gray-500 group-hover:text-gray-600'
+                          active ? 'text-admin-600' : 'text-gray-500 group-hover:text-gray-600'
                         )} />
                         {!sidebarCollapsed && (
                           <span className={cn(
                             'text-sm truncate',
-                            active ? 'text-white font-medium' : 'text-gray-700'
+                            active ? 'text-admin-700 font-medium' : 'text-gray-700'
                           )}>
                             {section.title}
                           </span>
-                        )}
-                        {!sidebarCollapsed && active && (
-                          <ChevronRight className="h-4 w-4 text-white/80 shrink-0 ml-auto" />
                         )}
                       </Link>
                     </div>
@@ -513,7 +520,9 @@ export function AdminLayout() {
                             !canUseFeature(item.planFeature)
                           )
                           const Icon = item.icon
-                          const active = !isLockedByPlan && isActive(item.path)
+                          const hasSubItems = item.subItems && item.subItems.length > 0
+                          const isSubExpanded = hasSubItems && location.pathname.startsWith(item.path)
+                          const active = !isLockedByPlan && (hasSubItems ? isSubExpanded : isActive(item.path))
                           const targetPath = isLockedByPlan
                             ? `/planes?from=${encodeURIComponent(item.path)}`
                             : item.path
@@ -522,33 +531,30 @@ export function AdminLayout() {
                             : undefined
 
                           const itemClass = cn(
-                            'flex items-center rounded-2xl transition-colors group w-full border-l-4 border-transparent',
-                            sidebarCollapsed ? 'justify-center p-2' : 'px-3 py-2 gap-3 ml-1',
+                            'flex items-center rounded-md transition-colors group w-full border-l-2 border-transparent',
+                            sidebarCollapsed ? 'justify-center p-2' : 'px-3 py-2 gap-3',
                             isLockedByPlan
                               ? 'bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-500'
                               : active
-                              ? 'bg-admin-600 text-white border-admin-600 shadow-sm'
-                              : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              ? 'bg-admin-50 text-admin-700 border-admin-500'
+                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                           )
                           const itemInner = (
                             <>
                               <Icon className={cn(
                                 'h-4 w-4 shrink-0',
-                                isLockedByPlan ? 'text-gray-400' : active ? 'text-white' : 'text-gray-500 group-hover:text-gray-600'
+                                isLockedByPlan ? 'text-gray-400' : active ? 'text-admin-600' : 'text-gray-500 group-hover:text-gray-600'
                               )} />
                               {!sidebarCollapsed && (
                                 <span className={cn(
                                   'text-sm truncate',
-                                  isLockedByPlan ? 'text-gray-500' : active ? 'text-white font-medium' : 'text-gray-700'
+                                  isLockedByPlan ? 'text-gray-500' : active ? 'text-admin-700 font-medium' : 'text-gray-700'
                                 )}>
                                   {item.label}
                                 </span>
                               )}
                               {!sidebarCollapsed && isLockedByPlan && (
                                 <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">Pro</span>
-                              )}
-                              {!sidebarCollapsed && active && (
-                                <ChevronRight className="h-4 w-4 text-white/80 shrink-0 ml-auto" />
                               )}
                             </>
                           )
@@ -563,6 +569,39 @@ export function AdminLayout() {
                                 >
                                   {itemInner}
                                 </button>
+                              ) : hasSubItems ? (
+                                <div>
+                                  <Link
+                                    to={item.path}
+                                    onClick={() => setSidebarOpen(false)}
+                                    className={itemClass}
+                                  >
+                                    {itemInner}
+                                  </Link>
+                                  {isSubExpanded && !sidebarCollapsed && (
+                                    <ul className="mt-0.5 ml-4 space-y-0.5 border-l border-slate-200 pl-2">
+                                      {item.subItems!.map((sub) => {
+                                        const subActive = location.pathname === sub.path
+                                        return (
+                                          <li key={sub.path}>
+                                            <Link
+                                              to={sub.path}
+                                              onClick={() => setSidebarOpen(false)}
+                                              className={cn(
+                                                'flex items-center px-2 py-1.5 rounded-md text-sm transition-colors border-l-2',
+                                                subActive
+                                                  ? 'bg-admin-50 text-admin-700 font-medium border-admin-500'
+                                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-transparent'
+                                              )}
+                                            >
+                                              {sub.label}
+                                            </Link>
+                                          </li>
+                                        )
+                                      })}
+                                    </ul>
+                                  )}
+                                </div>
                               ) : (
                                 <Link
                                   to={targetPath}

@@ -6,7 +6,6 @@ import {
   Check,
   ChevronRight,
   FileText,
-  Globe,
   ImageIcon,
   Package,
   Receipt,
@@ -40,7 +39,7 @@ const WA_NUMBER = '59898157459'
 
 function buildWaUrl(fields: { name: string; lastName: string; phone: string; business: string }, plan?: string) {
   const lines = [
-    `Hola, me interesa Axios${plan ? ` (plan ${plan})` : ''}.`,
+    `Hola, me interesa Axiostock${plan ? ` (plan ${plan})` : ''}.`,
     `Nombre: ${fields.name} ${fields.lastName}`,
     `Teléfono: ${fields.phone}`,
     `Tipo de negocio: ${fields.business}`,
@@ -78,7 +77,7 @@ function ContactModal({ onClose, plan }: { onClose: () => void; plan?: string })
         <button onClick={onClose} className="absolute right-4 top-4 rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors">
           <X className="h-5 w-5" />
         </button>
-        <h2 className="text-xl font-bold text-zinc-900">Empezar con Axios</h2>
+        <h2 className="text-xl font-bold text-zinc-900">Empezar con Axiostock</h2>
         <p className="mt-1 text-sm text-zinc-500">Completá tus datos y te contactamos por WhatsApp.</p>
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -213,6 +212,8 @@ const problems = [
   'Herramientas desconectadas entre sí',
   'Sin visibilidad de caja ni movimientos',
   'Reportes que llegan tarde o incompletos',
+  'La factura electrónica: un trámite aparte que da miedo',
+  'Decisiones de compra basadas en intuición, no en datos',
 ]
 
 const howItWorks = [
@@ -267,29 +268,45 @@ const proFeatures = [
 
 const clientProfiles = [
   {
-    title: 'Emprendimientos en crecimiento',
+    quote: '"Siempre hay plata que falta y nunca sé de dónde."',
+    persona: 'El dueño pragmático',
+    title: 'Negocio con 1 a 4 empleados',
     description:
-      'Vendé online y ordenás tu operación sin sumar herramientas separadas. Todo en un solo flujo desde el primer día.',
-    icon: Globe,
+      'Controlá la caja por operador, el stock en tiempo real y emitís la factura DGI sin salir del sistema. Sin curva de aprendizaje.',
+    icon: Wallet,
     iconBg: 'bg-red-100',
     iconColor: 'text-red-600',
   },
   {
-    title: 'Tiendas con varias sucursales',
+    quote: '"Tengo que llamar a la sucursal para saber si hay mercadería."',
+    persona: 'El emprendedor en crecimiento',
+    title: 'Abriendo la segunda sucursal',
     description:
-      'Control de stock por sucursal, transferencias y trazabilidad para mantener consistencia comercial en toda tu red.',
+      'Coordinar dos puntos de venta con WhatsApp y Excel ya no alcanza. Con Axiostock tenés el stock de cada sucursal en tiempo real, desde cualquier lugar.',
     icon: Building2,
     iconBg: 'bg-slate-100',
     iconColor: 'text-slate-700',
   },
   {
-    title: 'Operaciones con control interno',
+    quote: '"Cada cliente mío usa un sistema diferente — o ninguno."',
+    persona: 'El contador asesor',
+    title: 'Asesorás PyMEs uruguayas',
     description:
-      'Roles, permisos y auditoría para organizaciones que requieren seguridad y procesos claros en cada área.',
-    icon: Shield,
+      'Axiostock viene listo para DGI desde el primer día. Recomendalo a tus clientes con confianza: ellos operan solos y los números cuadran.',
+    icon: Receipt,
     iconBg: 'bg-red-100',
     iconColor: 'text-red-600',
   },
+]
+
+const comparisonRows: { label: string; axio: boolean | string; excel: boolean | string; legacy: boolean | string }[] = [
+  { label: 'Facturación DGI integrada nativa', axio: true, excel: false, legacy: false },
+  { label: 'Stock multi-sucursal en tiempo real', axio: true, excel: false, legacy: 'Limitado' },
+  { label: 'Tienda online incluida', axio: true, excel: false, legacy: false },
+  { label: 'Acceso desde cualquier dispositivo', axio: true, excel: true, legacy: false },
+  { label: 'Sin instalación ni mantenimiento', axio: true, excel: true, legacy: false },
+  { label: 'Auditoría de caja por operador', axio: true, excel: false, legacy: false },
+  { label: 'Reportes automáticos', axio: true, excel: false, legacy: 'Básico' },
 ]
 
 // Placeholder component for images
@@ -381,31 +398,31 @@ export function Landing() {
         <ContactModal plan={contactModal.plan} onClose={() => setContactModal({ open: false })} />
       )}
       <Helmet>
-        <title>Axios — Control de Stock y Gestión Comercial para tu Negocio</title>
-        <meta name="description" content="Tienda online, inventario multi sucursal, caja, órdenes, clientes y reportes. Todo conectado en una sola plataforma para que vendas más y operes sin caos." />
-        <meta name="keywords" content="gestión comercial, inventario, stock, tienda online, punto de venta, caja registradora, órdenes, reportes, Uruguay" />
+        <title>Axiostock — Control de Stock y Gestión Comercial para tu Negocio</title>
+        <meta name="description" content="Inventario multi sucursal, facturación electrónica DGI, punto de venta y reportes. Todo conectado en una sola plataforma para PyMEs uruguayas." />
+        <meta name="keywords" content="gestión comercial Uruguay, inventario multi sucursal, facturación electrónica DGI, stock, tienda online, punto de venta, caja registradora, reportes Uruguay" />
         <link rel="canonical" href="https://axiostock.com/landing/app" />
         {/* Open Graph */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content="https://axiostock.com/landing/app" />
-        <meta property="og:title" content="Axios — Control de Stock y Gestión Comercial para tu Negocio" />
-        <meta property="og:description" content="Tienda online, inventario multi sucursal, caja, órdenes, clientes y reportes. Todo en un solo lugar." />
+        <meta property="og:title" content="Axiostock — Control de Stock y Gestión Comercial para tu Negocio" />
+        <meta property="og:description" content="Inventario multi sucursal, facturación electrónica DGI, punto de venta y reportes. Todo en un solo lugar, hecho para Uruguay." />
         <meta property="og:image" content="https://axiostock.com/adminPanel3.png" />
         <meta property="og:image:width" content="1280" />
         <meta property="og:image:height" content="720" />
         <meta property="og:locale" content="es_UY" />
-        <meta property="og:site_name" content="Axios" />
+        <meta property="og:site_name" content="Axiostock" />
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Axios — Control de Stock y Gestión Comercial" />
-        <meta name="twitter:description" content="Tienda online, inventario multi sucursal, caja, órdenes y reportes. Todo conectado." />
+        <meta name="twitter:title" content="Axiostock — Control de Stock y Gestión Comercial" />
+        <meta name="twitter:description" content="Inventario multi sucursal, facturación DGI, punto de venta y reportes. Hecho para Uruguay." />
         <meta name="twitter:image" content="https://axiostock.com/adminPanel3.png" />
         {/* JSON-LD */}
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
           "@type": "SoftwareApplication",
-          "name": "Axios",
-          "description": "Plataforma de gestión comercial con tienda online, inventario multi sucursal, punto de venta, órdenes, clientes y reportes.",
+          "name": "Axiostock",
+          "description": "Plataforma de gestión comercial con inventario multi sucursal, facturación electrónica DGI, tienda online, punto de venta y reportes. Hecho para PyMEs uruguayas.",
           "applicationCategory": "BusinessApplication",
           "operatingSystem": "Web",
           "url": "https://axiostock.com",
@@ -413,7 +430,7 @@ export function Landing() {
             { "@type": "Offer", "name": "Starter", "price": "1990", "priceCurrency": "UYU" },
             { "@type": "Offer", "name": "Profesional", "price": "2890", "priceCurrency": "UYU" }
           ],
-          "publisher": { "@type": "Organization", "name": "Axios", "url": "https://axiostock.com" }
+          "publisher": { "@type": "Organization", "name": "Axiostock", "url": "https://axiostock.com" }
         })}</script>
       </Helmet>
 
@@ -422,7 +439,7 @@ export function Landing() {
         <div className="container-custom flex h-16 items-center justify-between">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2">
-            <img src="/logo2.png" alt="Axios" className="h-14 w-auto" />
+            <img src="/logo2.png" alt="Axiostock" className="h-14 w-auto" />
           </Link>
 
           <nav className="hidden items-center gap-6 text-sm text-zinc-500 md:flex">
@@ -465,14 +482,14 @@ export function Landing() {
                 </span>
               </h1>
               <p className="mt-5 text-lg text-zinc-400 leading-relaxed max-w-lg">
-                Tienda online, inventario multi sucursal, caja, órdenes, clientes y reportes. Todo conectado para que vendas más y operes sin caos.
+                Inventario multi sucursal, facturación electrónica DGI, punto de venta y reportes. Todo conectado, sin sistemas separados, sin fricciones.
               </p>
               <div className="mt-8 flex flex-wrap gap-4">
                 <button
                   onClick={() => openContact()}
                   className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3.5 text-sm font-bold text-white hover:bg-red-500 transition-colors shadow-lg shadow-red-600/25"
                 >
-                  Probar 14 días gratis
+                  Agendar demo gratis
                   <ArrowRight className="h-4 w-4" />
                 </button>
                 <a
@@ -488,11 +505,11 @@ export function Landing() {
               {/* Trust pills */}
               <div className="mt-10 flex flex-wrap gap-2">
                 {[
-                  '10+ módulos integrados',
-                  'Multi sucursal',
-                  'Inventario en tiempo real',
+                  'Facturación DGI incluida',
+                  'Inventario multi sucursal',
+                  'Tienda online integrada',
                   'Roles y permisos',
-                  'Tienda online incluida',
+                  'Hecho para Uruguay',
                 ].map((item) => (
                   <span
                     key={item}
@@ -541,9 +558,9 @@ export function Landing() {
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {[
               { value: '10+', label: 'Módulos integrados' },
-              { value: '2', label: 'Planes disponibles' },
-              { value: '10.000', label: 'Productos en plan Pro' },
-              { value: '360°', label: 'Visibilidad del negocio' },
+              { value: 'CFE', label: 'Facturación DGI nativa' },
+              { value: '∞', label: 'Productos en plan Pro' },
+              { value: '100%', label: 'Hecho para Uruguay' },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <p className="text-3xl font-black text-red-600">{stat.value}</p>
@@ -568,7 +585,7 @@ export function Landing() {
               </p>
               <div className="mt-6">
                 <ImagePlaceholder
-                  label="Comparativa de dolores sin sistema vs con Axios"
+                  label="Comparativa de dolores sin sistema vs con Axiostock"
                   aspectRatio="aspect-[16/7]"
                   
                   url='/comparativaDolor.png'
@@ -606,7 +623,7 @@ export function Landing() {
             <div className="relative overflow-hidden rounded-2xl aspect-video shadow-2xl shadow-black/40">
               <iframe
                 src="https://www.youtube.com/embed/5xjb8Ot4b0Y"
-                title="Demo de Axios"
+                title="Demo de Axiostock"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 className="absolute inset-0 h-full w-full"
@@ -800,10 +817,10 @@ export function Landing() {
         <div className="mb-12 text-center">
           <p className="text-sm font-bold uppercase tracking-widest text-red-600">Para quién es</p>
           <h2 className="mt-3 text-3xl font-bold text-zinc-900 md:text-4xl">
-            Pensado para distintos modelos de negocio
+            ¿Te suena alguna de estas frases?
           </h2>
           <p className="mt-4 text-zinc-500 max-w-xl mx-auto">
-            La plataforma se adapta desde comercios pequeños hasta operaciones con estructura compleja.
+            Si la respuesta es sí, Axiostock es para vos.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -815,11 +832,19 @@ export function Landing() {
                 className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
               >
                 <div className="p-6">
-                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${profile.iconBg}`}>
-                    <Icon className={`h-5 w-5 ${profile.iconColor}`} />
+                  <p className="text-sm italic text-zinc-500 leading-relaxed border-l-2 border-red-300 pl-3">
+                    {profile.quote}
+                  </p>
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${profile.iconBg}`}>
+                      <Icon className={`h-5 w-5 ${profile.iconColor}`} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-red-600">{profile.persona}</p>
+                      <p className="text-xs text-zinc-400">{profile.title}</p>
+                    </div>
                   </div>
-                  <h3 className="mt-4 text-base font-semibold text-zinc-900">{profile.title}</h3>
-                  <p className="mt-2 text-sm text-zinc-500 leading-relaxed">{profile.description}</p>
+                  <p className="mt-3 text-sm text-zinc-500 leading-relaxed">{profile.description}</p>
                 </div>
               </article>
             )
@@ -969,6 +994,68 @@ export function Landing() {
         </div>
       </section>
 
+      {/* COMPETITIVE */}
+      <section className="bg-zinc-50 border-y border-zinc-200">
+        <div className="container-custom py-16 md:py-24">
+          <div className="mb-12 text-center">
+            <p className="text-sm font-bold uppercase tracking-widest text-red-600">Por qué Axiostock</p>
+            <h2 className="mt-3 text-3xl font-bold text-zinc-900 md:text-4xl">
+              ¿Por qué no quedarte con lo que ya tenés?
+            </h2>
+            <p className="mt-4 text-zinc-500 max-w-xl mx-auto">
+              Excel y los sistemas instalados tienen una sola ventaja: ya los conocés. Todo lo demás es desventaja.
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="mx-auto w-full max-w-3xl border-collapse">
+              <thead>
+                <tr className="border-b-2 border-zinc-200">
+                  <th className="pb-4 pr-6 text-left text-sm font-medium text-zinc-400 w-2/5" />
+                  <th className="pb-4 text-center">
+                    <span className="inline-block rounded-full bg-red-600 px-4 py-1.5 text-xs font-bold text-white">
+                      Axiostock
+                    </span>
+                  </th>
+                  <th className="pb-4 px-4 text-center text-sm font-semibold text-zinc-400">
+                    Excel /<br />cuadernos
+                  </th>
+                  <th className="pb-4 text-center text-sm font-semibold text-zinc-400">
+                    Sistema<br />legacy
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100">
+                {comparisonRows.map(({ label, axio, excel, legacy }) => (
+                  <tr key={label} className="bg-white">
+                    <td className="py-3.5 pr-6 text-sm text-zinc-700">{label}</td>
+                    <td className="py-3.5 text-center">
+                      {axio === true
+                        ? <Check className="mx-auto h-5 w-5 text-red-500" />
+                        : <X className="mx-auto h-5 w-5 text-zinc-300" />}
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      {excel === true
+                        ? <Check className="mx-auto h-5 w-5 text-zinc-400" />
+                        : typeof excel === 'string'
+                        ? <span className="text-xs text-zinc-400">{excel}</span>
+                        : <X className="mx-auto h-5 w-5 text-zinc-300" />}
+                    </td>
+                    <td className="py-3.5 text-center">
+                      {legacy === true
+                        ? <Check className="mx-auto h-5 w-5 text-zinc-400" />
+                        : typeof legacy === 'string'
+                        ? <span className="text-xs text-zinc-400">{legacy}</span>
+                        : <X className="mx-auto h-5 w-5 text-zinc-300" />}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       {/* PLANS */}
       <section id="plans" className="container-custom py-16 md:py-24">
         <div className="mb-12 text-center">
@@ -983,6 +1070,13 @@ export function Landing() {
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-[10px] font-bold text-white">%</span>
             Pagando anualmente — <span className="text-green-600">10% OFF</span>
           </div>
+        </div>
+
+        <div className="mx-auto mb-10 max-w-2xl rounded-2xl border border-zinc-200 bg-zinc-50 p-5 text-center">
+          <p className="text-sm text-zinc-600 leading-relaxed">
+            ¿Cuánto te cuesta cada día no saber cuánto falta en tu caja, o perder una venta por stock mal manejado?{' '}
+            <span className="font-semibold text-zinc-800">El costo del descontrol siempre es mayor que el del sistema.</span>
+          </p>
         </div>
 
         <div className="mx-auto grid max-w-4xl grid-cols-1 gap-6 md:grid-cols-2">
@@ -1065,7 +1159,7 @@ export function Landing() {
               <span className="text-red-500">con orden y datos reales</span>
             </h2>
             <p className="mt-5 text-zinc-400 text-lg leading-relaxed">
-              Dejá atrás las planillas y las herramientas desconectadas. Axios unifica todo en un sistema que crece con vos.
+              Dejá atrás las planillas y las herramientas desconectadas. Axiostock unifica todo en un sistema que crece con vos.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
               <a
@@ -1102,7 +1196,7 @@ export function Landing() {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
             {/* Brand */}
             <div>
-              <img src="/logo1.png" alt="Axios" className="h-10 w-auto brightness-0 invert opacity-70" />
+              <img src="/logo1.png" alt="Axiostock" className="h-10 w-auto brightness-0 invert opacity-70" />
               <p className="mt-3 text-sm text-zinc-500 leading-relaxed">
                 Control de stock y gestión comercial para negocios en crecimiento.
               </p>
@@ -1136,7 +1230,7 @@ export function Landing() {
               <p className="text-xs font-semibold uppercase tracking-widest text-zinc-600 mb-4">Contacto</p>
               <div className="space-y-2">
                 <a
-                  href="https://wa.me/59898157459?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20Axios"
+                  href="https://wa.me/59898157459?text=Hola%2C%20quiero%20saber%20m%C3%A1s%20sobre%20Axiostock"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-sm text-zinc-400 hover:text-white transition-colors"
@@ -1147,7 +1241,7 @@ export function Landing() {
             </div>
           </div>
           <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-zinc-800 pt-6 text-xs text-zinc-600 md:flex-row">
-            <p>© {new Date().getFullYear()} Axios — Control de Stock & Gestión Comercial</p>
+            <p>© {new Date().getFullYear()} Axiostock — Control de Stock & Gestión Comercial</p>
             <p className="text-zinc-700">Todos los derechos reservados</p>
           </div>
         </div>

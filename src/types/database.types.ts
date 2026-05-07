@@ -429,6 +429,104 @@ export type Database = {
           },
         ]
       }
+      inventory_lots: {
+        Row: {
+          id: string
+          organization_id: string
+          branch_id: string
+          product_id: string | null
+          variant_id: string | null
+          received_at: string
+          expires_at: string | null
+          quantity_received: number
+          quantity_remaining: number
+          quantity_damaged: number
+          unit_cost: number | null
+          supplier_id: string | null
+          reference_document: string | null
+          status: 'active' | 'exhausted' | 'written_off'
+          writeoff_reason: string | null
+          writeoff_at: string | null
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          organization_id: string
+          branch_id: string
+          product_id?: string | null
+          variant_id?: string | null
+          received_at?: string
+          expires_at?: string | null
+          quantity_received: number
+          quantity_remaining: number
+          quantity_damaged?: number
+          unit_cost?: number | null
+          supplier_id?: string | null
+          reference_document?: string | null
+          status?: 'active' | 'exhausted' | 'written_off'
+          writeoff_reason?: string | null
+          writeoff_at?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          organization_id?: string
+          branch_id?: string
+          product_id?: string | null
+          variant_id?: string | null
+          received_at?: string
+          expires_at?: string | null
+          quantity_received?: number
+          quantity_remaining?: number
+          quantity_damaged?: number
+          unit_cost?: number | null
+          supplier_id?: string | null
+          reference_document?: string | null
+          status?: 'active' | 'exhausted' | 'written_off'
+          writeoff_reason?: string | null
+          writeoff_at?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_lots_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_lots_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_lots_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_lots_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_movements: {
         Row: {
           branch_inventory_id: string
@@ -1973,6 +2071,10 @@ export type CategoryUpdate = TablesUpdate<'categories'>
 export type Customer = Tables<'customers'>
 export type CustomerInsert = TablesInsert<'customers'>
 export type CustomerUpdate = TablesUpdate<'customers'>
+
+export type InventoryLot = Tables<'inventory_lots'>
+export type InventoryLotInsert = TablesInsert<'inventory_lots'>
+export type InventoryLotUpdate = TablesUpdate<'inventory_lots'>
 
 export type InventoryMovement = Tables<'inventory_movements'>
 export type InventoryMovementInsert = TablesInsert<'inventory_movements'>

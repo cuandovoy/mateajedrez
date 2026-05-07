@@ -1,5 +1,11 @@
 # CLAUDE.md — Reglas del repositorio ecommerce-supabase SaaS
 
+# Axiostock — Contexto del proyecto
+
+## Producto
+Ver @docs/product_marketing.md para contexto :completo de marketing, personas, voz de marca y lenguaje del cliente.
+
+
 Este archivo es leído automáticamente por Claude Code en cada sesión. Seguir estas reglas sin excepción.
 
 ---
