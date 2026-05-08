@@ -1,4 +1,5 @@
 import { DashboardMetrics } from '@/components/admin/DashboardMetrics'
+import { OnboardingChecklist } from '@/components/admin/OnboardingChecklist'
 
 export function AdminDashboard() {
   return (
@@ -7,9 +8,8 @@ export function AdminDashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
       </div>
 
-      {/* Métricas del Dashboard */}
+      <OnboardingChecklist />
       <DashboardMetrics />
-      
     </div>
   )
 }
