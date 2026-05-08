@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Dropdown } from '@/components/ui/Dropdown'
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { Category } from '@/types'
+import type { Category, UserProfile } from '@/types'
 import { cn } from '@/lib/utils'
 
 interface CategoryWithSubcategories {
@@ -16,7 +16,7 @@ interface CategoryWithSubcategories {
 }
 
 export function Header() {
-  const { user, signOut, isAdmin } = useAuthStore()
+  const { user, profile, signOut, isAdmin } = useAuthStore()
   const { getItemCount, fetchCart } = useCartStore()
   const navigate = useNavigate()
   const [categoriesWithSubs, setCategoriesWithSubs] = useState<CategoryWithSubcategories[]>([])
@@ -138,7 +138,7 @@ export function Header() {
 
             <nav className="flex items-center space-x-4">
               {user ? (
-                <UserMenu user={user} isAdmin={isAdmin} onSignOut={handleSignOut} />
+                <UserMenu user={user} profile={profile} isAdmin={isAdmin} onSignOut={handleSignOut} />
               ) : (
                 <>
                   <Link to="/login">
@@ -223,10 +223,13 @@ export function Header() {
                       </Link>
                     )}
                     <div className="flex items-center space-x-2 px-4 py-2 text-white">
-                      <User className="h-5 w-5" />
-                      <span className="text-sm">
-                        {user.email}
-                      </span>
+                      <User className="h-5 w-5 shrink-0" />
+                      <div className="flex flex-col min-w-0">
+                        {profile?.full_name && (
+                          <span className="text-sm font-medium truncate">{profile.full_name}</span>
+                        )}
+                        <span className="text-xs text-white/70 truncate">{user.email}</span>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
@@ -257,13 +260,21 @@ export function Header() {
   )
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Administrador',
+  manager: 'Gerente',
+  user: 'Usuario',
+  viewer: 'Visualizador',
+}
+
 interface UserMenuProps {
   user: { email?: string | null }
+  profile: UserProfile | null
   isAdmin: boolean
   onSignOut: () => void
 }
 
-function UserMenu({ user, isAdmin, onSignOut }: UserMenuProps) {
+function UserMenu({ user, profile, isAdmin, onSignOut }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -327,16 +338,23 @@ function UserMenu({ user, isAdmin, onSignOut }: UserMenuProps) {
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-100">
             <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 rounded-full bg-primary-200 flex items-center justify-center">
-                <User className="h-6 w-6 text-primary-700" />
+              <div className="h-11 w-11 rounded-full bg-primary-100 border-2 border-primary-200 flex items-center justify-center shrink-0">
+                <User className="h-5 w-5 text-primary-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
-                  {user.email || 'Usuario'}
-                </p>
-                <p className="text-xs text-gray-500">Sesión activa</p>
+                {profile?.full_name ? (
+                  <p className="text-sm font-semibold text-gray-900 truncate">
+                    {profile.full_name}
+                  </p>
+                ) : null}
+                <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                {profile?.role && (
+                  <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-50 text-primary-700 border border-primary-200">
+                    {ROLE_LABELS[profile.role] ?? profile.role}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -353,16 +371,19 @@ function UserMenu({ user, isAdmin, onSignOut }: UserMenuProps) {
                 </button>
               </Link>
             )}
+          </div>
+
+          <div className="px-3 pb-3">
             <button
               type="button"
               onClick={() => {
                 onSignOut()
                 setIsOpen(false)
               }}
-              className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors flex items-center space-x-2"
+              className="w-full py-2.5 px-4 rounded-lg text-sm font-semibold text-white bg-red-500 hover:bg-red-600 active:bg-red-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
             >
               <LogOut className="h-4 w-4" />
-              <span>Salir</span>
+              <span>Cerrar sesión</span>
             </button>
           </div>
         </div>

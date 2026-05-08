@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { BranchTable } from '@/components/admin/BranchTable'
-import { SearchFilter } from '@/components/filters'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
@@ -16,9 +15,7 @@ import { useOrgFeature } from '@/hooks/useOrgFeature'
 import { useToastStore } from '@/store/toastStore'
 import {
   Building2,
-  ChevronDown,
   Edit,
-  Filter,
   Grid3x3,
   List,
   Mail,
@@ -45,7 +42,6 @@ function AdminBranchesContent() {
   const [editingBranch, setEditingBranch] = useState<Branch | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [search, setSearch] = useState('')
-  const [filtersOpen, setFiltersOpen] = useState(false)
 
   const {
     register,
@@ -284,64 +280,29 @@ function AdminBranchesContent() {
         </div>
       </div>
 
-      {/* Mobile search */}
-      <div className="md:hidden mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
+      {/* Filter toolbar */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
             type="text"
             placeholder="Buscar sucursales..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
+            className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
           />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-      </div>
-
-      {/* Filters Panel */}
-      <div className="hidden md:block">
-      <Card className="mb-6">
-        <CardHeader
-          className="cursor-pointer select-none"
-          onClick={() => setFiltersOpen((v) => !v)}
-        >
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Filter className="h-5 w-5" />
-              <span>Filtros</span>
-              {search && (
-                <span className="ml-1 inline-flex items-center rounded-full bg-admin-100 text-admin-700 text-xs font-medium px-2 py-0.5">Activos</span>
-              )}
-            </div>
-            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
-          </CardTitle>
-        </CardHeader>
-        {filtersOpen && (
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <SearchFilter
-                value={search}
-                onChange={setSearch}
-                placeholder="Buscar sucursales..."
-              />
-            </div>
-            {search && (
-              <div className="mt-4">
-                <Button variant="outline" onClick={() => setSearch('')}>
-                  Limpiar Filtros
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
-      </div>
-
-      {/* Results count */}
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-600">
-          Mostrando {filteredBranches.length} de {branches.length} sucursales
-        </p>
+        <span className="ml-auto text-sm text-gray-500">
+          {filteredBranches.length} de {branches.length}
+        </span>
       </div>
 
       {/* Branches Display */}

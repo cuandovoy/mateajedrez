@@ -44,6 +44,7 @@ export function useOrgSettings(): OrganizationSettings {
       checkout_exclude_isolated_warehouses: (settings.checkout_exclude_isolated_warehouses as boolean) !== false,
       checkout_stock_allocation_mode: checkoutStockAllocationMode,
       inventory_transfer_completion_mode: inventoryTransferCompletionMode,
+      costing_method: (settings.costing_method as 'weighted_average' | 'fifo') ?? 'weighted_average',
     }
   }, [currentOrganization?.id, currentOrganization?.settings])
 }

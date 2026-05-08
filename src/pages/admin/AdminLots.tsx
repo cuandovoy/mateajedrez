@@ -1,6 +1,7 @@
 import { LotDetailPanel } from '@/components/admin/LotDetailPanel'
 import { LotReceptionModal } from '@/components/admin/LotReceptionModal'
 import { useOrganization } from '@/hooks/useOrganization'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useLots, type LotWithDetails } from '@/hooks/useLots'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
@@ -13,6 +14,28 @@ type FilterType = 'all' | 'critical' | 'warning' | 'stale'
 const STALE_DAYS = 60
 
 export function AdminLots() {
+  const settings = useOrgSettings()
+
+  if (settings.costing_method !== 'fifo') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[40vh] text-center px-4 space-y-3">
+        <Package className="h-12 w-12 text-gray-300" />
+        <h2 className="text-lg font-semibold text-gray-700">Trazabilidad por lotes no activada</h2>
+        <p className="text-sm text-gray-500 max-w-md">
+          La gestión de lotes está disponible cuando el método de costeo de la organización es <strong>FIFO</strong>.
+          Con FIFO, cada recepción de mercadería genera un lote automáticamente y las ventas los consumen en orden de ingreso.
+        </p>
+        <p className="text-xs text-gray-400">
+          Podés cambiar el método de costeo en Configuración → Organización.
+        </p>
+      </div>
+    )
+  }
+
+  return <AdminLotsContent />
+}
+
+function AdminLotsContent() {
   const { organizationId } = useOrganization()
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState('')

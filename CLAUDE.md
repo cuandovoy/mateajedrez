@@ -213,6 +213,49 @@ const unitPrice = item.variant?.price ?? item.product.price
 - **Tienda pública**: usar variables CSS `var(--org-primary-color, #fallback)` para colores dinámicos de la organización
 - No mezclar clases `admin-*` en componentes de la tienda pública
 
+### Filtros en el panel admin
+
+**Regla obligatoria**: toda página del panel admin con filtros debe usar una **barra de filtros inline**, siempre visible, sin card, sin colapsado.
+
+Principios:
+- Los controles de filtro son siempre visibles — nunca colapsados ni escondidos detrás de un botón
+- Usar `flex flex-wrap items-center gap-2` como contenedor
+- Cada control tiene altura `h-9` y bordes `border-gray-200 rounded-lg`
+- En mobile los labels de texto se ocultan con `hidden sm:inline`; el control sigue siendo funcional por ícono o valor
+- El botón "Limpiar" solo aparece cuando hay al menos un filtro activo
+- No usar `<Card>` ni secciones con headers para envolver filtros
+
+**Estado activo de cada control:**
+- Select activo (valor seleccionado): `border-admin-400 bg-admin-50 text-admin-800 font-medium`
+- Toggle activo (ej: "Stock bajo"): color semántico del contexto, ej. `bg-yellow-50 border-yellow-300 text-yellow-800`
+- Toggle activo neutro: `bg-gray-100 border-gray-400 text-gray-800 font-medium`
+- Botón "Limpiar": `text-red-500 border border-red-200 hover:bg-red-50`, solo cuando hay filtros activos
+
+**Input de búsqueda:**
+```tsx
+<div className="relative flex-1 min-w-[180px]">
+  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+  <input
+    placeholder="Nombre, SKU..."
+    className="w-full h-9 pl-9 pr-8 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-admin-500"
+  />
+  {/* Botón × inline para limpiar — solo cuando hay texto */}
+</div>
+```
+
+**Badges numéricos en toggles** (ej: cantidad de items en estado filtrado):
+```tsx
+<span className="text-xs rounded-full px-1.5 py-0.5 font-semibold leading-none bg-yellow-100 text-yellow-700">
+  {count}
+</span>
+```
+
+**No hacer:**
+- No usar `<Card>` para envolver filtros del panel admin
+- No colapsar filtros detrás de un botón "Mostrar/Ocultar"
+- No usar `<label>` encima de cada control — el placeholder o el valor seleccionado son suficientes
+- No agregar un campo de solo lectura que no permite interacción (ej: "Ordenar por: Stock")
+
 ### Responsive
 - Mobile-first siempre: base → `md:` → `lg:`
 - Grids: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`

@@ -768,6 +768,73 @@ export function Landing() {
         </div>
       </section>
 
+      {/* FIFO / COSTEO */}
+      <section className="bg-[#12192C] text-white">
+        <div className="container-custom py-16 md:py-20">
+          <div className="grid grid-cols-1 gap-12 md:grid-cols-2 md:items-center">
+            <div>
+              <span className="inline-block rounded-full bg-red-600/20 px-3 py-1 text-xs font-semibold text-red-400">
+                Gestión de costos
+              </span>
+              <h2 className="mt-4 text-3xl font-bold md:text-4xl">
+                ¿Vendés alimentos, cosméticos o medicamentos?{' '}
+                <span className="text-red-500">Tu stock tiene fecha.</span>
+              </h2>
+              <p className="mt-4 text-zinc-400 leading-relaxed">
+                Axiostock rastrea qué mercadería entró primero y la da de baja antes. Así el stock con más tiempo siempre sale primero, evitás vencimientos y el contador cierra el balance con números reales.
+              </p>
+              <ul className="mt-6 space-y-3">
+                {[
+                  { label: 'Costo promedio ponderado por defecto', desc: 'Compatible con NIIF para PyMEs. Sin configurar nada, el sistema calcula el costo correcto en cada compra.' },
+                  { label: 'FIFO activable por organización', desc: 'Para rubros con vencimiento: el lote más antiguo se consume primero. Se activa con un clic desde la configuración.' },
+                  { label: 'Margen bruto real en cada venta', desc: 'El costo queda registrado al momento de vender. Nunca perdés de vista cuánto ganás sobre cada producto.' },
+                ].map((item) => (
+                  <li key={item.label} className="flex gap-3">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600/20 text-red-400">
+                      <Check className="h-3 w-3" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{item.label}</p>
+                      <p className="text-sm text-zinc-400">{item.desc}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-6 text-xs text-zinc-500">
+                Compatible con lo que esperan los contadores uruguayos y con NIIF para PyMEs.
+              </p>
+            </div>
+            <div className="relative overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 aspect-[4/3] flex items-center justify-center">
+              {/* Reemplazar con imagen representativa de FIFO / lotes de inventario */}
+              <div className="flex flex-col items-center gap-4 px-8 text-center">
+                <div className="flex items-end gap-2">
+                  {[
+                    { label: 'Lote 1', date: 'Mar 2025', qty: 12, color: 'bg-red-500', height: 'h-20' },
+                    { label: 'Lote 2', date: 'Abr 2025', qty: 30, color: 'bg-zinc-600', height: 'h-32' },
+                    { label: 'Lote 3', date: 'May 2025', qty: 25, color: 'bg-zinc-700', height: 'h-28' },
+                  ].map((lot) => (
+                    <div key={lot.label} className="flex flex-col items-center gap-1">
+                      <span className="text-[10px] text-zinc-400">{lot.qty} u.</span>
+                      <div className={`w-16 rounded-t ${lot.color} ${lot.height} flex items-end justify-center pb-2`}>
+                        <span className="text-[9px] font-bold text-white">{lot.label}</span>
+                      </div>
+                      <span className="text-[10px] text-zinc-500">{lot.date}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-600/10 px-4 py-2">
+                  <ArrowRight className="h-4 w-4 text-red-400" />
+                  <span className="text-xs text-red-300 font-medium">Lote 1 sale primero</span>
+                </div>
+                <p className="text-xs text-zinc-500 max-w-[180px]">
+                  Reemplazá este placeholder con una imagen real de tu sistema
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* HOW IT WORKS */}
       <section className="bg-[#12192C] text-white">
         <div className="container-custom py-16 md:py-24">

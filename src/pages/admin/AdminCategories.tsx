@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useOrganization } from '@/hooks/useOrganization'
-import { Plus, Edit, Trash2, Upload, X, Grid3x3, List, Filter, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { Plus, Edit, Trash2, Upload, X, Grid3x3, List, Search, ArrowUpDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -12,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { uploadCategoryImage, deleteImage } from '@/lib/storage'
 import { CategoryTable } from '@/components/admin/CategoryTable'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
-import { SearchFilter } from '@/components/filters'
 import type { Category, CategoryInsert, CategoryUpdate } from '@/types'
 
 type ViewMode = 'grid' | 'list'
@@ -32,7 +31,6 @@ function AdminCategoriesContent() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
-  const [filtersCollapsed, setFiltersCollapsed] = useState(true)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<CategorySortBy>('name')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -259,117 +257,54 @@ function AdminCategoriesContent() {
         </div>
       </div>
 
-      {/* Mobile search */}
-      <div className="md:hidden mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
+      {/* Filter toolbar */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
             type="text"
             placeholder="Buscar categorías..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
+            className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
           />
-        </div>
-      </div>
-
-      {/* Filters Panel */}
-      <div className="hidden md:block">
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="flex items-center space-x-2">
-              <Filter className="h-5 w-5" />
-              <span>Filtros</span>
-            </CardTitle>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setFiltersCollapsed((prev) => !prev)}
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
-              {filtersCollapsed ? (
-                <>
-                  <ChevronRight className="h-4 w-4 mr-1" />
-                  Mostrar
-                </>
-              ) : (
-                <>
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Ocultar
-                </>
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        {!filtersCollapsed && (
-          <CardContent className="space-y-5">
-            <div>
-              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
-                Filtros de listado
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <SearchFilter
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="Buscar categorías..."
-                />
-              </div>
-            </div>
-            <div className="pt-4 border-t border-gray-200">
-              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
-                Ordenamiento
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ordenar por</label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as CategorySortBy)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                  >
-                    <option value="name">Nombre</option>
-                    <option value="slug">Slug</option>
-                    <option value="created_at">Fecha de creación</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Dirección</label>
-                  <select
-                    value={sortDirection}
-                    onChange={(e) => setSortDirection(e.target.value as SortDirection)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                  >
-                    <option value="asc">Ascendente</option>
-                    <option value="desc">Descendente</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            {(search || sortBy !== 'name' || sortDirection !== 'asc') && (
-              <div className="pt-1">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearch('')
-                    setSortBy('name')
-                    setSortDirection('asc')
-                  }}
-                >
-                  Limpiar Filtros
-                </Button>
-              </div>
-            )}
-          </CardContent>
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as CategorySortBy)}
+          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${sortBy !== 'name' ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
+        >
+          <option value="name">Nombre</option>
+          <option value="slug">Slug</option>
+          <option value="created_at">Fecha creación</option>
+        </select>
+        <button
+          onClick={() => setSortDirection(d => d === 'asc' ? 'desc' : 'asc')}
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          title={sortDirection === 'asc' ? 'Ascendente' : 'Descendente'}
+        >
+          <ArrowUpDown className="h-3.5 w-3.5" />
+          {sortDirection === 'asc' ? 'A→Z' : 'Z→A'}
+        </button>
+        {(search || sortBy !== 'name' || sortDirection !== 'asc') && (
+          <button
+            onClick={() => { setSearch(''); setSortBy('name'); setSortDirection('asc') }}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            Limpiar
+          </button>
         )}
-      </Card>
-      </div>
-
-      {/* Results count */}
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-600">
-          Mostrando {filteredCategories.length} de {categories.length} categorías
-        </p>
+        <span className="ml-auto text-sm text-gray-500">
+          {filteredCategories.length} de {categories.length}
+        </span>
       </div>
 
       {/* Categories Display */}

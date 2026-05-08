@@ -44,7 +44,7 @@ import { OrgAccessGate } from '@/components/features/OrgAccessGate'
 import type { Permission } from '@/lib/permissions'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useBillerConfig } from '@/hooks/useBillerConfig'
-import { Button } from '@/components/ui/Button'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import { useLocation } from 'react-router-dom'
@@ -65,7 +65,7 @@ type NavItem = {
   /** Acción custom en lugar de navegación */
   onClick?: () => void
   /** Subitems expandibles dentro del ítem */
-  subItems?: Array<{ path: string; label: string }>
+  subItems?: Array<{ path: string; label: string; requiresFifo?: boolean }>
 }
 
 type NavSection = {
@@ -81,6 +81,7 @@ export function AdminLayout() {
   const { currentOrganization, organizations, setCurrentOrganization, fetchOrganizations, switchingOrganization } = useOrganizationStore()
   const { canUseFeature, branchCount } = usePlanLimits()
   const { config: billerConfig, loading: billerConfigLoading } = useBillerConfig(currentOrganization?.id ?? null)
+  const orgSettings = useOrgSettings()
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -179,7 +180,7 @@ export function AdminLayout() {
           icon: Warehouse,
           subItems: [
             { path: '/inventory', label: 'Stock actual' },
-            { path: '/inventory/lots', label: 'Lotes' },
+            { path: '/inventory/lots', label: 'Lotes', requiresFifo: true },
           ],
         },
         { path: '/suppliers', label: 'Proveedores', icon: Truck },
@@ -266,48 +267,48 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Admin Header - compacto */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
+      <header className="bg-[#1c1d33] border-b border-white/10 sticky top-0 z-30">
         <div className="px-4 md:px-6 py-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
               <button
                 onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="lg:hidden p-1.5 hover:bg-gray-100 rounded-md transition-colors shrink-0"
+                className="lg:hidden p-1.5 hover:bg-white/10 rounded-md transition-colors shrink-0"
               >
-                {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+                {sidebarOpen ? <X className="h-5 w-5 text-slate-300" /> : <Menu className="h-5 w-5 text-slate-300" />}
               </button>
               <Link to="/" className="flex items-center gap-2.5 min-w-0 group">
                 <img src="/logo3.png" alt="Axios" className="h-8 w-8 object-contain shrink-0" />
-                <span className="font-semibold text-gray-900 truncate">Axios</span>
+                <span className="font-semibold text-white truncate">Axios Stock</span>
               </Link>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <div className="relative">
                 <button
                   onClick={() => setOrgDropdownOpen(!orgDropdownOpen)}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-gray-200 hover:bg-gray-50 text-sm min-w-0"
+                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-md border border-white/15 hover:bg-white/10 text-sm min-w-0 transition-colors"
                 >
-                  <div className="h-6 w-6 rounded flex items-center justify-center overflow-hidden shrink-0 bg-gray-100">
+                  <div className="h-6 w-6 rounded flex items-center justify-center overflow-hidden shrink-0 bg-white/10">
                     {currentOrganization?.logo_url ? (
                       <img src={currentOrganization.logo_url} alt="" className="h-full w-full object-contain" />
                     ) : (
-                      <Building2 className="h-4 w-4 text-gray-500" />
+                      <Building2 className="h-4 w-4 text-slate-400" />
                     )}
                   </div>
-                  <span className="font-medium text-gray-700 max-w-[100px] truncate text-xs md:text-sm">
+                  <span className="font-medium text-slate-200 max-w-[100px] truncate text-xs md:text-sm">
                     {currentOrganization?.name ?? 'Org'}
                   </span>
                   <span
                     className={cn(
                       'shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium hidden sm:inline',
                       currentOrganization?.subscription_tier === 'profesional'
-                        ? 'bg-admin-100 text-admin-800'
-                        : 'bg-gray-100 text-gray-600'
+                        ? 'bg-admin-500/30 text-admin-300'
+                        : 'bg-white/10 text-slate-400'
                     )}
                   >
                     {currentOrganization?.subscription_tier === 'profesional' ? 'Pro' : 'Starter'}
                   </span>
-                  <ChevronRight className={`h-4 w-4 text-gray-400 shrink-0 transition-transform ${orgDropdownOpen ? 'rotate-90' : ''}`} />
+                  <ChevronRight className={`h-4 w-4 text-slate-500 shrink-0 transition-transform ${orgDropdownOpen ? 'rotate-90' : ''}`} />
                 </button>
                 {orgDropdownOpen && (
                   <>
@@ -388,7 +389,7 @@ export function AdminLayout() {
                   href={`/${currentOrganization.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-gray-200 hover:bg-gray-50 text-sm text-gray-700 hover:text-gray-900 transition-colors"
+                  className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-white/15 hover:bg-white/10 text-sm text-slate-300 hover:text-white transition-colors"
                   title="Ver tienda pública"
                 >
                   <Store className="h-4 w-4" />
@@ -396,17 +397,25 @@ export function AdminLayout() {
                 </a>
               )}
               <NotificationBell orgId={currentOrganization?.id} />
-              <div className="flex items-center gap-1">
-                <span className="hidden md:block text-xs text-gray-500 truncate max-w-[140px]">{user.email}</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
+              <div className="flex items-center gap-2">
+                <div className="hidden md:flex items-center gap-2">
+                  <span className="text-xs text-slate-300 truncate max-w-[140px]">
+                    {profile?.full_name ?? user.email}
+                  </span>
+                  {profile?.role && (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white/10 text-slate-400 leading-none shrink-0">
+                      {{ admin: 'Admin', manager: 'Gerente', user: 'Usuario', viewer: 'Viewer' }[profile.role] ?? profile.role}
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
                   onClick={handleSignOut}
-                  className="p-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100"
                   title="Cerrar sesión"
+                  className="p-1.5 rounded-md text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
                 >
                   <LogOut className="h-4 w-4" />
-                </Button>
+                </button>
               </div>
             </div>
           </div>
@@ -424,7 +433,7 @@ export function AdminLayout() {
 
         {/* Admin Sidebar - más compacto */}
         <aside className={cn(
-          'fixed left-0 top-[52px] h-[calc(100vh-52px)] bg-white/95 backdrop-blur-xl border-r border-slate-200 shadow-sm overflow-y-auto z-20 transition-all duration-300 ease-in-out',
+          'fixed left-0 top-[52px] h-[calc(100vh-52px)] bg-[#1c1d33] border-r border-white/10 overflow-y-auto z-20 transition-all duration-300 ease-in-out',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
           sidebarCollapsed ? 'lg:w-14' : 'w-64 lg:w-64'
         )}>
@@ -452,18 +461,18 @@ export function AdminLayout() {
                           'flex items-center rounded-md transition-colors group w-full border-l-2 border-transparent',
                           sidebarCollapsed ? 'justify-center p-2' : 'px-3 py-2 gap-3',
                           active
-                            ? 'bg-admin-50 text-admin-700 border-admin-500'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                            ? 'bg-white/10 text-white border-admin-400'
+                            : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
                         )}
                       >
                         <SectionIcon className={cn(
                           'h-4 w-4 shrink-0',
-                          active ? 'text-admin-600' : 'text-gray-500 group-hover:text-gray-600'
+                          active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'
                         )} />
                         {!sidebarCollapsed && (
                           <span className={cn(
                             'text-sm truncate',
-                            active ? 'text-admin-700 font-medium' : 'text-gray-700'
+                            active ? 'text-white font-medium' : 'text-slate-400'
                           )}>
                             {section.title}
                           </span>
@@ -487,14 +496,14 @@ export function AdminLayout() {
                           'w-full flex items-center gap-2 px-3 py-2 rounded-2xl mb-1 group transition-colors',
                           isOpen
                             ? hasActiveItem
-                              ? 'bg-admin-50 text-admin-700 shadow-sm'
-                              : 'bg-slate-50 text-slate-700'
-                            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
+                              ? 'bg-white/[0.07] text-slate-200'
+                              : 'bg-white/[0.04] text-slate-300'
+                            : 'text-slate-500 hover:bg-white/[0.06] hover:text-slate-300'
                         )}
                       >
                         <SectionIcon className={cn(
                           'h-3.5 w-3.5 shrink-0',
-                          isOpen ? hasActiveItem ? 'text-admin-600' : 'text-gray-600' : 'text-gray-400'
+                          isOpen ? hasActiveItem ? 'text-admin-400' : 'text-slate-400' : 'text-slate-600'
                         )} />
                         <h3 className="text-[11px] font-semibold uppercase tracking-wider flex-1 text-left">
                           {section.title}
@@ -502,7 +511,7 @@ export function AdminLayout() {
                         <ChevronDown className={cn(
                           'h-3 w-3 shrink-0 transition-transform duration-200',
                           isOpen ? 'rotate-0' : '-rotate-90',
-                          isOpen ? hasActiveItem ? 'text-admin-500' : 'text-gray-500' : 'text-gray-400'
+                          isOpen ? hasActiveItem ? 'text-admin-400' : 'text-slate-500' : 'text-slate-600'
                         )} />
                       </button>
                     )}
@@ -534,27 +543,27 @@ export function AdminLayout() {
                             'flex items-center rounded-md transition-colors group w-full border-l-2 border-transparent',
                             sidebarCollapsed ? 'justify-center p-2' : 'px-3 py-2 gap-3',
                             isLockedByPlan
-                              ? 'bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-500'
+                              ? 'text-slate-600 hover:bg-white/[0.04] hover:text-slate-500'
                               : active
-                              ? 'bg-admin-50 text-admin-700 border-admin-500'
-                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                              ? 'bg-admin-500/25 text-white border-admin-400'
+                              : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'
                           )
                           const itemInner = (
                             <>
                               <Icon className={cn(
                                 'h-4 w-4 shrink-0',
-                                isLockedByPlan ? 'text-gray-400' : active ? 'text-admin-600' : 'text-gray-500 group-hover:text-gray-600'
+                                isLockedByPlan ? 'text-slate-600' : active ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'
                               )} />
                               {!sidebarCollapsed && (
                                 <span className={cn(
                                   'text-sm truncate',
-                                  isLockedByPlan ? 'text-gray-500' : active ? 'text-admin-700 font-medium' : 'text-gray-700'
+                                  isLockedByPlan ? 'text-slate-600' : active ? 'text-white font-medium' : 'text-slate-400 group-hover:text-slate-200'
                                 )}>
                                   {item.label}
                                 </span>
                               )}
                               {!sidebarCollapsed && isLockedByPlan && (
-                                <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">Pro</span>
+                                <span className="ml-auto text-[10px] font-medium px-1.5 py-0.5 rounded bg-white/10 text-slate-500">Pro</span>
                               )}
                             </>
                           )
@@ -579,8 +588,8 @@ export function AdminLayout() {
                                     {itemInner}
                                   </Link>
                                   {isSubExpanded && !sidebarCollapsed && (
-                                    <ul className="mt-0.5 ml-4 space-y-0.5 border-l border-slate-200 pl-2">
-                                      {item.subItems!.map((sub) => {
+                                    <ul className="mt-0.5 ml-7 space-y-0.5 border-l border-white/10 pl-2">
+                                      {item.subItems!.filter((sub) => !sub.requiresFifo || orgSettings.costing_method === 'fifo').map((sub) => {
                                         const subActive = location.pathname === sub.path
                                         return (
                                           <li key={sub.path}>
@@ -590,8 +599,8 @@ export function AdminLayout() {
                                               className={cn(
                                                 'flex items-center px-2 py-1.5 rounded-md text-sm transition-colors border-l-2',
                                                 subActive
-                                                  ? 'bg-admin-50 text-admin-700 font-medium border-admin-500'
-                                                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-transparent'
+                                                  ? 'bg-white/10 text-white font-medium border-admin-400'
+                                                  : 'text-slate-400 hover:bg-white/[0.06] hover:text-slate-200 border-transparent'
                                               )}
                                             >
                                               {sub.label}
@@ -634,7 +643,7 @@ export function AdminLayout() {
             <button
               type="button"
               onClick={toggleSidebarCollapsed}
-              className="mt-4 w-full flex items-center justify-center p-2 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors lg:flex"
+              className="mt-4 w-full flex items-center justify-center p-2 rounded-md text-slate-600 hover:bg-white/10 hover:text-slate-300 transition-colors lg:flex"
               title={sidebarCollapsed ? 'Expandir' : 'Colapsar'}
             >
               {sidebarCollapsed ? (
@@ -651,7 +660,7 @@ export function AdminLayout() {
             type="button"
             onClick={toggleSidebarCollapsed}
             aria-label="Expandir barra lateral"
-            className="hidden lg:flex fixed left-14 top-24 z-30 h-10 w-10 items-center justify-center rounded-r-full border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
+            className="hidden lg:flex fixed left-14 top-24 z-30 h-10 w-10 items-center justify-center rounded-r-full border border-white/15 bg-[#1c1d33] text-slate-400 shadow-sm hover:bg-white/10 hover:text-slate-200 transition-colors"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -677,7 +686,7 @@ export function AdminLayout() {
       </div>
 
       {/* Bottom Navigation - solo mobile */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#1c1d33] border-t border-white/10">
         <div className="flex items-stretch h-16">
           {[
             { path: '/', label: 'Inicio', icon: LayoutDashboard },
@@ -693,10 +702,10 @@ export function AdminLayout() {
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
                   'flex-1 flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors',
-                  active ? 'text-admin-600' : 'text-gray-500'
+                  active ? 'text-white' : 'text-slate-500'
                 )}
               >
-                <Icon className={cn('h-5 w-5', active ? 'text-admin-600' : 'text-gray-400')} />
+                <Icon className={cn('h-5 w-5', active ? 'text-admin-400' : 'text-slate-500')} />
                 {label}
               </Link>
             )

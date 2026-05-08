@@ -3,12 +3,11 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { ManualSaleForm } from '@/components/admin/ManualSaleForm'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatDateShort, formatPrice } from '@/lib/utils'
-import { Search, Calendar, Filter, ChevronLeft, ChevronRight, ChevronDown, Eye, Plus } from 'lucide-react'
+import { Search, Calendar, ChevronLeft, ChevronRight, Eye, Plus, X } from 'lucide-react'
 import type { Order, CashSession, Branch } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -98,7 +97,6 @@ export function AdminOrders() {
   )
   const [discountFilter, setDiscountFilter] = useState<'all' | 'with_discount' | 'without_discount'>('all')
   const [searchTerm, setSearchTerm] = useState('')
-  const [filtersOpen, setFiltersOpen] = useState(false)
   const [isManualSaleOpen, setIsManualSaleOpen] = useState(false)
   const [branches, setBranches] = useState<Branch[]>([])
   const [openCashSessions, setOpenCashSessions] = useState<CashSession[]>([])
@@ -342,151 +340,77 @@ export function AdminOrders() {
         </Button>
       </div>
 
-      {/* Mobile search */}
-      <div className="md:hidden mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
+      {/* Filter toolbar */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
             type="text"
-            placeholder="Buscar órdenes..."
+            placeholder="ID, nombre, teléfono..."
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
-            className="pl-10"
+            className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => { setSearchTerm(''); setCurrentPage(1) }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        <div className="relative">
+          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1) }}
+            className={`pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${startDate ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
+            placeholder="Desde"
           />
         </div>
-      </div>
-
-      {/* Filters */}
-      <div className="hidden md:block">
-      <Card className="mb-6">
-        <CardHeader
-          className="cursor-pointer select-none"
-          onClick={() => setFiltersOpen((v) => !v)}
+        <span className="text-gray-400 text-sm">—</span>
+        <div className="relative">
+          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1) }}
+            className={`pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${endDate ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
+            placeholder="Hasta"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value as OrderStatus | 'all'); setCurrentPage(1) }}
+          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${statusFilter !== 'all' ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
         >
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Filter className="h-5 w-5" />
-              <span>Filtros</span>
-              {(startDate || endDate || statusFilter !== 'all' || discountFilter !== 'all' || searchTerm) && (
-                <span className="ml-1 inline-flex items-center rounded-full bg-admin-100 text-admin-700 text-xs font-medium px-2 py-0.5">Activos</span>
-              )}
-            </div>
-            <ChevronDown className={cn('h-4 w-4 text-gray-500 transition-transform', filtersOpen && 'rotate-180')} />
-          </CardTitle>
-        </CardHeader>
-        {filtersOpen && (
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {/* Search */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Buscar
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="text"
-                    placeholder="ID, nombre, teléfono..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              {/* Start Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha Inicio
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setStartDate(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              {/* End Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Fecha Fin
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => {
-                      setEndDate(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              {/* Status Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estado
-                </label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value as OrderStatus | 'all')
-                    setCurrentPage(1)
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
-                >
-                  <option value="all">Todos</option>
-                  <option value="pending_allocation">Pend. asignación</option>
-                  <option value="pending">Pendiente</option>
-                  <option value="processing">En Proceso</option>
-                  <option value="shipped">Enviado</option>
-                  <option value="delivered">Entregado</option>
-                  <option value="cancelled">Cancelado</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Descuento
-                </label>
-                <select
-                  value={discountFilter}
-                  onChange={(e) => {
-                    setDiscountFilter(e.target.value as 'all' | 'with_discount' | 'without_discount')
-                    setCurrentPage(1)
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
-                >
-                  <option value="all">Todos</option>
-                  <option value="with_discount">Con descuento</option>
-                  <option value="without_discount">Sin descuento</option>
-                </select>
-              </div>
-            </div>
-
-            {(startDate || endDate || statusFilter !== 'all' || discountFilter !== 'all' || searchTerm) && (
-              <div className="mt-4">
-                <Button variant="outline" onClick={handleResetFilters}>
-                  Limpiar Filtros
-                </Button>
-              </div>
-            )}
-          </CardContent>
+          <option value="all">Estado: todos</option>
+          <option value="pending_allocation">Pend. asignación</option>
+          <option value="pending">Pendiente</option>
+          <option value="processing">En proceso</option>
+          <option value="shipped">Enviado</option>
+          <option value="delivered">Entregado</option>
+          <option value="cancelled">Cancelado</option>
+        </select>
+        <select
+          value={discountFilter}
+          onChange={(e) => { setDiscountFilter(e.target.value as 'all' | 'with_discount' | 'without_discount'); setCurrentPage(1) }}
+          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${discountFilter !== 'all' ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
+        >
+          <option value="all">Descuento: todos</option>
+          <option value="with_discount">Con descuento</option>
+          <option value="without_discount">Sin descuento</option>
+        </select>
+        {(startDate || statusFilter !== 'all' || discountFilter !== 'all' || searchTerm) && (
+          <button
+            onClick={handleResetFilters}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            Limpiar
+          </button>
         )}
-      </Card>
       </div>
 
       {/* Orders Table */}

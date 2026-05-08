@@ -2119,6 +2119,7 @@ export type OrganizationSettings = {
   checkout_exclude_isolated_warehouses?: boolean | null
   checkout_stock_allocation_mode?: 'immediate' | 'manual' | null
   inventory_transfer_completion_mode?: 'manual' | 'automatic' | null
+  costing_method?: 'weighted_average' | 'fifo' | null
   store_logo_minimal_url?: string | null
   store_cover_image_urls?: string[] | null
   [key: string]: unknown

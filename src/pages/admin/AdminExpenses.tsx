@@ -8,12 +8,14 @@ import { trackAuditAction } from '@/lib/audit'
 import { supabase } from '@/lib/supabase'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
-import { ChevronDown, Plus, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { BookOpen, ChevronDown, ClipboardList, CreditCard, Plus, Receipt, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type SupplierLite = { id: string; name: string }
 type BranchLite = { id: string; name: string }
 type ProductLite = { id: string; name: string }
+type ProductSearchResult = { id: string; name: string; sku: string; image_url: string | null }
+type CategoryLite = { id: string; name: string }
 type VariantLite = { id: string; name: string | null; sku: string }
 
 type PurchaseOrderLite = {
@@ -182,8 +184,27 @@ export function AdminExpenses() {
   const [suppliers, setSuppliers] = useState<SupplierLite[]>([])
   const [branches, setBranches] = useState<BranchLite[]>([])
   const [products, setProducts] = useState<ProductLite[]>([])
+  const [categories, setCategories] = useState<CategoryLite[]>([])
   const [variantsByProduct, setVariantsByProduct] = useState<Map<string, VariantLite[]>>(new Map())
   const [loadingVariants, setLoadingVariants] = useState(false)
+
+  const [quickCreateProductOpen, setQuickCreateProductOpen] = useState(false)
+  const [quickCreateProductForm, setQuickCreateProductForm] = useState({
+    name: '',
+    sku: '',
+    price: '',
+    category_id: '',
+    unit: '',
+    description: '',
+  })
+  const [quickCreateSkuError, setQuickCreateSkuError] = useState('')
+  const [checkingSkuLoading, setCheckingSkuLoading] = useState(false)
+
+  const [productSearchQuery, setProductSearchQuery] = useState('')
+  const [productSearchResults, setProductSearchResults] = useState<ProductSearchResult[]>([])
+  const [productSearchLoading, setProductSearchLoading] = useState(false)
+  const [productSearchOpen, setProductSearchOpen] = useState(false)
+  const productSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderLite[]>([])
   const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState<string>('')
@@ -207,6 +228,7 @@ export function AdminExpenses() {
     cash_session_id: '',
   })
   const [loadingDirectExpenses, setLoadingDirectExpenses] = useState(false)
+  const [directExpenseModalOpen, setDirectExpenseModalOpen] = useState(false)
   const [cashSessionDateFilter, setCashSessionDateFilter] = useState('')
   const [createOrderModalOpen, setCreateOrderModalOpen] = useState(false)
   const [editOrderModalOpen, setEditOrderModalOpen] = useState(false)
@@ -300,6 +322,53 @@ export function AdminExpenses() {
     }
   }
 
+  const searchProducts = async (query: string) => {
+    if (!organizationId) return
+    setProductSearchLoading(true)
+    try {
+      let q = fromAny('products')
+        .select('id, name, sku, image_url')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('name')
+        .limit(15)
+      if (query.trim()) {
+        q = q.or(`name.ilike.%${query.trim()}%,sku.ilike.%${query.trim()}%`)
+      }
+      const { data, error } = await q
+      if (!error) setProductSearchResults((data || []) as ProductSearchResult[])
+    } catch {
+      setProductSearchResults([])
+    } finally {
+      setProductSearchLoading(false)
+    }
+  }
+
+  const handleProductSearchInputChange = (value: string) => {
+    setProductSearchQuery(value)
+    setProductSearchOpen(true)
+    if (newOrderItemForm.product_id) {
+      setNewOrderItemForm((prev) => ({ ...prev, product_id: '', variant_id: '' }))
+    }
+    if (productSearchTimerRef.current) clearTimeout(productSearchTimerRef.current)
+    productSearchTimerRef.current = setTimeout(() => searchProducts(value), 350)
+  }
+
+  const selectProductFromSearch = (product: ProductSearchResult) => {
+    handleNewItemProductChange(product.id)
+    setProductSearchQuery(product.name)
+    setProductSearchOpen(false)
+    setProductSearchResults([])
+  }
+
+  const resetProductSearch = () => {
+    setProductSearchQuery('')
+    setProductSearchResults([])
+    setProductSearchOpen(false)
+    setProductSearchLoading(false)
+    if (productSearchTimerRef.current) clearTimeout(productSearchTimerRef.current)
+  }
+
   const handleNewItemProductChange = (productId: string) => {
     setNewOrderItemForm((prev) => ({ ...prev, product_id: productId, variant_id: '' }))
     if (productId) loadVariantsForProduct(productId)
@@ -383,10 +452,11 @@ export function AdminExpenses() {
     const silent = options?.silent ?? false
     if (!silent) setLoading(true)
     try {
-      const [suppliersResult, branchesResult, productsResult, purchaseOrdersResult, supplierInvoicesResult] = await Promise.all([
+      const [suppliersResult, branchesResult, productsResult, categoriesResult, purchaseOrdersResult, supplierInvoicesResult] = await Promise.all([
         fromAny('suppliers').select('id, name').eq('organization_id', organizationId).order('name'),
         fromAny('branches').select('id, name').eq('organization_id', organizationId).eq('is_active', true).order('name'),
         fromAny('products').select('id, name').eq('organization_id', organizationId).eq('is_active', true).order('name'),
+        fromAny('categories').select('id, name').eq('organization_id', organizationId).order('name'),
         fromAny('purchase_orders')
           .select('id, po_number, supplier_id, branch_id, status, notes, total, created_at')
           .eq('organization_id', organizationId)
@@ -409,6 +479,7 @@ export function AdminExpenses() {
       setSuppliers(suppliersResult.data || [])
       setBranches(branchesResult.data || [])
       setProducts(productsResult.data || [])
+      if (!categoriesResult.error) setCategories((categoriesResult.data || []) as CategoryLite[])
       setPurchaseOrders(purchaseOrdersData)
       setSupplierInvoices((supplierInvoicesResult.data || []) as SupplierInvoiceLite[])
 
@@ -658,6 +729,7 @@ export function AdminExpenses() {
         discount_amount: '0',
         description: '',
       })
+      resetProductSearch()
       setShowNewItemForm(false)
 
       await fetchPageData({ silent: true })
@@ -1193,6 +1265,7 @@ export function AdminExpenses() {
       })
       setCashSessionDateFilter('')
       await fetchDirectExpenses()
+      setDirectExpenseModalOpen(false)
       show('Gasto registrado correctamente.', 'success')
     } catch (error) {
       console.error('Error creating direct expense:', error)
@@ -1222,6 +1295,87 @@ export function AdminExpenses() {
     } catch (error) {
       console.error('Error deleting direct expense:', error)
       show('No se pudo eliminar el gasto.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const checkSkuExists = async (sku: string): Promise<boolean> => {
+    if (!organizationId || !sku.trim()) return false
+    try {
+      const { data } = await fromAny('products')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .ilike('sku', sku.trim())
+        .limit(1)
+        .maybeSingle()
+      return !!data
+    } catch {
+      return false
+    }
+  }
+
+  const handleQuickCreateSkuBlur = async (sku: string) => {
+    if (!sku.trim()) return
+    setCheckingSkuLoading(true)
+    const exists = await checkSkuExists(sku)
+    setCheckingSkuLoading(false)
+    if (exists) {
+      setQuickCreateSkuError('Ya existe un producto con este SKU (se ignoran mayúsculas/minúsculas).')
+    } else {
+      setQuickCreateSkuError('')
+    }
+  }
+
+  const quickCreateProduct = async () => {
+    if (!organizationId) return
+    const name = quickCreateProductForm.name.trim()
+    const sku = quickCreateProductForm.sku.trim()
+    const price = Number(quickCreateProductForm.price)
+
+    if (!name) { show('Ingresá el nombre del producto.', 'error'); return }
+    if (!sku) { show('Ingresá el SKU del producto.', 'error'); return }
+    if (!quickCreateProductForm.category_id) { show('Seleccioná una categoría.', 'error'); return }
+    if (!Number.isFinite(price) || price < 0) { show('Ingresá un precio válido.', 'error'); return }
+
+    const skuExists = await checkSkuExists(sku)
+    if (skuExists) {
+      setQuickCreateSkuError('Ya existe un producto con este SKU (se ignoran mayúsculas/minúsculas).')
+      return
+    }
+
+    try {
+      setSaving(true)
+      const { data, error } = await fromAny('products')
+        .insert({
+          organization_id: organizationId,
+          name,
+          sku,
+          price,
+          category_id: quickCreateProductForm.category_id,
+          unit: quickCreateProductForm.unit || null,
+          description: quickCreateProductForm.description || null,
+          stock: 0,
+          is_active: true,
+        })
+        .select('id, name')
+        .single()
+
+      if (error) throw error
+
+      setProducts((prev) => [...prev, { id: data.id, name: data.name }].sort((a, b) => a.name.localeCompare(b.name)))
+      handleNewItemProductChange(data.id)
+      setProductSearchQuery(data.name)
+      setNewOrderItemForm((prev) => ({ ...prev, unit_cost: quickCreateProductForm.price || '0' }))
+      setShowNewItemForm(true)
+
+      setQuickCreateProductForm({ name: '', sku: '', price: '', category_id: '', unit: '', description: '' })
+      setQuickCreateSkuError('')
+      setQuickCreateProductOpen(false)
+      show('Producto creado y seleccionado correctamente.', 'success')
+    } catch (error) {
+      console.error('Error creating quick product:', error)
+      show('No se pudo crear el producto.', 'error')
     } finally {
       setSaving(false)
     }
@@ -1276,19 +1430,31 @@ export function AdminExpenses() {
         <p className="mt-1 text-gray-600">Separa el trabajo por vista: ordenes, facturas y libro de egresos.</p>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-lg border border-gray-200 bg-white p-2">
-        <Button variant={activeView === 'purchase_orders' ? 'primary' : 'outline'} onClick={() => setActiveView('purchase_orders')}>
-          Ordenes de compra
-        </Button>
-        <Button variant={activeView === 'supplier_invoices' ? 'primary' : 'outline'} onClick={() => setActiveView('supplier_invoices')}>
-          Facturas de proveedores
-        </Button>
-        <Button variant={activeView === 'expense_ledger' ? 'primary' : 'outline'} onClick={() => setActiveView('expense_ledger')}>
-          Libro de egresos
-        </Button>
-        <Button variant={activeView === 'direct_expenses' ? 'primary' : 'outline'} onClick={() => setActiveView('direct_expenses')}>
-          Gastos directos
-        </Button>
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <nav className="flex" aria-label="Vistas de egresos">
+          {([
+            { key: 'purchase_orders', label: 'Ordenes de compra', short: 'Ordenes', icon: ClipboardList },
+            { key: 'supplier_invoices', label: 'Facturas de proveedores', short: 'Facturas', icon: Receipt },
+            { key: 'expense_ledger', label: 'Libro de egresos', short: 'Egresos', icon: BookOpen },
+            { key: 'direct_expenses', label: 'Gastos directos', short: 'Gastos', icon: CreditCard },
+          ] as const).map(({ key, label, short, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveView(key)}
+              className={`
+                flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-all duration-150 focus:outline-none
+                ${activeView === key
+                  ? 'border-admin-600 text-admin-700 bg-admin-50/60'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }
+              `}
+            >
+              <Icon className={`h-4 w-4 shrink-0 ${activeView === key ? 'text-admin-600' : 'text-gray-400'}`} />
+              <span className="hidden sm:inline">{label}</span>
+              <span className="sm:hidden">{short}</span>
+            </button>
+          ))}
+        </nav>
       </div>
 
       {activeView === 'purchase_orders' && (
@@ -1667,168 +1833,15 @@ export function AdminExpenses() {
 
       {activeView === 'direct_expenses' && (
         <div className="space-y-6">
-          {/* Form */}
           <Card>
             <CardHeader>
-              <CardTitle>Registrar gasto</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Fecha</label>
-                  <Input
-                    type="date"
-                    value={directExpenseForm.occurred_at}
-                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, occurred_at: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Categoría</label>
-                  <select
-                    className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3"
-                    value={directExpenseForm.category}
-                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
-                  >
-                    {EXPENSE_CATEGORIES.map((cat) => (
-                      <option key={cat.value} value={cat.value}>{cat.label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Monto</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={directExpenseForm.amount}
-                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Descripción (opcional)</label>
-                  <Input
-                    placeholder="Ej: Nafta viaje a Montevideo"
-                    value={directExpenseForm.description}
-                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, description: e.target.value }))}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Método de pago</label>
-                  <select
-                    className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3"
-                    value={directExpenseForm.payment_method}
-                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, payment_method: e.target.value }))}
-                  >
-                    <option value="cash">Efectivo</option>
-                    <option value="transfer">Transferencia</option>
-                    <option value="mercadopago">Mercado Pago</option>
-                    <option value="card">Tarjeta</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Sucursal (opcional)</label>
-                  <select
-                    className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3"
-                    value={directExpenseForm.branch_id}
-                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, branch_id: e.target.value }))}
-                  >
-                    <option value="">Sin sucursal</option>
-                    {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>{branch.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Notas (opcional)</label>
-                  <Input
-                    placeholder="Notas adicionales"
-                    value={directExpenseForm.notes}
-                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, notes: e.target.value }))}
-                  />
-                </div>
-
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <label className="flex items-center gap-2 cursor-pointer select-none mb-3">
-                    <input
-                      type="checkbox"
-                      checked={directExpenseForm.apply_to_cash_session}
-                      onChange={(e) => {
-                        setDirectExpenseForm((prev) => ({
-                          ...prev,
-                          apply_to_cash_session: e.target.checked,
-                          cash_session_id: '',
-                        }))
-                        setCashSessionDateFilter(e.target.checked ? (directExpenseForm.occurred_at || new Date().toISOString().slice(0, 10)) : '')
-                      }}
-                      className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
-                    />
-                    <span className="text-sm font-medium text-gray-700">Registrar en sesión de caja</span>
-                  </label>
-                  {directExpenseForm.apply_to_cash_session && (
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <div className="flex-1">
-                        <label className="mb-1 block text-xs text-gray-500">Fecha de la sesión</label>
-                        <Input
-                          type="date"
-                          value={cashSessionDateFilter}
-                          onChange={(e) => {
-                            setCashSessionDateFilter(e.target.value)
-                            setDirectExpenseForm((prev) => ({ ...prev, cash_session_id: '' }))
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label className="mb-1 block text-xs text-gray-500">Sesión de caja</label>
-                        {(() => {
-                          const sessionsForDate = cashSessions.filter((s) => s.opened_at.slice(0, 10) === cashSessionDateFilter)
-                          return (
-                            <select
-                              className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3 disabled:opacity-50"
-                              value={directExpenseForm.cash_session_id}
-                              onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, cash_session_id: e.target.value }))}
-                              disabled={!cashSessionDateFilter || sessionsForDate.length === 0}
-                            >
-                              {!cashSessionDateFilter && <option value="">Seleccioná una fecha primero</option>}
-                              {cashSessionDateFilter && sessionsForDate.length === 0 && <option value="">Sin cajas para ese día</option>}
-                              {cashSessionDateFilter && sessionsForDate.length > 0 && <option value="">Seleccionar caja</option>}
-                              {sessionsForDate.map((s) => {
-                                const branchName = branchNameById.get(s.branch_id) || 'Sucursal'
-                                const status = s.closed_at ? 'Cerrada' : 'Abierta'
-                                const openHour = s.opened_at.slice(11, 16)
-                                return (
-                                  <option key={s.id} value={s.id}>
-                                    {branchName} — abierta {openHour} ({status})
-                                  </option>
-                                )
-                              })}
-                            </select>
-                          )
-                        })()}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <Button onClick={createDirectExpense} disabled={saving}>
-                  {saving ? 'Guardando…' : 'Registrar gasto'}
+              <div className="flex items-center justify-between">
+                <CardTitle>Historial de gastos</CardTitle>
+                <Button onClick={() => setDirectExpenseModalOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Registrar nuevo gasto
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* History */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Historial de gastos</CardTitle>
             </CardHeader>
             <CardContent>
               {loadingDirectExpenses ? (
@@ -2318,18 +2331,103 @@ export function AdminExpenses() {
                   {showNewItemForm && (
                     <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                        <div>
+
+                        {/* Product search — full width */}
+                        <div className="md:col-span-2 lg:col-span-3">
                           <label className="block text-sm font-medium text-gray-700 mb-1">Producto</label>
-                          <select
-                            className="w-full min-h-[44px] px-3 border border-gray-300 rounded-lg bg-white"
-                            value={newOrderItemForm.product_id}
-                            onChange={(event) => handleNewItemProductChange(event.target.value)}
-                          >
-                            <option value="">Seleccionar producto</option>
-                            {products.map((product) => (
-                              <option key={product.id} value={product.id}>{product.name}</option>
-                            ))}
-                          </select>
+                          <div className="flex gap-2 items-start">
+                            <div className="relative flex-1">
+                              <input
+                                type="text"
+                                className={`w-full min-h-[44px] rounded-lg border px-3 pr-9 text-sm bg-white ${
+                                  newOrderItemForm.product_id ? 'border-admin-400 bg-admin-50/40' : 'border-gray-300'
+                                }`}
+                                placeholder="Buscar por nombre o SKU…"
+                                value={productSearchQuery}
+                                autoComplete="off"
+                                onChange={(e) => handleProductSearchInputChange(e.target.value)}
+                                onFocus={() => {
+                                  setProductSearchOpen(true)
+                                  if (!productSearchResults.length) searchProducts(productSearchQuery)
+                                }}
+                                onBlur={() => setTimeout(() => setProductSearchOpen(false), 160)}
+                              />
+                              {newOrderItemForm.product_id ? (
+                                <button
+                                  type="button"
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 transition-colors"
+                                  onMouseDown={(e) => {
+                                    e.preventDefault()
+                                    setProductSearchQuery('')
+                                    setProductSearchResults([])
+                                    setNewOrderItemForm((prev) => ({ ...prev, product_id: '', variant_id: '' }))
+                                  }}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              ) : productSearchLoading ? (
+                                <div className="absolute right-2.5 top-1/2 -translate-y-1/2">
+                                  <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-admin-600" />
+                                </div>
+                              ) : null}
+
+                              {productSearchOpen && (
+                                <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-xl">
+                                  {!productSearchLoading && productSearchResults.length === 0 && (
+                                    <p className="px-4 py-3 text-sm text-gray-400">
+                                      {productSearchQuery.trim() ? 'No se encontraron productos.' : 'Escribí para buscar…'}
+                                    </p>
+                                  )}
+                                  {productSearchResults.map((product) => (
+                                    <button
+                                      key={product.id}
+                                      type="button"
+                                      className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-gray-50 ${
+                                        newOrderItemForm.product_id === product.id ? 'bg-admin-50' : ''
+                                      }`}
+                                      onMouseDown={(e) => { e.preventDefault(); selectProductFromSearch(product) }}
+                                    >
+                                      <div className="relative shrink-0 group/img">
+                                        {product.image_url ? (
+                                          <>
+                                            <img
+                                              src={product.image_url}
+                                              alt={product.name}
+                                              className="h-10 w-10 rounded-md border border-gray-200 object-cover"
+                                            />
+                                            <div className="pointer-events-none absolute left-12 top-0 z-40 hidden group-hover/img:block">
+                                              <img
+                                                src={product.image_url}
+                                                alt={product.name}
+                                                className="h-28 w-28 rounded-lg border border-gray-200 object-cover shadow-xl"
+                                              />
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <div className="flex h-10 w-10 items-center justify-center rounded-md border border-gray-200 bg-gray-100">
+                                            <span className="text-center text-[9px] leading-tight text-gray-400">Sin imagen</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium text-gray-800">{product.name}</p>
+                                        <p className="font-mono text-xs text-gray-500">{product.sku}</p>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setQuickCreateProductOpen(true)}
+                              className="shrink-0 min-h-[44px] whitespace-nowrap rounded-lg border border-dashed border-admin-400 px-3 text-xs font-medium text-admin-600 transition-colors hover:bg-admin-50"
+                              title="Crear nuevo producto"
+                            >
+                              + Nuevo
+                            </button>
+                          </div>
                         </div>
 
                         {newOrderItemForm.product_id && (
@@ -2405,7 +2503,7 @@ export function AdminExpenses() {
 
                       <div className="flex items-center gap-2 pt-1">
                         <Button onClick={addItemToSelectedPurchaseOrder} disabled={saving}>Agregar ítem</Button>
-                        <Button variant="outline" onClick={() => setShowNewItemForm(false)} disabled={saving}>Cancelar</Button>
+                        <Button variant="outline" onClick={() => { setShowNewItemForm(false); resetProductSearch() }} disabled={saving}>Cancelar</Button>
                       </div>
                     </div>
                   )}
@@ -2524,6 +2622,280 @@ export function AdminExpenses() {
                 </Button>
                 <Button onClick={registerSupplierPayment} disabled={saving}>
                   Registrar pago
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {quickCreateProductOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-lg">
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle>Crear nuevo producto</CardTitle>
+                <button
+                  type="button"
+                  onClick={() => { setQuickCreateProductOpen(false); setQuickCreateSkuError('') }}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Nombre <span className="text-red-500">*</span></label>
+                <Input
+                  placeholder="Ej: Aceite Motor 10W40"
+                  value={quickCreateProductForm.name}
+                  onChange={(e) => setQuickCreateProductForm((prev) => ({ ...prev, name: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">SKU <span className="text-red-500">*</span></label>
+                <Input
+                  placeholder="Ej: ACT-10W40-1L"
+                  value={quickCreateProductForm.sku}
+                  onChange={(e) => {
+                    setQuickCreateProductForm((prev) => ({ ...prev, sku: e.target.value }))
+                    setQuickCreateSkuError('')
+                  }}
+                  onBlur={(e) => handleQuickCreateSkuBlur(e.target.value)}
+                />
+                {checkingSkuLoading && <p className="mt-1 text-xs text-gray-400">Verificando SKU…</p>}
+                {quickCreateSkuError && <p className="mt-1 text-xs text-red-600">{quickCreateSkuError}</p>}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Precio de venta <span className="text-red-500">*</span></label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={quickCreateProductForm.price}
+                    onChange={(e) => setQuickCreateProductForm((prev) => ({ ...prev, price: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Unidad (opcional)</label>
+                  <Input
+                    placeholder="Ej: unidad, kg, litro"
+                    value={quickCreateProductForm.unit}
+                    onChange={(e) => setQuickCreateProductForm((prev) => ({ ...prev, unit: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Categoría <span className="text-red-500">*</span></label>
+                <select
+                  className="min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3"
+                  value={quickCreateProductForm.category_id}
+                  onChange={(e) => setQuickCreateProductForm((prev) => ({ ...prev, category_id: e.target.value }))}
+                >
+                  <option value="">Seleccionar categoría</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Descripción (opcional)</label>
+                <Input
+                  placeholder="Descripción breve del producto"
+                  value={quickCreateProductForm.description}
+                  onChange={(e) => setQuickCreateProductForm((prev) => ({ ...prev, description: e.target.value }))}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <Button variant="outline" onClick={() => { setQuickCreateProductOpen(false); setQuickCreateSkuError('') }} disabled={saving}>
+                  Cancelar
+                </Button>
+                <Button onClick={quickCreateProduct} disabled={saving || !!quickCreateSkuError || checkingSkuLoading}>
+                  {saving ? 'Creando…' : 'Crear y seleccionar'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {directExpenseModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-xl max-h-[90vh] overflow-y-auto">
+            <CardHeader className="border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle>Registrar gasto</CardTitle>
+                <button
+                  type="button"
+                  onClick={() => setDirectExpenseModalOpen(false)}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                  aria-label="Cerrar"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Fecha</label>
+                  <Input
+                    type="date"
+                    value={directExpenseForm.occurred_at}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, occurred_at: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Categoría</label>
+                  <select
+                    className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3"
+                    value={directExpenseForm.category}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, category: e.target.value }))}
+                  >
+                    {EXPENSE_CATEGORIES.map((cat) => (
+                      <option key={cat.value} value={cat.value}>{cat.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Monto</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={directExpenseForm.amount}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, amount: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Descripción (opcional)</label>
+                  <Input
+                    placeholder="Ej: Nafta viaje a Montevideo"
+                    value={directExpenseForm.description}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, description: e.target.value }))}
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Método de pago</label>
+                  <select
+                    className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3"
+                    value={directExpenseForm.payment_method}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, payment_method: e.target.value }))}
+                  >
+                    <option value="cash">Efectivo</option>
+                    <option value="transfer">Transferencia</option>
+                    <option value="mercadopago">Mercado Pago</option>
+                    <option value="card">Tarjeta</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Sucursal (opcional)</label>
+                  <select
+                    className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3"
+                    value={directExpenseForm.branch_id}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, branch_id: e.target.value }))}
+                  >
+                    <option value="">Sin sucursal</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>{branch.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Notas (opcional)</label>
+                  <Input
+                    placeholder="Notas adicionales"
+                    value={directExpenseForm.notes}
+                    onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="flex items-center gap-2 cursor-pointer select-none mb-3">
+                    <input
+                      type="checkbox"
+                      checked={directExpenseForm.apply_to_cash_session}
+                      onChange={(e) => {
+                        setDirectExpenseForm((prev) => ({
+                          ...prev,
+                          apply_to_cash_session: e.target.checked,
+                          cash_session_id: '',
+                        }))
+                        setCashSessionDateFilter(e.target.checked ? (directExpenseForm.occurred_at || new Date().toISOString().slice(0, 10)) : '')
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Registrar en sesión de caja</span>
+                  </label>
+                  {directExpenseForm.apply_to_cash_session && (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs text-gray-500">Fecha de la sesión</label>
+                        <Input
+                          type="date"
+                          value={cashSessionDateFilter}
+                          onChange={(e) => {
+                            setCashSessionDateFilter(e.target.value)
+                            setDirectExpenseForm((prev) => ({ ...prev, cash_session_id: '' }))
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="mb-1 block text-xs text-gray-500">Sesión de caja</label>
+                        {(() => {
+                          const sessionsForDate = cashSessions.filter((s) => s.opened_at.slice(0, 10) === cashSessionDateFilter)
+                          return (
+                            <select
+                              className="min-h-[40px] w-full rounded-lg border border-gray-300 bg-white px-3 disabled:opacity-50"
+                              value={directExpenseForm.cash_session_id}
+                              onChange={(e) => setDirectExpenseForm((prev) => ({ ...prev, cash_session_id: e.target.value }))}
+                              disabled={!cashSessionDateFilter || sessionsForDate.length === 0}
+                            >
+                              {!cashSessionDateFilter && <option value="">Seleccioná una fecha primero</option>}
+                              {cashSessionDateFilter && sessionsForDate.length === 0 && <option value="">Sin cajas para ese día</option>}
+                              {cashSessionDateFilter && sessionsForDate.length > 0 && <option value="">Seleccionar caja</option>}
+                              {sessionsForDate.map((s) => {
+                                const branchName = branchNameById.get(s.branch_id) || 'Sucursal'
+                                const status = s.closed_at ? 'Cerrada' : 'Abierta'
+                                const openHour = s.opened_at.slice(11, 16)
+                                return (
+                                  <option key={s.id} value={s.id}>
+                                    {branchName} — abierta {openHour} ({status})
+                                  </option>
+                                )
+                              })}
+                            </select>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setDirectExpenseModalOpen(false)} disabled={saving}>
+                  Cancelar
+                </Button>
+                <Button onClick={createDirectExpense} disabled={saving}>
+                  {saving ? 'Guardando…' : 'Registrar gasto'}
                 </Button>
               </div>
             </CardContent>

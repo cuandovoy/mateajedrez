@@ -2,14 +2,6 @@ import { BarcodeManager } from '@/components/admin/BarcodeManager'
 import { ProductSupplierManager } from '@/components/admin/ProductSupplierManager'
 import { ProductTable } from '@/components/admin/ProductTable'
 import { VariantManager } from '@/components/admin/VariantManager'
-import {
-  CategoryFilter,
-  PriceRangeFilter,
-  SearchFilter,
-  StatusFilter,
-  StockFilter,
-  SupplierFilter,
-} from '@/components/filters'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -23,7 +15,7 @@ import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpd
 import { zodResolver } from '@hookform/resolvers/zod'
 import { productSchema } from '@/lib/schemas'
 import type { ProductForm } from '@/lib/schemas'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Edit, Filter, Grid3x3, List, Package, Percent, Plus, ScanLine, Star, Trash2, Truck, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Edit, Grid3x3, List, Package, Percent, Plus, ScanLine, Search, Star, Trash2, Truck, Upload, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { getMaxProductImages } from '@/lib/planLimits'
@@ -480,7 +472,6 @@ function AdminProductsContent() {
   const [initialBranchId, setInitialBranchId] = useState<string>('')
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([])
   const [viewMode, setViewMode] = useState<ViewMode>('list')
-  const [filtersCollapsed, setFiltersCollapsed] = useState(true)
   const [exportingPdf, setExportingPdf] = useState(false)
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
   const [bulkAction, setBulkAction] = useState<'status' | 'category' | 'price' | null>(null)
@@ -1637,180 +1628,104 @@ function AdminProductsContent() {
       {activeTab === 'products' && (
       <>
 
-      {/* Mobile search */}
-      <div className="md:hidden mb-4">
-        <SearchFilter
-          value={filters.search}
-          onChange={(value) => setFilters({ ...filters, search: value })}
-          placeholder="Buscar productos..."
-        />
-      </div>
-
-      {/* Filters Panel */}
-      <div className="hidden md:block">
-      <Card className="mb-6">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="flex items-center space-x-2">
-              <Filter className="h-5 w-5" />
-              <span>Filtros</span>
-            </CardTitle>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setFiltersCollapsed((prev) => !prev)}
+      {/* Filter toolbar */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Buscar productos..."
+            value={filters.search}
+            onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+            className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+          />
+          {filters.search && (
+            <button
+              onClick={() => setFilters({ ...filters, search: '' })}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
-              {filtersCollapsed ? (
-                <>
-                  <ChevronRight className="h-4 w-4 mr-1" />
-                  Mostrar
-                </>
-              ) : (
-                <>
-                  <ChevronLeft className="h-4 w-4 mr-1" />
-                  Ocultar
-                </>
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        {!filtersCollapsed && (
-          <CardContent className="space-y-5">
-            <div>
-              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
-                Filtros de listado
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Búsqueda en base de datos
-                  </label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <div className="flex-1">
-                      <SearchFilter
-                        value={filters.search}
-                        onChange={(value) => setFilters({ ...filters, search: value })}
-                        placeholder="Nombre, SKU o descripción"
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setPage(0)
-                        setAppliedSearch(filters.search.trim())
-                      }}
-                    >
-                      Buscar
-                    </Button>
-                  </div>
-                  {appliedSearch && (
-                    <p className="mt-2 text-xs text-gray-500">
-                      Filtro aplicado: <span className="font-medium text-gray-700">"{appliedSearch}"</span>
-                    </p>
-                  )}
-                </div>
-                <CategoryFilter
-                  categories={categories}
-                  selectedCategoryId={filters.categoryId}
-                  onCategoryChange={(categoryId) =>
-                    setFilters({ ...filters, categoryId })
-                  }
-                />
-                <SupplierFilter
-                  suppliers={suppliers}
-                  selectedSupplierId={filters.supplierId}
-                  onSupplierChange={(supplierId) =>
-                    setFilters({ ...filters, supplierId })
-                  }
-                />
-                <StatusFilter
-                  value={filters.status}
-                  onChange={(value) => setFilters({ ...filters, status: value })}
-                />
-                <StockFilter
-                  value={filters.stock}
-                  onChange={(value) => setFilters({ ...filters, stock: value })}
-                />
-                <PriceRangeFilter
-                  min={filters.priceMin}
-                  max={filters.priceMax}
-                  onMinChange={(min) => setFilters({ ...filters, priceMin: min })}
-                  onMaxChange={(max) => setFilters({ ...filters, priceMax: max })}
-                />
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-gray-200">
-              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
-                Ordenamiento
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ordenar por</label>
-                  <select
-                    value={filters.sortBy}
-                    onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as ProductSortBy })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                  >
-                    <option value="created_at">Fecha de creación</option>
-                    <option value="name">Nombre</option>
-                    <option value="sku">SKU</option>
-                    <option value="price">Precio</option>
-                    <option value="stock">Stock</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Dirección</label>
-                  <select
-                    value={filters.sortDirection}
-                    onChange={(e) => setFilters({ ...filters, sortDirection: e.target.value as SortDirection })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                  >
-                    <option value="desc">Descendente</option>
-                    <option value="asc">Ascendente</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {hasActiveFilters && (
-              <div className="pt-1">
-                <Button variant="outline" onClick={clearFilters}>
-                  Limpiar Filtros
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card>
-      </div>
-
-      {/* Results count */}
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <p className="text-sm text-gray-600">
-          Mostrando {fromItem}-{toItem} de {totalFiltered} producto{totalFiltered !== 1 ? 's' : ''}
-          {totalFiltered !== products.length && ` (filtrados de ${products.length})`}
-        </p>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-600" htmlFor="products-page-size">Mostrar</label>
-          <select
-            id="products-page-size"
-            value={pageSize}
-            onChange={(e) => {
-              setPageSize(Number(e.target.value))
-              setPage(0)
-            }}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size} por página
-              </option>
-            ))}
-          </select>
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
+        <select
+          value={filters.categoryId}
+          onChange={(e) => setFilters({ ...filters, categoryId: e.target.value })}
+          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${filters.categoryId ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
+        >
+          <option value="">Categoría</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
+        <select
+          value={filters.supplierId}
+          onChange={(e) => setFilters({ ...filters, supplierId: e.target.value })}
+          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${filters.supplierId ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
+        >
+          <option value="">Proveedor</option>
+          {suppliers.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        <select
+          value={filters.status}
+          onChange={(e) => setFilters({ ...filters, status: e.target.value as StatusFilterValue })}
+          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${filters.status !== 'all' ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
+        >
+          <option value="all">Estado: todos</option>
+          <option value="active">Activo</option>
+          <option value="inactive">Inactivo</option>
+        </select>
+        <select
+          value={filters.stock}
+          onChange={(e) => setFilters({ ...filters, stock: e.target.value as StockFilterValue })}
+          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${filters.stock !== 'all' ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
+        >
+          <option value="all">Stock: todos</option>
+          <option value="in_stock">Con stock</option>
+          <option value="low_stock">Stock bajo</option>
+          <option value="out_of_stock">Sin stock</option>
+        </select>
+        <select
+          value={filters.sortBy}
+          onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as ProductSortBy })}
+          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${filters.sortBy !== 'created_at' ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
+        >
+          <option value="created_at">Más recientes</option>
+          <option value="name">Nombre</option>
+          <option value="sku">SKU</option>
+          <option value="price">Precio</option>
+          <option value="stock">Stock</option>
+        </select>
+        <button
+          onClick={() => setFilters({ ...filters, sortDirection: filters.sortDirection === 'asc' ? 'desc' : 'asc' })}
+          className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+          title={filters.sortDirection === 'asc' ? 'Ascendente' : 'Descendente'}
+        >
+          <ArrowDown className={`h-3.5 w-3.5 transition-transform ${filters.sortDirection === 'asc' ? 'rotate-180' : ''}`} />
+        </button>
+        <select
+          value={pageSize}
+          onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0) }}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-admin-500"
+        >
+          {PAGE_SIZE_OPTIONS.map((size) => (
+            <option key={size} value={size}>{size}/pág.</option>
+          ))}
+        </select>
+        {hasActiveFilters && (
+          <button
+            onClick={clearFilters}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            Limpiar
+          </button>
+        )}
+        <span className="ml-auto text-sm text-gray-500 whitespace-nowrap">
+          {fromItem}-{toItem} de {totalFiltered}
+          {totalFiltered !== products.length && ` (de ${products.length})`}
+        </span>
       </div>
 
       {/* Products Display */}

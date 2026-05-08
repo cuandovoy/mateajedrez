@@ -10,8 +10,8 @@ import { cn, formatDateShort } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useToastStore } from '@/store/toastStore'
 import type { UserProfile } from '@/types'
-import { ChevronDown, ChevronLeft, ChevronRight, Filter, Plus, Search, Users } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ChevronLeft, ChevronRight, Edit2, Plus, Search, Users, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 interface UserProfileWithEmail extends UserProfile {
@@ -69,12 +69,15 @@ export function AdminUsers() {
   const navigate = useNavigate()
   const { createUser } = useUserManagement()
   const { user: authUser } = useAuthStore()
-  const [users, setUsers] = useState<UserProfileWithEmail[]>([])
+
+  const [allUsers, setAllUsers] = useState<UserProfileWithEmail[]>([])
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
   const [updatingRole, setUpdatingRole] = useState<string | null>(null)
   const [organizationRoles, setOrganizationRoles] = useState<OrganizationRoleOption[]>([])
+  // Ref para que handleRoleChange siempre lea los roles actuales sin depender del closure
+  const organizationRolesRef = useRef<OrganizationRoleOption[]>([])
+
   const [creatingUser, setCreatingUser] = useState(false)
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newUserForm, setNewUserForm] = useState<NewUserFormData>({
@@ -84,11 +87,15 @@ export function AdminUsers() {
     phone: '',
     role: 'user',
   })
-  
-  // Filters
-  const [filtersOpen, setFiltersOpen] = useState(false)
+
+  // Filters (client-side)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all')
+
+  // Edit modal
+  const [editingUser, setEditingUser] = useState<UserProfileWithEmail | null>(null)
+  const [editForm, setEditForm] = useState({ full_name: '', phone: '' })
+  const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
     if (!isAdmin) {
@@ -99,11 +106,18 @@ export function AdminUsers() {
       fetchOrganizationRoles()
       fetchUsers()
     }
-  }, [isAdmin, organizationId, currentPage, roleFilter, searchTerm, navigate])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, organizationId])
+
+  // Resetear página al cambiar filtros
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, roleFilter])
 
   const fetchOrganizationRoles = async () => {
     if (!organizationId) return
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any
       const { data, error } = await sb
         .from('organization_roles')
@@ -114,7 +128,9 @@ export function AdminUsers() {
         .order('name', { ascending: true })
 
       if (error) throw error
-      setOrganizationRoles((data || []) as OrganizationRoleOption[])
+      const roles = (data || []) as OrganizationRoleOption[]
+      setOrganizationRoles(roles)
+      organizationRolesRef.current = roles
     } catch (error) {
       console.error('Error fetching organization roles:', error)
     }
@@ -124,8 +140,11 @@ export function AdminUsers() {
     if (!organizationId) return
     setLoading(true)
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any
-      let rolesForMapping = organizationRoles
+
+      // Usar ref para tener roles actualizados; si vacíos, fetchear primero
+      let rolesForMapping = organizationRolesRef.current
       if (!rolesForMapping.length) {
         const { data: rolesData, error: rolesError } = await sb
           .from('organization_roles')
@@ -135,10 +154,10 @@ export function AdminUsers() {
         if (!rolesError && rolesData) {
           rolesForMapping = rolesData as OrganizationRoleOption[]
           setOrganizationRoles(rolesForMapping)
+          organizationRolesRef.current = rolesForMapping
         }
       }
 
-      // Fetch org members (role is per-org)
       const { data: membersData, error: membersError } = await sb
         .from('organization_members')
         .select('user_id, role, organization_role_id')
@@ -150,12 +169,10 @@ export function AdminUsers() {
       const userIds = members.map((m: { user_id: string }) => m.user_id).filter(Boolean)
 
       if (userIds.length === 0) {
-        setUsers([])
-        setTotalCount(0)
+        setAllUsers([])
         return
       }
 
-      // Fetch user profiles for those users
       const { data: profilesData, error: profilesError } = await supabase
         .from('user_profiles')
         .select('*')
@@ -169,8 +186,7 @@ export function AdminUsers() {
         members.map((m: { user_id: string; role: string; organization_role_id: string | null }) => [m.user_id, m])
       )
 
-      // Merge: profile + org role (role from organization_members)
-      let processedUsers: UserProfileWithEmail[] = (profilesData || []).map((profile: UserProfileWithEmail) => {
+      const processedUsers: UserProfileWithEmail[] = (profilesData || []).map((profile: UserProfileWithEmail) => {
         const member = memberByUserId.get(profile.user_id ?? '') as
           | { role: string; organization_role_id: string | null }
           | undefined
@@ -186,30 +202,7 @@ export function AdminUsers() {
         }
       })
 
-      // Apply role filter
-      if (roleFilter !== 'all') {
-        processedUsers = processedUsers.filter((u) => u.role === roleFilter)
-      }
-
-      // Filter by search term
-      if (searchTerm) {
-        const searchLower = searchTerm.toLowerCase()
-        processedUsers = processedUsers.filter((user) =>
-          user.full_name?.toLowerCase().includes(searchLower) ||
-          user.phone?.includes(searchTerm) ||
-          (user.address as { address?: string; city?: string })?.address?.toLowerCase().includes(searchLower) ||
-          (user.address as { city?: string })?.city?.toLowerCase().includes(searchLower)
-        )
-      }
-
-      // Pagination (client-side after filters)
-      const total = processedUsers.length
-      const from = (currentPage - 1) * ITEMS_PER_PAGE
-      const to = from + ITEMS_PER_PAGE
-      processedUsers = processedUsers.slice(from, to)
-
-      setUsers(processedUsers)
-      setTotalCount(total)
+      setAllUsers(processedUsers)
     } catch (error) {
       console.error('Error fetching users:', error)
       show('Error al cargar los usuarios', 'error')
@@ -218,7 +211,30 @@ export function AdminUsers() {
     }
   }
 
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
+  // Filtrado y paginación client-side
+  const filteredUsers = useMemo(() => {
+    let result = allUsers
+    if (roleFilter !== 'all') {
+      result = result.filter((u) => u.role === roleFilter || u.base_role_key === roleFilter)
+    }
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase()
+      result = result.filter((u) =>
+        u.full_name?.toLowerCase().includes(q) ||
+        u.phone?.includes(searchTerm) ||
+        (u.address as { address?: string })?.address?.toLowerCase().includes(q) ||
+        (u.address as { city?: string })?.city?.toLowerCase().includes(q)
+      )
+    }
+    return result
+  }, [allUsers, roleFilter, searchTerm])
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / ITEMS_PER_PAGE))
+
+  const paginatedUsers = useMemo(() => {
+    const from = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredUsers.slice(from, from + ITEMS_PER_PAGE)
+  }, [filteredUsers, currentPage])
 
   const handleResetFilters = () => {
     setSearchTerm('')
@@ -227,9 +243,10 @@ export function AdminUsers() {
   }
 
   const handleRoleChange = async (userOrProfileId: string, organizationRoleId: string) => {
-    const user = users.find((u) => u.id === userOrProfileId || u.user_id === userOrProfileId)
+    const user = allUsers.find((u) => u.id === userOrProfileId || u.user_id === userOrProfileId)
     const userId = user?.user_id ?? userOrProfileId
-    const selectedOrgRole = organizationRoles.find((r) => r.id === organizationRoleId)
+    // Leer desde ref para evitar stale closure
+    const selectedOrgRole = organizationRolesRef.current.find((r) => r.id === organizationRoleId)
     if (!selectedOrgRole) {
       show('Rol inválido', 'error')
       return
@@ -239,6 +256,7 @@ export function AdminUsers() {
 
     setUpdatingRole(userId)
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any
       const { error } = await sb
         .from('organization_members')
@@ -251,17 +269,17 @@ export function AdminUsers() {
 
       if (error) throw error
 
-      setUsers((prevUsers) =>
-        prevUsers.map((user) =>
-          user.user_id === userId
+      setAllUsers((prev) =>
+        prev.map((u) =>
+          u.user_id === userId
             ? {
-                ...user,
+                ...u,
                 role: legacyRole,
                 organization_role_id: selectedOrgRole.id,
                 role_name: selectedOrgRole.name,
                 base_role_key: selectedOrgRole.base_role_key,
               }
-            : user
+            : u
         )
       )
       show(`Rol actualizado a ${selectedOrgRole.name}`, 'success')
@@ -270,6 +288,37 @@ export function AdminUsers() {
       show('Error al actualizar el rol', 'error')
     } finally {
       setUpdatingRole(null)
+    }
+  }
+
+  const handleEditSave = async () => {
+    if (!editingUser) return
+    setSavingEdit(true)
+    try {
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          full_name: editForm.full_name.trim() || null,
+          phone: editForm.phone.trim() || null,
+        })
+        .eq('id', editingUser.id)
+
+      if (error) throw error
+
+      setAllUsers((prev) =>
+        prev.map((u) =>
+          u.id === editingUser.id
+            ? { ...u, full_name: editForm.full_name.trim() || null, phone: editForm.phone.trim() || null }
+            : u
+        )
+      )
+      show('Usuario actualizado', 'success')
+      setEditingUser(null)
+    } catch (err) {
+      console.error('Error updating user:', err)
+      show('Error al actualizar el usuario', 'error')
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -287,13 +336,7 @@ export function AdminUsers() {
       })
 
       show('Usuario creado correctamente', 'success')
-      setNewUserForm({
-        email: '',
-        password: '',
-        fullName: '',
-        phone: '',
-        role: 'user',
-      })
+      setNewUserForm({ email: '', password: '', fullName: '', phone: '', role: 'user' })
       setShowCreateForm(false)
       await fetchUsers()
     } catch (error) {
@@ -352,9 +395,7 @@ export function AdminUsers() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre Completo
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
                 <Input
                   type="text"
                   value={newUserForm.fullName}
@@ -362,9 +403,7 @@ export function AdminUsers() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Teléfono
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
                 <Input
                   type="text"
                   value={newUserForm.phone}
@@ -390,12 +429,7 @@ export function AdminUsers() {
                 <Button type="submit" disabled={creatingUser}>
                   {creatingUser ? 'Creando...' : 'Crear Usuario'}
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={creatingUser}
-                  onClick={() => setShowCreateForm(false)}
-                >
+                <Button type="button" variant="outline" disabled={creatingUser} onClick={() => setShowCreateForm(false)}>
                   Cancelar
                 </Button>
               </div>
@@ -404,116 +438,71 @@ export function AdminUsers() {
         </Card>
       )}
 
-      {/* Mobile search */}
-      <div className="md:hidden mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
+      {/* Filter toolbar */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
             type="text"
-            placeholder="Buscar usuarios..."
+            placeholder="Buscar por nombre, teléfono..."
             value={searchTerm}
             onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
-            className="pl-10"
+            className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
           />
+          {searchTerm && (
+            <button
+              onClick={() => { setSearchTerm(''); setCurrentPage(1) }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
-      </div>
-
-      {/* Filters */}
-      <div className="hidden md:block">
-      <Card className="mb-6">
-        <CardHeader
-          className="cursor-pointer select-none"
-          onClick={() => setFiltersOpen((v) => !v)}
+        <select
+          value={roleFilter}
+          onChange={(e) => { setRoleFilter(e.target.value as UserRole | 'all'); setCurrentPage(1) }}
+          className={`px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 ${roleFilter !== 'all' ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-300 text-gray-700'}`}
         >
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Filter className="h-5 w-5" />
-              <span>Filtros</span>
-              {(roleFilter !== 'all' || searchTerm) && (
-                <span className="ml-1 inline-flex items-center rounded-full bg-admin-100 text-admin-700 text-xs font-medium px-2 py-0.5">Activos</span>
-              )}
-            </div>
-            <ChevronDown className={cn('h-4 w-4 text-gray-500 transition-transform', filtersOpen && 'rotate-180')} />
-          </CardTitle>
-        </CardHeader>
-        {filtersOpen && (
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Search */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Buscar
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    type="text"
-                    placeholder="Nombre, teléfono, dirección..."
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value)
-                      setCurrentPage(1)
-                    }}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-
-              {/* Role Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rol
-                </label>
-                <select
-                  value={roleFilter}
-                  onChange={(e) => {
-                    setRoleFilter(e.target.value as UserRole | 'all')
-                    setCurrentPage(1)
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
-                >
-                  <option value="all">Todos</option>
-                  <option value="user">Usuario</option>
-                  <option value="viewer">Visualizador</option>
-                  <option value="manager">Gerente</option>
-                  <option value="admin">Administrador</option>
-                </select>
-              </div>
-            </div>
-
-            {(roleFilter !== 'all' || searchTerm) && (
-              <div className="mt-4">
-                <Button variant="outline" onClick={handleResetFilters}>
-                  Limpiar Filtros
-                </Button>
-              </div>
-            )}
-          </CardContent>
+          <option value="all">Rol: todos</option>
+          <option value="user">Usuario</option>
+          <option value="viewer">Visualizador</option>
+          <option value="manager">Gerente</option>
+          <option value="admin">Administrador</option>
+        </select>
+        {(searchTerm || roleFilter !== 'all') && (
+          <button
+            onClick={handleResetFilters}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            Limpiar
+          </button>
         )}
-      </Card>
+        <span className="ml-auto text-sm text-gray-500">
+          {filteredUsers.length} usuario{filteredUsers.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
       {/* Users Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Usuarios ({totalCount})</CardTitle>
+          <CardTitle>Lista de Usuarios ({filteredUsers.length})</CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600"></div>
             </div>
-          ) : users.length === 0 ? (
+          ) : paginatedUsers.length === 0 ? (
             <EmptyState
               icon={Users}
               title="No se encontraron usuarios"
-              description={searchTerm || roleFilter !== 'all' ? 'Prueba ajustar los filtros de búsqueda.' : 'Aún no hay usuarios en esta organización.'}
+              description={searchTerm || roleFilter !== 'all' ? 'Probá ajustar los filtros.' : 'Aún no hay usuarios en esta organización.'}
             />
           ) : (
             <>
               {/* Mobile cards */}
               <div className="md:hidden divide-y">
-                {users.map((user) => (
+                {paginatedUsers.map((user) => (
                   <div key={user.user_id ?? user.id} className="p-4 space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -543,6 +532,16 @@ export function AdminUsers() {
                           </option>
                         ))}
                       </select>
+                      <button
+                        onClick={() => {
+                          setEditingUser(user)
+                          setEditForm({ full_name: user.full_name || '', phone: user.phone || '' })
+                        }}
+                        className="p-1.5 text-gray-400 hover:text-admin-600 hover:bg-admin-50 rounded transition-colors"
+                        title="Editar usuario"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
                     </div>
                     <p className="text-xs text-gray-400">{formatDateShort(user.created_at, settings)}</p>
                   </div>
@@ -558,78 +557,58 @@ export function AdminUsers() {
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Teléfono</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Dirección</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Tipo</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Rol</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Acciones</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Rol actual</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Cambiar rol</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Fecha Registro</th>
+                      <th className="py-3 px-4"></th>
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map((user) => {
+                    {paginatedUsers.map((user) => {
                       const address = user.address as {
                         address?: string
                         city?: string
                         state?: string
-                        zipCode?: string
-                        country?: string
                       } | null
+                      const userId = user.user_id ?? user.id
 
                       return (
-                        <tr key={user.user_id ?? user.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <tr key={userId} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-4">
                             <div>
-                              <p className="font-medium text-gray-900">
-                                {user.full_name || 'Sin nombre'}
-                              </p>
-                              {user.email && (
-                                <p className="text-sm text-gray-500">{user.email}</p>
-                              )}
+                              <p className="font-medium text-gray-900">{user.full_name || 'Sin nombre'}</p>
+                              {user.email && <p className="text-sm text-gray-500">{user.email}</p>}
                             </div>
                           </td>
                           <td className="py-3 px-4 text-sm text-gray-600">
-                            {user.phone || 'N/A'}
+                            {user.phone || '—'}
                           </td>
                           <td className="py-3 px-4 text-sm text-gray-600">
                             {address ? (
                               <div>
                                 {address.address && <p>{address.address}</p>}
                                 {address.city && address.state && (
-                                  <p className="text-xs text-gray-500">
-                                    {address.city}, {address.state}
-                                  </p>
+                                  <p className="text-xs text-gray-500">{address.city}, {address.state}</p>
                                 )}
                               </div>
-                            ) : (
-                              'N/A'
-                            )}
+                            ) : '—'}
                           </td>
                           <td className="py-3 px-4">
-                            <span
-                              className={cn(
-                                'px-2 py-1 rounded-full text-xs font-medium',
-                                user.isGuest
-                                  ? 'bg-orange-100 text-orange-800'
-                                  : 'bg-green-100 text-green-800'
-                              )}
-                            >
+                            <span className={cn('px-2 py-1 rounded-full text-xs font-medium', user.isGuest ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800')}>
                               {user.isGuest ? 'Invitado' : 'Registrado'}
                             </span>
                           </td>
                           <td className="py-3 px-4">
-                            <span
-                              className={cn(
-                                'px-2 py-1 rounded-full text-xs font-medium',
-                                getRoleColor(user.base_role_key || user.role)
-                              )}
-                            >
+                            <span className={cn('px-2 py-1 rounded-full text-xs font-medium', getRoleColor(user.base_role_key || user.role))}>
                               {user.role_name || getRoleLabel(user.role)}
                             </span>
                           </td>
                           <td className="py-3 px-4">
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center gap-2">
                               <select
                                 value={user.organization_role_id ?? ''}
-                                onChange={(e) => handleRoleChange(user.user_id ?? user.id, e.target.value)}
-                                disabled={updatingRole === (user.user_id ?? user.id) || user.user_id === authUser?.id}
+                                onChange={(e) => handleRoleChange(userId, e.target.value)}
+                                disabled={updatingRole === userId || user.user_id === authUser?.id}
                                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-200 disabled:bg-gray-100 disabled:text-gray-500"
                               >
                                 {organizationRoles.map((roleOption) => (
@@ -638,13 +617,25 @@ export function AdminUsers() {
                                   </option>
                                 ))}
                               </select>
-                              {updatingRole === user.id && (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-admin-600"></div>
+                              {updatingRole === userId && (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-admin-600 shrink-0" />
                               )}
                             </div>
                           </td>
                           <td className="py-3 px-4 text-sm text-gray-600">
                             {formatDateShort(user.created_at, settings)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => {
+                                setEditingUser(user)
+                                setEditForm({ full_name: user.full_name || '', phone: user.phone || '' })
+                              }}
+                              className="p-1.5 text-gray-400 hover:text-admin-600 hover:bg-admin-50 rounded transition-colors"
+                              title="Editar usuario"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </button>
                           </td>
                         </tr>
                       )
@@ -656,11 +647,10 @@ export function AdminUsers() {
               {/* Pagination */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-                  <div className="text-sm text-gray-600">
-                    Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{' '}
-                    {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} de {totalCount} usuarios
-                  </div>
-                  <div className="flex items-center space-x-2">
+                  <p className="text-sm text-gray-600">
+                    {(currentPage - 1) * ITEMS_PER_PAGE + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filteredUsers.length)} de {filteredUsers.length}
+                  </p>
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
@@ -670,9 +660,7 @@ export function AdminUsers() {
                       <ChevronLeft className="h-4 w-4" />
                       Anterior
                     </Button>
-                    <span className="text-sm text-gray-600">
-                      Página {currentPage} de {totalPages}
-                    </span>
+                    <span className="text-sm text-gray-600">Página {currentPage} de {totalPages}</span>
                     <Button
                       variant="outline"
                       size="sm"
@@ -689,6 +677,49 @@ export function AdminUsers() {
           )}
         </CardContent>
       </Card>
+
+      {/* Edit user modal */}
+      {editingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h2 className="text-base font-semibold text-gray-900">Editar usuario</h2>
+              <button
+                onClick={() => setEditingUser(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre completo</label>
+                <Input
+                  value={editForm.full_name}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, full_name: e.target.value }))}
+                  placeholder="Nombre completo"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                <Input
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+598 9 123 4567"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 px-5 py-4 border-t border-gray-100">
+              <Button onClick={handleEditSave} isLoading={savingEdit} className="flex-1">
+                Guardar
+              </Button>
+              <Button variant="outline" onClick={() => setEditingUser(null)} disabled={savingEdit} className="flex-1">
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

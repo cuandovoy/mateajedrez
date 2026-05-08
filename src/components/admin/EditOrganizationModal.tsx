@@ -161,6 +161,9 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
   const [locale, setLocale] = useState((rawSettings.locale as string) ?? 'es-AR')
   const [timezone, setTimezone] = useState((rawSettings.timezone as string) ?? 'America/Argentina/Buenos_Aires')
   const [allowNegativeStock, setAllowNegativeStock] = useState((rawSettings.allow_negative_stock as boolean) !== false)
+  const [costingMethod, setCostingMethod] = useState<'weighted_average' | 'fifo'>(
+    (rawSettings.costing_method as 'weighted_average' | 'fifo') ?? 'weighted_average'
+  )
   const [defaultLowStockThreshold, setDefaultLowStockThreshold] = useState(
     Number.isFinite(rawSettings.default_low_stock_threshold as number)
       ? Number(rawSettings.default_low_stock_threshold)
@@ -452,6 +455,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
     setLocale((s.locale as string) ?? 'es-AR')
     setTimezone((s.timezone as string) ?? 'America/Argentina/Buenos_Aires')
     setAllowNegativeStock((s.allow_negative_stock as boolean) !== false)
+    setCostingMethod((s.costing_method as 'weighted_average' | 'fifo') ?? 'weighted_average')
     setDefaultLowStockThreshold(
       Number.isFinite(s.default_low_stock_threshold as number)
         ? Number(s.default_low_stock_threshold)
@@ -582,6 +586,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
     locale !== (prevSettings.locale ?? 'es-AR') ||
     timezone !== (prevSettings.timezone ?? 'America/Argentina/Buenos_Aires') ||
     allowNegativeStock !== ((prevSettings.allow_negative_stock as boolean) !== false) ||
+    costingMethod !== ((prevSettings.costing_method as 'weighted_average' | 'fifo') ?? 'weighted_average') ||
     defaultLowStockThreshold !==
       (Number.isFinite(prevSettings.default_low_stock_threshold as number)
         ? Number(prevSettings.default_low_stock_threshold)
@@ -818,6 +823,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
         locale: locale.trim() || 'es-AR',
         timezone: timezone.trim() || 'America/Argentina/Buenos_Aires',
         allow_negative_stock: allowNegativeStock,
+        costing_method: costingMethod,
         default_low_stock_threshold: Math.max(0, Math.trunc(defaultLowStockThreshold || 0)),
         checkout_fulfillment_mode: checkoutFulfillmentMode,
         checkout_exclude_isolated_warehouses: checkoutExcludeIsolatedWarehouses,
@@ -1333,6 +1339,25 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                   <p className="text-xs text-gray-500">
                     Si está desactivado, no se podrá completar una venta cuando falte stock.
                   </p>
+                </div>
+                <div className="space-y-2 border-t pt-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Método de costeo de inventario
+                    </label>
+                    <select
+                      value={costingMethod}
+                      onChange={(e) => setCostingMethod(e.target.value as 'weighted_average' | 'fifo')}
+                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
+                    >
+                      <option value="weighted_average">Costo promedio ponderado (recomendado)</option>
+                      <option value="fifo">FIFO — primero en entrar, primero en salir</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      El cambio aplica a movimientos futuros. El historial existente no se recalcula.
+                      FIFO es recomendado para alimentos, cosméticos y productos con vencimiento.
+                    </p>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

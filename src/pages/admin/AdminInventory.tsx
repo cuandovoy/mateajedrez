@@ -37,6 +37,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 const DEFAULT_PAGE_SIZE = 25
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
 const EXPORT_BATCH_SIZE = 1000
+const CROSS_VIEW_PAGE_SIZE = 20
 
 interface InventoryItem {
   id: string
@@ -59,6 +60,8 @@ interface CrossViewRow {
   product_id: string
   product_name: string
   sku: string | null
+  description: string | null
+  image_url: string | null
   branchStocks: Record<string, { stock: number; min_stock: number; low_stock_threshold: number }>
 }
 
@@ -111,7 +114,6 @@ export function AdminInventory() {
   const [inventoryViewTab, setInventoryViewTab] = useState<'branch' | 'product'>('branch')
   const [crossViewData, setCrossViewData] = useState<CrossViewRow[]>([])
   const [crossViewLoading, setCrossViewLoading] = useState(false)
-  const [filtersCollapsed, setFiltersCollapsed] = useState(true)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
@@ -120,6 +122,8 @@ export function AdminInventory() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false)
   const [hideOutOfStock, setHideOutOfStock] = useState(false)
+  const [crossViewSearch, setCrossViewSearch] = useState('')
+  const [crossViewPage, setCrossViewPage] = useState(0)
   const fetchInventoryRequestId = useRef(0)
 
   useEffect(() => {
@@ -178,6 +182,25 @@ export function AdminInventory() {
     if (hideOutOfStock) result = result.filter(item => item.stock > 0)
     return result
   }, [inventory, showOnlyLowStock, hideOutOfStock])
+
+  useEffect(() => {
+    setCrossViewPage(0)
+  }, [crossViewSearch])
+
+  const filteredCrossViewData = useMemo(() => {
+    if (!crossViewSearch.trim()) return crossViewData
+    const term = crossViewSearch.trim().toLowerCase()
+    return crossViewData.filter(row =>
+      row.product_name.toLowerCase().includes(term) ||
+      (row.sku && row.sku.toLowerCase().includes(term)) ||
+      (row.description && row.description.toLowerCase().includes(term))
+    )
+  }, [crossViewData, crossViewSearch])
+
+  const paginatedCrossViewData = useMemo(() => {
+    const from = crossViewPage * CROSS_VIEW_PAGE_SIZE
+    return filteredCrossViewData.slice(from, from + CROSS_VIEW_PAGE_SIZE)
+  }, [filteredCrossViewData, crossViewPage])
 
   const fetchInventory = useCallback(async () => {
     if (!organizationId) return
@@ -580,7 +603,7 @@ export function AdminInventory() {
           min_stock,
           low_stock_threshold,
           branch:branches!inner(id, name, organization_id),
-          product:products(id, name, sku)
+          product:products(id, name, sku, description, image_url, product_images(image_url, is_primary, display_order))
         `)
         .eq('branches.organization_id', organizationId)
         .is('variant_id', null) // Only base products for clarity
@@ -599,6 +622,8 @@ export function AdminInventory() {
             product_id: productId,
             product_name: row.product?.name || 'Producto',
             sku: row.product?.sku || null,
+            description: row.product?.description || null,
+            image_url: getPrimaryImageUrl(row.product?.product_images) || row.product?.image_url || null,
             branchStocks: {},
           })
         }
@@ -1137,15 +1162,29 @@ export function AdminInventory() {
       {/* Cross-view table */}
       {inventoryViewTab === 'product' && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Package className="h-5 w-5" />
-              Stock por producto en todas las sucursales
-            </CardTitle>
-            <Button variant="outline" size="sm" onClick={fetchCrossView} disabled={crossViewLoading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${crossViewLoading ? 'animate-spin' : ''}`} />
-              Actualizar
-            </Button>
+          <CardHeader className="flex flex-col gap-3">
+            <div className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Stock por producto en todas las sucursales
+              </CardTitle>
+              <Button variant="outline" size="sm" onClick={fetchCrossView} disabled={crossViewLoading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${crossViewLoading ? 'animate-spin' : ''}`} />
+                Actualizar
+              </Button>
+            </div>
+            {crossViewData.length > 0 && (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre, SKU o descripción..."
+                  value={crossViewSearch}
+                  onChange={(e) => setCrossViewSearch(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                />
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {crossViewLoading ? (
@@ -1157,15 +1196,29 @@ export function AdminInventory() {
                 <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
                 <p>No hay datos de inventario disponibles</p>
               </div>
+            ) : filteredCrossViewData.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Search className="h-10 w-10 mx-auto mb-3 text-gray-300" />
+                <p>Sin resultados para "{crossViewSearch}"</p>
+              </div>
             ) : (
               <>
                 {/* Mobile: cards por producto */}
                 <div className="md:hidden divide-y">
-                  {crossViewData.map((row) => (
+                  {paginatedCrossViewData.map((row) => (
                     <div key={row.product_id} className="p-4 space-y-2">
-                      <div>
-                        <p className="font-semibold text-gray-900">{capitalizeFirst(row.product_name)}</p>
-                        {row.sku && <p className="text-xs text-gray-400 font-mono">{row.sku}</p>}
+                      <div className="flex items-center gap-3">
+                        {row.image_url ? (
+                          <img src={row.image_url} alt={row.product_name} className="h-10 w-10 rounded-md object-cover shrink-0 border border-gray-200" loading="lazy" />
+                        ) : (
+                          <div className="h-10 w-10 rounded-md bg-gray-100 flex items-center justify-center shrink-0">
+                            <Package className="h-4 w-4 text-gray-400" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900 truncate">{capitalizeFirst(row.product_name)}</p>
+                          {row.sku && <p className="text-xs text-gray-400 font-mono">{row.sku}</p>}
+                        </div>
                       </div>
                       <div className="space-y-1.5">
                         {branches.map((b) => {
@@ -1195,7 +1248,8 @@ export function AdminInventory() {
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs sticky left-0 bg-gray-50 z-10">Producto</th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs sticky left-0 bg-gray-50 z-10 w-8"></th>
+                        <th className="px-4 py-3 text-left font-medium text-gray-500 uppercase text-xs sticky left-8 bg-gray-50 z-10">Producto</th>
                         <th className="px-3 py-3 text-left font-medium text-gray-500 uppercase text-xs">SKU</th>
                         {branches.map((b) => (
                           <th key={b.id} className="px-4 py-3 text-center font-medium text-gray-500 uppercase text-xs whitespace-nowrap">
@@ -1205,9 +1259,37 @@ export function AdminInventory() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
-                      {crossViewData.map((row) => (
+                      {paginatedCrossViewData.map((row) => (
                         <tr key={row.product_id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-900 sticky left-0 bg-white max-w-[200px] truncate">
+                          <td className="px-2 py-2 sticky left-0 bg-white group-hover:bg-gray-50">
+                            <div className="relative group/img h-9 w-9">
+                              <div className="h-9 w-9 rounded-md border border-gray-200 bg-gray-100 overflow-hidden">
+                                {row.image_url ? (
+                                  <img
+                                    src={row.image_url}
+                                    alt={row.product_name}
+                                    className="h-full w-full object-cover"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center">
+                                    <Package className="h-4 w-4 text-gray-300" />
+                                  </div>
+                                )}
+                              </div>
+                              {row.image_url && (
+                                <div className="absolute left-11 top-1/2 -translate-y-1/2 z-30 hidden group-hover/img:block pointer-events-none">
+                                  <img
+                                    src={row.image_url}
+                                    alt={row.product_name}
+                                    className="h-24 w-24 object-cover rounded-lg shadow-xl border border-gray-200"
+                                    loading="lazy"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 font-medium text-gray-900 sticky left-8 bg-white max-w-[180px] truncate">
                             {capitalizeFirst(row.product_name)}
                           </td>
                           <td className="px-3 py-3 text-gray-500 text-xs font-mono">{row.sku || '—'}</td>
@@ -1231,171 +1313,183 @@ export function AdminInventory() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Paginación cross-view */}
+                {filteredCrossViewData.length > CROSS_VIEW_PAGE_SIZE && (
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 pt-4 border-t border-gray-200">
+                    <p className="text-sm text-gray-600">
+                      {crossViewSearch
+                        ? `${filteredCrossViewData.length} resultado${filteredCrossViewData.length !== 1 ? 's' : ''} · `
+                        : ''}
+                      Mostrando {crossViewPage * CROSS_VIEW_PAGE_SIZE + 1}–{Math.min((crossViewPage + 1) * CROSS_VIEW_PAGE_SIZE, filteredCrossViewData.length)} de {filteredCrossViewData.length}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCrossViewPage((p) => Math.max(0, p - 1))}
+                        disabled={crossViewPage === 0}
+                        className="gap-1"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                        Anterior
+                      </Button>
+                      <span className="text-sm text-gray-600 px-2">
+                        Página {crossViewPage + 1} de {Math.ceil(filteredCrossViewData.length / CROSS_VIEW_PAGE_SIZE)}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCrossViewPage((p) => Math.min(Math.ceil(filteredCrossViewData.length / CROSS_VIEW_PAGE_SIZE) - 1, p + 1))}
+                        disabled={crossViewPage >= Math.ceil(filteredCrossViewData.length / CROSS_VIEW_PAGE_SIZE) - 1}
+                        className="gap-1"
+                      >
+                        Siguiente
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Mobile search — only in branch view */}
+      {/* Filter toolbar — only in branch view */}
       {inventoryViewTab === 'branch' && (
-        <div className="md:hidden mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[180px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input
               type="text"
-              placeholder="Buscar productos..."
+              placeholder="Nombre, SKU..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="pl-10"
+              className="w-full h-9 pl-9 pr-8 border border-gray-200 rounded-lg text-sm bg-white text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent"
             />
+            {searchInput && (
+              <button
+                type="button"
+                onClick={() => setSearchInput('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
+
+          {/* Branch selector — only if more than one */}
+          {branches.length > 1 && (
+            <select
+              value={selectedBranch}
+              onChange={(e) => { setSelectedBranch(e.target.value); setPage(0) }}
+              className={`h-9 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 transition-colors ${
+                selectedBranch
+                  ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium'
+                  : 'border-gray-200 bg-white text-gray-700'
+              }`}
+            >
+              <option value="">Todas las sucursales</option>
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Low stock toggle */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !showOnlyLowStock
+              setShowOnlyLowStock(next)
+              setPage(0)
+              if (next) setPageSize(10000)
+              else setPageSize(DEFAULT_PAGE_SIZE)
+            }}
+            className={`h-9 px-3 rounded-lg text-sm font-medium border flex items-center gap-1.5 transition-colors shrink-0 ${
+              showOnlyLowStock
+                ? 'bg-yellow-50 border-yellow-300 text-yellow-800'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden sm:inline">Stock bajo</span>
+            {lowStockCount > 0 && (
+              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold leading-none ${
+                showOnlyLowStock ? 'bg-yellow-300 text-yellow-900' : 'bg-yellow-100 text-yellow-700'
+              }`}>
+                {lowStockCount}
+              </span>
+            )}
+          </button>
+
+          {/* Hide out of stock toggle */}
+          <button
+            type="button"
+            onClick={() => { setHideOutOfStock((prev) => !prev); setPage(0) }}
+            className={`h-9 px-3 rounded-lg text-sm border flex items-center gap-1.5 transition-colors shrink-0 ${
+              hideOutOfStock
+                ? 'bg-gray-100 border-gray-400 text-gray-800 font-medium'
+                : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+            }`}
+          >
+            <span className="hidden sm:inline">{hideOutOfStock ? 'Sin stock oculto' : 'Ocultar sin stock'}</span>
+            <span className="sm:hidden">{hideOutOfStock ? 'Sin stock ×' : 'Sin stock'}</span>
+          </button>
+
+          {/* Sort direction toggle */}
+          <button
+            type="button"
+            onClick={() => { setSortDirection((prev) => prev === 'asc' ? 'desc' : 'asc'); setPage(0) }}
+            title={sortDirection === 'asc' ? 'Menor stock primero — click para invertir' : 'Mayor stock primero — click para invertir'}
+            className={`h-9 px-3 rounded-lg text-sm border flex items-center gap-1 transition-colors shrink-0 ${
+              sortDirection !== 'asc'
+                ? 'border-admin-300 bg-admin-50 text-admin-800 font-medium'
+                : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
+            }`}
+          >
+            {sortDirection === 'asc' ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
+            <span className="text-xs">Stock</span>
+          </button>
+
+          {/* Page size */}
+          <select
+            value={pageSize}
+            onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0) }}
+            className="h-9 border border-gray-200 rounded-lg px-2 text-sm bg-white text-gray-600 focus:outline-none focus:ring-2 focus:ring-admin-500 shrink-0"
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>{size}/pág</option>
+            ))}
+          </select>
+
+          {/* Clear — only when any filter is active */}
+          {(selectedBranch || searchInput || sortDirection !== 'asc' || hideOutOfStock || showOnlyLowStock) && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedBranch('')
+                setSearchInput('')
+                setSortDirection('asc')
+                setHideOutOfStock(false)
+                setShowOnlyLowStock(false)
+                setPageSize(DEFAULT_PAGE_SIZE)
+                setPage(0)
+              }}
+              className="h-9 px-3 rounded-lg text-sm text-red-500 border border-red-200 hover:bg-red-50 flex items-center gap-1 shrink-0 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Limpiar</span>
+            </button>
+          )}
         </div>
       )}
-
-      {/* Filters — only shown in branch view */}
-      {inventoryViewTab === 'branch' && <div className="hidden md:block"><Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-base flex items-center space-x-2">
-              <Search className="h-4 w-4" />
-              <span>Filtros</span>
-            </CardTitle>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setFiltersCollapsed((prev) => !prev)}
-            >
-              {filtersCollapsed ? (
-                <>
-                  <ChevronDown className="h-4 w-4 mr-1" />
-                  Mostrar
-                </>
-              ) : (
-                <>
-                  <ChevronUp className="h-4 w-4 mr-1" />
-                  Ocultar
-                </>
-              )}
-            </Button>
-          </div>
-        </CardHeader>
-        {!filtersCollapsed && (
-          <CardContent className="space-y-5">
-            <div>
-              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
-                Filtros de listado
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sucursal</label>
-                  <select
-                    value={selectedBranch}
-                    onChange={(e) => {
-                      setSelectedBranch(e.target.value)
-                      setPage(0)
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                  >
-                    <option value="">Todas las sucursales</option>
-                    {branches.map((branch) => (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Buscar Producto</label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-                    <Input
-                      type="text"
-                      value={searchInput}
-                      onChange={(e) => setSearchInput(e.target.value)}
-                      placeholder="Buscar por nombre..."
-                      className="pl-10"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Mostrar</label>
-                  <select
-                    value={pageSize}
-                    onChange={(e) => {
-                      setPageSize(Number(e.target.value))
-                      setPage(0)
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                  >
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <option key={size} value={size}>
-                        {size} por página
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-6 pt-2">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={hideOutOfStock}
-                  onChange={(e) => { setHideOutOfStock(e.target.checked); setPage(0) }}
-                  className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
-                />
-                <span className="text-sm text-gray-700">Ocultar sin stock (= 0)</span>
-              </label>
-            </div>
-
-            <div className="pt-4 border-t border-gray-200">
-              <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase mb-3">
-                Ordenamiento
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ordenar por</label>
-                  <Input value="Stock" readOnly className="bg-gray-50" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Dirección</label>
-                  <select
-                    value={sortDirection}
-                    onChange={(e) => {
-                      setSortDirection(e.target.value as 'asc' | 'desc')
-                      setPage(0)
-                    }}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                  >
-                    <option value="asc">Ascendente (menor stock primero)</option>
-                    <option value="desc">Descendente (mayor stock primero)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {(selectedBranch || searchInput || sortDirection !== 'asc' || hideOutOfStock) && (
-              <div className="pt-1">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelectedBranch('')
-                    setSearchInput('')
-                    setSortDirection('asc')
-                    setHideOutOfStock(false)
-                    setPage(0)
-                  }}
-                >
-                  Limpiar Filtros
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        )}
-      </Card></div>}
 
       {/* Inventory Table — only in branch view */}
       {inventoryViewTab === 'branch' && <Card>
@@ -1516,28 +1610,40 @@ export function AdminInventory() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center space-x-3">
-                          <div className="h-10 w-10 rounded-md border border-gray-200 bg-gray-100 overflow-hidden shrink-0">
-                            {item.thumbnail_url ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setPreviewImage({
-                                    url: item.thumbnail_url as string,
-                                    name: capitalizeFirst(item.product_name),
-                                  })
-                                }
-                                className="h-full w-full block"
-                              >
+                          <div className="relative group/img shrink-0 h-10 w-10">
+                            <div className="h-10 w-10 rounded-md border border-gray-200 bg-gray-100 overflow-hidden">
+                              {item.thumbnail_url ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setPreviewImage({
+                                      url: item.thumbnail_url as string,
+                                      name: capitalizeFirst(item.product_name),
+                                    })
+                                  }
+                                  className="h-full w-full block"
+                                >
+                                  <img
+                                    src={item.thumbnail_url}
+                                    alt={capitalizeFirst(item.product_name)}
+                                    className="h-full w-full object-cover"
+                                    loading="lazy"
+                                  />
+                                </button>
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center text-gray-400">
+                                  <Package className="h-4 w-4" />
+                                </div>
+                              )}
+                            </div>
+                            {item.thumbnail_url && (
+                              <div className="absolute left-12 top-1/2 -translate-y-1/2 z-30 hidden group-hover/img:block pointer-events-none">
                                 <img
                                   src={item.thumbnail_url}
                                   alt={capitalizeFirst(item.product_name)}
-                                  className="h-full w-full object-cover hover:scale-105 transition-transform"
+                                  className="h-24 w-24 object-cover rounded-lg shadow-xl border border-gray-200"
                                   loading="lazy"
                                 />
-                              </button>
-                            ) : (
-                              <div className="h-full w-full flex items-center justify-center text-gray-400">
-                                <Package className="h-4 w-4" />
                               </div>
                             )}
                           </div>
