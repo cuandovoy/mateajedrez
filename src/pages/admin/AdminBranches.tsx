@@ -15,6 +15,7 @@ import { useOrgFeature } from '@/hooks/useOrgFeature'
 import { useToastStore } from '@/store/toastStore'
 import {
   Building2,
+  Clock,
   Edit,
   Grid3x3,
   List,
@@ -22,6 +23,7 @@ import {
   MapPin,
   Phone,
   Plus,
+  RotateCcw,
   Search,
   Trash2,
   X,
@@ -199,19 +201,34 @@ function AdminBranchesContent() {
     setIsModalOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de eliminar esta sucursal? Esta acción no se puede deshacer.')) {
+  const handleSoftDelete = async (id: string) => {
+    if (!confirm('¿Marcar esta sucursal para eliminar? Se eliminará automáticamente en 2 semanas.')) {
       return
     }
-
     try {
-      const { error } = await supabase.from('branches').delete().eq('id', id)
-
+      const { error } = await supabase
+        .from('branches')
+        .update({ is_active: false, deleted_at: new Date().toISOString() } as never)
+        .eq('id', id)
       if (error) throw error
       fetchBranches()
     } catch (error) {
-      console.error('Error deleting branch:', error)
-      alert('Error al eliminar la sucursal. Asegúrate de que no tenga órdenes asociadas.')
+      console.error('Error soft-deleting branch:', error)
+      show('Error al marcar la sucursal para eliminar', 'error')
+    }
+  }
+
+  const handleRestore = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('branches')
+        .update({ is_active: true, deleted_at: null } as never)
+        .eq('id', id)
+      if (error) throw error
+      fetchBranches()
+    } catch (error) {
+      console.error('Error restoring branch:', error)
+      show('Error al restaurar la sucursal', 'error')
     }
   }
 
@@ -309,29 +326,41 @@ function AdminBranchesContent() {
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBranches.map((branch) => (
-            <Card key={branch.id} className="relative">
+            <Card key={branch.id} className={`relative ${branch.deleted_at ? 'border-red-200 bg-red-50/30' : ''}`}>
               <CardContent className="p-6">
                 <div className="absolute top-4 right-4">
                   <ActionsMenu
-                    actions={[
-                      {
-                        label: 'Editar',
-                        icon: <Edit className="h-4 w-4" />,
-                        onClick: () => handleEdit(branch),
-                      },
-                      {
-                        label: 'Eliminar',
-                        icon: <Trash2 className="h-4 w-4" />,
-                        onClick: () => handleDelete(branch.id),
-                        variant: 'danger',
-                      },
-                    ]}
+                    actions={
+                      branch.deleted_at
+                        ? [
+                            {
+                              label: 'Restaurar',
+                              icon: <RotateCcw className="h-4 w-4" />,
+                              onClick: () => handleRestore(branch.id),
+                            },
+                          ]
+                        : [
+                            {
+                              label: 'Editar',
+                              icon: <Edit className="h-4 w-4" />,
+                              onClick: () => handleEdit(branch),
+                            },
+                            {
+                              label: 'Marcar para eliminar',
+                              icon: <Trash2 className="h-4 w-4" />,
+                              onClick: () => handleSoftDelete(branch.id),
+                              variant: 'danger' as const,
+                            },
+                          ]
+                    }
                   />
                 </div>
                 <div className="pr-8">
                   <div className="flex items-center space-x-2 mb-3">
-                    <Building2 className="h-5 w-5 text-admin-600" />
-                    <h3 className="text-lg font-semibold text-gray-900">{branch.name}</h3>
+                    <Building2 className={`h-5 w-5 ${branch.deleted_at ? 'text-red-400' : 'text-admin-600'}`} />
+                    <h3 className={`text-lg font-semibold ${branch.deleted_at ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                      {branch.name}
+                    </h3>
                   </div>
                   {branch.code && (
                     <p className="text-sm text-gray-600 mb-2">Código: {branch.code}</p>
@@ -370,15 +399,22 @@ function AdminBranchesContent() {
                     )}
                   </div>
                   <div className="mt-4">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        branch.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {branch.is_active ? 'Activa' : 'Inactiva'}
-                    </span>
+                    {branch.deleted_at ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full bg-red-50 text-red-700 ring-1 ring-red-200">
+                        <Clock className="h-3 w-3" />
+                        Eliminación pendiente
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          branch.is_active
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {branch.is_active ? 'Activa' : 'Inactiva'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </CardContent>
@@ -391,7 +427,8 @@ function AdminBranchesContent() {
             <BranchTable
               branches={filteredBranches}
               onEdit={handleEdit}
-              onDelete={handleDelete}
+              onSoftDelete={handleSoftDelete}
+              onRestore={handleRestore}
             />
           </CardContent>
         </Card>

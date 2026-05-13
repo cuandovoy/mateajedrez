@@ -127,6 +127,17 @@ export function CreateOrganizationModal({ onClose }: Props) {
 
       if (memberError) throw memberError
 
+      // Crear sucursal principal por defecto
+      const { error: branchError } = await supabase
+        .from('branches')
+        .insert({
+          organization_id: orgId,
+          name: 'Principal',
+          slug: 'principal',
+        } as never)
+
+      if (branchError) throw branchError
+
       let logoUrl: string | null = null
       if (logoFile) {
         setUploadingLogo(true)

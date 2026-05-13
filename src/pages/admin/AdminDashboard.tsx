@@ -1,5 +1,6 @@
 import { DashboardMetrics } from '@/components/admin/DashboardMetrics'
 import { OnboardingChecklist } from '@/components/admin/OnboardingChecklist'
+import { WelcomeModal } from '@/components/admin/WelcomeModal'
 
 export function AdminDashboard() {
   return (
@@ -8,6 +9,7 @@ export function AdminDashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
       </div>
 
+      <WelcomeModal />
       <OnboardingChecklist />
       <DashboardMetrics />
     </div>

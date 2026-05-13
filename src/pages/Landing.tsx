@@ -826,9 +826,6 @@ export function Landing() {
                   <ArrowRight className="h-4 w-4 text-red-400" />
                   <span className="text-xs text-red-300 font-medium">Lote 1 sale primero</span>
                 </div>
-                <p className="text-xs text-zinc-500 max-w-[180px]">
-                  Reemplazá este placeholder con una imagen real de tu sistema
-                </p>
               </div>
             </div>
           </div>

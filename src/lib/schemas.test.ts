@@ -48,12 +48,47 @@ describe('productSchema', () => {
     expect(productSchema.safeParse({ ...valid, stock: 0 }).success).toBe(true)
   })
 
-  it('rechaza category_id vacío', () => {
-    const result = productSchema.safeParse({ ...valid, category_id: '' })
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.issues[0].message).toBe('La categoría es requerida')
-    }
+  // category_id es opcional en el schema: la validación "al menos una categoría"
+  // ocurre fuera del schema via selectedCategoryIds en onSubmit (AdminProducts.tsx)
+  it('acepta category_id vacío', () => {
+    expect(productSchema.safeParse({ ...valid, category_id: '' }).success).toBe(true)
+  })
+
+  it('acepta product sin category_id (undefined)', () => {
+    const { category_id: _, ...noCategory } = valid
+    expect(productSchema.safeParse(noCategory).success).toBe(true)
+  })
+
+  it('rechaza category_id null (usar undefined para ausencia, no null)', () => {
+    expect(productSchema.safeParse({ ...valid, category_id: null }).success).toBe(false)
+  })
+
+  it('acepta discount_percentage en límite inferior (0)', () => {
+    expect(productSchema.safeParse({ ...valid, discount_percentage: 0 }).success).toBe(true)
+  })
+
+  it('acepta discount_percentage en límite superior (100)', () => {
+    expect(productSchema.safeParse({ ...valid, discount_percentage: 100 }).success).toBe(true)
+  })
+
+  it('rechaza discount_percentage por debajo del límite (-1)', () => {
+    expect(productSchema.safeParse({ ...valid, discount_percentage: -1 }).success).toBe(false)
+  })
+
+  it('rechaza discount_percentage por encima del límite (101)', () => {
+    expect(productSchema.safeParse({ ...valid, discount_percentage: 101 }).success).toBe(false)
+  })
+
+  it('acepta discount_percentage null (sin descuento)', () => {
+    expect(productSchema.safeParse({ ...valid, discount_percentage: null }).success).toBe(true)
+  })
+
+  it('acepta discount_expires_at como string ISO', () => {
+    expect(productSchema.safeParse({ ...valid, discount_expires_at: '2026-12-31T23:59' }).success).toBe(true)
+  })
+
+  it('acepta discount_expires_at null (descuento sin límite de fecha)', () => {
+    expect(productSchema.safeParse({ ...valid, discount_expires_at: null }).success).toBe(true)
   })
 
   it('rechaza sku vacío', () => {

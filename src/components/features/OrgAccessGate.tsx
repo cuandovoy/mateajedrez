@@ -1,8 +1,8 @@
 import { useOrgAccess } from '@/hooks/useOrgAccess'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useAuthStore } from '@/store/authStore'
-import { AlertTriangle, Clock, MessageCircle } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { AlertTriangle, Building2, Clock, MessageCircle } from 'lucide-react'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_SALES_NUMBER
 
@@ -15,11 +15,13 @@ export function OrgAccessGate({ children }: Props) {
   const org = useOrganizationStore((s) => s.currentOrganization)
 
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const isAdmin = useAuthStore((s) => s.isAdmin)
 
   // ── Bloqueada: modal overlay sobre el contenido ───────────────────────────
   // Admins siempre pueden entrar. /organizations queda libre para cambiar de org.
   const isBlocked = access.status === 'blocked' && !isAdmin && !pathname.startsWith('/organizations')
+  const isPendingDeletion = !!org?.deleted_at && !pathname.startsWith('/organizations')
   const wasTrialing = org?.subscription_status === 'trialing'
   const tierLabel = org?.subscription_tier === 'profesional' ? 'Profesional' : 'Starter'
   const message = encodeURIComponent(
@@ -80,6 +82,38 @@ export function OrgAccessGate({ children }: Props) {
       )}
 
       {children}
+
+      {/* Modal de bloqueo por organización pendiente de eliminación */}
+      {isPendingDeletion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="relative max-w-sm w-full bg-white rounded-2xl shadow-2xl p-8 text-center space-y-5">
+            <div className="flex justify-center">
+              <div className="h-14 w-14 rounded-full bg-red-100 flex items-center justify-center">
+                <Clock className="h-7 w-7 text-red-500" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-gray-900">
+                Organización pendiente de eliminación
+              </h2>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                <strong className="text-gray-900">{org?.name}</strong> está marcada para ser eliminada y ya no es accesible.
+              </p>
+              <p className="text-gray-600 text-sm leading-relaxed">
+                Si querés recuperarla, un administrador puede restaurarla desde la página de Organizaciones.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/organizations')}
+              className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-admin-600 hover:bg-admin-700 text-white text-sm font-medium transition-colors"
+            >
+              <Building2 className="h-4 w-4" />
+              Ver mis organizaciones
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal de bloqueo por suscripción vencida */}
       {isBlocked && (

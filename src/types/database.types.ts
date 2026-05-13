@@ -147,6 +147,7 @@ export type Database = {
           code: string | null
           country: string | null
           created_at: string | null
+          deleted_at: string | null
           email: string | null
           id: string
           is_isolated_warehouse: boolean
@@ -189,6 +190,7 @@ export type Database = {
           code?: string | null
           country?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           email?: string | null
           id?: string
           is_isolated_warehouse?: boolean
@@ -1027,6 +1029,7 @@ export type Database = {
           button_style: string | null
           cover_image_url: string | null
           created_at: string | null
+          deleted_at: string | null
           font_family: string | null
           font_heading: string | null
           id: string
@@ -1069,6 +1072,7 @@ export type Database = {
           button_style?: string | null
           cover_image_url?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           font_family?: string | null
           font_heading?: string | null
           id?: string

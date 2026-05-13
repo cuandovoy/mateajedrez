@@ -3,3 +3,6 @@ nixPkgs = ["nodejs_22", "yarn"]
 
 [phases.install]
 cmds = ["yarn install --frozen-lockfile --ignore-engines"]
+
+[phases.build]
+cmds = ["yarn test", "yarn build"]

@@ -130,7 +130,7 @@ export function ManualSaleForm({
   const organizations = useOrganizationStore((s) => s.organizations)
   const currentOrganization = useOrganizationStore((s) => s.currentOrganization)
   const currentMemberRole = organizations.find((o) => o.id === currentOrganization?.id)?.member?.role
-  const canApplyManualDiscount = currentMemberRole === 'admin' || currentMemberRole === 'manager'
+  const canApplyManualDiscount = currentMemberRole === 'admin' || currentMemberRole === 'manager' || currentMemberRole === 'sales'
 
   
   
@@ -1443,8 +1443,8 @@ export function ManualSaleForm({
                 className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
               >
                 <option value="none">Sin descuento</option>
-                <option value="manual" disabled={!canApplyManualDiscount}>
-                  Manual {!canApplyManualDiscount ? '(solo admin/manager)' : ''}
+                <option value="manual">
+                  Manual
                 </option>
                 <option value="rule">Regla de descuento</option>
               </select>
