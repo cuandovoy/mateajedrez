@@ -4,6 +4,13 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-05-13 — Fix: entorno de tests cambiado de jsdom a node
+
+- **Archivos modificados:** `vitest.config.ts`
+- **Qué cambió:** El entorno `jsdom` transitivamente requería `html-encoding-sniffer`, que falla al hacer `require()` del paquete ESM `@exodus/bytes/encoding-lite.js`. Como todos los tests están en `src/lib/` (lógica pura, sin DOM), se cambió el entorno a `node`. 172 tests pasan correctamente.
+
+---
+
 ## 2026-05-13 — Tests automáticos en cada deploy via nixpacks
 
 - **Archivos modificados:** `nixpacks.toml`
