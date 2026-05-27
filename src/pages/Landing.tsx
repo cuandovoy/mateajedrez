@@ -4,10 +4,10 @@ import {
   Boxes,
   Building2,
   Check,
-  ChevronRight,
   FileText,
   ImageIcon,
   Package,
+  Play,
   Receipt,
   Shield,
   ShieldCheck,
@@ -388,6 +388,47 @@ function ImageCarousel({
 }
 
 
+function HeroVideo() {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [playing, setPlaying] = useState(false)
+
+  const handlePlay = () => {
+    if (!videoRef.current) return
+    videoRef.current.play()
+    setPlaying(true)
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl aspect-video bg-zinc-900 shadow-2xl">
+      <video
+        ref={videoRef}
+        src="/heroVideo.mp4"
+        poster="/heroVideoPoster.jpg"
+        className="absolute inset-0 h-full w-full object-cover"
+        onEnded={() => setPlaying(false)}
+        controls={playing}
+        playsInline
+      />
+      {!playing && (
+        <button
+          onClick={handlePlay}
+          className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/55 hover:bg-black/45 transition-colors group"
+        >
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-600 shadow-xl shadow-red-600/50 group-hover:scale-105 transition-transform">
+            <Play className="h-7 w-7 text-white ml-1" fill="white" />
+          </div>
+          <div className="text-center px-6">
+            <p className="text-sm font-semibold text-white leading-snug">
+              Mirá por qué tu negocio necesita esto
+            </p>
+            <p className="text-xs text-zinc-400 mt-1">2 min · Solo hablamos de tu problema</p>
+          </div>
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function Landing() {
   const [contactModal, setContactModal] = useState<{ open: boolean; plan?: string }>({ open: false })
   const openContact = (plan?: string) => setContactModal({ open: true, plan })
@@ -446,7 +487,6 @@ export function Landing() {
             <a href="#features" className="hover:text-zinc-900 transition-colors">Funcionalidades</a>
             <a href="#demo" className="hover:text-zinc-900 transition-colors">Demo</a>
             <a href="#plans" className="hover:text-zinc-900 transition-colors">Planes</a>
-            <a href="#testimonials" className="hover:text-zinc-900 transition-colors">Testimonios</a>
           </nav>
 
           <div className="flex items-center gap-3">
@@ -473,34 +513,26 @@ export function Landing() {
             <div>
               <span className="inline-flex items-center gap-2 rounded-full border border-zinc-700 bg-zinc-800/60 px-4 py-1.5 text-xs font-medium text-zinc-300">
                 <Zap className="h-3.5 w-3.5 text-red-400" />
-                Control de Stock & Gestión Comercial
+                Para negocios uruguayos que quieren control real
               </span>
               <h1 className="mt-6 text-4xl font-extrabold leading-tight tracking-tight md:text-5xl xl:text-6xl">
-                Tu negocio completo,{' '}
+                Cerrá la caja sin diferencias.{' '}
                 <span className="text-red-500">
-                  en un solo lugar
+                  Controlá el stock sin llamar a la sucursal.
                 </span>
               </h1>
               <p className="mt-5 text-lg text-zinc-400 leading-relaxed max-w-lg">
-                Inventario multi sucursal, facturación electrónica DGI, punto de venta y reportes. Todo conectado, sin sistemas separados, sin fricciones.
+                Axiostock unifica el punto de venta, el inventario multi-sucursal y la facturación DGI en un solo sistema. Sabés en tiempo real qué tenés, cuánto vendiste y dónde fue cada peso.
               </p>
-              <div className="mt-8 flex flex-wrap gap-4">
+              <div className="mt-8">
                 <button
                   onClick={() => openContact()}
                   className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-6 py-3.5 text-sm font-bold text-white hover:bg-red-500 transition-colors shadow-lg shadow-red-600/25"
                 >
-                  Agendar demo gratis
+                  Quiero una demo
                   <ArrowRight className="h-4 w-4" />
                 </button>
-                <a
-                  href="https://calendar.app.google/uQEnHKUCMX3DWwd98"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/60 px-6 py-3.5 text-sm font-bold text-zinc-200 hover:bg-zinc-700 transition-colors"
-                >
-                  Agendar demo
-                  <ChevronRight className="h-4 w-4" />
-                </a>
+                <p className="mt-3 text-xs text-zinc-500">Sin tarjeta · Sin instalación · Te contactamos hoy</p>
               </div>
               {/* Trust pills */}
               <div className="mt-10 flex flex-wrap gap-2">
@@ -522,31 +554,10 @@ export function Landing() {
               </div>
             </div>
 
-            {/* Right: Dashboard screenshot placeholder */}
+            {/* Right: Video del dolor */}
             <div className="relative">
               <div className="absolute -inset-4 rounded-3xl bg-red-600/5 blur-2xl" />
-              <div className="relative">
-
-                <ImageCarousel
-                  urls={['/adminPanel3.png']}
-                  aspectRatio="aspect-video"
-                  interval={3500}
-                />
-                {/* Badge flotante */}
-                <div className="absolute -bottom-4 -left-4 flex items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 shadow-xl">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-600/20">
-                    <BarChart3 className="h-5 w-5 text-red-400" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-zinc-400">Ventas del mes</p>
-                    <p className="text-sm font-bold text-white">Todo en tiempo real</p>
-                  </div>
-                </div>
-                <div className="absolute -top-4 -right-4 flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 shadow-xl">
-                  <div className="flex h-2 w-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />
-                  <p className="text-xs font-medium text-zinc-300">Stock actualizado</p>
-                </div>
-              </div>
+              <HeroVideo />
             </div>
           </div>
         </div>
@@ -557,10 +568,10 @@ export function Landing() {
         <div className="container-custom py-10">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             {[
-              { value: '10+', label: 'Módulos integrados' },
-              { value: 'CFE', label: 'Facturación DGI nativa' },
-              { value: '∞', label: 'Productos en plan Pro' },
-              { value: '100%', label: 'Hecho para Uruguay' },
+              { value: 'Hoy', label: 'Empezás a operar — sin instalación' },
+              { value: 'CFE', label: 'Factura DGI integrada en cada venta' },
+              { value: 'Real', label: 'Stock y caja en tiempo real por sucursal' },
+              { value: '100%', label: 'Hecho para negocios uruguayos' },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <p className="text-3xl font-black text-red-600">{stat.value}</p>

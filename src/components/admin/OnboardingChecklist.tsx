@@ -2,7 +2,19 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useOrganization } from '@/hooks/useOrganization'
 import { supabase } from '@/lib/supabase'
-import { CheckCircle2, ChevronRight, ImageIcon, LayoutGrid, Package, ShoppingCart, Store, Truck, X } from 'lucide-react'
+import {
+  CheckCircle2,
+  ChevronRight,
+  CreditCard,
+  ImageIcon,
+  LayoutGrid,
+  Package,
+  ShoppingCart,
+  Store,
+  Truck,
+  Users,
+  X,
+} from 'lucide-react'
 
 interface OnboardingStep {
   id: string
@@ -17,30 +29,51 @@ const INITIAL_STEPS: Omit<OnboardingStep, 'completed'>[] = [
   {
     id: 'org_logo',
     label: 'Personalizá tu tienda',
-    sublabel: 'Subí el logo y configurá colores',
+    sublabel: 'Subí el logo y configurá los colores de marca',
     href: '/organizations',
     icon: ImageIcon,
   },
   {
-    id: 'branch',
-    label: 'Creá tu primera sucursal',
-    sublabel: 'Agregá tu punto de venta',
+    id: 'branch_details',
+    label: 'Completá tu sucursal',
+    sublabel: 'Agregá dirección y teléfono de tu punto de venta',
     href: '/branches',
     icon: Store,
   },
   {
+    id: 'team',
+    label: 'Invitá a tu equipo',
+    sublabel: 'Sumá empleados con el rol que les corresponde',
+    href: '/users',
+    icon: Users,
+  },
+  {
     id: 'category',
     label: 'Organizá tu catálogo',
-    sublabel: 'Creá categorías de productos',
+    sublabel: 'Creá las categorías de tus productos',
     href: '/categories',
     icon: LayoutGrid,
   },
   {
     id: 'product',
     label: 'Cargá tu primer producto',
-    sublabel: 'Armá tu inventario inicial',
+    sublabel: 'Armá el inventario inicial de tu negocio',
     href: '/products',
     icon: Package,
+  },
+  {
+    id: 'cash_session',
+    label: 'Abrí tu primera caja',
+    sublabel: 'Iniciá una sesión de caja antes de vender',
+    href: '/pos',
+    icon: CreditCard,
+  },
+  {
+    id: 'first_order',
+    label: 'Registrá tu primera venta',
+    sublabel: 'Hacé una venta desde el punto de venta',
+    href: '/pos',
+    icon: ShoppingCart,
   },
   {
     id: 'supplier',
@@ -48,13 +81,6 @@ const INITIAL_STEPS: Omit<OnboardingStep, 'completed'>[] = [
     sublabel: 'Vinculá tus proveedores habituales',
     href: '/suppliers',
     icon: Truck,
-  },
-  {
-    id: 'purchase_order',
-    label: 'Primera orden de compra',
-    sublabel: 'Empezá a gestionar tus compras',
-    href: '/expenses',
-    icon: ShoppingCart,
   },
 ]
 
@@ -78,7 +104,7 @@ export function OnboardingChecklist() {
   const [dismissed, setDismissed] = useState(false)
   const [visible, setVisible] = useState(false)
 
-  const storageKey = organizationId ? `axiostock_onboarding_v1_${organizationId}` : null
+  const storageKey = organizationId ? `axiostock_onboarding_v2_${organizationId}` : null
 
   useEffect(() => {
     if (storageKey && localStorage.getItem(storageKey) === 'dismissed') {
@@ -105,52 +131,75 @@ export function OnboardingChecklist() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = supabase as any
 
-      const [orgResult, branchResult, categoryResult, productResult, supplierResult, purchaseOrderResult] =
-        await Promise.all([
-          supabase
-            .from('organizations')
-            .select('logo_url')
-            .eq('id', organizationId)
-            .single(),
-          sb
-            .from('branches')
-            .select('id', { count: 'exact', head: true })
-            .eq('organization_id', organizationId)
-            .eq('is_active', true),
-          sb
-            .from('categories')
-            .select('id', { count: 'exact', head: true })
-            .eq('organization_id', organizationId),
-          sb
-            .from('products')
-            .select('id', { count: 'exact', head: true })
-            .eq('organization_id', organizationId)
-            .eq('is_active', true),
-          sb
-            .from('suppliers')
-            .select('id', { count: 'exact', head: true })
-            .eq('organization_id', organizationId),
-          sb
-            .from('purchase_orders')
-            .select('id', { count: 'exact', head: true })
-            .eq('organization_id', organizationId),
-        ])
+      const [
+        orgResult,
+        branchDetailsResult,
+        teamResult,
+        categoryResult,
+        productResult,
+        cashSessionResult,
+        orderResult,
+        supplierResult,
+      ] = await Promise.all([
+        supabase
+          .from('organizations')
+          .select('logo_url')
+          .eq('id', organizationId)
+          .single(),
+        // Sucursal "Principal" se crea automáticamente — el paso se completa cuando
+        // el usuario agrega datos de contacto reales (dirección o teléfono)
+        sb
+          .from('branches')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .not('address', 'is', null),
+        sb
+          .from('organization_members')
+          .select('user_id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId),
+        sb
+          .from('categories')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId),
+        sb
+          .from('products')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId)
+          .eq('is_active', true),
+        sb
+          .from('cash_sessions')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId),
+        sb
+          .from('orders')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId),
+        sb
+          .from('suppliers')
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId),
+      ])
 
       setSteps((prev) =>
         prev.map((step) => {
           switch (step.id) {
             case 'org_logo':
               return { ...step, completed: !!orgResult.data?.logo_url }
-            case 'branch':
-              return { ...step, completed: (branchResult.count ?? 0) > 0 }
+            case 'branch_details':
+              return { ...step, completed: (branchDetailsResult.count ?? 0) > 0 }
+            case 'team':
+              // > 1 porque el creador ya cuenta como miembro
+              return { ...step, completed: (teamResult.count ?? 0) > 1 }
             case 'category':
               return { ...step, completed: (categoryResult.count ?? 0) > 0 }
             case 'product':
               return { ...step, completed: (productResult.count ?? 0) > 0 }
+            case 'cash_session':
+              return { ...step, completed: (cashSessionResult.count ?? 0) > 0 }
+            case 'first_order':
+              return { ...step, completed: (orderResult.count ?? 0) > 0 }
             case 'supplier':
               return { ...step, completed: (supplierResult.count ?? 0) > 0 }
-            case 'purchase_order':
-              return { ...step, completed: (purchaseOrderResult.count ?? 0) > 0 }
             default:
               return step
           }

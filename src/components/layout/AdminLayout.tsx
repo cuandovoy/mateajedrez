@@ -164,7 +164,16 @@ export function AdminLayout() {
         { path: '/billing/comprobantes', label: 'Comprobantes CFE', icon: Receipt, requiresBillerConfig: true },
         { path: '/expenses', label: 'Compras y Egresos', icon: Wallet },
         { path: '/customers', label: 'Clientes', icon: Users2, permission: 'customers:view' },
-        { path: '/cash-register', label: 'Punto de Venta', icon: StoreIcon, planFeature: 'cash_register' },
+        {
+          path: '/cash-register',
+          label: 'Punto de Venta',
+          icon: StoreIcon,
+          planFeature: 'cash_register',
+          subItems: [
+            { path: '/cash-register', label: 'Vista completa' },
+            { path: '/pos', label: 'Modo operador' },
+          ],
+        },
         { path: '/transfers', label: 'Transferencias', icon: ArrowRight, planFeature: 'transfers', minBranches: 2 },
       ],
     },
@@ -692,7 +701,7 @@ export function AdminLayout() {
             { path: '/', label: 'Inicio', icon: LayoutDashboard },
             { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
             { path: '/products', label: 'Productos', icon: Package },
-            { path: '/cash-register', label: 'PdV', icon: StoreIcon },
+            { path: '/pos', label: 'PdV', icon: StoreIcon },
           ].map(({ path, label, icon: Icon }) => {
             const active = isActive(path)
             return (

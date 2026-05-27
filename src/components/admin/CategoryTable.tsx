@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
 import type { Category } from '@/types'
@@ -133,9 +134,9 @@ export function CategoryTable({
           {parentCategories.map((category) => {
             const subcategories = subcategoriesMap.get(category.id) || []
             return (
-              <>
+              <Fragment key={category.id}>
                 {/* Parent Category Row */}
-                <tr key={category.id} className="hover:bg-gray-50 transition-colors bg-gray-50">
+                <tr className="hover:bg-gray-50 transition-colors bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex-shrink-0 h-12 w-12">
                       {category.image_url ? (
@@ -243,12 +244,12 @@ export function CategoryTable({
                           actions={[
                             {
                               label: 'Editar',
-                              icon: <span className="text-gray-600">✏️</span>,
+                              icon: <Edit className="h-4 w-4" />,
                               onClick: () => onEdit(subcategory),
                             },
                             {
                               label: 'Eliminar',
-                              icon: <span className="text-red-600">🗑️</span>,
+                              icon: <Trash2 className="h-4 w-4" />,
                               onClick: () => onDelete(subcategory.id),
                               variant: 'danger',
                             },
@@ -258,7 +259,7 @@ export function CategoryTable({
                     </td>
                   </tr>
                 ))}
-              </>
+              </Fragment>
             )
           })}
         </tbody>

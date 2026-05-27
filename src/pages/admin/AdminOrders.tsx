@@ -203,10 +203,14 @@ export function AdminOrders() {
         query = query.eq('discount_total', 0)
       }
 
-      // Apply pagination
-      const from = (currentPage - 1) * ITEMS_PER_PAGE
-      const to = from + ITEMS_PER_PAGE - 1
-      query = query.range(from, to)
+      // When searching, skip range pagination and fetch more to filter client-side
+      if (searchTerm) {
+        query = query.limit(500)
+      } else {
+        const from = (currentPage - 1) * ITEMS_PER_PAGE
+        const to = from + ITEMS_PER_PAGE - 1
+        query = query.range(from, to)
+      }
 
       const { data, error, count } = await query
 
@@ -258,7 +262,7 @@ export function AdminOrders() {
           biller_comprobantes: cfeMap[o.id] ? [cfeMap[o.id]] : [],
         }))
       )
-      setTotalCount(count || 0)
+      setTotalCount(searchTerm ? filteredData.length : (count || 0))
     } catch (error) {
       console.error('Error fetching orders:', error)
     } finally {
@@ -441,11 +445,16 @@ export function AdminOrders() {
                     <div key={order.id} className="p-4 space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <p className="font-semibold text-gray-900">{formatOrderDisplayNumber(order)}</p>
                             {order.biller_comprobantes && order.biller_comprobantes.length > 0 && (
                               <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-teal-100 text-teal-700">
                                 CFE
+                              </span>
+                            )}
+                            {Number(order.discount_total || 0) > 0 && (
+                              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-700">
+                                -{formatPrice(Number(order.discount_total), settings)}
                               </span>
                             )}
                           </div>
@@ -490,9 +499,7 @@ export function AdminOrders() {
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Orden</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Cliente</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Fecha</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Estado</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Descuento</th>
-                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Cobro</th>
+                      <th className="text-left py-3 px-4 font-semibold text-gray-700">Estado / Cobro</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Total</th>
                       <th className="text-left py-3 px-4 font-semibold text-gray-700">Acciones</th>
                     </tr>
@@ -503,46 +510,31 @@ export function AdminOrders() {
                       const shippingAddress = order.shipping_address as ShippingAddressLite
                       const shippingName = shippingAddress?.fullName || shippingAddress?.full_name || shippingAddress?.name
                       const customerName = order.customer?.full_name || shippingName || null
-                      const customerEmail = order.customer?.email || shippingAddress?.email
-                      const customerPhone = order.customer?.phone || shippingAddress?.phone
                       const isGuest = !order.customer?.id && !!shippingName
                       return (
                         <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
                           <td className="py-3 px-4">
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <p className="font-semibold text-gray-900">{formatOrderDisplayNumber(order)}</p>
-                                {order.biller_comprobantes && order.biller_comprobantes.length > 0 && (
-                                  <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-teal-100 text-teal-700">
-                                    CFE
-                                  </span>
-                                )}
-                              </div>
-                              <p className="font-mono text-xs text-gray-500">{order.id.slice(0, 8)}...</p>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <p className="font-semibold text-gray-900">{formatOrderDisplayNumber(order)}</p>
+                              {order.biller_comprobantes && order.biller_comprobantes.length > 0 && (
+                                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-teal-100 text-teal-700">
+                                  CFE
+                                </span>
+                              )}
+                              {Number(order.discount_total || 0) > 0 && (
+                                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-700">
+                                  -{formatPrice(Number(order.discount_total), settings)}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="py-3 px-4">
-                            <div>
-                              <div className="flex items-center gap-1.5">
-                                <p className="font-medium text-gray-900">
-                                  {customerName || 'Sin nombre'}
-                                </p>
-                                {isGuest && (
-                                  <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600">
-                                    Invitado
-                                  </span>
-                                )}
-                              </div>
-                              {(customerEmail || customerPhone) && (
-                                <p className="text-sm text-gray-500">
-                                  {[customerEmail, customerPhone].filter(Boolean).join(' · ')}
-                                </p>
-                              )}
-                              {order.customer?.rut && (
-                                <p className="text-xs text-gray-500">RUT: {order.customer.rut}</p>
-                              )}
-                              {order.customer?.id && (
-                                <p className="text-[11px] font-medium text-emerald-700">Cliente vinculado</p>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-medium text-gray-900">{customerName || 'Sin nombre'}</p>
+                              {isGuest && (
+                                <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium bg-gray-100 text-gray-600">
+                                  Invitado
+                                </span>
                               )}
                             </div>
                           </td>
@@ -550,37 +542,13 @@ export function AdminOrders() {
                             {formatDateShort(order.created_at, settings)}
                           </td>
                           <td className="py-3 px-4">
-                            <span
-                              className={cn(
-                                'px-2 py-1 rounded-full text-xs font-medium',
-                                getStatusColor(order.status)
-                              )}
-                            >
-                              {getStatusLabel(order.status)}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            {Number(order.discount_total || 0) > 0 ? (
-                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                -{formatPrice(Number(order.discount_total), settings)}
+                            <div className="flex flex-wrap gap-1.5">
+                              <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', getStatusColor(order.status))}>
+                                {getStatusLabel(order.status)}
                               </span>
-                            ) : (
-                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                                Sin descuento
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="space-y-1">
-                              <span
-                                className={cn(
-                                  'inline-flex px-2 py-1 rounded-full text-xs font-medium',
-                                  collectionStatus.color
-                                )}
-                              >
+                              <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', collectionStatus.color)}>
                                 {collectionStatus.label}
                               </span>
-                              <p className="text-xs text-gray-500">{collectionStatus.detail}</p>
                             </div>
                           </td>
                           <td className="py-3 px-4 font-semibold text-gray-900">
@@ -602,7 +570,7 @@ export function AdminOrders() {
               </div>
 
               {/* Pagination */}
-              {totalPages > 1 && (
+              {totalPages > 1 && !searchTerm && (
                 <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
                   <div className="text-sm text-gray-600">
                     Mostrando {(currentPage - 1) * ITEMS_PER_PAGE + 1} -{' '}

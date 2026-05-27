@@ -18,7 +18,7 @@ interface LotReceptionModalProps {
   onClose: () => void
 }
 
-type Step = 1 | 2 | 3
+type Step = 1 | 2 | 3 | 'success'
 
 export function LotReceptionModal({ branches, defaultBranchId, onCreated, onClose }: LotReceptionModalProps) {
   const { organizationId } = useOrganization()
@@ -27,7 +27,8 @@ export function LotReceptionModal({ branches, defaultBranchId, onCreated, onClos
   const [step, setStep] = useState<Step>(1)
   const [loading, setLoading] = useState(false)
 
-  // Paso 1 — producto
+  // Paso 1 — sucursal + producto
+  const [branchId, setBranchId] = useState(defaultBranchId ?? branches[0]?.id ?? '')
   const [search, setSearch] = useState('')
   const [products, setProducts] = useState<ProductOption[]>([])
   const [selectedProduct, setSelectedProduct] = useState<ProductOption | null>(null)
@@ -42,11 +43,25 @@ export function LotReceptionModal({ branches, defaultBranchId, onCreated, onClos
   const [hasExpiry, setHasExpiry] = useState<boolean | null>(null)
   const [expiryDate, setExpiryDate] = useState('')
   const [showOptional, setShowOptional] = useState(false)
-  const [branchId, setBranchId] = useState(defaultBranchId ?? branches[0]?.id ?? '')
   const [suppliers, setSuppliers] = useState<SupplierOption[]>([])
   const [supplierId, setSupplierId] = useState('')
   const [unitCost, setUnitCost] = useState('')
   const [referenceDoc, setReferenceDoc] = useState('')
+
+  // Success state
+  const [lastSaved, setLastSaved] = useState<{ name: string; qty: number } | null>(null)
+
+  const resetForNextProduct = () => {
+    setSelectedProduct(null)
+    setSearch('')
+    setProducts([])
+    setQuantity(1)
+    setDamaged(0)
+    setShowDamaged(false)
+    setHasExpiry(null)
+    setExpiryDate('')
+    setStep(1)
+  }
 
   const searchProducts = useCallback(async (term: string) => {
     if (!organizationId || term.length < 2) { setProducts([]); return }
@@ -98,9 +113,9 @@ export function LotReceptionModal({ branches, defaultBranchId, onCreated, onClos
       }
       const { error } = await supabase.from('inventory_lots').insert(payload)
       if (error) throw error
-      show('Lote registrado correctamente', 'success')
+      setLastSaved({ name: selectedProduct.name, qty: quantity })
       onCreated()
-      onClose()
+      setStep('success')
     } catch (e: any) {
       show(e.message ?? 'Error al registrar el lote', 'error')
     } finally {
@@ -115,23 +130,39 @@ export function LotReceptionModal({ branches, defaultBranchId, onCreated, onClos
         <div className="flex items-center justify-between p-4 border-b border-gray-100">
           <div>
             <h2 className="font-semibold text-gray-900">Recibí mercadería</h2>
-            <div className="flex gap-1.5 mt-1">
-              {([1, 2, 3] as Step[]).map(s => (
-                <div
-                  key={s}
-                  className={`h-1.5 w-6 rounded-full transition-colors ${s <= step ? 'bg-admin-600' : 'bg-gray-200'}`}
-                />
-              ))}
-            </div>
+            {step !== 'success' && (
+              <div className="flex gap-1.5 mt-1">
+                {([1, 2, 3] as const).map(s => (
+                  <div
+                    key={s}
+                    className={`h-1.5 w-6 rounded-full transition-colors ${s <= (step as number) ? 'bg-admin-600' : 'bg-gray-200'}`}
+                  />
+                ))}
+              </div>
+            )}
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
             <X className="h-4 w-4 text-gray-500" />
           </button>
         </div>
 
-        {/* Paso 1 — ¿Qué llegó? */}
+        {/* Paso 1 — sucursal + producto */}
         {step === 1 && (
           <div className="p-4 space-y-3">
+            {branches.length > 1 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal que recibe</label>
+                <select
+                  value={branchId}
+                  onChange={e => setBranchId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                >
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <p className="text-sm text-gray-500">¿Qué producto llegó?</p>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -235,21 +266,6 @@ export function LotReceptionModal({ branches, defaultBranchId, onCreated, onClos
               <span className="text-gray-400"> · {quantity} unidades</span>
             </p>
 
-            {branches.length > 1 && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal</label>
-                <select
-                  value={branchId}
-                  onChange={e => setBranchId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
-                >
-                  {branches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Fecha de vencimiento</label>
               <Input
@@ -319,33 +335,58 @@ export function LotReceptionModal({ branches, defaultBranchId, onCreated, onClos
           </div>
         )}
 
+        {/* Éxito — agregar otro o cerrar */}
+        {step === 'success' && lastSaved && (
+          <div className="p-6 text-center space-y-4">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-100 mx-auto">
+              <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <div>
+              <p className="font-semibold text-gray-900">{lastSaved.name}</p>
+              <p className="text-sm text-gray-500">{lastSaved.qty} unidades registradas</p>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <Button className="w-full bg-admin-600 hover:bg-admin-700 text-white" onClick={resetForNextProduct}>
+                + Agregar otro producto a esta remesa
+              </Button>
+              <Button variant="outline" className="w-full" onClick={onClose}>
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Footer con acciones */}
-        <div className="flex gap-2 p-4 border-t border-gray-100">
-          {step > 1 && (
-            <Button variant="outline" onClick={() => setStep(s => (s - 1) as Step)} disabled={loading}>
-              ← Atrás
-            </Button>
-          )}
-          {step === 1 && (
-            <Button variant="outline" className="flex-1" onClick={onClose}>
-              Cancelar
-            </Button>
-          )}
-          {step === 2 && (
-            <Button className="flex-1 bg-admin-600 hover:bg-admin-700 text-white" onClick={() => setStep(3)}>
-              Continuar →
-            </Button>
-          )}
-          {step === 3 && (
-            <Button
-              className="flex-1 bg-admin-600 hover:bg-admin-700 text-white"
-              onClick={handleSubmit}
-              disabled={loading || (!expiryDate && hasExpiry !== false)}
-            >
-              {loading ? 'Guardando...' : '✓ Registrar entrada'}
-            </Button>
-          )}
-        </div>
+        {step !== 'success' && (
+          <div className="flex gap-2 p-4 border-t border-gray-100">
+            {step > 1 && (
+              <Button variant="outline" onClick={() => setStep(s => (s - 1) as Step)} disabled={loading}>
+                ← Atrás
+              </Button>
+            )}
+            {step === 1 && (
+              <Button variant="outline" className="flex-1" onClick={onClose}>
+                Cancelar
+              </Button>
+            )}
+            {step === 2 && (
+              <Button className="flex-1 bg-admin-600 hover:bg-admin-700 text-white" onClick={() => setStep(3)}>
+                Continuar →
+              </Button>
+            )}
+            {step === 3 && (
+              <Button
+                className="flex-1 bg-admin-600 hover:bg-admin-700 text-white"
+                onClick={handleSubmit}
+                disabled={loading || (!expiryDate && hasExpiry !== false)}
+              >
+                {loading ? 'Guardando...' : 'Registrar entrada'}
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

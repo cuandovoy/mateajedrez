@@ -1,5 +1,6 @@
 import { Edit, MapPin, Phone, Mail, Building2, Trash2, RotateCcw, Clock } from 'lucide-react'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
+import { EmptyState } from '@/components/ui/EmptyState'
 import type { Branch } from '@/types'
 
 interface BranchTableProps {
@@ -64,9 +65,11 @@ function getBranchKindLabel(kind: string | null | undefined) {
 export function BranchTable({ branches, onEdit, onSoftDelete, onRestore }: BranchTableProps) {
   if (branches.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        No se encontraron sucursales
-      </div>
+      <EmptyState
+        icon={Building2}
+        title="No se encontraron sucursales"
+        description="Creá tu primera sucursal para empezar a gestionar tu inventario y ventas."
+      />
     )
   }
 

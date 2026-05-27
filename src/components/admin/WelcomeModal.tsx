@@ -1,24 +1,22 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useOrganization } from '@/hooks/useOrganization'
-import { ArrowRight, BookOpen, Package, ShoppingCart, Store, X } from 'lucide-react'
+import { BookOpen, CreditCard, Package, ShoppingCart, Store, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 
 const HIGHLIGHTS = [
   { icon: Store, text: 'Inventario multi-sucursal en tiempo real' },
-  { icon: ShoppingCart, text: 'Punto de venta y gestión de pedidos' },
-  { icon: Package, text: 'Compras, proveedores y libro de egresos' },
-  { icon: BookOpen, text: 'Reportes y tienda online integrada' },
+  { icon: CreditCard, text: 'Punto de venta con auditoría de caja por operador' },
+  { icon: ShoppingCart, text: 'Tienda online integrada al mismo inventario' },
+  { icon: Package, text: 'Compras, proveedores y gestión de stock' },
+  { icon: BookOpen, text: 'Reportes financieros e insights con IA' },
 ]
 
 export function WelcomeModal() {
   const { organizationId } = useOrganization()
-  const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
-  const [dontShowAgain, setDontShowAgain] = useState(false)
   const [visible, setVisible] = useState(false)
 
-  const storageKey = organizationId ? `axiostock_welcome_v1_${organizationId}` : null
+  const storageKey = organizationId ? `axiostock_welcome_v2_${organizationId}` : null
 
   useEffect(() => {
     if (storageKey && !localStorage.getItem(storageKey)) {
@@ -30,22 +28,9 @@ export function WelcomeModal() {
   const handleClose = () => {
     setVisible(false)
     setTimeout(() => {
-      if (dontShowAgain && storageKey) {
-        localStorage.setItem(storageKey, 'dismissed')
-      }
+      if (storageKey) localStorage.setItem(storageKey, 'dismissed')
       setIsOpen(false)
     }, 200)
-  }
-
-  const handleStart = () => {
-    if (dontShowAgain && storageKey) {
-      localStorage.setItem(storageKey, 'dismissed')
-    }
-    setVisible(false)
-    setTimeout(() => {
-      setIsOpen(false)
-      navigate('/branches')
-    }, 150)
   }
 
   if (!isOpen) return null
@@ -83,7 +68,7 @@ export function WelcomeModal() {
             ¡Bienvenido al panel<br />de administración!
           </h2>
           <p className="mt-2 text-sm text-white/60 leading-relaxed">
-            Tu cuenta está lista. Antes de empezar, te mostramos las áreas principales del sistema.
+            Tu cuenta está lista. Seguí el checklist de configuración para tener todo operativo desde el primer día.
           </p>
 
           {/* Decorative dots */}
@@ -112,23 +97,10 @@ export function WelcomeModal() {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-100 px-7 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <label className="flex cursor-pointer items-center gap-2 select-none">
-              <input
-                type="checkbox"
-                checked={dontShowAgain}
-                onChange={(e) => setDontShowAgain(e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500"
-              />
-              <span className="text-sm text-gray-500">No mostrar más</span>
-            </label>
-
-            <Button onClick={handleStart} className="gap-2 shrink-0">
-              Empezar configuración
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
+        <div className="border-t border-gray-100 px-7 py-4 flex justify-end">
+          <Button onClick={handleClose} className="gap-2">
+            Empezar configuración
+          </Button>
         </div>
       </div>
     </div>

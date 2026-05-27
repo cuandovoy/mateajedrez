@@ -1,8 +1,19 @@
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatDateShort, formatPrice, formatTime } from '@/lib/utils'
-import { Building2, DollarSign, Edit, Trash2, Receipt } from 'lucide-react'
+import { Building2, DollarSign, Edit, Trash2, Receipt, Timer } from 'lucide-react'
 import type { CashSession } from '@/types'
+
+function sessionDuration(openedAt: string, closedAt: string | null): string {
+  const start = new Date(openedAt).getTime()
+  const end = closedAt ? new Date(closedAt).getTime() : Date.now()
+  const totalMinutes = Math.floor((end - start) / 60000)
+  if (totalMinutes < 60) return `${totalMinutes}m`
+  const hours = Math.floor(totalMinutes / 60)
+  const mins = totalMinutes % 60
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+}
 
 interface CashSessionTableProps {
   sessions: CashSession[]
@@ -22,9 +33,11 @@ export function CashSessionTable({
   const settings = useOrgSettings()
   if (sessions.length === 0) {
     return (
-      <div className="text-center py-12 text-gray-500">
-        No se encontraron sesiones de caja
-      </div>
+      <EmptyState
+        icon={DollarSign}
+        title="No se encontraron sesiones de caja"
+        description="Abrí una sesión de caja para empezar a registrar ventas en efectivo."
+      />
     )
   }
 
@@ -48,6 +61,9 @@ export function CashSessionTable({
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Montos
+            </th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Duración
             </th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Diferencia
@@ -110,6 +126,13 @@ export function CashSessionTable({
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex items-center gap-1 text-sm text-gray-600">
+                    <Timer className="h-3.5 w-3.5 text-gray-400" />
+                    <span>{sessionDuration(session.opened_at, session.closed_at)}</span>
+                    {isOpen && <span className="text-xs text-blue-500 font-medium">(en curso)</span>}
+                  </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   {hasDifference ? (
                     <span
                       className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -137,28 +160,40 @@ export function CashSessionTable({
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <div className="flex items-center justify-end">
+                  <div className="flex items-center justify-end gap-2">
+                    {isOpen && (
+                      <button
+                        onClick={() => onEdit(session)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-admin-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-admin-700 transition-colors"
+                      >
+                        Cerrar caja
+                      </button>
+                    )}
                     <ActionsMenu
                       actions={[
                         ...(onViewPayments
                           ? [
                               {
-                                label: 'Ver Ventas',
+                                label: 'Ver ventas',
                                 icon: <Receipt className="h-4 w-4" />,
                                 onClick: () => onViewPayments(session.id),
                               },
                             ]
                           : []),
-                        {
-                          label: isOpen ? 'Cerrar Sesión' : 'Ver Detalles',
-                          icon: <Edit className="h-4 w-4" />,
-                          onClick: () => onEdit(session),
-                        },
+                        ...(!isOpen
+                          ? [
+                              {
+                                label: 'Ver detalles',
+                                icon: <Edit className="h-4 w-4" />,
+                                onClick: () => onEdit(session),
+                              },
+                            ]
+                          : []),
                         {
                           label: 'Eliminar',
                           icon: <Trash2 className="h-4 w-4" />,
                           onClick: () => onDelete(session.id),
-                          variant: 'danger',
+                          variant: 'danger' as const,
                         },
                       ]}
                     />

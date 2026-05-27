@@ -78,6 +78,7 @@ export function ProductTable({
           const variants = variantsByProduct[product.id] || []
           const hasVariants = variants.length > 0
           const isExpanded = expandedProductIds.has(product.id)
+          const mobileStock = product.inventory_stock ?? product.stock ?? 0
           return (
             <div
               key={product.id}
@@ -96,12 +97,23 @@ export function ProductTable({
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-gray-900 truncate">{capitalizeFirst(product.name)}</p>
                   <p className="text-xs text-gray-500">{product.sku}</p>
-                  <p className="text-sm font-medium text-gray-900 mt-1">{formatPrice(product.price, settings)}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <p className="text-sm font-medium text-gray-900">{formatPrice(product.price, settings)}</p>
+                    <span className={`text-xs font-semibold ${
+                      mobileStock === 0
+                        ? 'text-red-600'
+                        : mobileStock <= (product.low_stock_threshold || 10)
+                        ? 'text-yellow-600'
+                        : 'text-green-600'
+                    }`}>
+                      Stock: {mobileStock}
+                    </span>
+                  </div>
                   {hasVariants && (
                     <button
                       type="button"
                       onClick={() => toggleExpandedProduct(product.id)}
-                      className="mt-2 inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                      className="mt-1 inline-flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50"
                     >
                       {isExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                       {variants.length} variante{variants.length === 1 ? '' : 's'}

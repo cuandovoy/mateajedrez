@@ -144,6 +144,21 @@ export function AdminOrderDetail() {
   const [downloadingPDF, setDownloadingPDF] = useState(false)
   const [annullingCFE, setAnnullingCFE] = useState(false)
   const [orderManualItems, setOrderManualItems] = useState<{ id: string; description: string; quantity: number; price: number; created_at: string }[]>([])
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [isPartialReturnModalOpen, setIsPartialReturnModalOpen] = useState(false)
+  const [partialReturnItem, setPartialReturnItem] = useState<OrderItemWithProduct | null>(null)
+  const [partialReturnQuantity, setPartialReturnQuantity] = useState('')
+  const [partialReturnReason, setPartialReturnReason] = useState('')
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false)
+  const [discountTarget, setDiscountTarget] = useState<'order' | 'item'>('order')
+  const [discountTargetItem, setDiscountTargetItem] = useState<OrderItemWithProduct | null>(null)
+  const [discountRuleId, setDiscountRuleId] = useState('')
+  const [discountKind, setDiscountKind] = useState<DiscountKind>('percentage')
+  const [discountValue, setDiscountValue] = useState('')
+  const [discountReason, setDiscountReason] = useState('')
+  const [isManualDiscount, setIsManualDiscount] = useState(false)
+  const [isAnnulCFEConfirmOpen, setIsAnnulCFEConfirmOpen] = useState(false)
 
   const fetchOrder = useCallback(async () => {
     if (!id) return
@@ -181,41 +196,59 @@ export function AdminOrderDetail() {
       setEditItems(ord.order_items ?? [])
       setSelectedBranchId(ord.branch_id ?? '')
 
-      const { data: paymentsData } = await supabase
-        .from('order_payments')
-        .select('*')
-        .eq('order_id', id)
-      const payments = (paymentsData ?? []) as OrderPayment[]
+      const [
+        paymentsResult,
+        userProfileResult,
+        customerResult,
+        manualItemsResult,
+        cfeResult,
+        billerConfigResult,
+      ] = await Promise.all([
+        supabase.from('order_payments').select('*').eq('order_id', id),
+        ord.user_id
+          ? supabase.from('user_profiles').select('full_name').eq('user_id', ord.user_id).single()
+          : Promise.resolve({ data: null, error: null }),
+        ord.customer_id
+          ? supabase.from('customers').select('email, full_name').eq('id', ord.customer_id).single()
+          : Promise.resolve({ data: null, error: null }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from('order_manual_items')
+          .select('id, description, quantity, price, created_at')
+          .eq('order_id', id)
+          .order('created_at', { ascending: true }),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as any)
+          .from('biller_comprobantes')
+          .select('id, biller_id, tipo_comprobante, serie, numero, estado')
+          .eq('order_id', id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        ord.organization_id
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          ? (supabase as any)
+              .from('biller_config')
+              .select('*')
+              .eq('organization_id', ord.organization_id)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+      ])
+
+      const payments = (paymentsResult.data ?? []) as OrderPayment[]
       setOrderPayments(payments)
       const mainPayment = payments.find((p) => p.payment_method === ord.payment_method) ?? payments[0]
       setEditPaymentAmount(mainPayment ? String(mainPayment.amount) : String(ord.total))
 
       let userProfile: { full_name: string | null; email: string } | null = null
-      if (ord.user_id) {
-        const { data: profileData } = await supabase
-          .from('user_profiles')
-          .select('full_name')
-          .eq('user_id', ord.user_id)
-          .single()
-        if (profileData) {
-          userProfile = {
-            full_name: (profileData as { full_name: string }).full_name,
-            email: 'N/A',
-          }
+      if (userProfileResult.data) {
+        userProfile = {
+          full_name: (userProfileResult.data as { full_name: string }).full_name,
+          email: 'N/A',
         }
       }
 
-      let customer: { email: string | null; full_name: string } | null = null
-      if (ord.customer_id) {
-        const { data: custData } = await supabase
-          .from('customers')
-          .select('email, full_name')
-          .eq('id', ord.customer_id)
-          .single()
-        if (custData) {
-          customer = custData as { email: string | null; full_name: string }
-        }
-      }
+      const customer = customerResult.data as { email: string | null; full_name: string } | null
 
       setOrder({
         ...ord,
@@ -224,35 +257,9 @@ export function AdminOrderDetail() {
         customer,
       })
 
-      // Load manual items for this order
-      const { data: manualItemsData } = await (supabase as any)
-        .from('order_manual_items')
-        .select('id, description, quantity, price, created_at')
-        .eq('order_id', id)
-        .order('created_at', { ascending: true })
-      setOrderManualItems(manualItemsData ?? [])
-
-      // Load CFE comprobante for this order
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: cfeData } = await (supabase as any)
-        .from('biller_comprobantes')
-        .select('id, biller_id, tipo_comprobante, serie, numero, estado')
-        .eq('order_id', id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-      setBillerComprobante(cfeData ?? null)
-
-      // Load biller config for org (needed to call API for PDF/annul)
-      if (ord.organization_id) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: cfgData } = await (supabase as any)
-          .from('biller_config')
-          .select('*')
-          .eq('organization_id', ord.organization_id)
-          .maybeSingle()
-        setBillerConfig(cfgData ?? null)
-      }
+      setOrderManualItems(manualItemsResult.data ?? [])
+      setBillerComprobante(cfeResult.data ?? null)
+      setBillerConfig(billerConfigResult.data ?? null)
     } catch (error) {
       console.error('Error fetching order:', error)
       show('Error al cargar la orden', 'error')
@@ -266,44 +273,34 @@ export function AdminOrderDetail() {
   }, [fetchOrder])
 
   useEffect(() => {
-    if (organizationId && isEditing) {
-      supabase
+    if (!organizationId || !isEditing) return
+    const loadProducts = async () => {
+      const { data: productsData } = await supabase
         .from('products')
         .select('id, name, price, sku')
         .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name')
-        .then(async ({ data: productsData }) => {
-          const prods = (productsData ?? []) as Array<{ id: string; name: string; price: number; sku: string }>
-          const withVariants = await Promise.all(
-            prods.map(async (p) => {
-              const { data: defaultVar } = await supabase
-                .from('product_variants')
-                .select('id, price')
-                .eq('product_id', p.id)
-                .eq('is_active', true)
-                .like('sku', '%-DEFAULT')
-                .limit(1)
-                .maybeSingle()
-              const { data: anyVar } = defaultVar
-                ? { data: [defaultVar] }
-                : await supabase
-                    .from('product_variants')
-                    .select('id, price')
-                    .eq('product_id', p.id)
-                    .eq('is_active', true)
-                    .limit(1)
-              const variantList = defaultVar ? [defaultVar] : (anyVar ?? [])
-              const v = variantList[0] as { id: string; price: number | null } | undefined
-              return {
-                ...p,
-                defaultVariant: v ? { id: v.id, price: v.price } : undefined,
-              }
-            })
-          )
-          setProducts(withVariants)
-        })
+      const prods = (productsData ?? []) as Array<{ id: string; name: string; price: number; sku: string }>
+      if (prods.length === 0) {
+        setProducts([])
+        return
+      }
+      const { data: allVariants } = await supabase
+        .from('product_variants')
+        .select('id, product_id, price, sku')
+        .in('product_id', prods.map((p) => p.id))
+        .eq('is_active', true)
+      const variantMap: Record<string, { id: string; price: number | null }> = {}
+      for (const v of (allVariants ?? []) as Array<{ id: string; product_id: string; price: number | null; sku: string }>) {
+        if (!variantMap[v.product_id]) variantMap[v.product_id] = { id: v.id, price: v.price }
+      }
+      for (const v of (allVariants ?? []) as Array<{ id: string; product_id: string; price: number | null; sku: string }>) {
+        if (v.sku.endsWith('-DEFAULT')) variantMap[v.product_id] = { id: v.id, price: v.price }
+      }
+      setProducts(prods.map((p) => ({ ...p, defaultVariant: variantMap[p.id] })))
     }
+    loadProducts()
   }, [organizationId, isEditing])
 
   useEffect(() => {
@@ -346,49 +343,59 @@ export function AdminOrderDetail() {
     fetchDiscountRules()
   }, [organizationId])
 
-  const handleApplyOrderDiscount = async () => {
-    if (!order || !organizationId || !id) return
+  const openOrderDiscountModal = () => {
+    setDiscountTarget('order')
+    setDiscountTargetItem(null)
+    setDiscountRuleId(orderDiscountRules[0]?.id ?? '')
+    setIsManualDiscount(orderDiscountRules.length === 0)
+    setDiscountKind('percentage')
+    setDiscountValue('')
+    setDiscountReason('')
+    setIsDiscountModalOpen(true)
+  }
 
-    const selected = window.prompt(
-      `Reglas disponibles:\n${orderDiscountRules.map((r, idx) => `${idx + 1}. ${r.name} (${r.kind}=${r.value})`).join('\n')}\n\nEscribe el número de regla o "manual".`
-    )
-    if (!selected) return
+  const handleConfirmDiscount = async () => {
+    if (!id) return
 
-    let payload: Record<string, unknown> | null = null
-    if (selected.toLowerCase() === 'manual') {
-      const kind = window.prompt('Tipo de descuento: percentage | fixed_amount | price_override', 'percentage')
-      if (!kind || !['percentage', 'fixed_amount', 'price_override'].includes(kind)) {
-        show('Tipo inválido.', 'error')
-        return
-      }
-      const value = Number(window.prompt('Valor del descuento', '0'))
+    let payload: Record<string, unknown>
+    if (isManualDiscount) {
+      const value = Number(discountValue)
       if (!Number.isFinite(value) || value <= 0) {
         show('Valor inválido.', 'error')
         return
       }
-      const reason = window.prompt('Motivo (opcional):') || null
-      payload = { kind, value, reason }
+      payload = { kind: discountKind, value, reason: discountReason || null }
     } else {
-      const index = Number(selected) - 1
-      const rule = orderDiscountRules[index]
-      if (!rule) {
-        show('Regla inválida.', 'error')
+      if (!discountRuleId) {
+        show('Seleccioná una regla.', 'error')
         return
       }
-      payload = { rule_id: rule.id }
+      payload = { rule_id: discountRuleId }
     }
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.rpc as any)('apply_order_discount', {
-        p_order_id: id,
-        p_discount: payload,
-      })
-      if (error) throw error
-      show('Descuento de orden aplicado.', 'success')
+      if (discountTarget === 'order') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase.rpc as any)('apply_order_discount', {
+          p_order_id: id,
+          p_discount: payload,
+        })
+        if (error) throw error
+        show('Descuento de orden aplicado.', 'success')
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { error } = await (supabase.rpc as any)('apply_order_item_discount', {
+          p_order_id: id,
+          p_order_item_id: discountTargetItem!.id,
+          p_discount: payload,
+        })
+        if (error) throw error
+        show('Descuento de ítem aplicado.', 'success')
+      }
+      setIsDiscountModalOpen(false)
       await fetchOrder()
     } catch (error: unknown) {
-      console.error('Error applying order discount:', error)
+      console.error('Error applying discount:', error)
       show(error instanceof Error ? error.message : 'No se pudo aplicar el descuento.', 'error')
     }
   }
@@ -410,51 +417,15 @@ export function AdminOrderDetail() {
     }
   }
 
-  const handleApplyItemDiscount = async (item: OrderItemWithProduct) => {
-    if (!id) return
-    const selected = window.prompt(
-      `Reglas item disponibles:\n${itemDiscountRules.map((r, idx) => `${idx + 1}. ${r.name} (${r.kind}=${r.value})`).join('\n')}\n\nEscribe el número de regla o "manual".`
-    )
-    if (!selected) return
-
-    let payload: Record<string, unknown> | null = null
-    if (selected.toLowerCase() === 'manual') {
-      const kind = window.prompt('Tipo: percentage | fixed_amount | price_override', 'percentage')
-      if (!kind || !['percentage', 'fixed_amount', 'price_override'].includes(kind)) {
-        show('Tipo inválido.', 'error')
-        return
-      }
-      const value = Number(window.prompt('Valor del descuento', '0'))
-      if (!Number.isFinite(value) || value <= 0) {
-        show('Valor inválido.', 'error')
-        return
-      }
-      const reason = window.prompt('Motivo (opcional):') || null
-      payload = { kind, value, reason }
-    } else {
-      const index = Number(selected) - 1
-      const rule = itemDiscountRules[index]
-      if (!rule) {
-        show('Regla inválida.', 'error')
-        return
-      }
-      payload = { rule_id: rule.id }
-    }
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.rpc as any)('apply_order_item_discount', {
-        p_order_id: id,
-        p_order_item_id: item.id,
-        p_discount: payload,
-      })
-      if (error) throw error
-      show('Descuento de ítem aplicado.', 'success')
-      await fetchOrder()
-    } catch (error: unknown) {
-      console.error('Error applying item discount:', error)
-      show(error instanceof Error ? error.message : 'No se pudo aplicar el descuento de ítem.', 'error')
-    }
+  const openItemDiscountModal = (item: OrderItemWithProduct) => {
+    setDiscountTarget('item')
+    setDiscountTargetItem(item)
+    setDiscountRuleId(itemDiscountRules[0]?.id ?? '')
+    setIsManualDiscount(itemDiscountRules.length === 0)
+    setDiscountKind('percentage')
+    setDiscountValue('')
+    setDiscountReason('')
+    setIsDiscountModalOpen(true)
   }
 
   const handleRemoveItemDiscount = async (item: OrderItemWithProduct) => {
@@ -492,45 +463,20 @@ export function AdminOrderDetail() {
       }
     }
 
+    if (newStatus === 'cancelled') {
+      setCancelReason('')
+      setIsCancelModalOpen(true)
+      return
+    }
+
     const previousStatus = order.status
     setUpdating(true)
     try {
-      if (newStatus === 'cancelled') {
-        const reason = window.prompt('Ingresa el motivo de la anulación de la venta:')
-        if (!reason || reason.trim().length === 0) {
-          show('Debes indicar un motivo para anular la venta.', 'error')
-          return
-        }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: returnId, error } = await (supabase.rpc as any)('create_full_order_cancellation', {
-          p_order_id: id,
-          p_reason: reason.trim(),
-          p_refund_method: order.payment_method || null,
-          p_notes: 'Anulación ejecutada desde detalle de orden',
-        })
-        if (error) throw error
-
-        await trackAuditAction({
-          organizationId,
-          tableName: 'order_returns',
-          recordId: String(returnId || id),
-          action: 'INSERT',
-          notes: 'Anulación completa de orden desde detalle de orden.',
-          newData: {
-            order_id: id,
-            previous_status: previousStatus,
-            new_status: 'cancelled',
-            reason: reason.trim(),
-          },
-        })
-      } else {
-        const { error } = await supabase
-          .from('orders')
-          .update({ status: newStatus } as never)
-          .eq('id', id)
-        if (error) throw error
-      }
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus } as never)
+        .eq('id', id)
+      if (error) throw error
 
       await trackAuditAction({
         organizationId,
@@ -542,15 +488,59 @@ export function AdminOrderDetail() {
         newData: { status: newStatus },
       })
       setOrder({ ...order, status: newStatus })
-      show(
-        newStatus === 'cancelled'
-          ? 'Orden anulada correctamente. Se restauró stock y se registró la devolución total.'
-          : 'Estado actualizado',
-        'success'
-      )
+      show('Estado actualizado', 'success')
     } catch (error) {
       console.error('Error updating order status:', error)
       show('Error al actualizar el estado', 'error')
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleConfirmCancel = async () => {
+    if (!order || !id || !cancelReason.trim()) return
+    const previousStatus = order.status
+    setUpdating(true)
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: returnId, error } = await (supabase.rpc as any)('create_full_order_cancellation', {
+        p_order_id: id,
+        p_reason: cancelReason.trim(),
+        p_refund_method: order.payment_method || null,
+        p_notes: 'Anulación ejecutada desde detalle de orden',
+      })
+      if (error) throw error
+
+      await trackAuditAction({
+        organizationId,
+        tableName: 'order_returns',
+        recordId: String(returnId || id),
+        action: 'INSERT',
+        notes: 'Anulación completa de orden desde detalle de orden.',
+        newData: {
+          order_id: id,
+          previous_status: previousStatus,
+          new_status: 'cancelled',
+          reason: cancelReason.trim(),
+        },
+      })
+      await trackAuditAction({
+        organizationId,
+        tableName: 'orders',
+        recordId: id,
+        action: 'UPDATE',
+        notes: 'Cambio de estado de orden desde detalle de orden.',
+        oldData: { status: previousStatus },
+        newData: { status: 'cancelled' },
+      })
+
+      setOrder({ ...order, status: 'cancelled' })
+      setIsCancelModalOpen(false)
+      setCancelReason('')
+      show('Orden anulada correctamente. Se restauró stock y se registró la devolución total.', 'success')
+    } catch (error) {
+      console.error('Error cancelling order:', error)
+      show('Error al anular la orden', 'error')
     } finally {
       setUpdating(false)
     }
@@ -1018,62 +1008,63 @@ export function AdminOrderDetail() {
     return Number.isFinite(value) ? value : 0
   }
 
-  const handlePartialReturn = async (item: OrderItemWithProduct) => {
+  const openPartialReturnModal = (item: OrderItemWithProduct) => {
     if (!id || !organizationId) return
-
     const returnedQty = getReturnedQuantity(item)
     const remainingQty = item.quantity - returnedQty
-
     if (remainingQty <= 0) {
       show('Este item ya fue devuelto completamente.', 'info')
       return
     }
+    setPartialReturnItem(item)
+    setPartialReturnQuantity(String(remainingQty))
+    setPartialReturnReason('')
+    setIsPartialReturnModalOpen(true)
+  }
 
-    const quantityInput = window.prompt(
-      `Cantidad a devolver (máximo ${remainingQty})`,
-      String(remainingQty)
-    )
-    if (!quantityInput) return
+  const handleConfirmPartialReturn = async () => {
+    if (!id || !organizationId || !partialReturnItem) return
+    const returnedQty = getReturnedQuantity(partialReturnItem)
+    const remainingQty = partialReturnItem.quantity - returnedQty
+    const quantity = Number(partialReturnQuantity)
 
-    const quantity = Number(quantityInput)
     if (!Number.isFinite(quantity) || quantity <= 0 || quantity > remainingQty) {
       show('Cantidad de devolución inválida.', 'error')
       return
     }
-
-    const reason = window.prompt('Motivo de la devolución parcial:')
-    if (!reason || reason.trim().length === 0) {
+    if (!partialReturnReason.trim()) {
       show('Debes indicar un motivo para la devolución.', 'error')
       return
     }
 
-    setReturningItemId(item.id)
+    setReturningItemId(partialReturnItem.id)
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: returnId, error } = await (supabase.rpc as any)('process_partial_order_return', {
         p_order_id: id,
-        p_reason: reason.trim(),
-        p_items: [{ order_item_id: item.id, quantity }],
+        p_reason: partialReturnReason.trim(),
+        p_items: [{ order_item_id: partialReturnItem.id, quantity }],
         p_refund_method: order?.payment_method || null,
         p_notes: 'Devolución parcial desde detalle de orden',
       })
-
       if (error) throw error
 
       await trackAuditAction({
         organizationId,
         tableName: 'order_returns',
-        recordId: String(returnId || item.id),
+        recordId: String(returnId || partialReturnItem.id),
         action: 'INSERT',
         notes: 'Devolución parcial de item desde detalle de orden.',
         newData: {
           order_id: id,
-          order_item_id: item.id,
+          order_item_id: partialReturnItem.id,
           quantity,
-          reason: reason.trim(),
+          reason: partialReturnReason.trim(),
         },
       })
 
+      setIsPartialReturnModalOpen(false)
+      setPartialReturnItem(null)
       show('Devolución parcial registrada correctamente.', 'success')
       await fetchOrder()
     } catch (error) {
@@ -1099,7 +1090,6 @@ export function AdminOrderDetail() {
 
   const handleAnnulCFE = async () => {
     if (!billerComprobante || !billerConfig || !id) return
-    if (!window.confirm('¿Anular el comprobante fiscal electrónico? Esta acción no se puede deshacer.')) return
     setAnnullingCFE(true)
     try {
       await anularComprobante(billerConfig, billerComprobante.biller_id)
@@ -1109,6 +1099,7 @@ export function AdminOrderDetail() {
         .update({ estado: 'anulado' })
         .eq('id', billerComprobante.id)
       setBillerComprobante({ ...billerComprobante, estado: 'anulado' })
+      setIsAnnulCFEConfirmOpen(false)
       show('Comprobante anulado correctamente', 'success')
     } catch (e) {
       show(e instanceof BillerApiError ? e.message : 'Error al anular el comprobante', 'error')
@@ -1428,20 +1419,18 @@ export function AdminOrderDetail() {
                   </div>
                 )}
                 <p className="text-sm text-gray-600 mb-2">Actualizar Estado</p>
-                <div className="flex flex-wrap gap-2">
+                <select
+                  value={order.status ?? ''}
+                  onChange={(e) => handleStatusUpdate(e.target.value as Order['status'])}
+                  disabled={updating}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-admin-500 text-sm"
+                >
                   {statusOptions.map((status) => (
-                    <Button
-                      key={status}
-                      variant={order.status === status ? 'primary' : 'outline'}
-                      size="sm"
-                      onClick={() => handleStatusUpdate(status)}
-                      disabled={updating || order.status === status}
-                      className="text-xs"
-                    >
+                    <option key={status} value={status}>
                       {getStatusLabel(status)}
-                    </Button>
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
 
               {!isEditing && orderPayments.length > 0 && (
@@ -1615,7 +1604,7 @@ export function AdminOrderDetail() {
                                 <Button
                                   variant="secondary"
                                   size="sm"
-                                  onClick={() => handlePartialReturn(item)}
+                                  onClick={() => openPartialReturnModal(item)}
                                   disabled={Boolean(returningItemId) || getReturnedQuantity(item) >= item.quantity}
                                 >
                                   <Package className="h-4 w-4 mr-2" />
@@ -1624,7 +1613,7 @@ export function AdminOrderDetail() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleApplyItemDiscount(item)}
+                                  onClick={() => openItemDiscountModal(item)}
                                 >
                                   <Plus className="h-4 w-4 mr-2" />
                                   Aplicar descuento item
@@ -1690,7 +1679,7 @@ export function AdminOrderDetail() {
                 </div>
                 {!isEditing && order.status !== 'cancelled' && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={handleApplyOrderDiscount}>
+                    <Button variant="outline" size="sm" onClick={openOrderDiscountModal}>
                       <Plus className="h-4 w-4 mr-2" />
                       Aplicar descuento orden
                     </Button>
@@ -1777,7 +1766,7 @@ export function AdminOrderDetail() {
                     <Button
                       variant="danger"
                       size="sm"
-                      onClick={handleAnnulCFE}
+                      onClick={() => setIsAnnulCFEConfirmOpen(true)}
                       disabled={annullingCFE}
                     >
                       <X className="h-4 w-4 mr-2" />
@@ -2002,6 +1991,219 @@ export function AdminOrderDetail() {
           if (!collecting) setPaymentToDelete(null)
         }}
       />
+
+      <ConfirmDialog
+        open={isAnnulCFEConfirmOpen}
+        title="Anular comprobante fiscal"
+        message="¿Anular el comprobante fiscal electrónico? Esta acción no se puede deshacer."
+        confirmLabel={annullingCFE ? 'Anulando...' : 'Anular CFE'}
+        cancelLabel="Cancelar"
+        variant="danger"
+        onConfirm={handleAnnulCFE}
+        onCancel={() => { if (!annullingCFE) setIsAnnulCFEConfirmOpen(false) }}
+      />
+
+      {isCancelModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl">Anular orden</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setIsCancelModalOpen(false)} disabled={updating}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+              <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                Esta acción restaurará el stock y registrará una devolución total. No se puede deshacer.
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Motivo de anulación *</label>
+                <textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Indicá el motivo por el que se anula la venta..."
+                  rows={3}
+                  disabled={updating}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 resize-none"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setIsCancelModalOpen(false)} disabled={updating}>
+                  Cancelar
+                </Button>
+                <Button variant="danger" className="flex-1" onClick={handleConfirmCancel} disabled={updating || !cancelReason.trim()}>
+                  {updating ? 'Anulando...' : 'Confirmar anulación'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {isPartialReturnModalOpen && partialReturnItem && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl">Registrar devolución parcial</CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setIsPartialReturnModalOpen(false)} disabled={Boolean(returningItemId)}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+              <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+                <p className="font-medium">{capitalizeFirst(partialReturnItem.product.name)}</p>
+                <p className="text-gray-500">Cantidad original: {partialReturnItem.quantity} · Devuelto: {getReturnedQuantity(partialReturnItem)}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Cantidad a devolver (máximo {partialReturnItem.quantity - getReturnedQuantity(partialReturnItem)}) *
+                </label>
+                <Input
+                  type="number"
+                  min="1"
+                  max={partialReturnItem.quantity - getReturnedQuantity(partialReturnItem)}
+                  value={partialReturnQuantity}
+                  onChange={(e) => setPartialReturnQuantity(e.target.value)}
+                  disabled={Boolean(returningItemId)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Motivo de la devolución *</label>
+                <textarea
+                  value={partialReturnReason}
+                  onChange={(e) => setPartialReturnReason(e.target.value)}
+                  placeholder="Indicá el motivo de la devolución..."
+                  rows={3}
+                  disabled={Boolean(returningItemId)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 resize-none"
+                />
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setIsPartialReturnModalOpen(false)} disabled={Boolean(returningItemId)}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={handleConfirmPartialReturn} disabled={Boolean(returningItemId) || !partialReturnReason.trim()}>
+                  {returningItemId ? 'Procesando...' : 'Confirmar devolución'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {isDiscountModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader className="pb-4 border-b">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xl">
+                  {discountTarget === 'order' ? 'Aplicar descuento a la orden' : `Descuento en ítem`}
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setIsDiscountModalOpen(false)}>
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+              {discountTarget === 'item' && discountTargetItem && (
+                <div className="rounded-lg bg-gray-50 p-3 text-sm text-gray-700">
+                  <p className="font-medium">{capitalizeFirst(discountTargetItem.product.name)}</p>
+                </div>
+              )}
+
+              {(discountTarget === 'order' ? orderDiscountRules : itemDiscountRules).length > 0 && (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant={!isManualDiscount ? 'primary' : 'outline'}
+                    onClick={() => setIsManualDiscount(false)}
+                    className="flex-1"
+                  >
+                    Regla existente
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={isManualDiscount ? 'primary' : 'outline'}
+                    onClick={() => setIsManualDiscount(true)}
+                    className="flex-1"
+                  >
+                    Manual
+                  </Button>
+                </div>
+              )}
+
+              {!isManualDiscount && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Regla de descuento *</label>
+                  <select
+                    value={discountRuleId}
+                    onChange={(e) => setDiscountRuleId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  >
+                    <option value="">Seleccionar regla...</option>
+                    {(discountTarget === 'order' ? orderDiscountRules : itemDiscountRules).map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {r.name} — {r.kind === 'percentage' ? `${r.value}%` : r.kind === 'fixed_amount' ? formatPrice(r.value, settings) : `Precio fijo ${formatPrice(r.value, settings)}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {isManualDiscount && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de descuento *</label>
+                    <select
+                      value={discountKind}
+                      onChange={(e) => setDiscountKind(e.target.value as DiscountKind)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                    >
+                      <option value="percentage">Porcentaje (%)</option>
+                      <option value="fixed_amount">Monto fijo</option>
+                      <option value="price_override">Precio nuevo</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Valor {discountKind === 'percentage' ? '(%)' : '($)'} *
+                    </label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={discountValue}
+                      onChange={(e) => setDiscountValue(e.target.value)}
+                      placeholder={discountKind === 'percentage' ? 'Ej: 10' : 'Ej: 50.00'}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Motivo (opcional)</label>
+                    <Input
+                      value={discountReason}
+                      onChange={(e) => setDiscountReason(e.target.value)}
+                      placeholder="Ej: Descuento por fidelidad"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="flex-1" onClick={() => setIsDiscountModalOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button className="flex-1" onClick={handleConfirmDiscount}>
+                  Aplicar descuento
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

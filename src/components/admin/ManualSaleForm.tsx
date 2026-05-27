@@ -111,6 +111,7 @@ export function ManualSaleForm({
   const [manualDiscountReason, setManualDiscountReason] = useState('')
   const [selectedDiscountRuleId, setSelectedDiscountRuleId] = useState('')
   const [loading, setLoading] = useState(false)
+  const [pendingBranchId, setPendingBranchId] = useState<string | null>(null)
   const [linkedCustomer, setLinkedCustomer] = useState<CustomerLite | null>(null)
   const [isCustomerPickerOpen, setIsCustomerPickerOpen] = useState(false)
   const [customerPickerSearch, setCustomerPickerSearch] = useState('')
@@ -394,11 +395,30 @@ export function ManualSaleForm({
     show(`Cliente seleccionado: ${customer.full_name}.`, 'success')
   }
 
-  // Real-time search
+  const handleBranchChange = (newBranchId: string) => {
+    if (saleLines.length > 0) {
+      setPendingBranchId(newBranchId)
+    } else {
+      setBranchId(newBranchId)
+      onBranchChange?.(newBranchId)
+    }
+  }
+
+  const confirmBranchChange = () => {
+    if (!pendingBranchId) return
+    setSaleLines([])
+    setBranchId(pendingBranchId)
+    onBranchChange?.(pendingBranchId)
+    setPendingBranchId(null)
+  }
+
+  // Real-time search — name + SKU
   useEffect(() => {
     if (searchTerm.trim().length > 0) {
+      const term = searchTerm.toLowerCase()
       const filtered = products.filter((p) =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
+        p.name.toLowerCase().includes(term) ||
+        ((p as any).sku && (p as any).sku.toLowerCase().includes(term))
       )
       setSearchResults(filtered.slice(0, 8))
       setShowSearchResults(true)
@@ -1067,19 +1087,8 @@ export function ManualSaleForm({
           <span className="font-semibold text-gray-900 text-lg">Nueva Venta</span>
           {branches && branches.length > 1 && onBranchChange && (
             <select
-              value={branchId}
-              onChange={(e) => {
-                const newBranchId = e.target.value
-                setBranchId(newBranchId)
-                onBranchChange(newBranchId)
-                if (saleLines.length > 0) {
-                  if (confirm('¿Cambiar de sucursal? Se limpiarán las líneas de venta.')) {
-                    setSaleLines([])
-                  } else {
-                    setBranchId(branchId)
-                  }
-                }
-              }}
+              value={pendingBranchId ?? branchId}
+              onChange={(e) => handleBranchChange(e.target.value)}
               className="ml-2 text-sm border border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-admin-500 hidden sm:block"
             >
               {branches.map((branch) => (
@@ -1112,25 +1121,37 @@ export function ManualSaleForm({
             <div className="sm:hidden">
               <label className="block text-xs font-medium text-gray-700 mb-1">Sucursal</label>
               <select
-                value={branchId}
-                onChange={(e) => {
-                  const newBranchId = e.target.value
-                  setBranchId(newBranchId)
-                  onBranchChange(newBranchId)
-                  if (saleLines.length > 0) {
-                    if (confirm('¿Cambiar de sucursal? Se limpiarán las líneas de venta.')) {
-                      setSaleLines([])
-                    } else {
-                      setBranchId(branchId)
-                    }
-                  }
-                }}
+                value={pendingBranchId ?? branchId}
+                onChange={(e) => handleBranchChange(e.target.value)}
                 className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
               >
                 {branches.map((branch) => (
                   <option key={branch.id} value={branch.id}>{branch.name}</option>
                 ))}
               </select>
+            </div>
+          )}
+
+          {/* Branch change confirmation banner */}
+          {pendingBranchId && (
+            <div className="flex-shrink-0 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-center justify-between gap-3">
+              <span>Cambiar de sucursal borrará {saleLines.length} {saleLines.length === 1 ? 'ítem' : 'ítems'}. ¿Confirmás?</span>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={confirmBranchChange}
+                  className="px-3 py-1 rounded-lg bg-amber-600 text-white text-xs font-semibold hover:bg-amber-700 transition-colors"
+                >
+                  Confirmar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPendingBranchId(null)}
+                  className="px-3 py-1 rounded-lg border border-amber-300 text-xs font-semibold hover:bg-amber-100 transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
             </div>
           )}
 
@@ -1147,7 +1168,13 @@ export function ManualSaleForm({
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 onFocus={() => { if (searchResults.length > 0) setShowSearchResults(true) }}
-                placeholder="Escribe para buscar productos..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && searchResults.length > 0) {
+                    e.preventDefault()
+                    void handleAddProduct(searchResults[0])
+                  }
+                }}
+                placeholder="Buscar por nombre o SKU..."
                 className="pl-9"
               />
               {showSearchResults && searchResults.length > 0 && (

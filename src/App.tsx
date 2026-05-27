@@ -1,4 +1,5 @@
 import { AdminLayout } from '@/components/layout/AdminLayout'
+import { POSLayout } from '@/components/layout/POSLayout'
 import { PublicStoreWrapper } from '@/components/layout/PublicStoreWrapper'
 import { ForgotPassword } from '@/pages/ForgotPassword'
 import { Login } from '@/pages/Login'
@@ -41,6 +42,8 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { Landing } from './pages/Landing'
 import { LandingFacturacion } from './pages/LandingFacturacion'
+import { POSHome } from '@/pages/pos/POSHome'
+import { POSSale } from '@/pages/pos/POSSale'
 
 function ReportsRouteGuard({ children }: { children: JSX.Element }) {
   const { canUseFeature } = usePlanLimits()
@@ -116,6 +119,12 @@ function App() {
           <Route path="/users" element={<AdminUsers />} />
           <Route path="/roles-permissions" element={<AdminRolesPermissions />} />
           <Route path="/store/stats" element={<AdminStoreStats />} />
+        </Route>
+
+        {/* POS móvil — layout sin sidebar */}
+        <Route element={<POSLayout />}>
+          <Route path="/pos" element={<POSHome />} />
+          <Route path="/pos/sale/:branchId" element={<POSSale />} />
         </Route>
 
         {/* Ruta por defecto */}

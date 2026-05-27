@@ -23,6 +23,17 @@ interface InventoryAdjustmentModalProps {
   onSuccess: () => void
 }
 
+const ADJUSTMENT_REASONS = [
+  'Conteo físico',
+  'Merma / vencimiento',
+  'Rotura o daño',
+  'Devolución a proveedor',
+  'Error de ingreso anterior',
+  'Donación',
+  'Muestra / uso interno',
+  'Otro (especificar)',
+] as const
+
 export function InventoryAdjustmentModal({
   inventoryItem,
   onClose,
@@ -31,8 +42,12 @@ export function InventoryAdjustmentModal({
   const { organizationId } = useOrganization()
   const { show } = useToastStore()
   const [newStock, setNewStock] = useState(inventoryItem.current_stock.toString())
-  const [notes, setNotes] = useState('')
+  const [selectedReason, setSelectedReason] = useState('')
+  const [customNotes, setCustomNotes] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const isOtherReason = selectedReason === 'Otro (especificar)'
+  const notes = isOtherReason ? customNotes : selectedReason
 
   const difference = parseInt(newStock) - inventoryItem.current_stock
 
@@ -47,6 +62,11 @@ export function InventoryAdjustmentModal({
 
     if (stock === inventoryItem.current_stock) {
       show('El stock no ha cambiado', 'error')
+      return
+    }
+
+    if (!notes.trim()) {
+      show('Seleccioná un motivo para el ajuste', 'error')
       return
     }
 
@@ -168,14 +188,28 @@ export function InventoryAdjustmentModal({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Motivo del ajuste *
               </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-                rows={3}
-                placeholder="Ej: Conteo físico, merma, rotura, error de sistema..."
+              <select
+                value={selectedReason}
+                onChange={(e) => { setSelectedReason(e.target.value); setCustomNotes('') }}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 bg-white"
                 required
-              />
+              >
+                <option value="">Seleccioná un motivo...</option>
+                {ADJUSTMENT_REASONS.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+              {isOtherReason && (
+                <textarea
+                  value={customNotes}
+                  onChange={(e) => setCustomNotes(e.target.value)}
+                  className="mt-2 w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  rows={2}
+                  placeholder="Describí el motivo del ajuste..."
+                  autoFocus
+                  required
+                />
+              )}
             </div>
 
             <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:space-x-4 sm:gap-0 sm:pt-4">

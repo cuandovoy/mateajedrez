@@ -9,20 +9,23 @@ API_KEY = "AIzaSyBA2QqK0Aw7B8rRwo4FOBJa6k7DdLvfQ-g"
 
 # Rubros a buscar (podés agregar o sacar los que quieras)
 RUBROS = [
-    "casa de decoración",
-    "decoración del hogar",
-    "tienda de muebles",
-    "bazar decoración",
-    "tienda de regalos",
-    "decoración interior",
-    "artículos para el hogar",
-    "cuadros y marcos",
-    "iluminación decorativa",
+    "gimnasio",
+    "gym",
+    "centro deportivo",
+    "fitness center",
+    "crossfit",
+    "box crossfit",
+    "gimnasio funcional",
+    "centro de entrenamiento",
+    "yoga studio",
+    "pilates",
+    "artes marciales",
+    "box de boxeo",
 ]
 
-# Zona de búsqueda: centro de Montevideo
-LOCATION = "-34.9011,-56.1645"  # lat,lng de Montevideo
-RADIUS = 15000  # 15km de radio (cubre gran Montevideo)
+# Zona de búsqueda: Ciudad de México (Zócalo)
+LOCATION = "19.4326,-99.1332"  # lat,lng de CDMX
+RADIUS = 20000  # 20km de radio (cubre gran parte de CDMX)
 
 # ============================================================
 
@@ -35,7 +38,7 @@ def buscar_lugares(query):
 
     while True:
         params = {
-            "query": f"{query} Montevideo Uruguay",
+            "query": f"{query} Ciudad de México México",
             "location": LOCATION,
             "radius": RADIUS,
             "key": API_KEY,
@@ -90,7 +93,7 @@ def obtener_detalle(place_id):
 
 
 def main():
-    print("🔍 Iniciando búsqueda de locales en Montevideo...\n")
+    print("🔍 Iniciando búsqueda de gimnasios en Ciudad de México...\n")
 
     todos_los_ids = set()  # Usamos set para evitar duplicados
 
@@ -107,7 +110,7 @@ def main():
 
     # 2. Obtener detalles de cada lugar (guardando cada 25)
     GUARDAR_CADA = 25
-    archivo = "locales_montevideo.xlsx"
+    archivo = "gimnasios_cdmx.xlsx"
     locales = []
 
     def guardar(locales):
