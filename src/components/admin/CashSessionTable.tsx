@@ -5,7 +5,8 @@ import { formatDateShort, formatPrice, formatTime } from '@/lib/utils'
 import { Building2, DollarSign, Edit, Trash2, Receipt, Timer } from 'lucide-react'
 import type { CashSession } from '@/types'
 
-function sessionDuration(openedAt: string, closedAt: string | null): string {
+function sessionDuration(openedAt: string | null, closedAt: string | null): string {
+  if (!openedAt) return '—'
   const start = new Date(openedAt).getTime()
   const end = closedAt ? new Date(closedAt).getTime() : Date.now()
   const totalMinutes = Math.floor((end - start) / 60000)
