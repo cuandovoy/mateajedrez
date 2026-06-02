@@ -362,7 +362,7 @@ export function LotReceptionModal({ branches, defaultBranchId, onCreated, onClos
         {step !== 'success' && (
           <div className="flex gap-2 p-4 border-t border-gray-100">
             {step > 1 && (
-              <Button variant="outline" onClick={() => setStep(s => (s - 1) as Step)} disabled={loading}>
+              <Button variant="outline" onClick={() => setStep(s => (s as number - 1) as Step)} disabled={loading}>
                 ← Atrás
               </Button>
             )}
