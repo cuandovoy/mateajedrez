@@ -1,4 +1,5 @@
 import { BarcodeManager } from '@/components/admin/BarcodeManager'
+import { ProductImportModal } from '@/components/admin/ProductImportModal'
 import { ProductSupplierManager } from '@/components/admin/ProductSupplierManager'
 import { ProductTable } from '@/components/admin/ProductTable'
 import { VariantManager } from '@/components/admin/VariantManager'
@@ -457,6 +458,7 @@ function AdminProductsContent() {
   const [categories, setCategories] = useState<Category[]>([])
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'products' | 'discounts'>('products')
   const [discountedProducts, setDiscountedProducts] = useState<ProductWithImages[]>([])
   const [loadingDiscounts, setLoadingDiscounts] = useState(false)
@@ -510,6 +512,17 @@ function AdminProductsContent() {
     formState: { errors },
   } = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: '',
+      description: '',
+      price: 0,
+      stock: 0,
+      category_id: undefined,
+      sku: '',
+      is_active: true,
+      discount_percentage: null,
+      discount_expires_at: null,
+    },
   })
 
   const fetchProducts = useCallback(async () => {
@@ -1242,12 +1255,14 @@ function AdminProductsContent() {
       setIsModalOpen(false)
       setEditingProduct(null)
       setProductImages([])
+      setSelectedCategoryIds([])
+      setInitialBranchId('')
       reset()
       await fetchProducts()
       fetchDiscountedProducts()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving product:', error)
-      alert('Error al guardar el producto')
+      show(error?.message || 'Error al guardar el producto', 'error')
     } finally {
       setUploadingImage(false)
     }
@@ -1577,6 +1592,14 @@ function AdminProductsContent() {
           >
             <Download className="h-4 w-4 mr-2" />
             {exportingPdf ? 'Exportando...' : 'PDF'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsImportModalOpen(true)}
+            disabled={isAtLimit('products')}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Importar
           </Button>
           <Button onClick={handleNew} disabled={isAtLimit('products')}>
             <Plus className="h-4 w-4 mr-2" />
@@ -2339,6 +2362,18 @@ function AdminProductsContent() {
         <ProductSupplierManager
           productId={supplierManagerProduct.id}
           onClose={() => setSupplierManagerProduct(null)}
+        />
+      )}
+
+      {isImportModalOpen && organizationId && (
+        <ProductImportModal
+          organizationId={organizationId}
+          branches={branches}
+          onClose={() => setIsImportModalOpen(false)}
+          onImported={() => {
+            fetchProducts()
+            fetchDiscountedProducts()
+          }}
         />
       )}
     </div>

@@ -5,7 +5,7 @@ import { hasConfigSchema } from '@/lib/paymentMethodConfig'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
 import type { OrganizationPaymentMethod, OrganizationPaymentMethodInsert } from '@/types/database.types'
-import { Plus, Settings, Trash2 } from 'lucide-react'
+import { ImageIcon, Plus, Settings, Trash2, X } from 'lucide-react'
 import { useState } from 'react'
 import { PaymentMethodConfigModal } from './PaymentMethodConfigModal'
 
@@ -29,6 +29,8 @@ export function PaymentMethodsManager({ organizationId }: Props) {
   const [newKey, setNewKey] = useState('')
   const [newName, setNewName] = useState('')
   const [newRequiresCash, setNewRequiresCash] = useState(false)
+  const [editingIconId, setEditingIconId] = useState<string | null>(null)
+  const [iconUrlDraft, setIconUrlDraft] = useState('')
 
   const existingKeys = new Set(methods.map((m) => m.key))
 
@@ -87,6 +89,23 @@ export function PaymentMethodsManager({ organizationId }: Props) {
     }
   }
 
+  const handleSaveIconUrl = async (method: OrganizationPaymentMethod) => {
+    const url = iconUrlDraft.trim()
+    const nextConfig = { ...(method.config as Record<string, unknown> ?? {}), icon_url: url || undefined }
+    try {
+      const { error } = await supabase
+        .from('organization_payment_methods')
+        .update({ config: nextConfig } as never)
+        .eq('id', method.id)
+      if (error) throw error
+      show('Ícono actualizado', 'success')
+      setEditingIconId(null)
+      refetch()
+    } catch (err) {
+      show(err instanceof Error ? err.message : 'Error al guardar el ícono', 'error')
+    }
+  }
+
   const handleDelete = async (method: OrganizationPaymentMethod) => {
     if (!confirm(`¿Eliminar "${method.name}"? No se puede deshacer.`)) return
     try {
@@ -138,61 +157,100 @@ export function PaymentMethodsManager({ organizationId }: Props) {
       </p>
 
       <div className="space-y-2">
-        {methods.map((m) => (
-          <div
-            key={m.id}
-            className={`flex items-center justify-between px-3 py-2 rounded-lg border ${
-              m.is_active ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-100'
-            }`}
-          >
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <button
-                type="button"
-                onClick={() => handleToggleActive(m)}
-                className={`w-10 h-5 rounded-full transition-colors shrink-0 ${
-                  m.is_active ? 'bg-admin-600' : 'bg-gray-300'
-                }`}
-                aria-label={m.is_active ? 'Desactivar' : 'Activar'}
-              >
-                <span
-                  className={`block w-4 h-4 rounded-full bg-white shadow transform transition-transform ${
-                    m.is_active ? 'translate-x-5' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-              <div className="min-w-0">
-                <p className={`text-sm font-medium truncate ${m.is_active ? 'text-gray-900' : 'text-gray-500'}`}>{m.name}</p>
-                <p className="text-xs text-gray-400 font-mono">{m.key}</p>
+        {methods.map((m) => {
+          const currentIconUrl = (m.config as any)?.icon_url as string | undefined
+          const isEditingIcon = editingIconId === m.id
+          return (
+            <div key={m.id} className={`rounded-lg border ${m.is_active ? 'bg-white border-gray-200' : 'bg-gray-50 border-gray-100'}`}>
+              <div className="flex items-center justify-between px-3 py-2">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleActive(m)}
+                    className={`w-10 h-5 rounded-full transition-colors shrink-0 ${
+                      m.is_active ? 'bg-admin-600' : 'bg-gray-300'
+                    }`}
+                    aria-label={m.is_active ? 'Desactivar' : 'Activar'}
+                  >
+                    <span
+                      className={`block w-4 h-4 rounded-full bg-white shadow transform transition-transform ${
+                        m.is_active ? 'translate-x-5' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </button>
+                  {currentIconUrl && (
+                    <img src={currentIconUrl} alt="" className="h-5 w-auto object-contain shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p className={`text-sm font-medium truncate ${m.is_active ? 'text-gray-900' : 'text-gray-500'}`}>{m.name}</p>
+                    <p className="text-xs text-gray-400 font-mono">{m.key}</p>
+                  </div>
+                  {m.requires_cash_session && (
+                    <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded shrink-0">Requiere caja</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setEditingIconId(isEditingIcon ? null : m.id)
+                      setIconUrlDraft(currentIconUrl ?? '')
+                    }}
+                    className="text-gray-500 hover:text-gray-800"
+                    aria-label="Cambiar ícono"
+                    title="URL del ícono"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                  </Button>
+                  {hasConfigSchema(m.key) && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setConfigMethod(m)}
+                      className="text-gray-600 hover:text-gray-900"
+                      aria-label="Configurar"
+                    >
+                      <Settings className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(m)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              {m.requires_cash_session && (
-                <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-800 rounded shrink-0">Requiere caja</span>
+              {isEditingIcon && (
+                <div className="px-3 pb-3 pt-1 border-t border-gray-100 flex items-center gap-2">
+                  <Input
+                    type="url"
+                    placeholder="https://ejemplo.com/logo.png (dejá vacío para quitar)"
+                    value={iconUrlDraft}
+                    onChange={(e) => setIconUrlDraft(e.target.value)}
+                    className="text-sm flex-1"
+                  />
+                  <Button type="button" size="sm" onClick={() => handleSaveIconUrl(m)}>
+                    Guardar
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingIconId(null)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               )}
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              {hasConfigSchema(m.key) && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setConfigMethod(m)}
-                  className="text-gray-600 hover:text-gray-900"
-                  aria-label="Configurar"
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDelete(m)}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {!isAdding ? (

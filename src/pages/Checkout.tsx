@@ -8,26 +8,31 @@ import { supabase } from '@/lib/supabase'
 import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { capitalizeFirst, formatPrice, getEffectivePrice, hasActiveDiscount } from '@/lib/utils'
+import { capitalizeFirst, formatPrice, getEffectivePrice, hasActiveDiscount, getProductImageUrl } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch, CartItemWithProduct, Order } from '@/types'
+import type { ProductImage } from '@/types'
 import { BranchInventory, Customer } from '@/types/database.types'
-import { ArrowLeft, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3'
 
-interface ShippingForm {
+// Icon map for known payment method keys
+const PAYMENT_METHOD_ICONS: Record<string, React.ReactNode> = {
+  cash: <Banknote className="h-5 w-5" />,
+  transfer: <Landmark className="h-5 w-5" />,
+  credit_card: <CreditCard className="h-5 w-5" />,
+  paypal: <CreditCard className="h-5 w-5" />,
+}
+
+interface ContactForm {
   fullName: string
   email: string
   phone: string
-  address: string
-  city: string
-  state: string
-  zipCode: string
-  country: string
 }
 
 interface FulfillmentBranchCandidate {
@@ -36,12 +41,13 @@ interface FulfillmentBranchCandidate {
   code: string | null
 }
 
-export function Checkout() {
+function CheckoutInner() {
   const navigate = useNavigate()
   const { slug } = useParams<{ slug?: string }>()
   const settings = useOrgSettings()
   const { items, getTotal, clearCart } = useCartStore()
   const { user } = useAuthStore()
+  const { executeRecaptcha } = useGoogleReCaptcha()
   const orgFromStore = useOrganizationStore((s) => s.currentOrganization?.id)
   const orgFromCart = items[0] && 'product' in items[0] ? (items[0] as CartItemWithProduct).product?.organization_id : null
   const organizationId = orgFromStore ?? orgFromCart
@@ -58,17 +64,12 @@ export function Checkout() {
     tipoComprobante: 'ticket',
   })
   const [mainBranchId, setMainBranchId] = useState<string | null>(null)
-  const [formData, setFormData] = useState<ShippingForm>({
+  const [formData, setFormData] = useState<ContactForm>({
     fullName: '',
     email: '',
     phone: '',
-    address: '',
-    city: '',
-    state: '',
-    zipCode: '',
-    country: 'Uruguay',
   })
-  const [errors, setErrors] = useState<Partial<ShippingForm>>({})
+  const [errors, setErrors] = useState<Partial<ContactForm>>({})
 
   // Cargar configuración de Biller si la org la tiene activa
   useEffect(() => {
@@ -147,7 +148,7 @@ export function Checkout() {
   }, [paymentMethods, mainBranchId, paymentMethod])
 
   const validateForm = (): boolean => {
-    const newErrors: Partial<ShippingForm> = {}
+    const newErrors: Partial<ContactForm> = {}
 
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'El nombre completo es obligatorio'
@@ -157,21 +158,6 @@ export function Checkout() {
     }
     if (!formData.phone.trim()) {
       newErrors.phone = 'El teléfono es obligatorio'
-    }
-    if (!formData.address.trim()) {
-      newErrors.address = 'La dirección es obligatoria'
-    }
-    if (!formData.city.trim()) {
-      newErrors.city = 'La ciudad es obligatoria'
-    }
-    if (!formData.state.trim()) {
-      newErrors.state = 'La provincia es obligatoria'
-    }
-    if (!formData.zipCode.trim()) {
-      newErrors.zipCode = 'El código postal es obligatorio'
-    }
-    if (!formData.country.trim()) {
-      newErrors.country = 'El país es obligatorio'
     }
 
     setErrors(newErrors)
@@ -346,6 +332,24 @@ export function Checkout() {
       return
     }
 
+    // reCAPTCHA v3 validation
+    if (executeRecaptcha) {
+      try {
+        const token = await executeRecaptcha('checkout')
+        const { data: captchaResult, error: captchaError } = await supabase.functions.invoke('validate-recaptcha', {
+          body: { token },
+        })
+        if (captchaError || !captchaResult?.success || (captchaResult.score !== null && captchaResult.score < 0.5)) {
+          show('Verificación de seguridad fallida. Por favor intentá de nuevo.', 'error')
+          return
+        }
+      } catch {
+        // Si falla la verificación por error de red/config, se bloquea la orden
+        show('No se pudo completar la verificación de seguridad. Revisá tu conexión.', 'error')
+        return
+      }
+    }
+
     setLoading(true)
 
     try {
@@ -377,15 +381,10 @@ export function Checkout() {
 
       const total = getTotal()
       const customerEmail = (formData.email.trim() || user?.email) ?? null
-      const shippingAddress = {
+      const contactInfo = {
         fullName: formData.fullName,
         email: customerEmail || undefined,
         phone: formData.phone,
-        address: formData.address,
-        city: formData.city,
-        state: formData.state,
-        zipCode: formData.zipCode,
-        country: formData.country,
       }
 
       if (!organizationId) {
@@ -402,14 +401,14 @@ export function Checkout() {
         customer_id: null, // Will be set after creating customer
         total,
         status: (checkoutStockAllocationMode === 'manual' ? 'pending_allocation' : 'pending') as Order['status'],
-        shipping_address: shippingAddress,
+        shipping_address: contactInfo,
         payment_method: paymentMethod,
         branch_id: fulfillmentBranchId, // Auto-assigned to a branch that can fulfill this order
       } as any
 
       // Create or get customer (scoped by org)
       let customer: Customer | null = null
-      
+
       // Check if customer exists by phone within this org
       const { data: existingCustomer }: { data: Customer | null, error: Error | null } = await supabase
         .from('customers')
@@ -431,7 +430,7 @@ export function Checkout() {
               ...(user?.id && !existingCustomer.user_id ? { user_id: user.id } : {}),
               email: customerEmail ?? user?.email ?? existingCustomer.email,
               full_name: formData.fullName,
-              address: shippingAddress,
+              address: contactInfo,
             } as never)
             .eq('id', existingCustomer.id)
             .select()
@@ -448,7 +447,7 @@ export function Checkout() {
             email: customerEmail,
             full_name: formData.fullName,
             phone: formData.phone,
-            address: shippingAddress,
+            address: contactInfo,
             is_active: true,
           } as never)
           .select()
@@ -457,7 +456,7 @@ export function Checkout() {
         if (customerError || !newCustomer) {
           throw customerError || new Error('Failed to create customer')
         }
-        
+
         customer = newCustomer
       }
 
@@ -634,7 +633,7 @@ export function Checkout() {
       await clearCart()
 
       show('¡Orden creada exitosamente!', 'success')
-      
+
       // Navigate to order confirmation
       navigate(
         slug
@@ -649,7 +648,7 @@ export function Checkout() {
     }
   }
 
-  const handleChange = (field: keyof ShippingForm, value: string) => {
+  const handleChange = (field: keyof ContactForm, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }))
@@ -682,62 +681,61 @@ export function Checkout() {
               <div className="space-y-3">
                 {items.map((item) => {
                   const unitPrice = item.variant?.price ?? getEffectivePrice(item.product)
+                  const imgUrl = getProductImageUrl(
+                    item.product as typeof item.product & { product_images?: ProductImage[] },
+                    item.variant?.image_url ?? null
+                  )
                   return (
-                  <div key={item.id} className="flex items-center space-x-3">
-                    {item.product.image_url && (
-                      <img
-                        src={item.product.image_url}
-                        alt={capitalizeFirst(item.product.name)}
-                        className="w-16 h-16 object-cover rounded"
-                      />
-                    )}
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {capitalizeFirst(item.product.name)}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        Cantidad: {item.quantity}
-                      </p>
-                      <div className="mt-0.5">
-                        {!item.variant && hasActiveDiscount(item.product) && (
-                          <p className="text-xs text-gray-400 line-through leading-none">
-                            {formatPrice(item.product.price * item.quantity, settings)}
-                          </p>
-                        )}
-                        <p className="text-sm font-semibold text-primary-600">
-                          {formatPrice(unitPrice * item.quantity, settings)}
+                    <div key={item.id} className="flex items-start gap-3">
+                      {imgUrl ? (
+                        <img
+                          src={imgUrl}
+                          alt={capitalizeFirst(item.product.name)}
+                          className="w-16 h-16 object-cover rounded flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded bg-gray-100 flex-shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                          {capitalizeFirst(item.product.name)}
                         </p>
+                        {item.variant && (
+                          <p className="text-xs text-gray-500">{item.variant.name}</p>
+                        )}
+                        <p className="text-xs text-gray-600">
+                          Cantidad: {item.quantity}
+                        </p>
+                        <div className="mt-0.5">
+                          {!item.variant && hasActiveDiscount(item.product) && (
+                            <p className="text-xs text-gray-400 line-through leading-none">
+                              {formatPrice(item.product.price * item.quantity, settings)}
+                            </p>
+                          )}
+                          <p className="text-sm font-semibold text-primary-600">
+                            {formatPrice(unitPrice * item.quantity, settings)}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
                   )
                 })}
               </div>
-              <div className="border-t pt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-semibold">{formatPrice(subtotal, settings)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Envío</span>
-                  <span className="font-semibold">A calcular</span>
-                </div>
-                <div className="border-t pt-2">
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span>{formatPrice(subtotal, settings)}</span>
-                  </div>
+              <div className="border-t pt-4">
+                <div className="flex justify-between text-lg font-bold">
+                  <span>Total</span>
+                  <span>{formatPrice(subtotal, settings)}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Shipping Form */}
+        {/* Contact & Payment Form */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Datos de Envío</CardTitle>
+              <CardTitle>Datos de Contacto</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -782,97 +780,15 @@ export function Checkout() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Teléfono <span className="text-red-500">*</span>
                   </label>
-                    <Input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => handleChange('phone', e.target.value)}
-                      required
-                      className={errors.phone ? 'border-red-500' : ''}
-                    />
-                    {errors.phone && (
-                      <p className="text-xs text-red-500 mt-1">{errors.phone}</p>
-                    )}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Dirección <span className="text-red-500">*</span>
-                  </label>
                   <Input
-                    type="text"
-                    value={formData.address}
-                    onChange={(e) => handleChange('address', e.target.value)}
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => handleChange('phone', e.target.value)}
                     required
-                    className={errors.address ? 'border-red-500' : ''}
+                    className={errors.phone ? 'border-red-500' : ''}
                   />
-                  {errors.address && (
-                    <p className="text-xs text-red-500 mt-1">{errors.address}</p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Ciudad <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      type="text"
-                      value={formData.city}
-                      onChange={(e) => handleChange('city', e.target.value)}
-                      required
-                      className={errors.city ? 'border-red-500' : ''}
-                    />
-                    {errors.city && (
-                      <p className="text-xs text-red-500 mt-1">{errors.city}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Provincia <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      type="text"
-                      value={formData.state}
-                      onChange={(e) => handleChange('state', e.target.value)}
-                      required
-                      className={errors.state ? 'border-red-500' : ''}
-                    />
-                    {errors.state && (
-                      <p className="text-xs text-red-500 mt-1">{errors.state}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Código Postal <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      type="text"
-                      value={formData.zipCode}
-                      onChange={(e) => handleChange('zipCode', e.target.value)}
-                      required
-                      className={errors.zipCode ? 'border-red-500' : ''}
-                    />
-                    {errors.zipCode && (
-                      <p className="text-xs text-red-500 mt-1">{errors.zipCode}</p>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    País <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    type="text"
-                    value={formData.country}
-                    onChange={(e) => handleChange('country', e.target.value)}
-                    required
-                    className={errors.country ? 'border-red-500' : ''}
-                  />
-                  {errors.country && (
-                    <p className="text-xs text-red-500 mt-1">{errors.country}</p>
+                  {errors.phone && (
+                    <p className="text-xs text-red-500 mt-1">{errors.phone}</p>
                   )}
                 </div>
 
@@ -884,29 +800,43 @@ export function Checkout() {
                   <div className="space-y-3">
                     {paymentMethods
                       .filter((m) => !m.requires_cash_session || mainBranchId)
-                      .map((m) => (
-                        <label
-                          key={m.id}
-                          className={`flex items-center space-x-3 p-4 border-2 rounded-lg cursor-pointer transition-colors ${paymentMethod === m.key ? 'border-primary-200 bg-primary-50' : 'border-gray-200 hover:bg-gray-50'}`}
-                        >
-                          <input
-                            type="radio"
-                            name="paymentMethod"
-                            value={m.key}
-                            checked={paymentMethod === m.key}
-                            onChange={(e) => setPaymentMethod(e.target.value)}
-                            className="w-4 h-4 text-primary-200 focus:ring-primary-200"
-                          />
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900">{m.name}</p>
-                            <p className="text-sm text-gray-600">
-                              {m.requires_cash_session && mainBranchId
-                                ? 'Disponible solo en tienda física'
-                                : 'Realiza el pago según las instrucciones'}
-                            </p>
-                          </div>
-                        </label>
-                      ))}
+                      .map((m) => {
+                        const iconUrl = (m.config as any)?.icon_url as string | undefined
+                        const icon = iconUrl
+                          ? <img src={iconUrl} alt={m.name} className="h-5 w-auto object-contain" />
+                          : (PAYMENT_METHOD_ICONS[m.key] ?? <CreditCard className="h-5 w-5" />)
+
+                        return (
+                          <label
+                            key={m.id}
+                            className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                              paymentMethod === m.key
+                                ? 'border-primary-400 bg-primary-50'
+                                : 'border-gray-200 hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="paymentMethod"
+                              value={m.key}
+                              checked={paymentMethod === m.key}
+                              onChange={(e) => setPaymentMethod(e.target.value)}
+                              className="w-4 h-4 text-primary-500 focus:ring-primary-400 shrink-0"
+                            />
+                            <span className={`shrink-0 ${paymentMethod === m.key ? 'text-primary-600' : 'text-gray-400'}`}>
+                              {icon}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900">{m.name}</p>
+                              <p className="text-sm text-gray-500">
+                                {m.requires_cash_session && mainBranchId
+                                  ? 'Disponible solo en tienda física'
+                                  : 'Realizá el pago según las instrucciones'}
+                              </p>
+                            </div>
+                          </label>
+                        )
+                      })}
                   </div>
                 </div>
 
@@ -939,5 +869,14 @@ export function Checkout() {
         </div>
       </div>
     </div>
+  )
+}
+
+export function Checkout() {
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY ?? ''
+  return (
+    <GoogleReCaptchaProvider reCaptchaKey={siteKey}>
+      <CheckoutInner />
+    </GoogleReCaptchaProvider>
   )
 }

@@ -4,6 +4,58 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-01 — Checkout: imágenes, sin envío, íconos de pago y reCAPTCHA v3
+
+- **Archivos modificados:** `src/pages/Checkout.tsx`, `src/components/admin/PaymentMethodsManager.tsx`
+- **Archivos creados:** `supabase/functions/validate-recaptcha/index.ts`
+- **Qué cambió:** (1) Las imágenes de productos en el resumen del checkout ahora usan `getProductImageUrl()` con soporte para `product_images` en lugar del campo legacy `image_url`. (2) Se eliminó la sección de datos de envío (dirección, ciudad, provincia, código postal, país) — el formulario queda solo con nombre, email y teléfono bajo el título "Datos de Contacto". (3) Los métodos de pago ahora muestran un ícono (Banknote para efectivo, Landmark para transferencia, CreditCard como fallback). El admin puede configurar una URL de logo personalizado por método desde PaymentMethodsManager. (4) reCAPTCHA v3 invisible integrado: la confirmación de orden ejecuta el captcha automáticamente y valida el token via la Edge Function `validate-recaptcha` antes de crear la orden. La Edge Function requiere deploy manual y configuración del secret `RECAPTCHA_SECRET_KEY` + la env var `VITE_RECAPTCHA_SITE_KEY` en el frontend.
+
+---
+
+## 2026-06-01 — Fix: formulario de producto no limpia estado entre creaciones
+
+- **Archivos modificados:** `src/pages/admin/AdminProducts.tsx`
+- **Qué cambió:** Dos bugs relacionados. (1) `useForm` no tenía `defaultValues`, por lo que `reset()` sin argumentos usaba los últimos valores cargados por `handleEdit` — mostrando datos del producto anterior al abrir "Nuevo Producto". (2) Ese mismo comportamiento causaba que el 4to producto fallara con error de SKU duplicado (ya que el form se pre-cargaba con el SKU de un producto editado). Fix: se agregaron `defaultValues` vacíos a `useForm` para que `reset()` siempre vuelva al formulario en blanco. Además: se limpian `selectedCategoryIds` e `initialBranchId` en `onSubmit` tras guardar, y el error handler ahora muestra el mensaje real de Supabase vía toast en lugar de un `alert()` genérico.
+
+---
+
+## 2026-05-27 — Reposición: asignación rápida de proveedor inline
+
+- **Archivos modificados:** `src/pages/admin/AdminReposicion.tsx`
+- **Qué cambió:** Los productos sin proveedor asignado ahora muestran un select desplegable directamente en la columna Proveedor (desktop y mobile). Al elegir un proveedor se hace upsert en `product_suppliers` como proveedor primario y se actualiza el estado local inmediatamente. El click en el select no activa el toggle de selección de fila (`stopPropagation`). Si la org no tiene ningún proveedor cargado, muestra el texto "Sin proveedor" como antes.
+
+---
+
+## 2026-05-27 — Sprint 2: pantalla de reposición con generación de órdenes de compra
+
+- **Archivos creados:** `supabase/migrations/127_reposicion_rpc.sql`, `src/pages/admin/AdminReposicion.tsx`
+- **Archivos modificados:** `src/App.tsx`, `src/components/layout/AdminLayout.tsx`
+- **Qué cambió:** Nueva pantalla `/reposicion` en la sección Catálogo del sidebar. Lista todos los productos bajo su umbral de stock (via RPC `get_reposicion_report`) con días de stock, proveedor y filtros por búsqueda/sucursal/proveedor. Permite seleccionar múltiples productos y generar órdenes de compra agrupadas por proveedor en un modal editable — crea una `purchase_order` por proveedor y sus `purchase_order_items` con cantidades editables (default: `MAX(umbral * 2 - stock, 1)`). La migración `127_reposicion_rpc.sql` debe aplicarse manualmente en Supabase.
+
+---
+
+## 2026-05-27 — Sprint 1: días de stock y stock muerto en AdminInventory
+
+- **Archivos modificados:** `src/pages/admin/AdminInventory.tsx`
+- **Qué cambió:** Dos columnas nuevas en la tabla de inventario (vista por sucursal). "Días de stock": calcula cuántos días le quedan al negocio con el stock actual basándose en las ventas de los últimos 30 días — rojo < 7d, amarillo < 14d, gris el resto. "Última actividad": fecha del último movement registrado; si el producto lleva > 60 días sin movimiento y tiene stock > 0, muestra badge naranja. Toggle "Stock muerto" en la barra de filtros para aislar esos productos. En mobile se muestra la métrica de días de stock en cada card. Los datos de ventas y movimientos se cargan en paralelo con `Promise.all` después de cada carga de inventario.
+
+---
+
+## 2026-05-27 — Fix: stock incorrecto y en múltiples sucursales en importación masiva
+
+- **Archivos modificados:** `src/components/admin/ProductImportModal.tsx`
+- **Qué cambió:** El INSERT de productos usaba `stock: row.stockInicial`, lo que hacía que el trigger `create_inventory_for_product` creara filas en `branch_inventory` para **cada sucursal activa** con ese stock — en vez de solo la seleccionada. Además, el código posterior intentaba sumar encima del valor ya puesto por el trigger, duplicando el total. Fix: insertar productos con `stock: 0` (el trigger crea los branch_inventory en 0 para todas las sucursales), y luego hacer un batch fetch + UPDATE directo al valor correcto solo en la sucursal seleccionada. Los `inventory_movements` se insertan en un solo batch al final.
+
+---
+
+## 2026-05-27 — Importación masiva de productos vía CSV
+
+- **Archivos creados:** `src/components/admin/ProductImportModal.tsx`
+- **Archivos modificados:** `src/pages/admin/AdminProducts.tsx`
+- **Qué cambió:** Nueva funcionalidad de carga masiva de productos desde CSV/Excel, accesible desde el botón "Importar" en la barra de acciones de AdminProducts. El modal tiene 4 pasos: (1) subida con drag-and-drop y descarga de plantilla, (2) preview con tabla de filas válidas/inválidas y selector de sucursal para stock inicial, (3) progreso de importación, (4) resultado. El parser CSV es propio (sin dependencias externas) y soporta BOM, CRLF, campos con comillas y comas. Validaciones: nombre y SKU requeridos, precio válido ≥ 0, SKU único dentro del archivo y contra la DB. Categorías nuevas se crean automáticamente. Stock inicial se carga en `branch_inventory` + `inventory_movements` por sucursal seleccionada.
+
+---
+
 ## 2026-05-27 — Tabla de órdenes: limpieza visual y optimización de carga
 
 - **Archivos modificados:** `src/pages/admin/AdminOrders.tsx`, `src/pages/admin/AdminOrderDetail.tsx`
