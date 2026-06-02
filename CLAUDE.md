@@ -629,6 +629,7 @@ useEffect(() => {
 - El título resume el objetivo, no los archivos ("Soft delete en branches" no "Editar BranchTable.tsx")
 - Si la tarea incluye una migración SQL, mencionarla en la entrada
 - No registrar cambios triviales de formato o correcciones de typos menores a menos que el usuario lo pida
+- Al finalizar cualquier tarea que modifique archivos del proyecto, Claude Code debe debe de analizar si hay alguna nueva regla importante para actualizar, de ser así si el usuario aproba eso entonces la nueva regla se debe de escribir para que en futuras iteraciones Claude Code se comporte igual y tome los mismos criterios.
 
 ---
 

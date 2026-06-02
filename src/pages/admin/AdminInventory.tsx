@@ -9,13 +9,14 @@ import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { trackAuditAction } from '@/lib/audit'
-import { capitalizeFirst } from '@/lib/utils'
+import { capitalizeFirst, formatDateShort } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch } from '@/types'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
+  Archive,
   ArrowRight,
   Building2,
   ChevronDown,
@@ -122,6 +123,9 @@ export function AdminInventory() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false)
   const [hideOutOfStock, setHideOutOfStock] = useState(false)
+  const [filterStockMuerto, setFilterStockMuerto] = useState(false)
+  const [ventasPorProducto, setVentasPorProducto] = useState<Map<string, number>>(new Map())
+  const [lastMovByBiId, setLastMovByBiId] = useState<Map<string, string>>(new Map())
   const [crossViewSearch, setCrossViewSearch] = useState('')
   const [crossViewPage, setCrossViewPage] = useState(0)
   const fetchInventoryRequestId = useRef(0)
@@ -176,12 +180,26 @@ export function AdminInventory() {
     }
   }, [organizationId, selectedBranch])
 
+  const calcDiasStock = (stock: number, vendido30d: number): number | null => {
+    if (vendido30d === 0) return null
+    return Math.floor(stock / (vendido30d / 30))
+  }
+
   const filteredInventory = useMemo(() => {
     let result = inventory
     if (showOnlyLowStock) result = result.filter(item => item.is_low_stock)
     if (hideOutOfStock) result = result.filter(item => item.stock > 0)
+    if (filterStockMuerto) {
+      result = result.filter(item => {
+        if (item.stock <= 0) return false
+        const lastMov = lastMovByBiId.get(item.id)
+        if (!lastMov) return true
+        const days = Math.floor((Date.now() - new Date(lastMov).getTime()) / (1000 * 60 * 60 * 24))
+        return days > 60
+      })
+    }
     return result
-  }, [inventory, showOnlyLowStock, hideOutOfStock])
+  }, [inventory, showOnlyLowStock, hideOutOfStock, filterStockMuerto, lastMovByBiId])
 
   useEffect(() => {
     setCrossViewPage(0)
@@ -642,6 +660,53 @@ export function AdminInventory() {
     }
   }
 
+  const fetchSalesAndMovements = useCallback(async () => {
+    if (!organizationId || inventory.length === 0) return
+
+    const productIds = [...new Set(
+      inventory.map(i => i.product_id).filter((id): id is string => id !== null)
+    )]
+    const biIds = inventory.map(i => i.id)
+
+    if (productIds.length === 0) return
+
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+    const [salesResult, movResult] = await Promise.all([
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (supabase as any)
+        .from('order_items')
+        .select('product_id, quantity, orders!inner(organization_id, created_at, status)')
+        .eq('orders.organization_id', organizationId)
+        .neq('orders.status', 'cancelled')
+        .gte('orders.created_at', thirtyDaysAgo)
+        .in('product_id', productIds),
+      supabase
+        .from('inventory_movements')
+        .select('branch_inventory_id, created_at')
+        .in('branch_inventory_id', biIds)
+        .order('created_at', { ascending: false }),
+    ])
+
+    const salesMap = new Map<string, number>()
+    for (const row of (salesResult.data ?? []) as { product_id: string; quantity: number }[]) {
+      salesMap.set(row.product_id, (salesMap.get(row.product_id) ?? 0) + row.quantity)
+    }
+    setVentasPorProducto(salesMap)
+
+    const movMap = new Map<string, string>()
+    for (const row of (movResult.data ?? []) as { branch_inventory_id: string; created_at: string }[]) {
+      if (!movMap.has(row.branch_inventory_id)) {
+        movMap.set(row.branch_inventory_id, row.created_at)
+      }
+    }
+    setLastMovByBiId(movMap)
+  }, [organizationId, inventory])
+
+  useEffect(() => {
+    fetchSalesAndMovements()
+  }, [fetchSalesAndMovements])
+
   const handleSyncMissingProducts = async () => {
     if (!confirm('¿Crear entradas de inventario para todos los productos y variantes activos que no las tienen?')) {
       return
@@ -1082,6 +1147,12 @@ export function AdminInventory() {
   }
 
   const lowStockCount = filteredInventory.filter((item) => item.is_low_stock).length
+  const deadStockCount = useMemo(() => inventory.filter(item => {
+    if (item.stock <= 0) return false
+    const lastMov = lastMovByBiId.get(item.id)
+    if (!lastMov) return true
+    return Math.floor((Date.now() - new Date(lastMov).getTime()) / (1000 * 60 * 60 * 24)) > 60
+  }).length, [inventory, lastMovByBiId])
   const isPaginated = !showOnlyLowStock
   const displayInventory = isPaginated ? filteredInventory.slice(page * pageSize, (page + 1) * pageSize) : filteredInventory
   const displayTotalCount = filteredInventory.length
@@ -1425,6 +1496,27 @@ export function AdminInventory() {
             )}
           </button>
 
+          {/* Dead stock toggle */}
+          <button
+            type="button"
+            onClick={() => { setFilterStockMuerto(prev => !prev); setPage(0) }}
+            className={`h-9 px-3 rounded-lg text-sm font-medium border flex items-center gap-1.5 transition-colors shrink-0 ${
+              filterStockMuerto
+                ? 'bg-orange-50 border-orange-300 text-orange-800'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            <Archive className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden sm:inline">Stock muerto</span>
+            {deadStockCount > 0 && (
+              <span className={`text-xs rounded-full px-1.5 py-0.5 font-semibold leading-none ${
+                filterStockMuerto ? 'bg-orange-200 text-orange-900' : 'bg-orange-100 text-orange-700'
+              }`}>
+                {deadStockCount}
+              </span>
+            )}
+          </button>
+
           {/* Hide out of stock toggle */}
           <button
             type="button"
@@ -1470,7 +1562,7 @@ export function AdminInventory() {
           </select>
 
           {/* Clear — only when any filter is active */}
-          {(selectedBranch || searchInput || sortDirection !== 'asc' || hideOutOfStock || showOnlyLowStock) && (
+          {(selectedBranch || searchInput || sortDirection !== 'asc' || hideOutOfStock || showOnlyLowStock || filterStockMuerto) && (
             <button
               type="button"
               onClick={() => {
@@ -1479,6 +1571,7 @@ export function AdminInventory() {
                 setSortDirection('asc')
                 setHideOutOfStock(false)
                 setShowOnlyLowStock(false)
+                setFilterStockMuerto(false)
                 setPageSize(DEFAULT_PAGE_SIZE)
                 setPage(0)
               }}
@@ -1565,6 +1658,20 @@ export function AdminInventory() {
                           <Building2 className="h-3.5 w-3.5" />
                           <span className="text-xs">{item.branch_name}</span>
                         </div>
+                        {item.product_id && (() => {
+                          const vendido = ventasPorProducto.get(item.product_id) ?? 0
+                          const dias = calcDiasStock(item.stock, vendido)
+                          if (dias === null) return null
+                          return (
+                            <span className={`text-xs font-mono font-semibold ${
+                              dias < 7 ? 'text-red-600' : dias < 14 ? 'text-yellow-600' : 'text-gray-500'
+                            }`}>
+                              {dias}d de stock
+                            </span>
+                          )
+                        })()}
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
                         <div className="flex items-center gap-3">
                           {editingItem?.id === item.id ? (
                             <div className="flex items-center gap-2">
@@ -1593,6 +1700,8 @@ export function AdminInventory() {
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Stock</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Stock Mín.</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Umbral Bajo</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Días de stock</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Última actividad</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Acciones</th>
                   </tr>
                 </thead>
@@ -1710,6 +1819,37 @@ export function AdminInventory() {
                         ) : (
                           <span className="text-sm text-gray-600">{item.low_stock_threshold}</span>
                         )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {(() => {
+                          if (!item.product_id) return <span className="text-xs text-gray-300">—</span>
+                          const vendido = ventasPorProducto.get(item.product_id) ?? 0
+                          const dias = calcDiasStock(item.stock, vendido)
+                          if (dias === null) return <span className="text-xs text-gray-400">Sin rotación</span>
+                          return (
+                            <span className={`text-sm font-mono font-semibold ${
+                              dias < 7 ? 'text-red-600' : dias < 14 ? 'text-yellow-600' : 'text-gray-700'
+                            }`}>
+                              {dias}d
+                            </span>
+                          )
+                        })()}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {(() => {
+                          const lastMov = lastMovByBiId.get(item.id)
+                          if (!lastMov) return <span className="text-xs text-gray-300">—</span>
+                          const days = Math.floor((Date.now() - new Date(lastMov).getTime()) / (1000 * 60 * 60 * 24))
+                          if (days > 60 && item.stock > 0) {
+                            return (
+                              <span className="inline-flex items-center gap-1 text-xs bg-orange-50 text-orange-700 border border-orange-200 rounded px-1.5 py-0.5">
+                                <Archive className="h-3 w-3" />
+                                {days}d
+                              </span>
+                            )
+                          }
+                          return <span className="text-xs text-gray-400">{formatDateShort(lastMov)}</span>
+                        })()}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {editingItem?.id === item.id ? (

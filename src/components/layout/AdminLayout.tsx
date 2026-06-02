@@ -30,6 +30,7 @@ import {
   Share2,
   Globe,
   Settings,
+  RefreshCw,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { AdminBreadcrumbs } from '@/components/admin/AdminBreadcrumbs'
@@ -192,6 +193,7 @@ export function AdminLayout() {
             { path: '/inventory/lots', label: 'Lotes', requiresFifo: true },
           ],
         },
+        { path: '/reposicion', label: 'Reposición', icon: RefreshCw },
         { path: '/suppliers', label: 'Proveedores', icon: Truck },
         { path: '/branches', label: 'Sucursales', icon: Building2 },
       ],
