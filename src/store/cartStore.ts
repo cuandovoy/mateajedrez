@@ -14,10 +14,14 @@ interface LocalCartItem {
   quantity: number
 }
 
+function localCartKey(organizationId?: string | null) {
+  return organizationId ? `local_cart_${organizationId}` : 'local_cart'
+}
+
 interface CartState {
   items: CartItemWithProduct[]
   loading: boolean
-  fetchCart: () => Promise<void>
+  fetchCart: (organizationId?: string) => Promise<void>
   addToCart: (productId: string, quantity?: number, variantId?: string) => Promise<void>
   updateQuantity: (itemId: string, quantity: number) => Promise<void>
   removeFromCart: (itemId: string) => Promise<void>
@@ -25,21 +29,21 @@ interface CartState {
   getTotal: () => number
   getItemCount: () => number
   syncLocalCart: () => Promise<void>
-  loadLocalCart: () => Promise<void>
+  loadLocalCart: (organizationId?: string) => Promise<void>
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   loading: false,
 
-  fetchCart: async () => {
+  fetchCart: async (orgIdParam?: string) => {
     const { user } = useAuthStore.getState()
-    const organizationId = useOrganizationStore.getState().currentOrganization?.id
-    
-    set({ loading: true })
+    const organizationId = orgIdParam ?? useOrganizationStore.getState().currentOrganization?.id
+
+    // Clear stale items immediately so we don't flash items from a different org
+    set({ loading: true, items: [] })
     try {
       if (user && organizationId) {
-        // Fetch from database with variant information and product images
         const { data, error } = await supabase
           .from('cart_items')
           .select(`
@@ -68,8 +72,7 @@ export const useCartStore = create<CartState>((set, get) => ({
           })) as CartItemWithProduct[],
         })
       } else {
-        // Load from localStorage
-        await get().loadLocalCart()
+        await get().loadLocalCart(organizationId)
       }
     } catch (error) {
       console.error('Error fetching cart:', error)
@@ -78,26 +81,26 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  loadLocalCart: async () => {
+  loadLocalCart: async (organizationId?: string) => {
+    const cartKey = localCartKey(organizationId)
     try {
-      const localCart = localStorage.getItem('local_cart')
+      const localCart = localStorage.getItem(cartKey)
       if (!localCart) {
         set({ items: [] })
         return
       }
 
       const localItems: LocalCartItem[] = JSON.parse(localCart)
-      
-        // Fetch product details for all items
-        const productIds = localItems.map(item => item.product_id)
-        if (productIds.length === 0) {
-          set({ items: [] })
-          return
-        }
 
-        const { data: products, error }: { data: (Product & { product_images?: any[] })[] | null, error: PostgrestError | null } = await supabase
-          .from('products')
-          .select(`
+      const productIds = localItems.map(item => item.product_id)
+      if (productIds.length === 0) {
+        set({ items: [] })
+        return
+      }
+
+      let query = supabase
+        .from('products')
+        .select(`
           *,
           product_images (
             id,
@@ -106,12 +109,18 @@ export const useCartStore = create<CartState>((set, get) => ({
             is_primary
           )
         `)
-          .in('id', productIds)
-          .eq('is_active', true)
+        .in('id', productIds)
+        .eq('is_active', true)
+
+      // Filter by org to prevent cross-org contamination
+      if (organizationId) {
+        query = (query as any).eq('organization_id', organizationId)
+      }
+
+      const { data: products, error }: { data: (Product & { product_images?: any[] })[] | null, error: PostgrestError | null } = await query
 
       if (error) throw error
 
-      // Fetch variants if any
       const variantIds = localItems.filter(item => item.variant_id).map(item => item.variant_id as string)
       let variants: ProductVariant[] = []
       if (variantIds.length > 0) {
@@ -119,23 +128,22 @@ export const useCartStore = create<CartState>((set, get) => ({
           .from('product_variants')
           .select('*')
           .in('id', variantIds)
-        
+
         variants = (variantsData || []) as ProductVariant[]
       }
 
-      // Map local items with product and variant data
       const items: CartItemWithProduct[] = localItems
         .map(localItem => {
           const product = products?.find(p => p.id === localItem.product_id)
           if (!product) return null
 
-          const variant = localItem.variant_id 
+          const variant = localItem.variant_id
             ? variants.find(v => v.id === localItem.variant_id)
             : null
 
           return {
             id: `local_${localItem.product_id}_${localItem.variant_id || 'default'}`,
-            organization_id: '',
+            organization_id: organizationId || '',
             user_id: '',
             product_id: localItem.product_id,
             variant_id: localItem.variant_id || null,
@@ -160,38 +168,37 @@ export const useCartStore = create<CartState>((set, get) => ({
     const organizationId = useOrganizationStore.getState().currentOrganization?.id
     if (!user || !organizationId) return
 
-    const localCart = localStorage.getItem('local_cart')
-    if (!localCart) return
+    const orgCartKey = localCartKey(organizationId)
+    // Support legacy key for users who had a cart before org-keying was introduced
+    const legacyCartKey = 'local_cart'
+    const rawCart = localStorage.getItem(orgCartKey) || localStorage.getItem(legacyCartKey)
+    if (!rawCart) return
 
     try {
-      const localItems: LocalCartItem[] = JSON.parse(localCart)
-      
-      // Sync each item to database
+      const localItems: LocalCartItem[] = JSON.parse(rawCart)
+
       for (const localItem of localItems) {
-        // Check if item exists in database (matching product_id and variant_id)
         let query = supabase
           .from('cart_items')
           .select('*')
           .eq('user_id', user.id)
           .eq('organization_id', organizationId)
           .eq('product_id', localItem.product_id)
-        
+
         if (localItem.variant_id) {
           query = query.eq('variant_id', localItem.variant_id)
         } else {
           query = query.is('variant_id', null)
         }
-        
+
         const { data: dbItem }: { data: CartItem | null; error: PostgrestError | null } = await query.maybeSingle()
 
         if (dbItem) {
-          // Update quantity
           await (supabase
             .from('cart_items') as any)
             .update({ quantity: (dbItem?.quantity || 0) + localItem.quantity })
             .eq('id', dbItem?.id as string)
         } else {
-          // Insert new item
           await (supabase
             .from('cart_items') as any)
             .insert({
@@ -204,10 +211,9 @@ export const useCartStore = create<CartState>((set, get) => ({
         }
       }
 
-      // Clear local cart
-      localStorage.removeItem('local_cart')
-      
-      // Reload cart from database
+      localStorage.removeItem(orgCartKey)
+      localStorage.removeItem(legacyCartKey)
+
       await get().fetchCart()
     } catch (error) {
       console.error('Error syncing local cart:', error)
@@ -218,12 +224,10 @@ export const useCartStore = create<CartState>((set, get) => ({
     const { user } = useAuthStore.getState()
 
     try {
-      // Check stock availability - use variant if provided, otherwise product
       let availableStock = 0
       let productName = ''
 
       if (variantId) {
-        // Check variant stock
         const { data: variant, error: variantError } = await (supabase
           .from('product_variants') as any)
           .select('id, name, is_active, product:products(id, name, is_active, organization_id)')
@@ -246,7 +250,6 @@ export const useCartStore = create<CartState>((set, get) => ({
         availableStock = await getProductStock(productId, variantId, null, product.organization_id || null)
         productName = variant.name || product.name
       } else {
-        // Check product active state.
         const { data: product, error: productError }: { data: Product | null, error: PostgrestError | null } = await supabase
           .from('products')
           .select('id, name, is_active, organization_id')
@@ -260,7 +263,6 @@ export const useCartStore = create<CartState>((set, get) => ({
           throw new Error('Product is not active')
         }
 
-        // If product has active variants, force explicit variant selection.
         const { count: variantsCount } = await supabase
           .from('product_variants')
           .select('id', { head: true, count: 'exact' })
@@ -276,7 +278,6 @@ export const useCartStore = create<CartState>((set, get) => ({
         productName = product.name
       }
 
-      // Check if item already exists in cart (matching product_id and variant_id)
       const existingItem = get().items.find(
         (item) => item.product_id === productId && item.variant_id === (variantId || null)
       )
@@ -302,7 +303,6 @@ export const useCartStore = create<CartState>((set, get) => ({
 
       if (existingItem) {
         await get().updateQuantity(existingItem.id, existingItem.quantity + quantity)
-        // Show toast notification
         useToastStore.getState().show(
           `Cantidad actualizada en el carrito`,
           'success'
@@ -316,7 +316,6 @@ export const useCartStore = create<CartState>((set, get) => ({
           useToastStore.getState().show('Selecciona una organización para agregar al carrito', 'error')
           return
         }
-        // User is logged in - save to database
         const { data, error } = await (supabase
           .from('cart_items') as any)
           .insert({
@@ -356,13 +355,11 @@ export const useCartStore = create<CartState>((set, get) => ({
           ],
         })
 
-        // Show toast notification
         useToastStore.getState().show(
           `${capitalizeFirst(newItem.product.name)} agregado al carrito`,
           'success'
         )
       } else {
-        // User is not logged in - save to localStorage
         const { data: product, error } = await supabase
           .from('products')
           .select(`
@@ -380,7 +377,6 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         if (error) throw error
 
-        // Fetch variant if provided
         let variant: ProductVariant | null = null
         if (variantId) {
           const { data: variantData } = await supabase
@@ -388,15 +384,16 @@ export const useCartStore = create<CartState>((set, get) => ({
             .select('*')
             .eq('id', variantId)
             .single()
-          
+
           variant = variantData as ProductVariant | null
         }
 
-        // Get current local cart
-        const localCart = localStorage.getItem('local_cart')
+        // Use org-specific key so carts from different orgs don't mix
+        const productOrgId = (product as Product).organization_id || undefined
+        const cartKey = localCartKey(productOrgId)
+        const localCart = localStorage.getItem(cartKey)
         const localItems: LocalCartItem[] = localCart ? JSON.parse(localCart) : []
 
-        // Add or update item (matching product_id and variant_id)
         const existingLocalItem = localItems.find(
           item => item.product_id === productId && item.variant_id === (variantId || null)
         )
@@ -406,13 +403,11 @@ export const useCartStore = create<CartState>((set, get) => ({
           localItems.push({ product_id: productId, variant_id: variantId || null, quantity })
         }
 
-        // Save to localStorage
-        localStorage.setItem('local_cart', JSON.stringify(localItems))
+        localStorage.setItem(cartKey, JSON.stringify(localItems))
 
-        // Update state
         const newItem: CartItemWithProduct = {
           id: `local_${productId}_${variantId || 'default'}`,
-          organization_id: '', // Local cart - set on sync
+          organization_id: productOrgId || '',
           user_id: '',
           product_id: productId,
           variant_id: variantId || null,
@@ -430,7 +425,6 @@ export const useCartStore = create<CartState>((set, get) => ({
           ],
         })
 
-        // Show toast notification
         useToastStore.getState().show(
           `${(product as Product).name} agregado al carrito`,
           'success'
@@ -454,9 +448,8 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     try {
       const { user } = useAuthStore.getState()
-      
+
       if (user && !itemId.startsWith('local_')) {
-        // Update in database
         const { error } = await (supabase
           .from('cart_items') as any)
           .update({ quantity })
@@ -464,17 +457,17 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         if (error) throw error
       } else {
-        // Update in localStorage
         const item = get().items.find(i => i.id === itemId)
         if (!item) return
 
-        const localCart = localStorage.getItem('local_cart')
+        const cartKey = localCartKey(item.organization_id || undefined)
+        const localCart = localStorage.getItem(cartKey)
         const localItems: LocalCartItem[] = localCart ? JSON.parse(localCart) : []
-        
+
         const localItem = localItems.find(li => li.product_id === item.product_id)
         if (localItem) {
           localItem.quantity = quantity
-          localStorage.setItem('local_cart', JSON.stringify(localItems))
+          localStorage.setItem(cartKey, JSON.stringify(localItems))
         }
       }
 
@@ -493,9 +486,8 @@ export const useCartStore = create<CartState>((set, get) => ({
     try {
       const { user } = useAuthStore.getState()
       const item = get().items.find(i => i.id === itemId)
-      
+
       if (user && !itemId.startsWith('local_')) {
-        // Remove from database
         const { error } = await supabase
           .from('cart_items')
           .delete()
@@ -503,12 +495,12 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         if (error) throw error
       } else if (item) {
-        // Remove from localStorage
-        const localCart = localStorage.getItem('local_cart')
+        const cartKey = localCartKey(item.organization_id || undefined)
+        const localCart = localStorage.getItem(cartKey)
         const localItems: LocalCartItem[] = localCart ? JSON.parse(localCart) : []
-        
+
         const filteredItems = localItems.filter(li => li.product_id !== item.product_id)
-        localStorage.setItem('local_cart', JSON.stringify(filteredItems))
+        localStorage.setItem(cartKey, JSON.stringify(filteredItems))
       }
 
       set({
@@ -525,7 +517,6 @@ export const useCartStore = create<CartState>((set, get) => ({
 
     try {
       if (user) {
-        // Clear from database
         const { error } = await supabase
           .from('cart_items')
           .delete()
@@ -533,7 +524,11 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         if (error) throw error
       } else {
-        // Clear from localStorage
+        // Clear all org-specific keys present in current items
+        const orgIds = [...new Set(get().items.map(i => i.organization_id).filter(Boolean))]
+        for (const orgId of orgIds) {
+          localStorage.removeItem(localCartKey(orgId))
+        }
         localStorage.removeItem('local_cart')
       }
 

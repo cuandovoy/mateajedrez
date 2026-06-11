@@ -4,6 +4,13 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-11 — Fix: aislamiento del carrito por organización en tienda pública
+
+- **Archivos modificados:** `src/store/cartStore.ts`, `src/components/layout/PublicStoreHeader.tsx`
+- **Qué cambió:** `fetchCart` usaba el org ID del panel admin (`useOrganizationStore`) en lugar del de la tienda visitada, mostrando ítems de otra org. Se agregó parámetro `organizationId` a `fetchCart` y `loadLocalCart`, se limpia el estado al cambiar de org, y el localStorage queda aislado por clave `local_cart_${orgId}`
+
+---
+
 ## 2026-06-11 — Mercado Pago: integración completa (webhook robusto + refresh manual + manejo de redirect)
 
 - **Archivos modificados:** `supabase/functions/create-mp-preference/index.ts`, `supabase/functions/mp-webhook/index.ts`, `src/pages/OrderConfirmation.tsx`

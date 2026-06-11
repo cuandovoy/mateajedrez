@@ -24,8 +24,8 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
   const { categoriesWithSubs } = usePublicCategoriesForMenu(organization.id)
 
   useEffect(() => {
-    fetchCart()
-  }, [fetchCart])
+    fetchCart(organization.id)
+  }, [fetchCart, organization.id])
 
   const handleCategoryChange = (categorySlug: string) => {
     if (categorySlug) {
