@@ -4,6 +4,27 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-11 — Homogenización del panel admin: skeletons, EmptyState, filtros y performance
+
+- **Archivos modificados:**
+  - `src/pages/admin/AdminCategories.tsx`
+  - `src/pages/admin/AdminSuppliers.tsx`
+  - `src/pages/admin/AdminBranches.tsx`
+  - `src/pages/admin/AdminOrders.tsx`
+  - `src/pages/admin/AdminUsers.tsx`
+  - `src/pages/admin/AdminTransfers.tsx`
+  - `src/pages/admin/AdminCustomers.tsx`
+  - `src/pages/admin/AdminProducts.tsx`
+- **Qué cambió:**
+  - Reemplazados todos los spinners (`animate-spin`) por `<SkeletonTable>` para mantener el layout durante la carga
+  - Reemplazados mensajes de texto vacíos por el componente `<EmptyState>` en todas las páginas que lo usaban incorrectamente
+  - Eliminado el filtro colapsable en AdminCustomers (violaba convención de CLAUDE.md); reemplazado por barra de filtros inline siempre visible
+  - AdminCustomers refactorizado a paginación server-side con debounce de 400ms (antes cargaba todos los clientes en memoria)
+  - AdminOrders y AdminUsers: `ITEMS_PER_PAGE` hardcodeado migrado a `PAGE_SIZE_ADMIN` importado de `@/lib/constants`
+  - AdminProducts: `fetchCategories`, `fetchSuppliers`, `fetchBranches` envueltos en `useCallback` para evitar re-renders innecesarios
+
+---
+
 ## 2026-06-01 — Checkout: imágenes, sin envío, íconos de pago y reCAPTCHA v3
 
 - **Archivos modificados:** `src/pages/Checkout.tsx`, `src/components/admin/PaymentMethodsManager.tsx`

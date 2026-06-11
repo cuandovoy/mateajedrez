@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { ArrowRight, Package, CheckCircle, Clock, Search, XCircle } from 'lucide-react'
 import { PlanGate } from '@/components/features/PlanGate'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
@@ -242,14 +244,13 @@ export function AdminTransfers() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600"></div>
-            </div>
+            <SkeletonTable rows={5} />
           ) : filteredTransfers.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <Package className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <p>No se encontraron transferencias</p>
-            </div>
+            <EmptyState
+              icon={Package}
+              title="No se encontraron transferencias"
+              description={searchTerm || statusFilter ? 'Probá ajustar los filtros.' : 'Aún no hay transferencias registradas.'}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">

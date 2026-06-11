@@ -9,6 +9,8 @@ import type { CategoryForm } from '@/lib/schemas'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { SkeletonTable } from '@/components/ui/Skeleton'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { uploadCategoryImage, deleteImage } from '@/lib/storage'
 import { CategoryTable } from '@/components/admin/CategoryTable'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
@@ -218,14 +220,6 @@ function AdminCategoriesContent() {
     setIsModalOpen(true)
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -308,7 +302,14 @@ function AdminCategoriesContent() {
       </div>
 
       {/* Categories Display */}
-      {viewMode === 'grid' ? (
+      {loading && (
+        <Card>
+          <CardContent className="p-6">
+            <SkeletonTable rows={5} />
+          </CardContent>
+        </Card>
+      )}
+      {!loading && (viewMode === 'grid' ? (
         <div className="space-y-6">
           {getParentCategories()
             .filter((cat) => filteredCategories.includes(cat))
@@ -419,21 +420,15 @@ function AdminCategoriesContent() {
             />
           </CardContent>
         </Card>
-      )}
+      ))}
 
-      {filteredCategories.length === 0 && !loading && (
-        <div className="text-center py-12">
-          <p className="text-gray-600 text-lg mb-4">
-            {search
-              ? 'No se encontraron categorías con el término de búsqueda'
-              : 'No hay categorías disponibles'}
-          </p>
-          {search && (
-            <Button variant="outline" onClick={() => setSearch('')}>
-              Limpiar búsqueda
-            </Button>
-          )}
-        </div>
+      {!loading && filteredCategories.length === 0 && (
+        <EmptyState
+          icon={Grid3x3}
+          title={search ? 'No se encontraron categorías' : 'No hay categorías'}
+          description={search ? 'Probá ajustar el término de búsqueda.' : 'Creá tu primera categoría para organizar los productos.'}
+          action={search ? { label: 'Limpiar búsqueda', onClick: () => setSearch('') } : undefined}
+        />
       )}
 
       {isModalOpen && (

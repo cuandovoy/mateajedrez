@@ -3,11 +3,14 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { ManualSaleForm } from '@/components/admin/ManualSaleForm'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatDateShort, formatPrice } from '@/lib/utils'
-import { Search, Calendar, ChevronLeft, ChevronRight, Eye, Plus, X } from 'lucide-react'
+import { PAGE_SIZE_ADMIN } from '@/lib/constants'
+import { Search, Calendar, ChevronLeft, ChevronRight, Eye, Plus, ShoppingCart, X } from 'lucide-react'
 import type { Order, CashSession, Branch } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -74,7 +77,7 @@ type OrderWithPayments = Order & {
   biller_comprobantes?: BillerComprobanteLite[] | null
 }
 
-const ITEMS_PER_PAGE = 20
+const ITEMS_PER_PAGE = PAGE_SIZE_ADMIN
 
 export function AdminOrders() {
   const { organizationId } = useOrganization()
@@ -424,13 +427,13 @@ export function AdminOrders() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600"></div>
-            </div>
+            <SkeletonTable rows={10} />
           ) : orders.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600">No se encontraron órdenes</p>
-            </div>
+            <EmptyState
+              icon={ShoppingCart}
+              title="No se encontraron órdenes"
+              description="Probá ajustar los filtros o el rango de fechas."
+            />
           ) : (
             <>
               {/* Mobile cards */}

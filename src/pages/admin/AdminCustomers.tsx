@@ -1,15 +1,18 @@
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { supabase } from '@/lib/supabase'
 import { formatDateShort } from '@/lib/utils'
+import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { useToastStore } from '@/store/toastStore'
 import type { Customer } from '@/types/database.types'
-import { ChevronDown, Edit, ExternalLink, Filter, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { ChevronLeft, ChevronRight, Edit, ExternalLink, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2, Users, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 interface CustomerForm {
@@ -33,6 +36,9 @@ export function AdminCustomers() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState<CustomerForm>({
@@ -50,31 +56,50 @@ export function AdminCustomers() {
     notes: '',
   })
   const { show } = useToastStore()
-  const [filtersOpen, setFiltersOpen] = useState(false)
 
   useEffect(() => {
-    if (organizationId) fetchCustomers()
-  }, [organizationId])
+    const timer = setTimeout(() => {
+      setCurrentPage(1)
+      setDebouncedSearch(searchTerm)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [searchTerm])
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = useCallback(async () => {
     if (!organizationId) return
     try {
       setLoading(true)
-      const { data, error } = await supabase
+      const from = (currentPage - 1) * PAGE_SIZE_ADMIN
+      const to = from + PAGE_SIZE_ADMIN - 1
+
+      let query = (supabase as any)
         .from('customers')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
+        .range(from, to)
 
+      if (debouncedSearch.trim()) {
+        query = query.or(
+          `full_name.ilike.%${debouncedSearch.trim()}%,phone.ilike.%${debouncedSearch.trim()}%,email.ilike.%${debouncedSearch.trim()}%,rut.ilike.%${debouncedSearch.trim()}%`
+        )
+      }
+
+      const { data, count, error } = await query
       if (error) throw error
       setCustomers(data || [])
+      setTotalCount(count || 0)
     } catch (error) {
       console.error('Error fetching customers:', error)
       show('Error al cargar clientes', 'error')
     } finally {
       setLoading(false)
     }
-  }
+  }, [organizationId, currentPage, debouncedSearch])
+
+  useEffect(() => {
+    if (organizationId) fetchCustomers()
+  }, [organizationId, currentPage, debouncedSearch, fetchCustomers])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -222,12 +247,7 @@ export function AdminCustomers() {
     window.open(whatsappUrl, '_blank')
   }
 
-  const filteredCustomers = customers.filter((customer) =>
-    customer.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.phone.includes(searchTerm) ||
-    (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (customer.rut && customer.rut.toLowerCase().includes(searchTerm.toLowerCase()))
-  )
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE_ADMIN))
 
   return (
     <div className="space-y-6">
@@ -235,7 +255,7 @@ export function AdminCustomers() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Gestión de Clientes</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Total de clientes: {filteredCustomers.length}
+            {totalCount > 0 ? `${totalCount} cliente${totalCount !== 1 ? 's' : ''}` : 'Sin clientes registrados'}
           </p>
         </div>
         {!showForm && (
@@ -411,55 +431,35 @@ export function AdminCustomers() {
         </Card>
       )}
 
-      {/* Search / Filtros colapsables */}
+      {/* Barra de filtros inline */}
       {!showForm && (
-        <div className="md:hidden mb-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <input
               type="text"
-              placeholder="Buscar clientes..."
+              placeholder="Nombre, teléfono, email o RUT..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="w-full h-9 pl-9 pr-8 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-admin-500"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
-        </div>
-      )}
-
-      {!showForm && (
-        <div className="hidden md:block">
-        <Card>
-          <button
-            onClick={() => setFiltersOpen((p) => !p)}
-            className="w-full flex items-center justify-between px-4 py-3 text-left"
-          >
-            <span className="flex items-center gap-2 text-sm font-medium text-gray-700">
-              <Filter className="h-4 w-4" />
-              Buscar / Filtros
-              {searchTerm && (
-                <span className="ml-1 inline-flex items-center rounded-full bg-admin-100 px-2 py-0.5 text-xs font-medium text-admin-700">
-                  1 activo
-                </span>
-              )}
-            </span>
-            <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} />
-          </button>
-          {filtersOpen && (
-            <CardContent className="pt-0 pb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Buscar por nombre, teléfono, email o RUT..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </CardContent>
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="h-9 px-3 text-sm text-red-500 border border-red-200 rounded-lg hover:bg-red-50"
+            >
+              Limpiar
+            </button>
           )}
-        </Card>
         </div>
       )}
 
@@ -468,18 +468,19 @@ export function AdminCustomers() {
         <Card>
           <CardContent className="pt-6">
             {loading ? (
-              <div className="text-center py-12 text-gray-500">
-                Cargando clientes...
-              </div>
-            ) : filteredCustomers.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                {searchTerm ? 'No se encontraron clientes' : 'No hay clientes registrados'}
-              </div>
+              <SkeletonTable rows={PAGE_SIZE_ADMIN} />
+            ) : customers.length === 0 ? (
+              <EmptyState
+                icon={Users}
+                title={debouncedSearch ? 'No se encontraron clientes' : 'No hay clientes registrados'}
+                description={debouncedSearch ? 'Probá ajustar el término de búsqueda.' : 'Agregá tu primer cliente para empezar a gestionar ventas.'}
+                action={!debouncedSearch ? { label: 'Nuevo cliente', onClick: () => setShowForm(true) } : undefined}
+              />
             ) : (
               <>
                 {/* Mobile cards */}
                 <div className="md:hidden divide-y">
-                  {filteredCustomers.map((customer) => {
+                  {customers.map((customer) => {
                     const address = (customer.address || {}) as any
                     return (
                       <div key={customer.id} className="p-4 space-y-2">
@@ -534,7 +535,7 @@ export function AdminCustomers() {
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {filteredCustomers.map((customer) => {
+                      {customers.map((customer) => {
                         const address = (customer.address || {}) as any
                         return (
                           <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
@@ -573,6 +574,36 @@ export function AdminCustomers() {
                     </tbody>
                   </table>
                 </div>
+
+                {/* Paginación */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-100 mt-2">
+                    <p className="text-sm text-gray-600">
+                      {(currentPage - 1) * PAGE_SIZE_ADMIN + 1}–{Math.min(currentPage * PAGE_SIZE_ADMIN, totalCount)} de {totalCount}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        <span className="hidden sm:inline">Anterior</span>
+                      </Button>
+                      <span className="text-sm text-gray-600">Página {currentPage} de {totalPages}</span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        <span className="hidden sm:inline">Siguiente</span>
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </CardContent>

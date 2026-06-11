@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
@@ -7,6 +8,7 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useUserManagement } from '@/hooks/useUserManagement'
 import { supabase } from '@/lib/supabase'
 import { cn, formatDateShort } from '@/lib/utils'
+import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { useAuthStore } from '@/store/authStore'
 import { useToastStore } from '@/store/toastStore'
 import type { UserProfile } from '@/types'
@@ -39,7 +41,7 @@ type OrganizationRoleOption = {
   is_system: boolean
 }
 
-const ITEMS_PER_PAGE = 10
+const ITEMS_PER_PAGE = PAGE_SIZE_ADMIN
 
 const getRoleLabel = (role: string | null): string => {
   const roleMap: Record<string, string> = {
@@ -489,9 +491,7 @@ export function AdminUsers() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600"></div>
-            </div>
+            <SkeletonTable rows={PAGE_SIZE_ADMIN} />
           ) : paginatedUsers.length === 0 ? (
             <EmptyState
               icon={Users}

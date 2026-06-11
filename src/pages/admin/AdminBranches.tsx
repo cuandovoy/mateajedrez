@@ -7,6 +7,8 @@ import type { BranchForm } from '@/lib/schemas'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { BranchTable } from '@/components/admin/BranchTable'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { useOrganization } from '@/hooks/useOrganization'
@@ -258,14 +260,6 @@ function AdminBranchesContent() {
     setIsModalOpen(true)
   }
 
-  if (!organizationId || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -323,7 +317,14 @@ function AdminBranchesContent() {
       </div>
 
       {/* Branches Display */}
-      {viewMode === 'grid' ? (
+      {loading && (
+        <Card>
+          <CardContent className="p-6">
+            <SkeletonTable rows={5} />
+          </CardContent>
+        </Card>
+      )}
+      {!loading && (viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredBranches.map((branch) => (
             <Card key={branch.id} className={`relative ${branch.deleted_at ? 'border-red-200 bg-red-50/30' : ''}`}>
@@ -432,21 +433,15 @@ function AdminBranchesContent() {
             />
           </CardContent>
         </Card>
-      )}
+      ))}
 
-      {filteredBranches.length === 0 && !loading && (
-        <div className="text-center py-12">
-          <p className="text-gray-600 text-lg mb-4">
-            {search
-              ? 'No se encontraron sucursales con el término de búsqueda'
-              : 'No hay sucursales disponibles'}
-          </p>
-          {search && (
-            <Button variant="outline" onClick={() => setSearch('')}>
-              Limpiar búsqueda
-            </Button>
-          )}
-        </div>
+      {!loading && filteredBranches.length === 0 && (
+        <EmptyState
+          icon={Building2}
+          title={search ? 'No se encontraron sucursales' : 'No hay sucursales'}
+          description={search ? 'Probá ajustar el término de búsqueda.' : 'Creá tu primera sucursal para comenzar a operar.'}
+          action={search ? { label: 'Limpiar búsqueda', onClick: () => setSearch('') } : undefined}
+        />
       )}
 
       {/* Modal */}

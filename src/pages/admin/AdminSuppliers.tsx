@@ -2,6 +2,8 @@ import { SupplierTable } from '@/components/admin/SupplierTable'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
 import { normalizeUruguayanPhone } from '@/lib/uruguay-validators'
@@ -222,14 +224,6 @@ function AdminSuppliersContent() {
     setIsModalOpen(true)
   }
 
-  if (!organizationId || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-admin-600"></div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
@@ -313,7 +307,14 @@ function AdminSuppliersContent() {
       </div>
 
       {/* Suppliers Display */}
-      {viewMode === 'grid' ? (
+      {loading && (
+        <Card>
+          <CardContent className="p-6">
+            <SkeletonTable rows={5} />
+          </CardContent>
+        </Card>
+      )}
+      {!loading && (viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredSuppliers.map((supplier) => (
             <Card key={supplier.id} className="relative">
@@ -403,21 +404,15 @@ function AdminSuppliersContent() {
             />
           </CardContent>
         </Card>
-      )}
+      ))}
 
-      {filteredSuppliers.length === 0 && !loading && (
-        <div className="text-center py-12">
-          <p className="text-gray-600 text-lg mb-4">
-            {search
-              ? 'No se encontraron proveedores con el término de búsqueda'
-              : 'No hay proveedores disponibles'}
-          </p>
-          {search && (
-            <Button variant="outline" onClick={() => setSearch('')}>
-              Limpiar búsqueda
-            </Button>
-          )}
-        </div>
+      {!loading && filteredSuppliers.length === 0 && (
+        <EmptyState
+          icon={Building2}
+          title={search ? 'No se encontraron proveedores' : 'No hay proveedores'}
+          description={search ? 'Probá ajustar el término de búsqueda.' : 'Agregá tu primer proveedor para asociarlo a productos.'}
+          action={search ? { label: 'Limpiar búsqueda', onClick: () => setSearch('') } : undefined}
+        />
       )}
 
       {/* Modal */}

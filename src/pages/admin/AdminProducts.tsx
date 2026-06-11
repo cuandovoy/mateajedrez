@@ -777,7 +777,7 @@ function AdminProductsContent() {
     }
   }, [page, safePage])
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     if (!organizationId) return
     try {
       const { data, error } = await supabase
@@ -791,9 +791,9 @@ function AdminProductsContent() {
     } catch (error) {
       console.error('Error fetching categories:', error)
     }
-  }
+  }, [organizationId])
 
-  const fetchSuppliers = async () => {
+  const fetchSuppliers = useCallback(async () => {
     if (!organizationId) return
     try {
       const { data, error } = await supabase
@@ -808,9 +808,9 @@ function AdminProductsContent() {
     } catch (error) {
       console.error('Error fetching suppliers:', error)
     }
-  }
+  }, [organizationId])
 
-  const fetchBranches = async () => {
+  const fetchBranches = useCallback(async () => {
     if (!organizationId) return
     try {
       const { data, error } = await supabase
@@ -825,7 +825,7 @@ function AdminProductsContent() {
     } catch (error) {
       console.error('Error fetching branches:', error)
     }
-  }
+  }, [organizationId])
 
   const fetchDiscountedProducts = useCallback(async () => {
     if (!organizationId) return
