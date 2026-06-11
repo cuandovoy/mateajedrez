@@ -15,11 +15,11 @@ export type PlanLimits = {
 
 export const PLAN_LIMITS: Record<string, PlanLimits> = {
   [PLAN_STARTER]: {
-    products: 700,
+    products: 2000,
     branches: 1,
   },
   [PLAN_PROFESIONAL]: {
-    products: null,
+    products: 2000,
     branches: null,
   },
 }

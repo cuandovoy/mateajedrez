@@ -467,9 +467,9 @@ export function AdminCustomers() {
       {!showForm && (
         <Card>
           <CardContent className="pt-6">
-            {loading ? (
+            {loading && customers.length === 0 ? (
               <SkeletonTable rows={PAGE_SIZE_ADMIN} />
-            ) : customers.length === 0 ? (
+            ) : !loading && customers.length === 0 ? (
               <EmptyState
                 icon={Users}
                 title={debouncedSearch ? 'No se encontraron clientes' : 'No hay clientes registrados'}

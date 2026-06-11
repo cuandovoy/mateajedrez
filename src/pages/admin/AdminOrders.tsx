@@ -426,9 +426,9 @@ export function AdminOrders() {
           <CardTitle>Lista de Órdenes ({totalCount})</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
+          {loading && orders.length === 0 ? (
             <SkeletonTable rows={10} />
-          ) : orders.length === 0 ? (
+          ) : !loading && orders.length === 0 ? (
             <EmptyState
               icon={ShoppingCart}
               title="No se encontraron órdenes"

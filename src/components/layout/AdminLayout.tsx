@@ -85,7 +85,7 @@ export function AdminLayout() {
   const orgSettings = useOrgSettings()
   const navigate = useNavigate()
   const location = useLocation()
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('admin-sidebar-collapsed') === 'true'

@@ -4,6 +4,24 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-11 — Límites de plan simplificados, fix skeleton en filtros y corrección modal productos
+
+- **Archivos modificados:**
+  - `src/lib/planLimits.ts`
+  - `src/hooks/usePlanLimits.ts`
+  - `src/pages/admin/AdminProducts.tsx`
+  - `src/pages/admin/AdminOrders.tsx`
+  - `src/pages/admin/AdminCustomers.tsx`
+- **Qué cambió:**
+  - Límite de productos unificado en 2000 para todos los planes (starter y profesional)
+  - `usePlanLimits` ahora expone `refreshCounts` para forzar reconteo después de crear productos; elimina bypass especial para plan profesional
+  - Corregido bug en `AdminProducts`: filtros ya no muestran skeleton completo cuando hay productos cargados (solo en carga inicial); mismo fix en `AdminOrders` y `AdminCustomers`
+  - `reset()` del formulario ahora se llama antes de cerrar el modal para evitar datos residuales al reabrir
+  - Mensaje de límite alcanzado ahora usa el valor real del plan en vez del hardcodeado "200 productos"
+  - Contador de productos visible para todos los planes en la cabecera de la página
+
+---
+
 ## 2026-06-11 — Homogenización del panel admin: skeletons, EmptyState, filtros y performance
 
 - **Archivos modificados:**

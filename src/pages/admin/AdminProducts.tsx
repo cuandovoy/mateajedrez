@@ -451,7 +451,7 @@ function AdminProductsContent() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const { show } = useToastStore()
-  const { isAtLimit, productCount, limits, tier } = usePlanLimits()
+  const { isAtLimit, productCount, limits, tier, refreshCounts } = usePlanLimits()
   const maxProductImages = getMaxProductImages(tier)
   const [products, setProducts] = useState<ProductWithImages[]>([])
   const [productVariantsByProduct, setProductVariantsByProduct] = useState<Record<string, ProductVariantWithInventory[]>>({})
@@ -964,7 +964,7 @@ function AdminProductsContent() {
     if (!organizationId) return
 
     if (!editingProduct && isAtLimit('products')) {
-      show('Límite alcanzado (200 productos). Actualizá tu plan.', 'error')
+      show(`Límite alcanzado (${limits.products} productos). Actualizá tu plan.`, 'error')
       return
     }
 
@@ -1252,13 +1252,14 @@ function AdminProductsContent() {
         }
       }
 
+      reset()
       setIsModalOpen(false)
       setEditingProduct(null)
       setProductImages([])
       setSelectedCategoryIds([])
       setInitialBranchId('')
-      reset()
       await fetchProducts()
+      refreshCounts()
       fetchDiscountedProducts()
     } catch (error: any) {
       console.error('Error saving product:', error)
@@ -1381,7 +1382,7 @@ function AdminProductsContent() {
 
   const handleNew = () => {
     if (isAtLimit('products')) {
-      show('Límite alcanzado (200 productos). Actualizá tu plan.', 'error')
+      show(`Límite alcanzado (${limits.products} productos). Actualizá tu plan.`, 'error')
       return
     }
     setEditingProduct(null)
@@ -1534,7 +1535,7 @@ function AdminProductsContent() {
     }
   }
 
-  if (loading) {
+  if (loading && products.length === 0) {
     return (
       <div>
         <div className="mb-8">
@@ -1561,7 +1562,7 @@ function AdminProductsContent() {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Productos</h1>
           <p className="text-gray-600 mt-1 text-sm sm:text-base">
             Gestiona todos los productos de tu tienda
-            {tier === 'starter' && limits.products != null && (
+            {limits.products != null && (
               <span className="ml-2 text-sm text-gray-500">
                 ({productCount} / {limits.products})
               </span>
