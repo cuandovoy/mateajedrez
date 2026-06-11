@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
+import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -11,7 +14,7 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { Search, Calendar, ChevronLeft, ChevronRight, Eye, Plus, ShoppingCart, X } from 'lucide-react'
-import type { Order, CashSession, Branch } from '@/types'
+import type { Order, CashSession } from '@/types'
 import { cn } from '@/lib/utils'
 
 const formatOrderDisplayNumber = (order: { id: string; order_number?: number | null }): string => {
@@ -82,13 +85,9 @@ const ITEMS_PER_PAGE = PAGE_SIZE_ADMIN
 export function AdminOrders() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
+  const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [orders, setOrders] = useState<OrderWithPayments[]>([])
-  const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
-  
-  // Filters - Initialize from URL params
   const statusFromUrl = searchParams.get('status') as OrderStatus | null
   const todayStr = new Date().toISOString().split('T')[0]
   const [startDate, setStartDate] = useState('')
@@ -101,13 +100,9 @@ export function AdminOrders() {
   const [discountFilter, setDiscountFilter] = useState<'all' | 'with_discount' | 'without_discount'>('all')
   const [searchTerm, setSearchTerm] = useState('')
   const [isManualSaleOpen, setIsManualSaleOpen] = useState(false)
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [openCashSessions, setOpenCashSessions] = useState<CashSession[]>([])
   const [saleBranchId, setSaleBranchId] = useState('')
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
-  const fetchOrdersRef = useRef<() => void>(() => {})
 
-  // Update URL when status filter changes
   useEffect(() => {
     if (statusFilter !== 'all') {
       setSearchParams({ status: statusFilter })
@@ -116,110 +111,52 @@ export function AdminOrders() {
     }
   }, [statusFilter, setSearchParams])
 
+  const { data: branches = [] } = useAdminBranches(organizationId)
+
   useEffect(() => {
-    if (organizationId) {
-      fetchOrders()
-      fetchBranches()
-      fetchOpenCashSessions()
-    }
-  }, [organizationId, currentPage, startDate, endDate, statusFilter, discountFilter, searchTerm])
+    if (branches.length > 0 && !saleBranchId) setSaleBranchId(branches[0].id)
+  }, [branches, saleBranchId])
 
-  // Realtime: refetch cuando se inserta o actualiza una orden de esta org
-  useEffect(() => {
-    if (!organizationId) return
+  const { data: openCashSessions = [] } = useQuery({
+    queryKey: queryKeys.cashRegister.sessions(organizationId!, { open: true }),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cash_sessions')
+        .select('*')
+        .eq('organization_id', organizationId!)
+        .is('closed_at', null)
+      if (error) throw error
+      return (data || []) as CashSession[]
+    },
+    enabled: !!organizationId,
+    staleTime: 2 * 60 * 1000,
+  })
 
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current)
-      channelRef.current = null
-    }
-
-    const channel = supabase
-      .channel(`orders:${organizationId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'orders', filter: `organization_id=eq.${organizationId}` },
-        () => { fetchOrdersRef.current() }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `organization_id=eq.${organizationId}` },
-        () => { fetchOrdersRef.current() }
-      )
-      .subscribe()
-
-    channelRef.current = channel
-
-    return () => {
-      supabase.removeChannel(channel)
-      channelRef.current = null
-    }
-  }, [organizationId])
-
-  const fetchBranches = async () => {
-    if (!organizationId) return
-    const { data } = await supabase
-      .from('branches')
-      .select('id, name, code')
-      .eq('organization_id', organizationId)
-      .eq('is_active', true)
-      .order('name')
-    const list = (data || []) as Branch[]
-    setBranches(list)
-    if (list.length > 0 && !saleBranchId) setSaleBranchId(list[0].id)
-  }
-
-  const fetchOpenCashSessions = async () => {
-    if (!organizationId) return
-    const { data } = await supabase
-      .from('cash_sessions')
-      .select('*')
-      .is('closed_at', null)
-    setOpenCashSessions((data || []) as CashSession[])
-  }
-
-  const fetchOrders = async () => {
-    if (!organizationId) return
-    setLoading(true)
-    try {
+  const { data: ordersData, isPending: loading } = useQuery({
+    queryKey: queryKeys.orders.list(organizationId!, { currentPage, startDate, endDate, statusFilter, discountFilter, searchTerm }),
+    queryFn: async () => {
       let query = supabase
         .from('orders')
         .select('*, customer:customers(id, full_name, email, phone, rut), order_payments(id, amount, created_at)', { count: 'exact' })
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId!)
         .order('created_at', { ascending: false })
 
-      // Apply date filters
-      if (startDate) {
-        query = query.gte('created_at', `${startDate}T00:00:00.000Z`)
-      }
-      if (endDate) {
-        query = query.lte('created_at', `${endDate}T23:59:59.999Z`)
-      }
+      if (startDate) query = query.gte('created_at', `${startDate}T00:00:00.000Z`)
+      if (endDate) query = query.lte('created_at', `${endDate}T23:59:59.999Z`)
+      if (statusFilter !== 'all') query = query.eq('status', statusFilter)
+      if (discountFilter === 'with_discount') query = query.gt('discount_total', 0)
+      else if (discountFilter === 'without_discount') query = query.eq('discount_total', 0)
 
-      // Apply status filter
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter)
-      }
-
-      if (discountFilter === 'with_discount') {
-        query = query.gt('discount_total', 0)
-      } else if (discountFilter === 'without_discount') {
-        query = query.eq('discount_total', 0)
-      }
-
-      // When searching, skip range pagination and fetch more to filter client-side
       if (searchTerm) {
         query = query.limit(500)
       } else {
         const from = (currentPage - 1) * ITEMS_PER_PAGE
-        const to = from + ITEMS_PER_PAGE - 1
-        query = query.range(from, to)
+        query = query.range(from, from + ITEMS_PER_PAGE - 1)
       }
 
       const { data, error, count } = await query
-
       if (error) throw error
 
-      // Filter by search term (order ID, customer, shipping snapshot)
       let filteredData = data || []
       if (searchTerm) {
         filteredData = filteredData.filter((order) => {
@@ -242,7 +179,7 @@ export function AdminOrders() {
           )
         })
       }
-      // Fetch CFE data for visible orders
+
       const orderIds = (filteredData as { id: string }[]).map((o) => o.id)
       let cfeMap: Record<string, BillerComprobanteLite> = {}
       if (orderIds.length > 0) {
@@ -259,21 +196,39 @@ export function AdminOrders() {
         }
       }
 
-      setOrders(
-        (filteredData as OrderWithPayments[]).map((o) => ({
-          ...o,
-          biller_comprobantes: cfeMap[o.id] ? [cfeMap[o.id]] : [],
-        }))
-      )
-      setTotalCount(searchTerm ? filteredData.length : (count || 0))
-    } catch (error) {
-      console.error('Error fetching orders:', error)
-    } finally {
-      setLoading(false)
+      const orders = (filteredData as OrderWithPayments[]).map((o) => ({
+        ...o,
+        biller_comprobantes: cfeMap[o.id] ? [cfeMap[o.id]] : [],
+      }))
+      return { orders, totalCount: searchTerm ? filteredData.length : (count || 0) }
+    },
+    enabled: !!organizationId,
+    staleTime: 60 * 1000,
+  })
+
+  const orders = ordersData?.orders ?? []
+  const totalCount = ordersData?.totalCount ?? 0
+
+  // Realtime: invalidar caché cuando se inserta o actualiza una orden de esta org
+  useEffect(() => {
+    if (!organizationId) return
+
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current)
+      channelRef.current = null
     }
-  }
-  // Mantener ref siempre actualizada con el closure más reciente
-  fetchOrdersRef.current = fetchOrders
+
+    const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.orders.all(organizationId) })
+
+    const channel = supabase
+      .channel(`orders:${organizationId}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders', filter: `organization_id=eq.${organizationId}` }, invalidate)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `organization_id=eq.${organizationId}` }, invalidate)
+      .subscribe()
+
+    channelRef.current = channel
+    return () => { supabase.removeChannel(channel); channelRef.current = null }
+  }, [organizationId, queryClient])
 
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
 
@@ -618,7 +573,7 @@ export function AdminOrders() {
           onClose={() => setIsManualSaleOpen(false)}
           onSaleCreated={() => {
             setIsManualSaleOpen(false)
-            fetchOrders()
+            queryClient.invalidateQueries({ queryKey: queryKeys.orders.all(organizationId!) })
           }}
           onBranchChange={(newBranchId) => setSaleBranchId(newBranchId)}
         />

@@ -331,16 +331,18 @@ if (isAtLimit('products')) { /* Bloquear creación */ }
 - **console.log**: solo en catch/error, nunca en flujos normales
 - **any**: permitido solo con `// eslint-disable-next-line @typescript-eslint/no-explicit-any` cuando los tipos generados de Supabase están desactualizados
 - **Confirmaciones destructivas**: usar `confirm()` nativo antes de eliminar o cancelar
-- **Fetching en admin**: usar `useCallback` + `useEffect` directamente con Supabase, no React Query (React Query se usa en hooks de tienda pública)
+- **Fetching**: todo server state (datos de Supabase) se obtiene con `useQuery` y se muta con `useMutation` de TanStack Query, tanto en admin como en tienda pública. Las queryKeys usan la factory de `src/lib/queryKeys.ts`. UI state local (modales, tabs, filtros draft) va en `useState`. Estado global de app (auth, org activa, carrito, toasts) va en Zustand.
 - **Ante dudas**: siempre preguntar al usuario antes de tomar decisiones de arquitectura, diseño de datos o cuando el alcance de una tarea no esté claro
 
 ## Data fetching y hooks
 
 - Toda lógica de obtención y mutación de datos debe encapsularse en **custom hooks** en `src/hooks/`
-- Los hooks deben ser optimizados: usar `useCallback` para funciones, `useMemo` para derivaciones costosas, y evitar re-fetches innecesarios
 - Nombrar hooks descriptivamente: `useProducts`, `useOrderDetail`, `useBranchInventory`, etc.
-- Los hooks de tienda pública usan **TanStack Query** (`useQuery`, `useMutation`)
-- Los hooks de admin usan **Supabase directo** con `useCallback` + `useEffect`
+- Todos los hooks que consultan Supabase usan **TanStack Query**: `useQuery` para lecturas, `useMutation` para mutaciones
+- Las queryKeys se definen en la factory `src/lib/queryKeys.ts` — nunca usar string literals
+- En `useMutation.onSuccess`, invalidar las queryKeys afectadas para mantener el caché sincronizado
+- Para mutaciones que afectan tanto admin como tienda pública (ej: crear producto), invalidar ambas keys (`['admin', orgId, ...]` y `['store', orgId, ...]`)
+- `useState` + `useEffect` se reserva para: timers/debounce, suscripciones Realtime (canal), inicialización desde URL params, UI state local
 
 ## Edge Functions
 

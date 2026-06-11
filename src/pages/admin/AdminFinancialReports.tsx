@@ -3,12 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
-import type { Branch } from '@/types'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Calendar, Download, Info, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 function InfoTooltip({ text }: { text: string }) {
   return (
@@ -99,12 +101,9 @@ export function AdminFinancialReports() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const { show } = useToastStore()
+  const queryClient = useQueryClient()
 
-  const [loading, setLoading] = useState(true)
-  const [refreshingAggregates, setRefreshingAggregates] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
-  const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [startDate, setStartDate] = useState(() => {
     const date = new Date()
@@ -119,32 +118,6 @@ export function AdminFinancialReports() {
   const [draftEndDate, setDraftEndDate] = useState(endDate)
   const [draftAsOfDate, setDraftAsOfDate] = useState(asOfDate)
 
-  const [summary, setSummary] = useState<Summary>({
-    salesRevenue: 0,
-    grossSales: 0,
-    discountsGranted: 0,
-    netSales: 0,
-    collectedIncome: 0,
-    salesOrders: 0,
-    grossMargin: 0,
-    accrualExpense: 0,
-    cashExpense: 0,
-    netCashflow: 0,
-  })
-  const [dailySeries, setDailySeries] = useState<SeriesPoint[]>([])
-  const [monthlySeries, setMonthlySeries] = useState<SeriesPoint[]>([])
-  const [aging, setAging] = useState<Aging>({
-    current: 0,
-    days1To30: 0,
-    days31To60: 0,
-    days61To90: 0,
-    days90Plus: 0,
-    totalOutstanding: 0,
-    openInvoices: 0,
-  })
-  const [topSuppliers, setTopSuppliers] = useState<SupplierOutstanding[]>([])
-  const requestSequenceRef = useRef(0)
-
   const invalidRange = draftStartDate > draftEndDate
   const invalidAsOfDate = !draftAsOfDate
   const hasPendingChanges =
@@ -153,38 +126,13 @@ export function AdminFinancialReports() {
     draftEndDate !== endDate ||
     draftAsOfDate !== asOfDate
 
-  useEffect(() => {
-    if (!organizationId) return
-    fetchBranches()
-  }, [organizationId])
+  const { data: branches = [] } = useAdminBranches(organizationId)
 
-  useEffect(() => {
-    if (!organizationId) return
-    fetchFinancialData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, selectedBranchId, startDate, endDate, asOfDate, refreshKey])
+  const financialQueryKey = queryKeys.reports.financial(organizationId!, { selectedBranchId, startDate, endDate, asOfDate })
 
-  const fetchBranches = async () => {
-    if (!organizationId) return
-    const { data, error } = await supabase
-      .from('branches')
-      .select('id, name, code, organization_id, is_active, created_at, updated_at')
-      .eq('organization_id', organizationId)
-      .eq('is_active', true)
-      .order('name')
-
-    if (error) {
-      console.error('Error fetching branches:', error)
-      return
-    }
-    setBranches((data || []) as Branch[])
-  }
-
-  const fetchFinancialData = async () => {
-    if (!organizationId) return
-    const requestId = ++requestSequenceRef.current
-    setLoading(true)
-    try {
+  const { data: financialData, isPending: loading } = useQuery({
+    queryKey: financialQueryKey,
+    queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase.rpc as any)('get_financial_report_summary', {
         p_organization_id: organizationId,
@@ -193,15 +141,13 @@ export function AdminFinancialReports() {
         p_branch_id: selectedBranchId || null,
         p_as_of_date: asOfDate,
       })
-
       if (error) throw error
-      if (requestId !== requestSequenceRef.current) return
 
       const payload = (data || {}) as Record<string, unknown>
       const summaryPayload = (payload.summary as Record<string, unknown> | undefined) || {}
       const agingPayload = (payload.accounts_payable_aging as Record<string, unknown> | undefined) || {}
 
-      setSummary({
+      const summary: Summary = {
         salesRevenue: asNumber(summaryPayload.sales_revenue),
         grossSales: asNumber(summaryPayload.gross_sales),
         discountsGranted: asNumber(summaryPayload.discounts_granted),
@@ -212,35 +158,16 @@ export function AdminFinancialReports() {
         accrualExpense: asNumber(summaryPayload.accrual_expense),
         cashExpense: asNumber(summaryPayload.cash_expense),
         netCashflow: asNumber(summaryPayload.net_cashflow),
+      }
+      const dailySeries: SeriesPoint[] = (Array.isArray(payload.daily_sales_vs_expenses) ? payload.daily_sales_vs_expenses : []).map((item) => {
+        const row = item as Record<string, unknown>
+        return { label: asString(row.date), sales: asNumber(row.sales), expenses: asNumber(row.expenses), net: asNumber(row.net) }
       })
-
-      const daily = Array.isArray(payload.daily_sales_vs_expenses) ? payload.daily_sales_vs_expenses : []
-      setDailySeries(
-        daily.map((item) => {
-          const row = item as Record<string, unknown>
-          return {
-            label: asString(row.date),
-            sales: asNumber(row.sales),
-            expenses: asNumber(row.expenses),
-            net: asNumber(row.net),
-          }
-        })
-      )
-
-      const monthly = Array.isArray(payload.monthly_sales_vs_expenses) ? payload.monthly_sales_vs_expenses : []
-      setMonthlySeries(
-        monthly.map((item) => {
-          const row = item as Record<string, unknown>
-          return {
-            label: asString(row.month),
-            sales: asNumber(row.sales),
-            expenses: asNumber(row.expenses),
-            net: asNumber(row.net),
-          }
-        })
-      )
-
-      setAging({
+      const monthlySeries: SeriesPoint[] = (Array.isArray(payload.monthly_sales_vs_expenses) ? payload.monthly_sales_vs_expenses : []).map((item) => {
+        const row = item as Record<string, unknown>
+        return { label: asString(row.month), sales: asNumber(row.sales), expenses: asNumber(row.expenses), net: asNumber(row.net) }
+      })
+      const aging: Aging = {
         current: asNumber(agingPayload.current),
         days1To30: asNumber(agingPayload.days_1_30),
         days31To60: asNumber(agingPayload.days_31_60),
@@ -248,28 +175,22 @@ export function AdminFinancialReports() {
         days90Plus: asNumber(agingPayload.days_90_plus),
         totalOutstanding: asNumber(agingPayload.total_outstanding),
         openInvoices: asNumber(agingPayload.open_invoices),
-      })
-
-      const top = Array.isArray(payload.top_suppliers_outstanding) ? payload.top_suppliers_outstanding : []
-      setTopSuppliers(
-        top.map((item) => {
-          const row = item as Record<string, unknown>
-          return {
-            supplierId: asString(row.supplier_id),
-            supplierName: asString(row.supplier_name) || 'Proveedor',
-            outstandingAmount: asNumber(row.outstanding_amount),
-          }
-        })
-      )
-    } catch (error) {
-      if (requestId !== requestSequenceRef.current) return
-      console.error('Error fetching financial report:', error)
-    } finally {
-      if (requestId === requestSequenceRef.current) {
-        setLoading(false)
       }
-    }
-  }
+      const topSuppliers: SupplierOutstanding[] = (Array.isArray(payload.top_suppliers_outstanding) ? payload.top_suppliers_outstanding : []).map((item) => {
+        const row = item as Record<string, unknown>
+        return { supplierId: asString(row.supplier_id), supplierName: asString(row.supplier_name) || 'Proveedor', outstandingAmount: asNumber(row.outstanding_amount) }
+      })
+      return { summary, dailySeries, monthlySeries, aging, topSuppliers }
+    },
+    enabled: !!organizationId,
+    staleTime: 3 * 60 * 1000,
+  })
+
+  const summary = financialData?.summary ?? { salesRevenue: 0, grossSales: 0, discountsGranted: 0, netSales: 0, collectedIncome: 0, salesOrders: 0, grossMargin: 0, accrualExpense: 0, cashExpense: 0, netCashflow: 0 }
+  const dailySeries = financialData?.dailySeries ?? []
+  const monthlySeries = financialData?.monthlySeries ?? []
+  const aging = financialData?.aging ?? { current: 0, days1To30: 0, days31To60: 0, days61To90: 0, days90Plus: 0, totalOutstanding: 0, openInvoices: 0 }
+  const topSuppliers = financialData?.topSuppliers ?? []
 
   const applyFilters = () => {
     if (invalidRange || invalidAsOfDate) return
@@ -279,21 +200,20 @@ export function AdminFinancialReports() {
     setAsOfDate(draftAsOfDate)
   }
 
-  const refreshAggregates = async () => {
-    try {
-      setRefreshingAggregates(true)
+  const refreshAggregates = useMutation({
+    mutationFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await (supabase.rpc as any)('refresh_financial_reporting_materialized_views')
       if (error) throw error
+    },
+    onSuccess: () => {
       show('Agregados financieros actualizados.', 'success')
-      await fetchFinancialData()
-    } catch (error: any) {
-      console.error('Error refreshing financial aggregates:', error)
-      show(error?.message || 'No se pudieron actualizar los agregados.', 'error')
-    } finally {
-      setRefreshingAggregates(false)
-    }
-  }
+      queryClient.invalidateQueries({ queryKey: financialQueryKey })
+    },
+    onError: (error: unknown) => {
+      show(error instanceof Error ? error.message : 'No se pudieron actualizar los agregados.', 'error')
+    },
+  })
 
   const exportFinancialReport = async () => {
     if (!organizationId) return
@@ -452,15 +372,15 @@ export function AdminFinancialReports() {
       </div>
 
       <div className="flex flex-wrap justify-end gap-2">
-        <Button variant="outline" onClick={() => setRefreshKey((k) => k + 1)} disabled={loading}>
+        <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: financialQueryKey })} disabled={loading}>
           {loading ? 'Actualizando...' : 'Actualizar datos'}
         </Button>
         <Button variant="outline" onClick={exportFinancialReport} disabled={exporting}>
           <Download className="mr-2 h-4 w-4" />
           {exporting ? 'Exportando...' : 'Exportar CSV'}
         </Button>
-        <Button variant="outline" onClick={refreshAggregates} disabled={refreshingAggregates}>
-          {refreshingAggregates ? 'Actualizando agregados...' : 'Actualizar agregados'}
+        <Button variant="outline" onClick={() => refreshAggregates.mutate()} disabled={refreshAggregates.isPending}>
+          {refreshAggregates.isPending ? 'Actualizando agregados...' : 'Actualizar agregados'}
         </Button>
       </div>
 

@@ -4,6 +4,37 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-11 — Mercado Pago: integración completa (webhook robusto + refresh manual + manejo de redirect)
+
+- **Archivos modificados:** `supabase/functions/create-mp-preference/index.ts`, `supabase/functions/mp-webhook/index.ts`, `src/pages/OrderConfirmation.tsx`
+- **Archivos creados:** `supabase/functions/mp-refresh-payment/index.ts`
+- **Qué cambió:** (1) **Bug crítico resuelto en `create-mp-preference`**: `currencyId` se usaba antes de ser declarado con `const` (TDZ) — movido el fetch de `orgRow` arriba del `mpItems.map()`. Se agrega también un placeholder row en `order_payments` con `mp_payment_id = NULL` cuando se crea la preferencia; (2) **`mp-webhook` reescrito**: reemplaza el `upsert({ onConflict: 'order_id,payment_method' })` roto (no existía esa constraint UNIQUE) con lógica robusta: busca por `mp_payment_id` → si no, busca placeholder `IS NULL` → si no, inserta. Agrega `pending_allocation` a la lista de estados inmutables; (3) **Nueva edge function `mp-refresh-payment`**: permite al admin re-sincronizar manualmente el estado de un pago MP buscando por `mp_payment_id` o por `order_id` (search en MP API); (4) **`OrderConfirmation.tsx`**: lee `?mp_status=` del redirect de MP, muestra banner rojo para `failure` y banner amarillo para `pending` con botón "Verificar estado ahora" que invoca `mp-refresh-payment`. Fix del label de método de pago (antes mostraba "Mercado Pago" para cualquier método no-transfer).
+
+## 2026-06-11 — AdminCustomers: features de comercio + React Query
+
+- **Archivos modificados:** `src/pages/admin/AdminCustomers.tsx`, `src/lib/queryKeys.ts`
+- **Qué cambió:** Migración a React Query (useQuery con keepPreviousData) + 4 features nuevas para el panel de clientes: (1) **Estadísticas en el header** — 3 chips de COUNT paralelos (Total / Activos / Nuevos este mes) sin leer filas; (2) **Filtro "Solo activos"** en barra de filtros, con botón Limpiar condicional; (3) **Toggle is_active** desde ActionsMenu — activa/desactiva sin eliminar el cliente, refleja el estado en la fila con opacidad; (4) **Exportar CSV** — descarga todos los clientes con los filtros actuales aplicados, con BOM UTF-8 para Excel; (5) **Columna "Pedidos"** — el queryFn principal hace un segundo fetch de `orders.customer_id` para la página actual y muestra el conteo en tabla y mobile cards. `queryKeys.customers` extendido con `list` y `stats`. Sin cambios en DB.
+
+## 2026-06-11 — Migración a React Query: AdminInventory (Fase 4 continúa)
+
+- **Archivos modificados:** `src/pages/admin/AdminInventory.tsx`
+- **Qué cambió:** Migración completa de AdminInventory (2070 líneas). Se eliminó el patrón `requestSequenceRef` (`fetchInventoryRequestId = useRef(0)`) reemplazando `fetchInventory` por `useQuery` con `placeholderData: keepPreviousData`. La clave del cambio: `fetchSalesAndMovements` (que dependía de `inventory` como estado y se ejecutaba en un segundo paso vía `useEffect`) fue fusionado dentro del `queryFn` de inventario, evitando el doble fetch y la dependencia en estado local. Se reemplazaron `fetchBranches` por `useAdminBranches`, y `checkUnsyncedItems`/`checkMissingProducts`/`fetchCrossView` por `useQuery` condicionales. `invalidateInventory()` usando prefix matching `queryKeys.inventory.all(orgId)` cubre todos los sub-queries (branch, cross-view, unsynced count, missing count) en una sola llamada.
+
+## 2026-06-11 — Migración a React Query: Fase 4 (páginas admin complejas con mutaciones)
+
+- **Archivos modificados:** `src/hooks/useAdminBranches.ts`, `src/pages/admin/AdminOrders.tsx`, `src/pages/admin/AdminReposicion.tsx`, `src/pages/admin/AdminCashRegister.tsx`, `src/pages/admin/AdminOrderDetail.tsx`, `src/pages/admin/AdminProducts.tsx`
+- **Qué cambió:** Migración de 5 páginas admin complejas con mutaciones. `AdminOrders` elimina `fetchOrdersRef` y convierte el handler Realtime a `queryClient.invalidateQueries`. `AdminReposicion` convierte `assignSupplier` a `useMutation`. `AdminCashRegister` elimina `fetchSessions` y usa `invalidateSessions()` en todos los handlers. `AdminOrderDetail` migra el fetch principal con 6 queries paralelas, descarta todos los `setOrder` optimistas y limpia 8 llamadas a `fetchOrder()`. `AdminProducts` es la migración más crítica: invalida simultáneamente `['admin', orgId, 'products']`, `['store', orgId, 'products']` y `config.planLimits` en create/edit/delete — resolviendo el bug estructural donde cambios en admin no se reflejaban en la tienda pública sin F5. `useAdminBranches` actualizado para seleccionar `'*'` y exponer `is_isolated_warehouse`.
+
+## 2026-06-11 — Migración a React Query: Fase 3 (páginas admin, eliminación de requestSequenceRef)
+
+- **Archivos modificados:** `src/lib/queryKeys.ts`, `src/hooks/useAdminBranches.ts` (nuevo), `src/pages/admin/AdminStoreStats.tsx`, `src/pages/admin/AdminInventoryReports.tsx`, `src/pages/admin/AdminCustomerDetail.tsx`, `src/pages/admin/AdminTransfers.tsx`, `src/pages/admin/AdminOrganizations.tsx`, `src/pages/admin/AdminAuditLogs.tsx`, `src/pages/admin/AdminSales.tsx`, `src/pages/admin/AdminFinancialReports.tsx`
+- **Qué cambió:** Migración de 8 páginas admin a React Query. Se eliminó el patrón manual `requestSequenceRef` de `AdminSales` y `AdminFinancialReports` (race conditions ahora manejadas nativamente por React Query). Se creó `useAdminBranches` hook compartido. `AdminFinancialReports.refreshAggregates` migrado a `useMutation`. `AdminTransfers` corregido bug de seguridad: query sin `organization_id` filter. `AdminOrganizations` agrega `queryKeys.myOrganizations` al factory. Los modales de org ahora invalidan la query en lugar de llamar `fetchAllOrgs`.
+
+## 2026-06-11 — Migración a React Query: Fases 0, 1 y 2
+
+- **Archivos modificados:** `src/lib/queryKeys.ts` (nuevo), `src/hooks/usePublicProducts.ts`, `src/hooks/usePublicCategories.ts`, `src/hooks/useProductVariants.ts` (nuevo), `src/components/features/VariantSelector.tsx`, `src/pages/ProductDetail.tsx`, `src/hooks/useMoneyMetrics.ts`, `src/hooks/useOperationalMetrics.ts`, `src/hooks/useTrendsMetrics.ts`, `src/hooks/useLowStockProducts.ts`, `src/hooks/useBillerConfig.ts`, `src/hooks/useOrgPaymentMethods.ts`, `src/hooks/usePlanLimits.ts`, `src/hooks/useLots.ts`
+- **Qué cambió:** Se creó la factory de query keys (`queryKeys`) en `src/lib/queryKeys.ts` como base de toda la migración. Los 2 hooks ya migrados se actualizaron para usar la nueva factory. Se creó `useProductVariants` con React Query para deduplicar el fetch de variantes entre `ProductDetail` y `VariantSelector` (de 3 requests a 1 por producto). Se migraron 9 hooks custom del dominio admin: los 3 de métricas del dashboard, `useLowStockProducts`, `useBillerConfig`, `useOrgPaymentMethods`, `usePlanLimits` y `useLots` (con sus mutaciones). Interfaz pública de todos los hooks preservada sin breaking changes.
+
 ## 2026-06-11 — Actualización de tests y CLAUDE.md por nuevo límite de productos (2000)
 
 - **Archivos modificados:** `src/lib/planLimits.test.ts`, `CLAUDE.md`

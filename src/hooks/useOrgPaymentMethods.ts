@@ -1,66 +1,49 @@
-import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
+import { queryKeys } from '@/lib/queryKeys'
 import type { OrganizationPaymentMethod } from '@/types/database.types'
 
 type UseOrgPaymentMethodsOptions = {
-  /** Si true, incluye métodos inactivos (para admin al verificar keys existentes) */
   includeInactive?: boolean
 }
 
-/**
- * Obtiene los métodos de pago de la organización.
- * Por defecto solo activos (Checkout, ManualSaleForm).
- * Con includeInactive: true devuelve todos (admin para evitar duplicados).
- */
 export function useOrgPaymentMethods(
   organizationId?: string | null,
   options?: UseOrgPaymentMethodsOptions
 ): {
   methods: OrganizationPaymentMethod[]
   loading: boolean
-  refetch: () => Promise<void>
+  refetch: () => void
 } {
   const { includeInactive = false } = options ?? {}
   const currentOrgId = useOrganizationStore((s) => s.currentOrganization?.id)
   const orgId = organizationId ?? currentOrgId
-  const [methods, setMethods] = useState<OrganizationPaymentMethod[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
-  const fetch = async () => {
-    if (!orgId) {
-      setMethods([])
-      setLoading(false)
-      return
-    }
-    setLoading(true)
-    try {
+  const { data: methods = [], isPending: loading } = useQuery({
+    queryKey: queryKeys.config.paymentMethods(orgId!, includeInactive),
+    queryFn: async () => {
       let query = supabase
         .from('organization_payment_methods')
         .select('*')
-        .eq('organization_id', orgId)
+        .eq('organization_id', orgId!)
         .order('display_order', { ascending: true })
         .order('name', { ascending: true })
 
-      if (!includeInactive) {
-        query = query.eq('is_active', true)
-      }
+      if (!includeInactive) query = query.eq('is_active', true)
 
       const { data, error } = await query
-
       if (error) throw error
-      setMethods((data ?? []) as OrganizationPaymentMethod[])
-    } catch (err) {
-      console.error('Error fetching payment methods:', err)
-      setMethods([])
-    } finally {
-      setLoading(false)
-    }
-  }
+      return (data ?? []) as OrganizationPaymentMethod[]
+    },
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  })
 
-  useEffect(() => {
-    fetch()
-  }, [orgId, includeInactive])
+  const refetch = () => queryClient.invalidateQueries({
+    queryKey: queryKeys.config.paymentMethods(orgId!, includeInactive),
+  })
 
-  return { methods, loading, refetch: fetch }
+  return { methods, loading, refetch }
 }

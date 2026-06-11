@@ -1,28 +1,28 @@
-// src/hooks/useBillerConfig.ts
-// Hook para leer la configuración de Biller de una organización.
-// Patrón del proyecto: useState + useEffect + Supabase directo.
-
-import { useEffect, useState, useCallback } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import type { BillerConfig } from '@/types/biller'
 
 export function useBillerConfig(organizationId: string | null) {
-  const [config, setConfig] = useState<BillerConfig | null>(null)
-  const [loading, setLoading] = useState(false)
+  const queryClient = useQueryClient()
 
-  const fetchConfig = useCallback(async () => {
-    if (!organizationId) return
-    setLoading(true)
-    const { data } = await supabase
-      .from('biller_config' as never)
-      .select('*')
-      .eq('organization_id', organizationId)
-      .maybeSingle()
-    setConfig(data ? (data as unknown as BillerConfig) : null)
-    setLoading(false)
-  }, [organizationId])
+  const { data: config = null, isPending: loading } = useQuery({
+    queryKey: queryKeys.config.billerConfig(organizationId!),
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('biller_config' as never)
+        .select('*')
+        .eq('organization_id', organizationId!)
+        .maybeSingle()
+      return data ? (data as unknown as BillerConfig) : null
+    },
+    enabled: !!organizationId,
+    staleTime: 10 * 60 * 1000,
+  })
 
-  useEffect(() => { fetchConfig() }, [fetchConfig])
+  const refetch = () => queryClient.invalidateQueries({
+    queryKey: queryKeys.config.billerConfig(organizationId!),
+  })
 
-  return { config, loading, refetch: fetchConfig }
+  return { config, loading, refetch }
 }

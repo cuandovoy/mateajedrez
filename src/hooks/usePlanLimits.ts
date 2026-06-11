@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import {
   canUseFeature as canUseFeatureLib,
@@ -6,6 +6,12 @@ import {
   type PlanFeature,
 } from '@/lib/planLimits'
 import { useOrganizationStore } from '@/store/organizationStore'
+import { queryKeys } from '@/lib/queryKeys'
+
+interface PlanCounts {
+  productCount: number
+  branchCount: number
+}
 
 export function usePlanLimits(): {
   tier: string
@@ -21,45 +27,33 @@ export function usePlanLimits(): {
   const orgId = currentOrganization?.id ?? null
   const tier = currentOrganization?.subscription_tier ?? 'starter'
   const limits = getPlanLimits(tier)
+  const queryClient = useQueryClient()
 
-  const [productCount, setProductCount] = useState(0)
-  const [branchCount, setBranchCount] = useState(0)
-  const [loading, setLoading] = useState(true)
-
-  const fetchCounts = useCallback(async () => {
-    if (!orgId) return
-    setLoading(true)
-    try {
+  const { data, isPending: loading } = useQuery<PlanCounts>({
+    queryKey: queryKeys.config.planLimits(orgId!),
+    queryFn: async () => {
       const [productsRes, branchesRes] = await Promise.all([
         supabase
           .from('products')
           .select('id', { count: 'exact', head: true })
-          .eq('organization_id', orgId),
+          .eq('organization_id', orgId!),
         supabase
           .from('branches')
           .select('id', { count: 'exact', head: true })
-          .eq('organization_id', orgId)
+          .eq('organization_id', orgId!)
           .eq('is_active', true),
       ])
-      setProductCount(productsRes.count ?? 0)
-      setBranchCount(branchesRes.count ?? 0)
-    } catch {
-      setProductCount(0)
-      setBranchCount(0)
-    } finally {
-      setLoading(false)
-    }
-  }, [orgId])
+      return {
+        productCount: productsRes.count ?? 0,
+        branchCount: branchesRes.count ?? 0,
+      }
+    },
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  })
 
-  useEffect(() => {
-    if (!orgId) {
-      setProductCount(0)
-      setBranchCount(0)
-      setLoading(false)
-      return
-    }
-    fetchCounts()
-  }, [orgId, fetchCounts])
+  const productCount = data?.productCount ?? 0
+  const branchCount = data?.branchCount ?? 0
 
   const canUseFeature = (feature: PlanFeature) => canUseFeatureLib(tier, feature)
 
@@ -67,6 +61,10 @@ export function usePlanLimits(): {
     if (type === 'products') return productCount >= (limits.products ?? Infinity)
     if (type === 'branches') return branchCount >= (limits.branches ?? Infinity)
     return false
+  }
+
+  const refreshCounts = () => {
+    if (orgId) queryClient.invalidateQueries({ queryKey: queryKeys.config.planLimits(orgId) })
   }
 
   return {
@@ -77,6 +75,6 @@ export function usePlanLimits(): {
     productCount,
     branchCount,
     loading,
-    refreshCounts: fetchCounts,
+    refreshCounts,
   }
 }

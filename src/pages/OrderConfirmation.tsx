@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
-import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone, Download } from 'lucide-react'
+import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone, Download, AlertCircle, Clock, RefreshCw } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
 
 const getStatusLabel = (status: string | null): string => {
@@ -37,14 +37,24 @@ interface OrderWithItems extends Order {
   }>
 }
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  mercadopago:  'Mercado Pago',
+  transfer:     'Transferencia Bancaria',
+  cash:         'Efectivo',
+  credit_card:  'Tarjeta de Crédito',
+}
+
 export function OrderConfirmation() {
   const { slug, orderId } = useParams<{ slug?: string; orderId: string }>()
+  const [searchParams] = useSearchParams()
+  const mpStatus = searchParams.get('mp_status') // 'failure' | 'pending' | null (success)
   const settings = useOrgSettings()
   const primaryColor = 'var(--org-primary-color, #6366f1)'
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [transferInstructions, setTransferInstructions] = useState<string>('')
   const [transferContactPhone, setTransferContactPhone] = useState<string>('')
   const [loading, setLoading] = useState(true)
+  const [refreshingMp, setRefreshingMp] = useState(false)
 
   useEffect(() => {
     if (orderId) {
@@ -113,6 +123,31 @@ export function OrderConfirmation() {
       console.error('Error fetching order:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleRefreshMpPayment = async () => {
+    if (!order || !order.organization_id) return
+    setRefreshingMp(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mp-refresh-payment`
+      const res = await fetch(fnUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ order_id: order.id, organization_id: order.organization_id }),
+      })
+      if (res.ok) {
+        // Reload to show updated status
+        window.location.reload()
+      }
+    } catch (err) {
+      console.error('Error refreshing MP payment:', err)
+    } finally {
+      setRefreshingMp(false)
     }
   }
 
@@ -258,6 +293,41 @@ export function OrderConfirmation() {
   return (
     <div className="container-custom py-8">
       <div className="max-w-3xl mx-auto">
+
+        {/* MP-specific status banners — shown when MP redirects back with ?mp_status= */}
+        {order.payment_method === 'mercadopago' && mpStatus === 'failure' && (
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
+            <AlertCircle className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-red-800">El pago fue rechazado</p>
+              <p className="text-sm text-red-700 mt-0.5">
+                Tu orden fue creada pero el pago no se completó. Podés intentar de nuevo o elegir otro método de pago.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {order.payment_method === 'mercadopago' && mpStatus === 'pending' && (
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
+            <Clock className="h-5 w-5 shrink-0 text-yellow-600 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-yellow-800">Pago en proceso</p>
+              <p className="text-sm text-yellow-700 mt-0.5">
+                Mercado Pago está procesando tu pago. El estado de la orden se actualizará automáticamente cuando se confirme.
+              </p>
+              <button
+                type="button"
+                onClick={handleRefreshMpPayment}
+                disabled={refreshingMp}
+                className="mt-3 flex items-center gap-1.5 text-sm font-medium text-yellow-800 underline underline-offset-2 hover:text-yellow-900 disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${refreshingMp ? 'animate-spin' : ''}`} />
+                {refreshingMp ? 'Verificando...' : 'Verificar estado ahora'}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
             <CheckCircle2 className="h-8 w-8 text-green-600" />
@@ -294,8 +364,8 @@ export function OrderConfirmation() {
             {order.payment_method && (
               <div className="border-t pt-4">
                 <p className="text-sm font-medium text-gray-700 mb-2">Método de Pago</p>
-                <p className="text-sm text-gray-600 capitalize">
-                  {order.payment_method === 'transfer' ? 'Transferencia Bancaria' : 'Mercado Pago'}
+                <p className="text-sm text-gray-600">
+                  {PAYMENT_METHOD_LABELS[order.payment_method] ?? capitalizeFirst(order.payment_method)}
                 </p>
               </div>
             )}

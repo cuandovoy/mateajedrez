@@ -1,5 +1,8 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
+import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -26,7 +29,7 @@ import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { trackAuditAction } from '@/lib/audit'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
-import type { CashSession, CashSessionInsert, CashSessionUpdate, Branch } from '@/types'
+import type { CashSession, CashSessionInsert, CashSessionUpdate } from '@/types'
 
 
 const cashSessionSchema = z.object({
@@ -48,9 +51,7 @@ function AdminCashRegisterContent() {
   const { organizationId } = useOrganization()
   const { user } = useAuthStore()
   const settings = useOrgSettings()
-  const [sessions, setSessions] = useState<CashSession[]>([])
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
   const [editingSession, setEditingSession] = useState<CashSession | null>(null)
@@ -79,97 +80,59 @@ function AdminCashRegisterContent() {
     resolver: zodResolver(closeSessionSchema),
   })
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchBranches()
-      fetchSessions()
-    }
-  }, [organizationId])
+  const { data: branches = [] } = useAdminBranches(organizationId)
 
-  const fetchBranches = async () => {
-    if (!organizationId) return
-    try {
-      const { data, error } = await supabase
-        .from('branches')
-        .select('id, name, code')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name')
+  const sessionsKey = queryKeys.cashRegister.sessions(organizationId!, {})
 
-      if (error) throw error
-      setBranches((data || []) as Branch[])
-    } catch (error) {
-      console.error('Error fetching branches:', error)
-    }
-  }
-
-  const fetchSessions = async () => {
-    if (!organizationId) {
-      setSessions([])
-      return
-    }
-
-    try {
-      setLoading(true)
+  const { data: sessions = [], isPending: loading } = useQuery({
+    queryKey: sessionsKey,
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('cash_sessions')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId!)
         .order('opened_at', { ascending: false })
-
       if (error) throw error
 
       const sessionsData = (data || []) as CashSession[]
 
       // expected_amount = apertura + ventas efectivo (excluyendo órdenes canceladas/devoluciones)
-      const sessionsWithExpected = await Promise.all(
+      return Promise.all(
         sessionsData.map(async (session) => {
-          try {
-            const { data: paymentsData } = await supabase
-              .from('order_payments')
-              .select('amount, order_id')
-              .eq('cash_session_id', session.id)
-              .eq('payment_method', 'cash')
+          const { data: paymentsData } = await supabase
+            .from('order_payments')
+            .select('amount, order_id')
+            .eq('cash_session_id', session.id)
+            .eq('payment_method', 'cash')
 
-            const payments = paymentsData || []
-            const orderIds = [...new Set(payments.map((p: { order_id: string }) => p.order_id))]
+          const payments = paymentsData || []
+          const orderIds = [...new Set(payments.map((p: { order_id: string }) => p.order_id))]
 
-            let validPaymentsTotal = 0
-            if (orderIds.length > 0) {
-              const { data: ordersData } = await supabase
-                .from('orders')
-                .select('id, status')
-                .in('id', orderIds)
-                .eq('organization_id', organizationId)
+          let validPaymentsTotal = 0
+          if (orderIds.length > 0) {
+            const { data: ordersData } = await supabase
+              .from('orders')
+              .select('id, status')
+              .in('id', orderIds)
+              .eq('organization_id', organizationId!)
 
-              const validOrderIds = new Set(
-                (ordersData || []).filter((o) => o.status !== 'cancelled').map((o) => o.id)
-              )
-              validPaymentsTotal = payments
-                .filter((p: { order_id: string }) => validOrderIds.has(p.order_id))
-                .reduce((sum: number, p: { amount: number }) => sum + p.amount, 0)
-            }
-
-            const expectedAmount = (session.opening_amount || 0) + validPaymentsTotal
-
-            return {
-              ...session,
-              expected_amount: expectedAmount,
-            } as CashSession
-          } catch (error) {
-            console.error('Error calculating expected amount:', error)
-            return session
+            const validOrderIds = new Set(
+              (ordersData || []).filter((o) => o.status !== 'cancelled').map((o) => o.id)
+            )
+            validPaymentsTotal = payments
+              .filter((p: { order_id: string }) => validOrderIds.has(p.order_id))
+              .reduce((sum: number, p: { amount: number }) => sum + p.amount, 0)
           }
+
+          return { ...session, expected_amount: (session.opening_amount || 0) + validPaymentsTotal } as CashSession
         })
       )
+    },
+    enabled: !!organizationId,
+    staleTime: 2 * 60 * 1000,
+  })
 
-      setSessions(sessionsWithExpected)
-    } catch (error) {
-      console.error('Error fetching cash sessions:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const invalidateSessions = () => queryClient.invalidateQueries({ queryKey: sessionsKey })
 
   // Open sessions: always all, no filters
   const openSessions = useMemo(() => sessions.filter((s) => !s.closed_at), [sessions])
@@ -244,7 +207,7 @@ function AdminCashRegisterContent() {
 
       setIsModalOpen(false)
       resetOpen()
-      fetchSessions()
+      invalidateSessions()
     } catch (error) {
       console.error('Error opening cash session:', error)
       alert('Error al abrir la sesión de caja')
@@ -299,7 +262,7 @@ function AdminCashRegisterContent() {
       setIsCloseModalOpen(false)
       setEditingSession(null)
       resetClose()
-      fetchSessions()
+      invalidateSessions()
     } catch (error) {
       console.error('Error closing cash session:', error)
       alert('Error al cerrar la sesión de caja')
@@ -324,7 +287,7 @@ function AdminCashRegisterContent() {
         notes: 'Eliminación de sesión de caja.',
         oldData: sessionToDelete || null,
       })
-      fetchSessions()
+      invalidateSessions()
     } catch (error) {
       console.error('Error deleting cash session:', error)
       alert('Error al eliminar la sesión de caja')
@@ -814,7 +777,7 @@ function AdminCashRegisterContent() {
             setSelectedBranchForSale('')
           }}
           onSaleCreated={() => {
-            fetchSessions()
+            invalidateSessions()
           }}
           onBranchChange={(newBranchId) => {
             setSelectedBranchForSale(newBranchId)

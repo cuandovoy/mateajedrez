@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { useQuery } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useOrganization } from '@/hooks/useOrganization'
@@ -8,7 +10,6 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice, formatDateShort } from '@/lib/utils'
 import { ArrowLeft, ShoppingCart, DollarSign, Calendar, Package, Plus } from 'lucide-react'
 import type { Customer } from '@/types/database.types'
-import type { Order } from '@/types'
 import { cn } from '@/lib/utils'
 
 const getStatusLabel = (status: string | null): string => {
@@ -46,60 +47,51 @@ export function AdminCustomerDetail() {
   const navigate = useNavigate()
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
-  const [customer, setCustomer] = useState<Customer | null>(null)
-  const [orders, setOrders] = useState<Order[]>([])
-  const [topProducts, setTopProducts] = useState<TopProduct[]>([])
-  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    if (organizationId && id) fetchData()
-  }, [organizationId, id])
-
-  const fetchData = async () => {
-    if (!organizationId || !id) return
-    try {
+  const { data, isPending: loading } = useQuery({
+    queryKey: queryKeys.customers.detail(organizationId!, id!),
+    queryFn: async () => {
       const [customerRes, ordersRes] = await Promise.all([
-        supabase.from('customers').select('*').eq('id', id).eq('organization_id', organizationId).single(),
+        supabase.from('customers').select('*').eq('id', id!).eq('organization_id', organizationId!).single(),
         supabase
           .from('orders')
           .select('*, order_items(id, quantity, unit_price, product_id, products(name, sku))')
-          .eq('organization_id', organizationId)
-          .eq('customer_id', id)
+          .eq('organization_id', organizationId!)
+          .eq('customer_id', id!)
           .order('created_at', { ascending: false }),
       ])
-
       if (customerRes.error) throw customerRes.error
-      setCustomer(customerRes.data as Customer)
+      return {
+        customer: customerRes.data as Customer,
+        orders: (ordersRes.data ?? []) as any[],
+      }
+    },
+    enabled: !!organizationId && !!id,
+    staleTime: 5 * 60 * 1000,
+  })
 
-      const ordersData = (ordersRes.data || []) as any[]
-      setOrders(ordersData)
+  const customer = data?.customer ?? null
+  const orders = data?.orders ?? []
 
-      // Aggregate top products
-      const productMap = new Map<string, { name: string; sku: string; quantity: number }>()
-      for (const order of ordersData) {
-        for (const item of order.order_items || []) {
-          const name = item.products?.name || 'Producto'
-          const sku = item.products?.sku || ''
-          const key = item.product_id || name
-          const prev = productMap.get(key)
-          if (prev) {
-            prev.quantity += item.quantity || 1
-          } else {
-            productMap.set(key, { name, sku, quantity: item.quantity || 1 })
-          }
+  const topProducts = useMemo<TopProduct[]>(() => {
+    const productMap = new Map<string, { name: string; sku: string; quantity: number }>()
+    for (const order of orders) {
+      for (const item of order.order_items || []) {
+        const name = item.products?.name || 'Producto'
+        const sku = item.products?.sku || ''
+        const key = item.product_id || name
+        const prev = productMap.get(key)
+        if (prev) {
+          prev.quantity += item.quantity || 1
+        } else {
+          productMap.set(key, { name, sku, quantity: item.quantity || 1 })
         }
       }
-      setTopProducts(
-        Array.from(productMap.values())
-          .sort((a, b) => b.quantity - a.quantity)
-          .slice(0, 5)
-      )
-    } catch (err) {
-      console.error('Error loading customer detail:', err)
-    } finally {
-      setLoading(false)
     }
-  }
+    return Array.from(productMap.values())
+      .sort((a, b) => b.quantity - a.quantity)
+      .slice(0, 5)
+  }, [orders])
 
   if (loading) {
     return (

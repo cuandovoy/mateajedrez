@@ -5,6 +5,8 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useOrganization } from '@/hooks/useOrganization'
 import { formatDateTime } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,7 +16,7 @@ import {
   RefreshCw,
   User
 } from 'lucide-react'
-import { useEffect, useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 
 type AuditLog = {
   id: string
@@ -77,10 +79,8 @@ const ACTIONS = [
 export function AdminAuditLogs() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
-  const [logs, setLogs] = useState<AuditLog[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [page, setPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
   const [filters, setFilters] = useState({
     table_name: '',
     action: '',
@@ -94,20 +94,15 @@ export function AdminAuditLogs() {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const pageSize = 50
 
-  useEffect(() => {
-    fetchLogs()
-  }, [page, filters])
-
-  const fetchLogs = async () => {
-    try {
-      setLoading(true)
-
+  const { data: queryData, isPending: loading } = useQuery({
+    queryKey: queryKeys.reports.auditLogs(organizationId!, { page, ...filters }),
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const params: any = {
         p_limit: pageSize,
         p_offset: (page - 1) * pageSize,
         p_organization_id: organizationId || null,
       }
-
       if (filters.table_name) params.p_table_name = filters.table_name
       if (filters.action) params.p_action = filters.action
       if (filters.user_id) params.p_user_id = filters.user_id
@@ -120,26 +115,21 @@ export function AdminAuditLogs() {
       if (filters.start_date) params.p_start_date = filters.start_date
       if (filters.end_date) params.p_end_date = filters.end_date
 
-      // Type assertion needed because PostgREST types may not be updated
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase.rpc as any)('get_audit_logs', params)
-
       if (error) throw error
+      const logs = (data || []) as AuditLog[]
+      const totalCount = logs.length < pageSize
+        ? (page - 1) * pageSize + logs.length
+        : page * pageSize + 1
+      return { logs, totalCount }
+    },
+    enabled: !!organizationId,
+    staleTime: 2 * 60 * 1000,
+  })
 
-      setLogs((data || []) as AuditLog[])
-
-      // Get total count (simplified - in production, you'd want a separate count function)
-      if (data && data.length < pageSize) {
-        setTotalCount((page - 1) * pageSize + data.length)
-      } else {
-        setTotalCount(page * pageSize + 1) // Estimate
-      }
-    } catch (error) {
-      console.error('Error fetching audit logs:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const logs = queryData?.logs ?? []
+  const totalCount = queryData?.totalCount ?? 0
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
@@ -282,7 +272,7 @@ export function AdminAuditLogs() {
           <h1 className="text-3xl font-bold text-gray-900">Logs de Auditoría</h1>
           <p className="text-gray-600 mt-1">Registro completo de todos los movimientos del sistema</p>
         </div>
-        <Button onClick={fetchLogs} variant="outline">
+        <Button onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.reports.auditLogs(organizationId!, { page, ...filters }) })} variant="outline">
           <RefreshCw className="h-4 w-4 mr-2" />
           Actualizar
         </Button>

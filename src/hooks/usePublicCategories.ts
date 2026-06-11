@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import type { Category } from '@/types'
 
 export interface CategoryWithSubcategories {
@@ -19,24 +20,15 @@ async function fetchPublicCategories(organizationId: string): Promise<Category[]
   return data ?? []
 }
 
-/**
- * Hook para obtener categorías públicas de una organización.
- * Cache key incluye organizationId para separar correctamente entre tenants.
- * staleTime: 5 min — las categorías no cambian frecuentemente.
- */
 export function usePublicCategories(organizationId: string) {
   return useQuery({
-    queryKey: ['public-categories', organizationId],
+    queryKey: queryKeys.store.categories(organizationId),
     queryFn: () => fetchPublicCategories(organizationId),
     enabled: !!organizationId,
     staleTime: 5 * 60 * 1000,
   })
 }
 
-/**
- * Versión del hook que devuelve las categorías ya estructuradas
- * para el dropdown del header (padres + subcategorías anidadas).
- */
 export function usePublicCategoriesForMenu(organizationId: string) {
   const query = usePublicCategories(organizationId)
 

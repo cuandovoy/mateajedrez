@@ -3,6 +3,8 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { useOrganization } from '@/hooks/useOrganization'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useToastStore } from '@/store/toastStore'
 import {
   AlertTriangle,
@@ -15,7 +17,7 @@ import {
   Truck,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 interface ReposicionItem {
   product_id: string
@@ -308,89 +310,60 @@ function ReposicionPOModal({ selectedItems, organizationId, branches, onClose, o
 export function AdminReposicion() {
   const { organizationId } = useOrganization()
   const { show } = useToastStore()
-  const [items, setItems] = useState<ReposicionItem[]>([])
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showPOModal, setShowPOModal] = useState(false)
   const [search, setSearch] = useState('')
   const [filterBranch, setFilterBranch] = useState('')
   const [filterSupplier, setFilterSupplier] = useState('')
 
-  const fetchData = useCallback(async () => {
-    if (!organizationId) return
-    setLoading(true)
-    try {
+  const reposicionKey = queryKeys.reposicion.items(organizationId ?? '', '')
+
+  const { data: reposData, isPending: loading } = useQuery({
+    queryKey: reposicionKey,
+    queryFn: async () => {
       const [reposResult, branchesResult, suppliersResult] = await Promise.all([
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any).rpc('get_reposicion_report', { p_organization_id: organizationId }),
-        supabase
-          .from('branches')
-          .select('id, name')
-          .eq('organization_id', organizationId)
-          .eq('is_active', true)
-          .order('name'),
-        supabase
-          .from('suppliers')
-          .select('id, name')
-          .eq('organization_id', organizationId)
-          .order('name'),
+        supabase.from('branches').select('id, name').eq('organization_id', organizationId!).eq('is_active', true).order('name'),
+        supabase.from('suppliers').select('id, name').eq('organization_id', organizationId!).order('name'),
       ])
-
       if (reposResult.error) throw reposResult.error
       if (branchesResult.error) throw branchesResult.error
       if (suppliersResult.error) throw suppliersResult.error
+      return {
+        items: (reposResult.data ?? []) as ReposicionItem[],
+        branches: (branchesResult.data ?? []) as Branch[],
+        suppliers: (suppliersResult.data ?? []) as Supplier[],
+      }
+    },
+    enabled: !!organizationId,
+    staleTime: 3 * 60 * 1000,
+  })
 
-      setItems((reposResult.data ?? []) as ReposicionItem[])
-      setBranches((branchesResult.data ?? []) as Branch[])
-      setSuppliers((suppliersResult.data ?? []) as Supplier[])
-    } catch (err) {
-      console.error('Error cargando reposición:', err)
-      show('Error al cargar los productos a reponer', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [organizationId, show])
+  const items = reposData?.items ?? []
+  const branches = reposData?.branches ?? []
+  const suppliers = reposData?.suppliers ?? []
 
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  const invalidateReposicion = () => queryClient.invalidateQueries({ queryKey: reposicionKey })
 
-  const assignSupplier = useCallback(async (productId: string, supplierId: string) => {
-    try {
-      // Unset current primary supplier if any
-      await supabase
-        .from('product_suppliers')
-        .update({ is_primary: false })
-        .eq('product_id', productId)
-        .eq('is_primary', true)
-
-      // Upsert new primary supplier
+  const assignSupplierMutation = useMutation({
+    mutationFn: async ({ productId, supplierId }: { productId: string; supplierId: string }) => {
+      await supabase.from('product_suppliers').update({ is_primary: false }).eq('product_id', productId).eq('is_primary', true)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase as any)
-        .from('product_suppliers')
-        .upsert(
-          { product_id: productId, supplier_id: supplierId, is_primary: true },
-          { onConflict: 'product_id,supplier_id' }
-        )
-
-      if (error) throw error
-
-      const supplierName = suppliers.find(s => s.id === supplierId)?.name ?? null
-      setItems(prev =>
-        prev.map(i =>
-          i.product_id === productId
-            ? { ...i, supplier_id: supplierId, supplier_name: supplierName }
-            : i
-        )
+      const { error } = await (supabase as any).from('product_suppliers').upsert(
+        { product_id: productId, supplier_id: supplierId, is_primary: true },
+        { onConflict: 'product_id,supplier_id' }
       )
-      show('Proveedor asignado', 'success')
-    } catch (err) {
-      console.error('Error asignando proveedor:', err)
-      show('Error al asignar el proveedor', 'error')
-    }
-  }, [suppliers, show])
+      if (error) throw error
+    },
+    onSuccess: () => { show('Proveedor asignado', 'success'); invalidateReposicion() },
+    onError: () => show('Error al asignar el proveedor', 'error'),
+  })
+
+  const assignSupplier = (productId: string, supplierId: string) => {
+    assignSupplierMutation.mutate({ productId, supplierId })
+  }
 
   // Unique branches and suppliers for filter selects
   const uniqueBranches = useMemo(() =>
@@ -460,7 +433,7 @@ export function AdminReposicion() {
             Productos bajo umbral de stock con su rotación y proveedor
           </p>
         </div>
-        <Button variant="outline" onClick={fetchData} disabled={loading} size="sm">
+        <Button variant="outline" onClick={invalidateReposicion} disabled={loading} size="sm">
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
           Actualizar
         </Button>
@@ -731,7 +704,7 @@ export function AdminReposicion() {
           onCreated={() => {
             setShowPOModal(false)
             setSelected(new Set())
-            fetchData()
+            invalidateReposicion()
           }}
         />
       )}

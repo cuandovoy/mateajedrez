@@ -10,6 +10,8 @@ import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import { BookOpen, ChevronDown, ClipboardList, CreditCard, Plus, Receipt, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 
 type SupplierLite = { id: string; name: string }
 type BranchLite = { id: string; name: string }
@@ -178,13 +180,8 @@ export function AdminExpenses() {
   const settings = useOrgSettings()
   const { show } = useToastStore()
 
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [saving, setSaving] = useState(false)
-
-  const [suppliers, setSuppliers] = useState<SupplierLite[]>([])
-  const [branches, setBranches] = useState<BranchLite[]>([])
-  const [products, setProducts] = useState<ProductLite[]>([])
-  const [categories, setCategories] = useState<CategoryLite[]>([])
   const [variantsByProduct, setVariantsByProduct] = useState<Map<string, VariantLite[]>>(new Map())
   const [loadingVariants, setLoadingVariants] = useState(false)
 
@@ -206,16 +203,9 @@ export function AdminExpenses() {
   const [productSearchOpen, setProductSearchOpen] = useState(false)
   const productSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderLite[]>([])
   const [selectedPurchaseOrderId, setSelectedPurchaseOrderId] = useState<string>('')
-  const [purchaseOrderItems, setPurchaseOrderItems] = useState<PurchaseOrderItemLite[]>([])
-
-  const [supplierInvoices, setSupplierInvoices] = useState<SupplierInvoiceLite[]>([])
   const [paymentModalInvoice, setPaymentModalInvoice] = useState<SupplierInvoiceLite | null>(null)
   const [activeView, setActiveView] = useState<ExpenseView>('purchase_orders')
-
-  const [directExpenses, setDirectExpenses] = useState<DirectExpense[]>([])
-  const [cashSessions, setCashSessions] = useState<CashSessionLite[]>([])
   const [directExpenseForm, setDirectExpenseForm] = useState({
     occurred_at: new Date().toISOString().slice(0, 10),
     category: 'varios',
@@ -227,15 +217,12 @@ export function AdminExpenses() {
     apply_to_cash_session: false,
     cash_session_id: '',
   })
-  const [loadingDirectExpenses, setLoadingDirectExpenses] = useState(false)
   const [directExpenseModalOpen, setDirectExpenseModalOpen] = useState(false)
   const [cashSessionDateFilter, setCashSessionDateFilter] = useState('')
   const [createOrderModalOpen, setCreateOrderModalOpen] = useState(false)
   const [editOrderModalOpen, setEditOrderModalOpen] = useState(false)
   const [ledgerDetailEntry, setLedgerDetailEntry] = useState<ExpenseLedgerEntry | null>(null)
-  const [expenseLedgerEntries, setExpenseLedgerEntries] = useState<ExpenseLedgerEntry[]>([])
   const [expenseLedgerPage, setExpenseLedgerPage] = useState(1)
-  const [expenseLedgerTotalCount, setExpenseLedgerTotalCount] = useState(0)
   const [ledgerDraftFilters, setLedgerDraftFilters] = useState<ExpenseLedgerFilters>({
     dateFrom: '',
     dateTo: '',
@@ -374,6 +361,51 @@ export function AdminExpenses() {
     if (productId) loadVariantsForProduct(productId)
   }
 
+  const pageDataKey = ['admin', organizationId!, 'expenses', 'page-data'] as const
+  const { data: pageData, isPending: loading } = useQuery({
+    queryKey: pageDataKey,
+    queryFn: async () => {
+      const [suppliersResult, branchesResult, productsResult, categoriesResult, purchaseOrdersResult, supplierInvoicesResult] = await Promise.all([
+        fromAny('suppliers').select('id, name').eq('organization_id', organizationId!).order('name'),
+        fromAny('branches').select('id, name').eq('organization_id', organizationId!).eq('is_active', true).order('name'),
+        fromAny('products').select('id, name').eq('organization_id', organizationId!).eq('is_active', true).order('name'),
+        fromAny('categories').select('id, name').eq('organization_id', organizationId!).order('name'),
+        fromAny('purchase_orders')
+          .select('id, po_number, supplier_id, branch_id, status, notes, total, created_at')
+          .eq('organization_id', organizationId!)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        fromAny('supplier_invoices')
+          .select('id, invoice_number, supplier_id, purchase_order_id, status, total_amount, paid_amount, outstanding_amount')
+          .eq('organization_id', organizationId!)
+          .order('created_at', { ascending: false })
+          .limit(100),
+      ])
+      if (suppliersResult.error) throw suppliersResult.error
+      if (branchesResult.error) throw branchesResult.error
+      if (productsResult.error) throw productsResult.error
+      if (purchaseOrdersResult.error) throw purchaseOrdersResult.error
+      if (supplierInvoicesResult.error) throw supplierInvoicesResult.error
+      return {
+        suppliers: (suppliersResult.data || []) as SupplierLite[],
+        branches: (branchesResult.data || []) as BranchLite[],
+        products: (productsResult.data || []) as ProductLite[],
+        categories: (!categoriesResult.error ? categoriesResult.data || [] : []) as CategoryLite[],
+        purchaseOrders: (purchaseOrdersResult.data || []) as PurchaseOrderLite[],
+        supplierInvoices: (supplierInvoicesResult.data || []) as SupplierInvoiceLite[],
+      }
+    },
+    enabled: !!organizationId,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  const suppliers = pageData?.suppliers ?? []
+  const branches = pageData?.branches ?? []
+  const products = pageData?.products ?? []
+  const categories = pageData?.categories ?? []
+  const purchaseOrders = pageData?.purchaseOrders ?? []
+  const supplierInvoices = pageData?.supplierInvoices ?? []
+
   const supplierNameById = useMemo(() => new Map(suppliers.map((s) => [s.id, s.name])), [suppliers])
   const branchNameById = useMemo(() => new Map(branches.map((b) => [b.id, b.name])), [branches])
   const productNameById = useMemo(() => new Map(products.map((p) => [p.id, p.name])), [products])
@@ -394,21 +426,93 @@ export function AdminExpenses() {
     })
   }, [purchaseOrders, searchOrder, supplierNameById, branchNameById])
 
+  useEffect(() => {
+    if (!selectedPurchaseOrderId && purchaseOrders.length > 0) {
+      setSelectedPurchaseOrderId(purchaseOrders[0].id)
+    }
+  }, [purchaseOrders, selectedPurchaseOrderId])
+
+  const ledgerKey = queryKeys.expenses.ledger(organizationId!, { page: expenseLedgerPage, ...ledgerAppliedFilters })
+  const { data: ledgerData } = useQuery({
+    queryKey: ledgerKey,
+    queryFn: async () => {
+      const from = (expenseLedgerPage - 1) * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query: any = fromAny('expense_ledger')
+        .select('id, entry_kind, event_type, occurred_at, net_amount, supplier_id, source_table', { count: 'exact' })
+        .eq('organization_id', organizationId!)
+        .order('occurred_at', { ascending: false })
+        .range(from, to)
+      if (ledgerAppliedFilters.dateFrom) query = query.gte('occurred_at', `${ledgerAppliedFilters.dateFrom}T00:00:00`)
+      if (ledgerAppliedFilters.dateTo) query = query.lte('occurred_at', `${ledgerAppliedFilters.dateTo}T23:59:59`)
+      if (ledgerAppliedFilters.supplierId) query = query.eq('supplier_id', ledgerAppliedFilters.supplierId)
+      if (ledgerAppliedFilters.entryKind) query = query.eq('entry_kind', ledgerAppliedFilters.entryKind)
+      if (ledgerAppliedFilters.eventType) query = query.eq('event_type', ledgerAppliedFilters.eventType)
+      const { data, error, count } = await query
+      if (error) throw error
+      return { entries: (data || []) as ExpenseLedgerEntry[], totalCount: count || 0 }
+    },
+    enabled: !!organizationId,
+    staleTime: 60 * 1000,
+  })
+  const expenseLedgerEntries = ledgerData?.entries ?? []
+  const expenseLedgerTotalCount = ledgerData?.totalCount ?? 0
   const totalExpenseLedgerPages = Math.max(1, Math.ceil(expenseLedgerTotalCount / PAGE_SIZE))
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchPageData()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId])
+  const poItemsKey = ['admin', organizationId!, 'expenses', 'po-items', selectedPurchaseOrderId] as const
+  const { data: purchaseOrderItems = [] } = useQuery({
+    queryKey: poItemsKey,
+    queryFn: async () => {
+      const { data, error } = await fromAny('purchase_order_items')
+        .select('id, line_number, product_id, variant_id, quantity_ordered, quantity_received, unit_cost, tax_amount, discount_amount, description')
+        .eq('purchase_order_id', selectedPurchaseOrderId)
+        .order('line_number', { ascending: true })
+      if (error) throw error
+      return (data || []) as PurchaseOrderItemLite[]
+    },
+    enabled: !!selectedPurchaseOrderId,
+    staleTime: 60 * 1000,
+  })
 
   useEffect(() => {
-    if (organizationId) {
-      fetchExpenseLedger()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, expenseLedgerPage, ledgerAppliedFilters])
+    const uniqueProductIds = [...new Set(purchaseOrderItems.map((i) => i.product_id))]
+    uniqueProductIds.forEach((pid) => loadVariantsForProduct(pid))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purchaseOrderItems])
+
+  const { data: directExpenses = [], isPending: loadingDirectExpenses } = useQuery({
+    queryKey: ['admin', organizationId!, 'expenses', 'direct'],
+    queryFn: async () => {
+      const { data, error } = await fromAny('direct_expenses')
+        .select('id, occurred_at, category, description, amount, payment_method, branch_id, cash_session_id, notes, created_at')
+        .eq('organization_id', organizationId!)
+        .order('occurred_at', { ascending: false })
+        .limit(200)
+      if (error) throw error
+      return (data || []) as DirectExpense[]
+    },
+    enabled: !!organizationId && activeView === 'direct_expenses',
+    staleTime: 60 * 1000,
+  })
+
+  const { data: cashSessions = [] } = useQuery({
+    queryKey: ['admin', organizationId!, 'expenses', 'cash-sessions'],
+    queryFn: async () => {
+      const branchIds = branches.length > 0 ? branches.map((b) => b.id) : ['00000000-0000-0000-0000-000000000000']
+      const { data, error } = await fromAny('cash_sessions')
+        .select('id, branch_id, opened_at, closed_at')
+        .in('branch_id', branchIds)
+        .order('opened_at', { ascending: false })
+        .limit(60)
+      if (error) throw error
+      return (data || []) as CashSessionLite[]
+    },
+    enabled: !!organizationId && activeView === 'direct_expenses' && branches.length > 0,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  const invalidateExpenses = () => queryClient.invalidateQueries({ queryKey: ['admin', organizationId!, 'expenses'] })
 
   useEffect(() => {
     if (!selectedPurchaseOrder) return
@@ -424,132 +528,6 @@ export function AdminExpenses() {
     }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPurchaseOrderId])
-
-  useEffect(() => {
-    if (selectedPurchaseOrderId) {
-      fetchPurchaseOrderItems(selectedPurchaseOrderId)
-    } else {
-      setPurchaseOrderItems([])
-    }
-  }, [selectedPurchaseOrderId])
-
-  useEffect(() => {
-    if (organizationId && activeView === 'direct_expenses') {
-      fetchDirectExpenses()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, activeView])
-
-  useEffect(() => {
-    if (organizationId && activeView === 'direct_expenses' && branches.length > 0) {
-      fetchCashSessions()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, activeView, branches])
-
-  const fetchPageData = async (options?: { silent?: boolean }) => {
-    if (!organizationId) return
-    const silent = options?.silent ?? false
-    if (!silent) setLoading(true)
-    try {
-      const [suppliersResult, branchesResult, productsResult, categoriesResult, purchaseOrdersResult, supplierInvoicesResult] = await Promise.all([
-        fromAny('suppliers').select('id, name').eq('organization_id', organizationId).order('name'),
-        fromAny('branches').select('id, name').eq('organization_id', organizationId).eq('is_active', true).order('name'),
-        fromAny('products').select('id, name').eq('organization_id', organizationId).eq('is_active', true).order('name'),
-        fromAny('categories').select('id, name').eq('organization_id', organizationId).order('name'),
-        fromAny('purchase_orders')
-          .select('id, po_number, supplier_id, branch_id, status, notes, total, created_at')
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(100),
-        fromAny('supplier_invoices')
-          .select('id, invoice_number, supplier_id, purchase_order_id, status, total_amount, paid_amount, outstanding_amount')
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(100),
-      ])
-
-      if (suppliersResult.error) throw suppliersResult.error
-      if (branchesResult.error) throw branchesResult.error
-      if (productsResult.error) throw productsResult.error
-      if (purchaseOrdersResult.error) throw purchaseOrdersResult.error
-      if (supplierInvoicesResult.error) throw supplierInvoicesResult.error
-
-      const purchaseOrdersData = (purchaseOrdersResult.data || []) as PurchaseOrderLite[]
-      setSuppliers(suppliersResult.data || [])
-      setBranches(branchesResult.data || [])
-      setProducts(productsResult.data || [])
-      if (!categoriesResult.error) setCategories((categoriesResult.data || []) as CategoryLite[])
-      setPurchaseOrders(purchaseOrdersData)
-      setSupplierInvoices((supplierInvoicesResult.data || []) as SupplierInvoiceLite[])
-
-      if (!selectedPurchaseOrderId && purchaseOrdersData.length > 0) {
-        setSelectedPurchaseOrderId(purchaseOrdersData[0].id)
-      }
-    } catch (error) {
-      console.error('Error loading purchases and expenses page:', error)
-      show('No se pudieron cargar los datos de compras y egresos.', 'error')
-    } finally {
-      if (!silent) setLoading(false)
-    }
-  }
-
-  const fetchExpenseLedger = async () => {
-    if (!organizationId) return
-    try {
-      const from = (expenseLedgerPage - 1) * PAGE_SIZE
-      const to = from + PAGE_SIZE - 1
-      let query = fromAny('expense_ledger')
-        .select('id, entry_kind, event_type, occurred_at, net_amount, supplier_id, source_table', { count: 'exact' })
-        .eq('organization_id', organizationId)
-        .order('occurred_at', { ascending: false })
-        .range(from, to)
-
-      if (ledgerAppliedFilters.dateFrom) {
-        query = query.gte('occurred_at', `${ledgerAppliedFilters.dateFrom}T00:00:00`)
-      }
-      if (ledgerAppliedFilters.dateTo) {
-        query = query.lte('occurred_at', `${ledgerAppliedFilters.dateTo}T23:59:59`)
-      }
-      if (ledgerAppliedFilters.supplierId) {
-        query = query.eq('supplier_id', ledgerAppliedFilters.supplierId)
-      }
-      if (ledgerAppliedFilters.entryKind) {
-        query = query.eq('entry_kind', ledgerAppliedFilters.entryKind)
-      }
-      if (ledgerAppliedFilters.eventType) {
-        query = query.eq('event_type', ledgerAppliedFilters.eventType)
-      }
-
-      const { data, error, count } = await query
-
-      if (error) throw error
-      setExpenseLedgerEntries((data || []) as ExpenseLedgerEntry[])
-      setExpenseLedgerTotalCount(count || 0)
-    } catch (error) {
-      console.error('Error loading expense ledger:', error)
-      show('No se pudo cargar el libro de egresos.', 'error')
-    }
-  }
-
-  const fetchPurchaseOrderItems = async (purchaseOrderId: string) => {
-    try {
-      const { data, error } = await fromAny('purchase_order_items')
-        .select('id, line_number, product_id, variant_id, quantity_ordered, quantity_received, unit_cost, tax_amount, discount_amount, description')
-        .eq('purchase_order_id', purchaseOrderId)
-        .order('line_number', { ascending: true })
-
-      if (error) throw error
-      const items = (data || []) as PurchaseOrderItemLite[]
-      setPurchaseOrderItems(items)
-      // Pre-cargar variantes de los productos que aparecen en los items
-      const uniqueProductIds = [...new Set(items.map((i) => i.product_id))]
-      uniqueProductIds.forEach((pid) => loadVariantsForProduct(pid))
-    } catch (error) {
-      console.error('Error loading purchase order items:', error)
-      show('No se pudieron cargar los productos de la orden de compra.', 'error')
-    }
-  }
 
   const createPurchaseOrder = async () => {
     if (!organizationId) return
@@ -591,7 +569,7 @@ export function AdminExpenses() {
 
       setCreateOrderForm({ supplier_id: '', branch_id: '', status: 'submitted', notes: '' })
       setCreateOrderModalOpen(false)
-      await fetchPageData({ silent: true })
+      invalidateExpenses()
       if (data?.id) {
         setSelectedPurchaseOrderId(data.id)
         setEditOrderModalOpen(true)
@@ -643,7 +621,7 @@ export function AdminExpenses() {
           notes: editOrderForm.notes || null,
         },
       })
-      await fetchPageData({ silent: true })
+      invalidateExpenses()
       show('Orden de compra actualizada correctamente.', 'success')
     } catch (error) {
       console.error('Error updating purchase order:', error)
@@ -732,8 +710,7 @@ export function AdminExpenses() {
       resetProductSearch()
       setShowNewItemForm(false)
 
-      await fetchPageData({ silent: true })
-      await fetchPurchaseOrderItems(selectedPurchaseOrder.id)
+      invalidateExpenses()
       show('Producto agregado a la orden de compra.', 'success')
     } catch (error) {
       console.error('Error adding item to purchase order:', error)
@@ -760,8 +737,7 @@ export function AdminExpenses() {
         notes: 'Producto eliminado de una orden de compra.',
         oldData: existingItem || null,
       })
-      await fetchPageData({ silent: true })
-      await fetchPurchaseOrderItems(selectedPurchaseOrder.id)
+      invalidateExpenses()
       show('Producto eliminado de la orden de compra.', 'success')
     } catch (error) {
       console.error('Error removing purchase order item:', error)
@@ -866,8 +842,7 @@ export function AdminExpenses() {
       })
 
       setEditingItemId(null)
-      await fetchPageData({ silent: true })
-      await fetchPurchaseOrderItems(selectedPurchaseOrder.id)
+      invalidateExpenses()
       show('Ítem actualizado correctamente.', 'success')
     } catch (error) {
       console.error('Error updating purchase order item:', error)
@@ -937,9 +912,7 @@ export function AdminExpenses() {
         },
       })
 
-      await fetchPageData({ silent: true })
-      await fetchPurchaseOrderItems(selectedPurchaseOrder.id)
-      await fetchExpenseLedger()
+      invalidateExpenses()
       show('Recepcion creada y confirmada correctamente.', 'success')
     } catch (error) {
       console.error('Error creating receipt from purchase order:', error)
@@ -1013,8 +986,7 @@ export function AdminExpenses() {
         issue_immediately: true,
       })
 
-      await fetchPageData({ silent: true })
-      await fetchExpenseLedger()
+      invalidateExpenses()
       show('Factura creada correctamente.', 'success')
     } catch (error) {
       console.error('Error creating invoice from purchase order:', error)
@@ -1071,8 +1043,7 @@ export function AdminExpenses() {
         notes: '',
       })
 
-      await fetchPageData({ silent: true })
-      await fetchExpenseLedger()
+      invalidateExpenses()
       setPaymentModalInvoice(null)
       show('Pago registrado correctamente.', 'success')
     } catch (error) {
@@ -1128,8 +1099,7 @@ export function AdminExpenses() {
         },
       })
 
-      await fetchPageData({ silent: true })
-      await fetchExpenseLedger()
+      invalidateExpenses()
       show(`Pago revertido correctamente para la factura ${invoice.invoice_number}.`, 'success')
     } catch (error) {
       console.error('Error reversing supplier payment:', error)
@@ -1159,52 +1129,13 @@ export function AdminExpenses() {
         newData: { status: 'cancelled' },
       })
 
-      await fetchPageData({ silent: true })
-      await fetchExpenseLedger()
+      invalidateExpenses()
       show(`Factura ${invoice.invoice_number} anulada correctamente.`, 'success')
     } catch (error: any) {
       console.error('Error cancelling supplier invoice:', error)
       show(error?.message || 'No se pudo anular la factura.', 'error')
     } finally {
       setSaving(false)
-    }
-  }
-
-  const fetchCashSessions = async () => {
-    if (!organizationId) return
-    try {
-      const { data, error } = await fromAny('cash_sessions')
-        .select('id, branch_id, opened_at, closed_at')
-        .in('branch_id',
-          branches.length > 0
-            ? branches.map((b) => b.id)
-            : ['00000000-0000-0000-0000-000000000000']
-        )
-        .order('opened_at', { ascending: false })
-        .limit(60)
-      if (error) throw error
-      setCashSessions((data || []) as CashSessionLite[])
-    } catch (error) {
-      console.error('Error loading cash sessions:', error)
-    }
-  }
-
-  const fetchDirectExpenses = async () => {
-    if (!organizationId) return
-    setLoadingDirectExpenses(true)
-    try {
-      const { data, error } = await fromAny('direct_expenses')
-        .select('id, occurred_at, category, description, amount, payment_method, branch_id, cash_session_id, notes, created_at')
-        .eq('organization_id', organizationId)
-        .order('occurred_at', { ascending: false })
-        .limit(200)
-      if (error) throw error
-      setDirectExpenses((data || []) as DirectExpense[])
-    } catch (error) {
-      console.error('Error loading direct expenses:', error)
-      show('No se pudieron cargar los gastos directos.', 'error')
-    } finally {
-      setLoadingDirectExpenses(false)
     }
   }
 
@@ -1264,7 +1195,7 @@ export function AdminExpenses() {
         cash_session_id: '',
       })
       setCashSessionDateFilter('')
-      await fetchDirectExpenses()
+      invalidateExpenses()
       setDirectExpenseModalOpen(false)
       show('Gasto registrado correctamente.', 'success')
     } catch (error) {
@@ -1290,7 +1221,7 @@ export function AdminExpenses() {
         notes: 'Gasto directo eliminado.',
         oldData: existing || null,
       })
-      await fetchDirectExpenses()
+      invalidateExpenses()
       show('Gasto eliminado correctamente.', 'success')
     } catch (error) {
       console.error('Error deleting direct expense:', error)
@@ -1363,7 +1294,7 @@ export function AdminExpenses() {
 
       if (error) throw error
 
-      setProducts((prev) => [...prev, { id: data.id, name: data.name }].sort((a, b) => a.name.localeCompare(b.name)))
+      invalidateExpenses()
       handleNewItemProductChange(data.id)
       setProductSearchQuery(data.name)
       setNewOrderItemForm((prev) => ({ ...prev, unit_cost: quickCreateProductForm.price || '0' }))

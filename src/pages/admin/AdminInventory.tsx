@@ -8,11 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { trackAuditAction } from '@/lib/audit'
 import { capitalizeFirst, formatDateShort } from '@/lib/utils'
+import { queryKeys } from '@/lib/queryKeys'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
-import type { Branch } from '@/types'
 import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -33,7 +34,8 @@ import {
   Search,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 
 const DEFAULT_PAGE_SIZE = 25
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const
@@ -95,9 +97,6 @@ export function AdminInventory() {
   const { organizationId, isAdmin } = useOrganization()
   const { show } = useToastStore()
   const { canUseFeature } = usePlanLimits()
-  const [inventory, setInventory] = useState<InventoryItem[]>([])
-  const [branches, setBranches] = useState<Branch[]>([])
-  const [loading, setLoading] = useState(true)
   const [selectedBranch, setSelectedBranch] = useState<string>('')
   const [editingItem, setEditingItem] = useState<{ id: string; stock: number; min_stock: number; low_stock_threshold: number } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -105,30 +104,22 @@ export function AdminInventory() {
   const [syncingItemId, setSyncingItemId] = useState<string | null>(null)
   const [syncingAll, setSyncingAll] = useState(false)
   const [exportingAll, setExportingAll] = useState(false)
-  const [unsyncedCount, setUnsyncedCount] = useState<number | null>(null)
-  const [missingProductsCount, setMissingProductsCount] = useState<number | null>(null)
   const [receiptModalItem, setReceiptModalItem] = useState<InventoryItem | null>(null)
   const [adjustmentModalItem, setAdjustmentModalItem] = useState<InventoryItem | null>(null)
   const [transferModalItem, setTransferModalItem] = useState<InventoryItem | null>(null)
   const [movementsModalItem, setMovementsModalItem] = useState<InventoryItem | null>(null)
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null)
   const [inventoryViewTab, setInventoryViewTab] = useState<'branch' | 'product'>('branch')
-  const [crossViewData, setCrossViewData] = useState<CrossViewRow[]>([])
-  const [crossViewLoading, setCrossViewLoading] = useState(false)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [page, setPage] = useState(0)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [_totalCount, setTotalCount] = useState(0)
   const [searchInput, setSearchInput] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false)
   const [hideOutOfStock, setHideOutOfStock] = useState(false)
   const [filterStockMuerto, setFilterStockMuerto] = useState(false)
-  const [ventasPorProducto, setVentasPorProducto] = useState<Map<string, number>>(new Map())
-  const [lastMovByBiId, setLastMovByBiId] = useState<Map<string, string>>(new Map())
   const [crossViewSearch, setCrossViewSearch] = useState('')
   const [crossViewPage, setCrossViewPage] = useState(0)
-  const fetchInventoryRequestId = useRef(0)
 
   useEffect(() => {
     const initialSearch = (searchParams.get('search') || '').trim()
@@ -161,70 +152,15 @@ export function AdminInventory() {
     }
   }, [searchParams])
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchBranches()
-      checkMissingProducts()
-    }
-  }, [organizationId])
+  const queryClient = useQueryClient()
+  const { data: branches = [] } = useAdminBranches(organizationId)
 
-  useEffect(() => {
-    if (selectedBranch && organizationId) {
-      checkMissingProducts()
-    }
-  }, [selectedBranch, organizationId])
-
-  useEffect(() => {
-    if (organizationId) {
-      checkUnsyncedItems()
-    }
-  }, [organizationId, selectedBranch])
-
-  const calcDiasStock = (stock: number, vendido30d: number): number | null => {
-    if (vendido30d === 0) return null
-    return Math.floor(stock / (vendido30d / 30))
-  }
-
-  const filteredInventory = useMemo(() => {
-    let result = inventory
-    if (showOnlyLowStock) result = result.filter(item => item.is_low_stock)
-    if (hideOutOfStock) result = result.filter(item => item.stock > 0)
-    if (filterStockMuerto) {
-      result = result.filter(item => {
-        if (item.stock <= 0) return false
-        const lastMov = lastMovByBiId.get(item.id)
-        if (!lastMov) return true
-        const days = Math.floor((Date.now() - new Date(lastMov).getTime()) / (1000 * 60 * 60 * 24))
-        return days > 60
-      })
-    }
-    return result
-  }, [inventory, showOnlyLowStock, hideOutOfStock, filterStockMuerto, lastMovByBiId])
-
-  useEffect(() => {
-    setCrossViewPage(0)
-  }, [crossViewSearch])
-
-  const filteredCrossViewData = useMemo(() => {
-    if (!crossViewSearch.trim()) return crossViewData
-    const term = crossViewSearch.trim().toLowerCase()
-    return crossViewData.filter(row =>
-      row.product_name.toLowerCase().includes(term) ||
-      (row.sku && row.sku.toLowerCase().includes(term)) ||
-      (row.description && row.description.toLowerCase().includes(term))
-    )
-  }, [crossViewData, crossViewSearch])
-
-  const paginatedCrossViewData = useMemo(() => {
-    const from = crossViewPage * CROSS_VIEW_PAGE_SIZE
-    return filteredCrossViewData.slice(from, from + CROSS_VIEW_PAGE_SIZE)
-  }, [filteredCrossViewData, crossViewPage])
-
-  const fetchInventory = useCallback(async () => {
-    if (!organizationId) return
-    const requestId = ++fetchInventoryRequestId.current
-    try {
-      setLoading(true)
+  const inventoryKey = queryKeys.inventory.branch(organizationId!, selectedBranch, {
+    page, pageSize, search: debouncedSearch, sortDirection,
+  })
+  const { data: inventoryData, isPending: loading } = useQuery({
+    queryKey: inventoryKey,
+    queryFn: async () => {
       const from = page * pageSize
       const to = from + pageSize - 1
       const hasSearch = debouncedSearch.length > 0
@@ -237,26 +173,10 @@ export function AdminInventory() {
           variantsByNameResult,
           variantsBySkuResult,
         ] = await Promise.all([
-          supabase
-            .from('products')
-            .select('id')
-            .eq('organization_id', organizationId)
-            .ilike('name', likeTerm),
-          supabase
-            .from('products')
-            .select('id')
-            .eq('organization_id', organizationId)
-            .ilike('sku', likeTerm),
-          supabase
-            .from('product_variants')
-            .select('id, product_id, products!inner(organization_id)')
-            .eq('products.organization_id', organizationId)
-            .ilike('name', likeTerm),
-          supabase
-            .from('product_variants')
-            .select('id, product_id, products!inner(organization_id)')
-            .eq('products.organization_id', organizationId)
-            .ilike('sku', likeTerm),
+          supabase.from('products').select('id').eq('organization_id', organizationId!).ilike('name', likeTerm),
+          supabase.from('products').select('id').eq('organization_id', organizationId!).ilike('sku', likeTerm),
+          supabase.from('product_variants').select('id, product_id, products!inner(organization_id)').eq('products.organization_id', organizationId!).ilike('name', likeTerm),
+          supabase.from('product_variants').select('id, product_id, products!inner(organization_id)').eq('products.organization_id', organizationId!).ilike('sku', likeTerm),
         ])
 
         if (productsByNameResult.error) throw productsByNameResult.error
@@ -277,80 +197,36 @@ export function AdminInventory() {
             .from('product_variants')
             .select('id')
             .in('product_id', Array.from(productIds))
-
           if (variantsFromMatchedProductsError) throw variantsFromMatchedProductsError
           for (const row of variantsFromMatchedProducts || []) variantIds.add(row.id)
         }
 
-        return {
-          productIds: Array.from(productIds),
-          variantIds: Array.from(variantIds),
-        }
+        return { productIds: Array.from(productIds), variantIds: Array.from(variantIds) }
       }
 
       let query = supabase
         .from('branch_inventory')
         .select(
-          `
-          id,
-          branch_id,
-          product_id,
-          variant_id,
-          stock,
-          min_stock,
-          low_stock_threshold,
+          `id, branch_id, product_id, variant_id, stock, min_stock, low_stock_threshold,
           branches!inner(id, name, organization_id),
-          products(
-            id,
-            organization_id,
-            name,
-            sku,
-            stock,
-            image_url,
-            product_images (
-              image_url,
-              is_primary,
-              display_order
-            )
-          ),
-          product_variants(
-            id,
-            name,
-            sku,
-            image_url,
-            product_id,
-            stock,
-            products!inner(
-              id,
-              organization_id,
-              name,
-              sku,
-              stock,
-              image_url,
-              product_images (
-                image_url,
-                is_primary,
-                display_order
-              )
-            )
-          )
-        `,
+          products(id, organization_id, name, sku, stock, image_url, product_images(image_url, is_primary, display_order)),
+          product_variants(id, name, sku, image_url, product_id, stock, products!inner(id, organization_id, name, sku, stock, image_url, product_images(image_url, is_primary, display_order)))`,
           { count: 'exact' }
         )
-        .eq('branches.organization_id', organizationId)
+        .eq('branches.organization_id', organizationId!)
         .order('stock', { ascending: sortDirection === 'asc' })
 
-      if (selectedBranch) {
-        query = query.eq('branch_id', selectedBranch)
-      }
+      if (selectedBranch) query = query.eq('branch_id', selectedBranch)
 
       if (hasSearch) {
         const { productIds, variantIds } = await resolveSearchMatches(debouncedSearch)
         if (productIds.length === 0 && variantIds.length === 0) {
-          if (requestId !== fetchInventoryRequestId.current) return
-          setInventory([])
-          setTotalCount(0)
-          return
+          return {
+            inventory: [] as InventoryItem[],
+            totalCount: 0,
+            ventasPorProducto: new Map<string, number>(),
+            lastMovByBiId: new Map<string, string>(),
+          }
         }
         if (productIds.length > 0 && variantIds.length > 0) {
           query = query.or(`product_id.in.(${productIds.join(',')}),variant_id.in.(${variantIds.join(',')})`)
@@ -362,11 +238,9 @@ export function AdminInventory() {
       }
 
       query = query.range(from, to)
-
       const { data, error, count } = await query
-
       if (error) throw error
-      if (requestId !== fetchInventoryRequestId.current) return
+
       const rawItems = (data || []).map((item: Record<string, unknown>) => {
         const branch = item.branches as { id: string; name: string } | null
         const product = item.product_id
@@ -376,7 +250,6 @@ export function AdminInventory() {
         const productPrimaryImage = getPrimaryImageUrl(
           (product as { product_images?: ProductImageRef[] } | null)?.product_images
         )
-
         return {
           id: item.id as string,
           branch_id: item.branch_id as string,
@@ -420,85 +293,96 @@ export function AdminInventory() {
           return sanitized
         })
 
-      setInventory(inventoryItems)
-      setTotalCount(count ?? 0)
-    } catch (err) {
-      if (requestId !== fetchInventoryRequestId.current) return
-      console.error('Error fetching inventory:', err)
-      show('Error al cargar el inventario', 'error')
-    } finally {
-      if (requestId === fetchInventoryRequestId.current) {
-        setLoading(false)
-      }
-    }
-  }, [organizationId, page, pageSize, selectedBranch, debouncedSearch, sortDirection, show])
+      // Fetch sales and movements in parallel with the same scope
+      const productIds = [...new Set(inventoryItems.map(i => i.product_id).filter((id): id is string => id !== null))]
+      const biIds = inventoryItems.map(i => i.id)
+      const ventasPorProducto = new Map<string, number>()
+      const lastMovByBiId = new Map<string, string>()
 
-  useEffect(() => {
-    if (organizationId) fetchInventory()
-  }, [organizationId, fetchInventory])
-
-  const fetchBranches = async () => {
-    if (!organizationId) return
-    try {
-      const { data, error } = await supabase
-        .from('branches')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name')
-
-      if (error) throw error
-      const branchesData = (data || []) as Branch[]
-      setBranches(branchesData)
-    } catch (error) {
-      console.error('Error fetching branches:', error)
-    }
-  }
-
-  const handleEdit = (item: InventoryItem) => {
-    setEditingItem({
-      id: item.id,
-      stock: item.stock,
-      min_stock: item.min_stock,
-      low_stock_threshold: item.low_stock_threshold,
-    })
-  }
-
-  const handleCancelEdit = () => {
-    setEditingItem(null)
-  }
-
-  const updateInventoryItemLocal = (
-    itemId: string,
-    updates: Partial<Pick<InventoryItem, 'stock' | 'min_stock' | 'low_stock_threshold'>>
-  ) => {
-    setInventory((prev) =>
-      prev.map((inv) => {
-        if (inv.id !== itemId) return inv
-        const next = { ...inv, ...updates }
-        return {
-          ...next,
-          is_low_stock: next.stock <= next.low_stock_threshold,
+      if (productIds.length > 0 && biIds.length > 0) {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+        const [salesResult, movResult] = await Promise.all([
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (supabase as any)
+            .from('order_items')
+            .select('product_id, quantity, orders!inner(organization_id, created_at, status)')
+            .eq('orders.organization_id', organizationId!)
+            .neq('orders.status', 'cancelled')
+            .gte('orders.created_at', thirtyDaysAgo)
+            .in('product_id', productIds),
+          supabase
+            .from('inventory_movements')
+            .select('branch_inventory_id, created_at')
+            .in('branch_inventory_id', biIds)
+            .order('created_at', { ascending: false }),
+        ])
+        for (const row of (salesResult.data ?? []) as { product_id: string; quantity: number }[]) {
+          ventasPorProducto.set(row.product_id, (ventasPorProducto.get(row.product_id) ?? 0) + row.quantity)
         }
-      })
-    )
-  }
+        for (const row of (movResult.data ?? []) as { branch_inventory_id: string; created_at: string }[]) {
+          if (!lastMovByBiId.has(row.branch_inventory_id)) {
+            lastMovByBiId.set(row.branch_inventory_id, row.created_at)
+          }
+        }
+      }
 
-  const checkMissingProducts = async () => {
-    try {
-      const branchId = selectedBranch || branches[0]?.id
-      if (!branchId || !organizationId) return
+      return { inventory: inventoryItems, totalCount: count ?? 0, ventasPorProducto, lastMovByBiId }
+    },
+    enabled: !!organizationId,
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
+  })
+  const inventory = inventoryData?.inventory ?? []
+  const ventasPorProducto = inventoryData?.ventasPorProducto ?? new Map<string, number>()
+  const lastMovByBiId = inventoryData?.lastMovByBiId ?? new Map<string, string>()
 
-      // Count active products without inventory entries (org-scoped)
+  const defaultBranchId = branches[0]?.id
+  const effectiveBranchId = selectedBranch || defaultBranchId
+
+  const { data: unsyncedCount = null } = useQuery({
+    queryKey: ['admin', organizationId!, 'inventory', 'unsynced', selectedBranch] as const,
+    queryFn: async () => {
+      let scopeQuery = supabase
+        .from('branch_inventory')
+        .select(
+          `id, branch_id, product_id, variant_id, stock,
+          branches!inner(organization_id),
+          products(id, organization_id, stock),
+          product_variants(id, stock, products!inner(id, organization_id))`
+        )
+        .eq('branches.organization_id', organizationId!)
+      if (selectedBranch) scopeQuery = scopeQuery.eq('branch_id', selectedBranch)
+      const { data, error } = await scopeQuery
+      if (error) throw error
+      const rows = (data || []) as Record<string, unknown>[]
+      return rows.reduce((acc, row) => {
+        const product = row.product_id
+          ? (row.products as Record<string, unknown> | null)
+          : ((row.product_variants as { products?: Record<string, unknown> } | null)?.products ?? null)
+        const variant = row.variant_id ? (row.product_variants as Record<string, unknown> | null) : null
+        const sourceStock =
+          (variant as { stock?: number } | null)?.stock ??
+          (product as { stock?: number } | null)?.stock ??
+          null
+        const currentStock = Number(row.stock ?? 0)
+        if (typeof sourceStock === 'number' && sourceStock !== currentStock) return acc + 1
+        return acc
+      }, 0)
+    },
+    enabled: !!organizationId,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  const { data: missingProductsCount = null } = useQuery({
+    queryKey: ['admin', organizationId!, 'inventory', 'missing', effectiveBranchId ?? ''] as const,
+    queryFn: async () => {
+      if (!effectiveBranchId) return null
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('id')
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId!)
         .eq('is_active', true)
-
       if (productsError) throw productsError
-
-      // Count active variants without inventory entries (via products of org)
       const ids = (productsData || []).map((p: { id: string }) => p.id)
       let variantsData: { id: string }[] = []
       if (ids.length > 0) {
@@ -510,16 +394,12 @@ export function AdminInventory() {
         if (vErr) throw vErr
         variantsData = vData || []
       }
-
-      // Check which ones don't have inventory entries
-      const prodIds = (productsData || []).map((p: { id: string }) => p.id)
+      const prodIds = ids
       const variantIds = variantsData.map((v) => v.id)
-
       const { data: existingInventory } = await supabase
         .from('branch_inventory')
         .select('product_id, variant_id')
-        .eq('branch_id', branchId)
-
+        .eq('branch_id', effectiveBranchId)
       const existingProductIds = new Set(
         (existingInventory || [])
           .filter((inv): inv is { product_id: string; variant_id: string | null } => inv.product_id !== null)
@@ -530,105 +410,29 @@ export function AdminInventory() {
           .filter((inv): inv is { product_id: string | null; variant_id: string } => inv.variant_id !== null)
           .map((inv) => inv.variant_id)
       )
-
       const missingProducts = prodIds.filter((id: string) => !existingProductIds.has(id))
       const missingVariants = variantIds.filter((id: string) => !existingVariantIds.has(id))
+      return missingProducts.length + missingVariants.length
+    },
+    enabled: !!organizationId && !!effectiveBranchId,
+    staleTime: 5 * 60 * 1000,
+  })
 
-      setMissingProductsCount(missingProducts.length + missingVariants.length)
-    } catch (error) {
-      console.error('Error checking missing products:', error)
-    }
-  }
-
-  const getSourceStockFromSyncRow = (row: Record<string, unknown>): number | null => {
-    const product = row.product_id
-      ? (row.products as Record<string, unknown> | null)
-      : ((row.product_variants as { products?: Record<string, unknown> } | null)?.products ?? null)
-    const variant = row.variant_id ? (row.product_variants as Record<string, unknown> | null) : null
-    const sourceStock =
-      (variant as { stock?: number } | null)?.stock ??
-      (product as { stock?: number } | null)?.stock ??
-      null
-    return typeof sourceStock === 'number' ? sourceStock : null
-  }
-
-  const fetchSyncScopeRows = async () => {
-    if (!organizationId) return []
-
-    let query = supabase
-      .from('branch_inventory')
-      .select(
-        `
-        id,
-        branch_id,
-        product_id,
-        variant_id,
-        stock,
-        branches!inner(organization_id),
-        products(
-          id,
-          organization_id,
-          stock
-        ),
-        product_variants(
-          id,
-          stock,
-          products!inner(
-            id,
-            organization_id
-          )
-        )
-      `
-      )
-      .eq('branches.organization_id', organizationId)
-
-    if (selectedBranch) {
-      query = query.eq('branch_id', selectedBranch)
-    }
-
-    const { data, error } = await query
-    if (error) throw error
-    return (data || []) as Record<string, unknown>[]
-  }
-
-  const checkUnsyncedItems = async () => {
-    if (!organizationId) return
-    try {
-      const rows = await fetchSyncScopeRows()
-      const count = rows.reduce((acc, row) => {
-        const sourceStock = getSourceStockFromSyncRow(row)
-        const currentStock = Number(row.stock ?? 0)
-        if (sourceStock !== null && sourceStock !== currentStock) return acc + 1
-        return acc
-      }, 0)
-      setUnsyncedCount(count)
-    } catch (error) {
-      console.error('Error checking unsynced inventory items:', error)
-      setUnsyncedCount(null)
-    }
-  }
-
-  const fetchCrossView = async () => {
-    if (!organizationId) return
-    setCrossViewLoading(true)
-    try {
+  const crossViewKey = queryKeys.inventory.crossView(organizationId!)
+  const { data: crossViewData = [], isPending: crossViewLoading } = useQuery({
+    queryKey: crossViewKey,
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('branch_inventory')
         .select(`
-          product_id,
-          variant_id,
-          stock,
-          min_stock,
-          low_stock_threshold,
+          product_id, variant_id, stock, min_stock, low_stock_threshold,
           branch:branches!inner(id, name, organization_id),
           product:products(id, name, sku, description, image_url, product_images(image_url, is_primary, display_order))
         `)
-        .eq('branches.organization_id', organizationId)
-        .is('variant_id', null) // Only base products for clarity
+        .eq('branches.organization_id', organizationId!)
+        .is('variant_id', null)
         .not('product_id', 'is', null)
-
       if (error) throw error
-
       const rowMap = new Map<string, CrossViewRow>()
       for (const item of data || []) {
         const row = item as any
@@ -651,61 +455,68 @@ export function AdminInventory() {
           low_stock_threshold: row.low_stock_threshold ?? 0,
         }
       }
+      return Array.from(rowMap.values()).sort((a, b) => a.product_name.localeCompare(b.product_name))
+    },
+    enabled: !!organizationId && inventoryViewTab === 'product',
+    staleTime: 2 * 60 * 1000,
+  })
 
-      setCrossViewData(Array.from(rowMap.values()).sort((a, b) => a.product_name.localeCompare(b.product_name)))
-    } catch (err) {
-      console.error('Error fetching cross-view inventory:', err)
-    } finally {
-      setCrossViewLoading(false)
-    }
+  const invalidateInventory = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all(organizationId!) })
   }
 
-  const fetchSalesAndMovements = useCallback(async () => {
-    if (!organizationId || inventory.length === 0) return
+  const calcDiasStock = (stock: number, vendido30d: number): number | null => {
+    if (vendido30d === 0) return null
+    return Math.floor(stock / (vendido30d / 30))
+  }
 
-    const productIds = [...new Set(
-      inventory.map(i => i.product_id).filter((id): id is string => id !== null)
-    )]
-    const biIds = inventory.map(i => i.id)
-
-    if (productIds.length === 0) return
-
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-
-    const [salesResult, movResult] = await Promise.all([
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (supabase as any)
-        .from('order_items')
-        .select('product_id, quantity, orders!inner(organization_id, created_at, status)')
-        .eq('orders.organization_id', organizationId)
-        .neq('orders.status', 'cancelled')
-        .gte('orders.created_at', thirtyDaysAgo)
-        .in('product_id', productIds),
-      supabase
-        .from('inventory_movements')
-        .select('branch_inventory_id, created_at')
-        .in('branch_inventory_id', biIds)
-        .order('created_at', { ascending: false }),
-    ])
-
-    const salesMap = new Map<string, number>()
-    for (const row of (salesResult.data ?? []) as { product_id: string; quantity: number }[]) {
-      salesMap.set(row.product_id, (salesMap.get(row.product_id) ?? 0) + row.quantity)
+  const filteredInventory = useMemo(() => {
+    let result = inventory
+    if (showOnlyLowStock) result = result.filter(item => item.is_low_stock)
+    if (hideOutOfStock) result = result.filter(item => item.stock > 0)
+    if (filterStockMuerto) {
+      result = result.filter(item => {
+        if (item.stock <= 0) return false
+        const lastMov = lastMovByBiId.get(item.id)
+        if (!lastMov) return true
+        const days = Math.floor((Date.now() - new Date(lastMov).getTime()) / (1000 * 60 * 60 * 24))
+        return days > 60
+      })
     }
-    setVentasPorProducto(salesMap)
-
-    const movMap = new Map<string, string>()
-    for (const row of (movResult.data ?? []) as { branch_inventory_id: string; created_at: string }[]) {
-      if (!movMap.has(row.branch_inventory_id)) {
-        movMap.set(row.branch_inventory_id, row.created_at)
-      }
-    }
-    setLastMovByBiId(movMap)
-  }, [organizationId, inventory])
+    return result
+  }, [inventory, showOnlyLowStock, hideOutOfStock, filterStockMuerto, lastMovByBiId])
 
   useEffect(() => {
-    fetchSalesAndMovements()
-  }, [fetchSalesAndMovements])
+    setCrossViewPage(0)
+  }, [crossViewSearch])
+
+  const filteredCrossViewData = useMemo(() => {
+    if (!crossViewSearch.trim()) return crossViewData
+    const term = crossViewSearch.trim().toLowerCase()
+    return crossViewData.filter(row =>
+      row.product_name.toLowerCase().includes(term) ||
+      (row.sku && row.sku.toLowerCase().includes(term)) ||
+      (row.description && row.description.toLowerCase().includes(term))
+    )
+  }, [crossViewData, crossViewSearch])
+
+  const paginatedCrossViewData = useMemo(() => {
+    const from = crossViewPage * CROSS_VIEW_PAGE_SIZE
+    return filteredCrossViewData.slice(from, from + CROSS_VIEW_PAGE_SIZE)
+  }, [filteredCrossViewData, crossViewPage])
+
+  const handleEdit = (item: InventoryItem) => {
+    setEditingItem({
+      id: item.id,
+      stock: item.stock,
+      min_stock: item.min_stock,
+      low_stock_threshold: item.low_stock_threshold,
+    })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingItem(null)
+  }
 
   const handleSyncMissingProducts = async () => {
     if (!confirm('¿Crear entradas de inventario para todos los productos y variantes activos que no las tienen?')) {
@@ -733,8 +544,7 @@ export function AdminInventory() {
         newData: { created_entries: createdCount, branch_id: selectedBranch || null },
       })
       show(`Se crearon ${createdCount} entradas de inventario faltantes`, 'success')
-      setMissingProductsCount(0)
-      fetchInventory()
+      invalidateInventory()
     } catch (error: any) {
       console.error('Error syncing missing products:', error)
       show(error.message || 'Error al sincronizar productos faltantes', 'error')
@@ -814,11 +624,7 @@ export function AdminInventory() {
       })
 
       show('Inventario actualizado exitosamente', 'success')
-      updateInventoryItemLocal(editingItem.id, {
-        stock: editingItem.stock,
-        min_stock: editingItem.min_stock,
-        low_stock_threshold: editingItem.low_stock_threshold,
-      })
+      invalidateInventory()
       setEditingItem(null)
     } catch (error: any) {
       console.error('Error updating inventory:', error)
@@ -911,8 +717,7 @@ export function AdminInventory() {
       })
 
       show(`Stock sincronizado (${sourceLabel}): ${previousStock} → ${sourceStock}`, 'success')
-      updateInventoryItemLocal(item.id, { stock: sourceStock })
-      checkUnsyncedItems()
+      invalidateInventory()
     } catch (error: any) {
       console.error('Error syncing item stock:', error)
       show(error?.message || 'Error al sincronizar stock', 'error')
@@ -938,7 +743,7 @@ export function AdminInventory() {
       const updatedCount = Number(data || 0)
       if (updatedCount === 0) {
         show('No hay items desincronizados para sincronizar.', 'info')
-        setUnsyncedCount(0)
+        invalidateInventory()
         return
       }
 
@@ -956,8 +761,7 @@ export function AdminInventory() {
       })
 
       show(`Se sincronizaron ${updatedCount} item(s) desincronizados.`, 'success')
-      fetchInventory()
-      checkUnsyncedItems()
+      invalidateInventory()
     } catch (error: any) {
       console.error('Error syncing all unsynced inventory items:', error)
       show(error?.message || 'Error al sincronizar todos los desincronizados', 'error')
@@ -1220,10 +1024,7 @@ export function AdminInventory() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            setInventoryViewTab('product')
-            if (crossViewData.length === 0) fetchCrossView()
-          }}
+          onClick={() => setInventoryViewTab('product')}
           className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${inventoryViewTab === 'product' ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-800'}`}
         >
           Por producto (cruzado)
@@ -1239,7 +1040,7 @@ export function AdminInventory() {
                 <Package className="h-5 w-5" />
                 Stock por producto en todas las sucursales
               </CardTitle>
-              <Button variant="outline" size="sm" onClick={fetchCrossView} disabled={crossViewLoading}>
+              <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: crossViewKey })} disabled={crossViewLoading}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${crossViewLoading ? 'animate-spin' : ''}`} />
                 Actualizar
               </Button>
@@ -1987,7 +1788,7 @@ export function AdminInventory() {
             current_stock: receiptModalItem.stock,
           }}
           onClose={() => setReceiptModalItem(null)}
-          onSuccess={fetchInventory}
+          onSuccess={invalidateInventory}
         />
       )}
 
@@ -2004,7 +1805,7 @@ export function AdminInventory() {
             current_stock: adjustmentModalItem.stock,
           }}
           onClose={() => setAdjustmentModalItem(null)}
-          onSuccess={fetchInventory}
+          onSuccess={invalidateInventory}
         />
       )}
 
@@ -2022,7 +1823,7 @@ export function AdminInventory() {
           }}
           branches={branches}
           onClose={() => setTransferModalItem(null)}
-          onSuccess={fetchInventory}
+          onSuccess={invalidateInventory}
         />
       )}
 

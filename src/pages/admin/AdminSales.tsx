@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import { formatDateShort, formatPrice } from '@/lib/utils'
-import type { Branch } from '@/types'
+import { useQuery } from '@tanstack/react-query'
 import {
   BarChart3,
   Building2,
@@ -17,7 +19,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 function InfoTooltip({ text }: { text: string }) {
   return (
@@ -156,7 +158,6 @@ export function AdminSales() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
 
-  const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [periodMode, setPeriodMode] = useState<PeriodMode>('month')
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -171,58 +172,7 @@ export function AdminSales() {
   const [draftCustomStart, setDraftCustomStart] = useState(customStart)
   const [draftCustomEnd, setDraftCustomEnd] = useState(customEnd)
 
-  const [loading, setLoading] = useState(true)
-  const [currentSummary, setCurrentSummary] = useState<SummaryCurrent>({
-    revenue: 0,
-    grossSales: 0,
-    discountsGranted: 0,
-    netSales: 0,
-    orders: 0,
-    avgTicket: 0,
-  })
-  const [previousSummary, setPreviousSummary] = useState<SummaryPrevious>({
-    revenue: 0,
-    grossSales: 0,
-    discountsGranted: 0,
-    netSales: 0,
-    orders: 0,
-  })
-  const [currentMargin, setCurrentMargin] = useState<MarginSummary>({
-    grossMargin: 0,
-    trackedCost: 0,
-    trackedRevenue: 0,
-    marginPct: 0,
-    trackedItems: 0,
-    totalItems: 0,
-    missingItems: 0,
-    branchMissingItems: 0,
-    inventoryCostMissingItems: 0,
-    otherMissingItems: 0,
-  })
-  const [previousMargin, setPreviousMargin] = useState<MarginSummary>({
-    grossMargin: 0,
-    trackedCost: 0,
-    trackedRevenue: 0,
-    marginPct: 0,
-    trackedItems: 0,
-    totalItems: 0,
-    missingItems: 0,
-    branchMissingItems: 0,
-    inventoryCostMissingItems: 0,
-    otherMissingItems: 0,
-  })
-  const [dailySales, setDailySales] = useState<DailySale[]>([])
-  const [monthlySales, setMonthlySales] = useState<MonthlySale[]>([])
-  const [paymentMethodSales, setPaymentMethodSales] = useState<PaymentMethodSummary[]>([])
-  const [branchSummary, setBranchSummary] = useState<BranchSummary[]>([])
-
-  const requestSequenceRef = useRef(0)
-
-  useEffect(() => {
-    if (organizationId) {
-      fetchBranches()
-    }
-  }, [organizationId])
+  const { data: branches = [] } = useAdminBranches(organizationId)
 
   const range = useMemo(() => {
     if (periodMode === 'month') {
@@ -233,46 +183,20 @@ export function AdminSales() {
 
   const comparison = useMemo(() => compareRange(range.start, range.end), [range])
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchReportData()
-    }
-  }, [organizationId, selectedBranchId, range.start.getTime(), range.end.getTime(), comparison.start.getTime(), comparison.end.getTime()])
+  const { data: salesData, isPending: loading } = useQuery({
+    queryKey: queryKeys.reports.sales(organizationId!, {
+      selectedBranchId,
+      periodMode,
+      selectedMonth,
+      customStart: periodMode === 'custom' ? customStart : null,
+      customEnd: periodMode === 'custom' ? customEnd : null,
+    }),
+    queryFn: async () => {
+      const monthlyStart = new Date(range.end)
+      monthlyStart.setDate(1)
+      monthlyStart.setMonth(monthlyStart.getMonth() - 11)
+      monthlyStart.setHours(0, 0, 0, 0)
 
-  const fetchBranches = async () => {
-    if (!organizationId) return
-
-    try {
-      const { data, error } = await supabase
-        .from('branches')
-        .select('id, name, code, organization_id, is_active, created_at, updated_at')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name')
-
-      if (error) throw error
-      setBranches((data || []) as Branch[])
-    } catch (error) {
-      console.error('Error fetching branches:', error)
-    }
-  }
-
-  const fetchReportData = async () => {
-    if (!organizationId) return
-
-    if (periodMode === 'custom' && customStart > customEnd) {
-      return
-    }
-
-    const monthlyStart = new Date(range.end)
-    monthlyStart.setDate(1)
-    monthlyStart.setMonth(monthlyStart.getMonth() - 11)
-    monthlyStart.setHours(0, 0, 0, 0)
-
-    const requestId = ++requestSequenceRef.current
-    setLoading(true)
-
-    try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase.rpc as any)('get_sales_report_summary', {
         p_organization_id: organizationId,
@@ -283,118 +207,78 @@ export function AdminSales() {
         p_monthly_start: monthlyStart.toISOString(),
         p_branch_id: selectedBranchId || null,
       })
-
       if (error) throw error
-      if (requestId !== requestSequenceRef.current) return
 
       const payload = (data || {}) as Record<string, unknown>
-
       const current = (payload.current as Record<string, unknown> | undefined) || {}
       const previous = (payload.previous as Record<string, unknown> | undefined) || {}
+      const currentMarginPayload = (payload.current_margin as Record<string, unknown> | undefined) || {}
+      const previousMarginPayload = (payload.previous_margin as Record<string, unknown> | undefined) || {}
 
-      setCurrentSummary({
+      const currentSummary: SummaryCurrent = {
         revenue: asNumber(current.revenue),
         grossSales: asNumber(current.gross_sales),
         discountsGranted: asNumber(current.discounts_granted),
         netSales: asNumber(current.net_sales || current.revenue),
         orders: asNumber(current.orders),
         avgTicket: asNumber(current.avg_ticket),
-      })
-
-      setPreviousSummary({
+      }
+      const previousSummary: SummaryPrevious = {
         revenue: asNumber(previous.revenue),
         grossSales: asNumber(previous.gross_sales),
         discountsGranted: asNumber(previous.discounts_granted),
         netSales: asNumber(previous.net_sales || previous.revenue),
         orders: asNumber(previous.orders),
-      })
-
-      const currentMarginPayload = (payload.current_margin as Record<string, unknown> | undefined) || {}
-      setCurrentMargin({
-        grossMargin: asNumber(currentMarginPayload.gross_margin),
-        trackedCost: asNumber(currentMarginPayload.tracked_cost),
-        trackedRevenue: asNumber(currentMarginPayload.tracked_revenue),
-        marginPct: asNumber(currentMarginPayload.margin_pct),
-        trackedItems: asNumber(currentMarginPayload.tracked_items),
-        totalItems: asNumber(currentMarginPayload.total_items),
-        missingItems: asNumber(currentMarginPayload.missing_items),
-        branchMissingItems: asNumber(currentMarginPayload.branch_missing_items),
-        inventoryCostMissingItems: asNumber(currentMarginPayload.inventory_cost_missing_items),
-        otherMissingItems: asNumber(currentMarginPayload.other_missing_items),
-      })
-
-      const previousMarginPayload = (payload.previous_margin as Record<string, unknown> | undefined) || {}
-      setPreviousMargin({
-        grossMargin: asNumber(previousMarginPayload.gross_margin),
-        trackedCost: asNumber(previousMarginPayload.tracked_cost),
-        trackedRevenue: asNumber(previousMarginPayload.tracked_revenue),
-        marginPct: asNumber(previousMarginPayload.margin_pct),
-        trackedItems: asNumber(previousMarginPayload.tracked_items),
-        totalItems: asNumber(previousMarginPayload.total_items),
-        missingItems: asNumber(previousMarginPayload.missing_items),
-        branchMissingItems: asNumber(previousMarginPayload.branch_missing_items),
-        inventoryCostMissingItems: asNumber(previousMarginPayload.inventory_cost_missing_items),
-        otherMissingItems: asNumber(previousMarginPayload.other_missing_items),
-      })
-
-      const daily = Array.isArray(payload.daily) ? payload.daily : []
-      setDailySales(
-        daily.map((item) => {
-          const row = item as Record<string, unknown>
-          return {
-            date: asString(row.date),
-            orders: asNumber(row.orders),
-            revenue: asNumber(row.revenue),
-          }
-        })
-      )
-
-      const monthly = Array.isArray(payload.monthly) ? payload.monthly : []
-      setMonthlySales(
-        monthly.map((item) => {
-          const row = item as Record<string, unknown>
-          return {
-            month: asString(row.month),
-            orders: asNumber(row.orders),
-            revenue: asNumber(row.revenue),
-          }
-        })
-      )
-
-      const methods = Array.isArray(payload.payment_methods) ? payload.payment_methods : []
-      setPaymentMethodSales(
-        methods.map((item) => {
-          const row = item as Record<string, unknown>
-          const method = asString(row.method)
-          return {
-            method,
-            label: getPaymentMethodLabel(method),
-            amount: asNumber(row.amount),
-          }
-        })
-      )
-
-      const branchesData = Array.isArray(payload.branches) ? payload.branches : []
-      setBranchSummary(
-        branchesData.map((item) => {
-          const row = item as Record<string, unknown>
-          return {
-            branch_id: asString(row.branch_id),
-            branch_name: asString(row.branch_name) || 'Sin sucursal',
-            orders: asNumber(row.orders),
-            revenue: asNumber(row.revenue),
-          }
-        })
-      )
-    } catch (error) {
-      if (requestId !== requestSequenceRef.current) return
-      console.error('Error fetching sales report data:', error)
-    } finally {
-      if (requestId === requestSequenceRef.current) {
-        setLoading(false)
       }
-    }
-  }
+      const buildMargin = (p: Record<string, unknown>): MarginSummary => ({
+        grossMargin: asNumber(p.gross_margin),
+        trackedCost: asNumber(p.tracked_cost),
+        trackedRevenue: asNumber(p.tracked_revenue),
+        marginPct: asNumber(p.margin_pct),
+        trackedItems: asNumber(p.tracked_items),
+        totalItems: asNumber(p.total_items),
+        missingItems: asNumber(p.missing_items),
+        branchMissingItems: asNumber(p.branch_missing_items),
+        inventoryCostMissingItems: asNumber(p.inventory_cost_missing_items),
+        otherMissingItems: asNumber(p.other_missing_items),
+      })
+      const dailySales: DailySale[] = (Array.isArray(payload.daily) ? payload.daily : []).map((item) => {
+        const row = item as Record<string, unknown>
+        return { date: asString(row.date), orders: asNumber(row.orders), revenue: asNumber(row.revenue) }
+      })
+      const monthlySales: MonthlySale[] = (Array.isArray(payload.monthly) ? payload.monthly : []).map((item) => {
+        const row = item as Record<string, unknown>
+        return { month: asString(row.month), orders: asNumber(row.orders), revenue: asNumber(row.revenue) }
+      })
+      const paymentMethodSales: PaymentMethodSummary[] = (Array.isArray(payload.payment_methods) ? payload.payment_methods : []).map((item) => {
+        const row = item as Record<string, unknown>
+        const method = asString(row.method)
+        return { method, label: getPaymentMethodLabel(method), amount: asNumber(row.amount) }
+      })
+      const branchSummary: BranchSummary[] = (Array.isArray(payload.branches) ? payload.branches : []).map((item) => {
+        const row = item as Record<string, unknown>
+        return {
+          branch_id: asString(row.branch_id),
+          branch_name: asString(row.branch_name) || 'Sin sucursal',
+          orders: asNumber(row.orders),
+          revenue: asNumber(row.revenue),
+        }
+      })
+
+      return { currentSummary, previousSummary, currentMargin: buildMargin(currentMarginPayload), previousMargin: buildMargin(previousMarginPayload), dailySales, monthlySales, paymentMethodSales, branchSummary }
+    },
+    enabled: !!organizationId && !(periodMode === 'custom' && customStart > customEnd),
+    staleTime: 3 * 60 * 1000,
+  })
+
+  const currentSummary = salesData?.currentSummary ?? { revenue: 0, grossSales: 0, discountsGranted: 0, netSales: 0, orders: 0, avgTicket: 0 }
+  const previousSummary = salesData?.previousSummary ?? { revenue: 0, grossSales: 0, discountsGranted: 0, netSales: 0, orders: 0 }
+  const currentMargin = salesData?.currentMargin ?? { grossMargin: 0, trackedCost: 0, trackedRevenue: 0, marginPct: 0, trackedItems: 0, totalItems: 0, missingItems: 0, branchMissingItems: 0, inventoryCostMissingItems: 0, otherMissingItems: 0 }
+  const previousMargin = salesData?.previousMargin ?? { grossMargin: 0, trackedCost: 0, trackedRevenue: 0, marginPct: 0, trackedItems: 0, totalItems: 0, missingItems: 0, branchMissingItems: 0, inventoryCostMissingItems: 0, otherMissingItems: 0 }
+  const dailySales = salesData?.dailySales ?? []
+  const monthlySales = salesData?.monthlySales ?? []
+  const paymentMethodSales = salesData?.paymentMethodSales ?? []
+  const branchSummary = salesData?.branchSummary ?? []
 
   const selectedBranch = branches.find((b) => b.id === selectedBranchId)
   const invalidDraftCustomRange = draftPeriodMode === 'custom' && draftCustomStart > draftCustomEnd

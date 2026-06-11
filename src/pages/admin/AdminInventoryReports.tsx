@@ -2,12 +2,14 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import { formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
-import type { Branch } from '@/types'
+import { useQuery } from '@tanstack/react-query'
 import { Download, Warehouse } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 
 type ValuationRow = {
   product_id: string
@@ -35,60 +37,25 @@ export function AdminInventoryReports() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const { show } = useToastStore()
-
-  const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
-  const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState('')
-  const [rows, setRows] = useState<ValuationRow[]>([])
-  const requestSequenceRef = useRef(0)
 
-  useEffect(() => {
-    if (!organizationId) return
-    fetchBranches()
-  }, [organizationId])
+  const { data: branches = [] } = useAdminBranches(organizationId)
 
-  useEffect(() => {
-    if (!organizationId) return
-    fetchValuation()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId, selectedBranchId])
-
-  const fetchBranches = async () => {
-    if (!organizationId) return
-    const { data, error } = await supabase
-      .from('branches')
-      .select('id, name, code, organization_id, is_active, created_at, updated_at')
-      .eq('organization_id', organizationId)
-      .eq('is_active', true)
-      .order('name')
-    if (error) {
-      console.error('Error fetching branches:', error)
-      return
-    }
-    setBranches((data || []) as Branch[])
-  }
-
-  const fetchValuation = async () => {
-    if (!organizationId) return
-    const requestId = ++requestSequenceRef.current
-    setLoading(true)
-    try {
+  const { data: rows = [], isPending: loading, refetch: fetchValuation } = useQuery({
+    queryKey: queryKeys.reports.inventory(organizationId!, { selectedBranchId }),
+    queryFn: async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data, error } = await (supabase.rpc as any)('get_inventory_valuation_report', {
         p_organization_id: organizationId,
         p_branch_id: selectedBranchId || null,
       })
       if (error) throw error
-      if (requestId !== requestSequenceRef.current) return
-      setRows((data || []) as ValuationRow[])
-    } catch (error) {
-      if (requestId !== requestSequenceRef.current) return
-      console.error('Error fetching inventory valuation:', error)
-    } finally {
-      if (requestId === requestSequenceRef.current) setLoading(false)
-    }
-  }
+      return (data || []) as ValuationRow[]
+    },
+    enabled: !!organizationId,
+    staleTime: 3 * 60 * 1000,
+  })
 
   const totalValue = rows.reduce((acc, row) => acc + row.total_value, 0)
   const totalUnits = rows.reduce((acc, row) => acc + row.stock, 0)
@@ -153,7 +120,7 @@ export function AdminInventoryReports() {
               </option>
             ))}
           </select>
-          <Button variant="outline" size="sm" onClick={fetchValuation} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={() => fetchValuation()} disabled={loading}>
             Actualizar
           </Button>
         </div>

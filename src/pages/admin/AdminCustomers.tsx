@@ -7,13 +7,33 @@ import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
 import { formatDateShort } from '@/lib/utils'
 import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { useToastStore } from '@/store/toastStore'
 import type { Customer } from '@/types/database.types'
-import { ChevronLeft, ChevronRight, Edit, ExternalLink, Mail, MapPin, MessageCircle, Phone, Plus, Search, Trash2, Users, X } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Edit,
+  ExternalLink,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Phone,
+  Plus,
+  Search,
+  ShoppingBag,
+  Trash2,
+  UserCheck,
+  Users,
+  UserX,
+  X,
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 
 interface CustomerForm {
   full_name: string
@@ -30,32 +50,31 @@ interface CustomerForm {
   notes: string
 }
 
+const EMPTY_FORM: CustomerForm = {
+  full_name: '',
+  email: '',
+  phone: '',
+  rut: '',
+  address: { address: '', city: '', state: '', zipCode: '', country: 'Uruguay' },
+  notes: '',
+}
+
 export function AdminCustomers() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
-  const [customers, setCustomers] = useState<Customer[]>([])
-  const [loading, setLoading] = useState(true)
+  const { show } = useToastStore()
+  const queryClient = useQueryClient()
+
+  // UI state
   const [searchTerm, setSearchTerm] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
+  const [filterActiveOnly, setFilterActiveOnly] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [formData, setFormData] = useState<CustomerForm>({
-    full_name: '',
-    email: '',
-    phone: '',
-    rut: '',
-    address: {
-      address: '',
-      city: '',
-      state: '',
-      zipCode: '',
-      country: 'Uruguay',
-    },
-    notes: '',
-  })
-  const { show } = useToastStore()
+  const [formData, setFormData] = useState<CustomerForm>(EMPTY_FORM)
+  const [saving, setSaving] = useState(false)
+  const [exportingCsv, setExportingCsv] = useState(false)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -65,49 +84,104 @@ export function AdminCustomers() {
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  const fetchCustomers = useCallback(async () => {
-    if (!organizationId) return
-    try {
-      setLoading(true)
+  // ─── QUERIES ─────────────────────────────────────────────────────────────────
+
+  const customersListKey = queryKeys.customers.list(organizationId!, {
+    page: currentPage,
+    search: debouncedSearch,
+    activeOnly: filterActiveOnly,
+  })
+
+  const { data: listData, isPending: loading } = useQuery({
+    queryKey: customersListKey,
+    queryFn: async () => {
       const from = (currentPage - 1) * PAGE_SIZE_ADMIN
       const to = from + PAGE_SIZE_ADMIN - 1
 
-      let query = (supabase as any)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q = (supabase as any)
         .from('customers')
         .select('*', { count: 'exact' })
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId!)
         .order('created_at', { ascending: false })
         .range(from, to)
 
-      if (debouncedSearch.trim()) {
-        query = query.or(
+      if (debouncedSearch.trim())
+        q = q.or(
           `full_name.ilike.%${debouncedSearch.trim()}%,phone.ilike.%${debouncedSearch.trim()}%,email.ilike.%${debouncedSearch.trim()}%,rut.ilike.%${debouncedSearch.trim()}%`
         )
+      if (filterActiveOnly) q = q.eq('is_active', true)
+
+      const { data: customersData, count, error } = await q
+      if (error) throw error
+
+      // Fetch order counts for this page's customers
+      const ids = (customersData || []).map((c: Customer) => c.id)
+      const orderCountMap: Record<string, number> = {}
+      if (ids.length > 0) {
+        const { data: orderRows } = await supabase
+          .from('orders')
+          .select('customer_id')
+          .eq('organization_id', organizationId!)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .in('customer_id', ids as any)
+        for (const row of (orderRows || []) as { customer_id: string }[]) {
+          if (row.customer_id)
+            orderCountMap[row.customer_id] = (orderCountMap[row.customer_id] || 0) + 1
+        }
       }
 
-      const { data, count, error } = await query
-      if (error) throw error
-      setCustomers(data || [])
-      setTotalCount(count || 0)
-    } catch (error) {
-      console.error('Error fetching customers:', error)
-      show('Error al cargar clientes', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [organizationId, currentPage, debouncedSearch])
+      return { customers: (customersData || []) as Customer[], totalCount: count || 0, orderCountMap }
+    },
+    enabled: !!organizationId,
+    placeholderData: keepPreviousData,
+    staleTime: 60 * 1000,
+  })
 
-  useEffect(() => {
-    if (organizationId) fetchCustomers()
-  }, [organizationId, currentPage, debouncedSearch, fetchCustomers])
+  const customers = listData?.customers ?? []
+  const totalCount = listData?.totalCount ?? 0
+  const orderCountMap = listData?.orderCountMap ?? {}
+
+  const { data: stats } = useQuery({
+    queryKey: queryKeys.customers.stats(organizationId!),
+    queryFn: async () => {
+      const thisMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()
+      const [all, active, newMonth] = await Promise.all([
+        supabase
+          .from('customers')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', organizationId!),
+        supabase
+          .from('customers')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', organizationId!)
+          .eq('is_active', true),
+        supabase
+          .from('customers')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', organizationId!)
+          .gte('created_at', thisMonthStart),
+      ])
+      return {
+        total: all.count ?? 0,
+        active: active.count ?? 0,
+        newThisMonth: newMonth.count ?? 0,
+      }
+    },
+    enabled: !!organizationId,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const invalidateCustomers = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.customers.all(organizationId!) })
+
+  // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
-
+    setSaving(true)
     try {
       if (editingId) {
-        // Update existing customer
         const { error } = await supabase
           .from('customers')
           .update({
@@ -119,11 +193,9 @@ export function AdminCustomers() {
             notes: formData.notes || null,
           } as never)
           .eq('id', editingId)
-
         if (error) throw error
         show('Cliente actualizado correctamente', 'success')
       } else {
-        // Create new customer
         const { error } = await supabase
           .from('customers')
           .insert({
@@ -136,37 +208,23 @@ export function AdminCustomers() {
             notes: formData.notes || null,
             is_active: true,
           } as never)
-
         if (error) throw error
         show('Cliente creado correctamente', 'success')
       }
-
-      setFormData({
-        full_name: '',
-        email: '',
-        phone: '',
-        rut: '',
-        address: {
-          address: '',
-          city: '',
-          state: '',
-          zipCode: '',
-          country: 'Uruguay',
-        },
-        notes: '',
-      })
+      setFormData(EMPTY_FORM)
       setEditingId(null)
       setShowForm(false)
-      await fetchCustomers()
+      invalidateCustomers()
     } catch (error) {
       console.error('Error saving customer:', error)
       show('Error al guardar cliente', 'error')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
   const handleEdit = (customer: Customer) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const address = (customer.address || {}) as any
     setFormData({
       full_name: customer.full_name,
@@ -188,81 +246,147 @@ export function AdminCustomers() {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('¿Estás seguro de que deseas eliminar este cliente?')) return
-
     try {
-      const { error } = await supabase
-        .from('customers')
-        .delete()
-        .eq('id', id)
-
+      const { error } = await supabase.from('customers').delete().eq('id', id)
       if (error) throw error
       show('Cliente eliminado correctamente', 'success')
-      await fetchCustomers()
+      invalidateCustomers()
     } catch (error) {
       console.error('Error deleting customer:', error)
       show('Error al eliminar cliente', 'error')
     }
   }
 
+  const handleToggleActive = async (customer: Customer) => {
+    const label = customer.is_active ? 'desactivar' : 'activar'
+    if (!confirm(`¿${label.charAt(0).toUpperCase() + label.slice(1)} a ${customer.full_name}?`)) return
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({ is_active: !customer.is_active } as never)
+        .eq('id', customer.id)
+      if (error) throw error
+      show(`Cliente ${customer.is_active ? 'desactivado' : 'activado'} correctamente`, 'success')
+      invalidateCustomers()
+    } catch (err: unknown) {
+      console.error('Error toggling customer active:', err)
+      show('Error al cambiar estado del cliente', 'error')
+    }
+  }
+
   const handleCancel = () => {
     setShowForm(false)
     setEditingId(null)
-    setFormData({
-      full_name: '',
-      email: '',
-      phone: '',
-      rut: '',
-      address: {
-        address: '',
-        city: '',
-        state: '',
-        zipCode: '',
-        country: 'Uruguay',
-      },
-      notes: '',
-    })
+    setFormData(EMPTY_FORM)
   }
 
   const handleWhatsApp = (phone: string, fullName: string) => {
-    // Format phone number for WhatsApp (remove spaces and special characters)
     const formattedPhone = phone.replace(/[\s\-\(\)]/g, '')
-    
-    // Add country code if not present (assuming Uruguay +598)
     let whatsappPhone = formattedPhone
     if (!formattedPhone.startsWith('+')) {
-      // If starts with 9, assume it's Uruguay number without country code
-      if (formattedPhone.startsWith('9')) {
-        whatsappPhone = '+598' + formattedPhone
-      } else {
-        whatsappPhone = '+' + formattedPhone
-      }
+      whatsappPhone = formattedPhone.startsWith('9') ? '+598' + formattedPhone : '+' + formattedPhone
     }
-    
-    // Create WhatsApp link with greeting message
-    const message = `Hola ${fullName}, ¿cómo estás?`
-    const encodedMessage = encodeURIComponent(message)
-    const whatsappUrl = `https://wa.me/${whatsappPhone.replace('+', '')}?text=${encodedMessage}`
-    
-    // Open in new tab
-    window.open(whatsappUrl, '_blank')
+    const message = encodeURIComponent(`Hola ${fullName}, ¿cómo estás?`)
+    window.open(`https://wa.me/${whatsappPhone.replace('+', '')}?text=${message}`, '_blank')
+  }
+
+  const handleExportCsv = async () => {
+    if (!organizationId) return
+    try {
+      setExportingCsv(true)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let q = (supabase as any)
+        .from('customers')
+        .select('*')
+        .eq('organization_id', organizationId)
+        .order('full_name')
+      if (debouncedSearch.trim())
+        q = q.or(
+          `full_name.ilike.%${debouncedSearch.trim()}%,phone.ilike.%${debouncedSearch.trim()}%,email.ilike.%${debouncedSearch.trim()}%,rut.ilike.%${debouncedSearch.trim()}%`
+        )
+      if (filterActiveOnly) q = q.eq('is_active', true)
+
+      const { data, error } = await q
+      if (error) throw error
+      if (!data?.length) {
+        show('No hay clientes para exportar', 'info')
+        return
+      }
+
+      const headers = ['Nombre', 'Teléfono', 'Email', 'RUT', 'Ciudad', 'Activo', 'Fecha registro']
+      const rows = data.map((c: Customer) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const addr = (c.address || {}) as any
+        return [
+          c.full_name,
+          c.phone,
+          c.email || '',
+          c.rut || '',
+          addr.city || '',
+          c.is_active ? 'Sí' : 'No',
+          c.created_at ? new Date(c.created_at).toLocaleDateString('es-UY') : '',
+        ]
+      })
+
+      const escapeCsv = (v: string) => {
+        const s = String(v)
+        return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+      }
+      const csv = [headers, ...rows].map((row) => row.map(escapeCsv).join(',')).join('\n')
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `clientes_${new Date().toISOString().split('T')[0].replace(/-/g, '')}.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+      show(`${data.length} clientes exportados`, 'success')
+    } catch (err: unknown) {
+      console.error('Error exporting customers:', err)
+      show('Error al exportar clientes', 'error')
+    } finally {
+      setExportingCsv(false)
+    }
   }
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE_ADMIN))
+  const hasFilters = !!searchTerm || filterActiveOnly
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div className="space-y-2">
           <h1 className="text-3xl font-bold text-gray-900">Gestión de Clientes</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {totalCount > 0 ? `${totalCount} cliente${totalCount !== 1 ? 's' : ''}` : 'Sin clientes registrados'}
-          </p>
+          {stats ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="bg-gray-100 text-gray-600 rounded-full px-2.5 py-0.5">
+                Total: {stats.total}
+              </span>
+              <span className="bg-green-50 text-green-700 rounded-full px-2.5 py-0.5">
+                Activos: {stats.active}
+              </span>
+              <span className="bg-blue-50 text-blue-700 rounded-full px-2.5 py-0.5">
+                Nuevos este mes: {stats.newThisMonth}
+              </span>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">
+              {totalCount > 0 ? `${totalCount} cliente${totalCount !== 1 ? 's' : ''}` : 'Sin clientes registrados'}
+            </p>
+          )}
         </div>
         {!showForm && (
-          <Button onClick={() => setShowForm(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nuevo Cliente
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={exportingCsv}>
+              <Download className="h-4 w-4 mr-2" />
+              {exportingCsv ? 'Exportando...' : 'Exportar CSV'}
+            </Button>
+            <Button onClick={() => setShowForm(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nuevo Cliente
+            </Button>
+          </div>
         )}
       </div>
 
@@ -270,9 +394,7 @@ export function AdminCustomers() {
       {showForm && (
         <Card>
           <CardHeader>
-            <CardTitle>
-              {editingId ? 'Editar Cliente' : 'Crear Nuevo Cliente'}
-            </CardTitle>
+            <CardTitle>{editingId ? 'Editar Cliente' : 'Crear Nuevo Cliente'}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -284,9 +406,7 @@ export function AdminCustomers() {
                   <Input
                     type="text"
                     value={formData.full_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, full_name: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                     required
                   />
                 </div>
@@ -298,55 +418,40 @@ export function AdminCustomers() {
                   <Input
                     type="tel"
                     value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     required
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    RUT (opcional)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">RUT (opcional)</label>
                   <Input
                     type="text"
                     value={formData.rut}
-                    onChange={(e) =>
-                      setFormData({ ...formData, rut: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, rut: e.target.value })}
                     placeholder="Ej: 214567890012"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                   <Input
                     type="email"
                     value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">
-                  Dirección
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Dirección</label>
                 <div className="space-y-3">
                   <Input
                     type="text"
                     placeholder="Calle y número"
                     value={formData.address.address}
                     onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        address: { ...formData.address, address: e.target.value },
-                      })
+                      setFormData({ ...formData, address: { ...formData.address, address: e.target.value } })
                     }
                   />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -355,10 +460,7 @@ export function AdminCustomers() {
                       placeholder="Ciudad"
                       value={formData.address.city}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          address: { ...formData.address, city: e.target.value },
-                        })
+                        setFormData({ ...formData, address: { ...formData.address, city: e.target.value } })
                       }
                     />
                     <Input
@@ -366,10 +468,7 @@ export function AdminCustomers() {
                       placeholder="Provincia"
                       value={formData.address.state}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          address: { ...formData.address, state: e.target.value },
-                        })
+                        setFormData({ ...formData, address: { ...formData.address, state: e.target.value } })
                       }
                     />
                   </div>
@@ -379,10 +478,7 @@ export function AdminCustomers() {
                       placeholder="Código Postal"
                       value={formData.address.zipCode}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          address: { ...formData.address, zipCode: e.target.value },
-                        })
+                        setFormData({ ...formData, address: { ...formData.address, zipCode: e.target.value } })
                       }
                     />
                     <Input
@@ -390,10 +486,7 @@ export function AdminCustomers() {
                       placeholder="País"
                       value={formData.address.country}
                       onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          address: { ...formData.address, country: e.target.value },
-                        })
+                        setFormData({ ...formData, address: { ...formData.address, country: e.target.value } })
                       }
                     />
                   </div>
@@ -401,28 +494,20 @@ export function AdminCustomers() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notas
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
                 <textarea
                   value={formData.notes}
-                  onChange={(e) =>
-                    setFormData({ ...formData, notes: e.target.value })
-                  }
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-200 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-admin-200 focus:border-transparent"
                 />
               </div>
 
               <div className="flex gap-3">
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  isLoading={loading}
-                >
+                <Button type="submit" disabled={saving} isLoading={saving}>
                   {editingId ? 'Actualizar Cliente' : 'Crear Cliente'}
                 </Button>
-                <Button variant="outline" onClick={handleCancel}>
+                <Button variant="outline" onClick={handleCancel} type="button">
                   Cancelar
                 </Button>
               </div>
@@ -431,7 +516,7 @@ export function AdminCustomers() {
         </Card>
       )}
 
-      {/* Barra de filtros inline */}
+      {/* Filter toolbar */}
       {!showForm && (
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
@@ -452,12 +537,27 @@ export function AdminCustomers() {
               </button>
             )}
           </div>
-          {searchTerm && (
+
+          <button
+            type="button"
+            onClick={() => { setFilterActiveOnly((prev) => !prev); setCurrentPage(1) }}
+            className={`h-9 px-3 rounded-lg text-sm font-medium border flex items-center gap-1.5 shrink-0 transition-colors ${
+              filterActiveOnly
+                ? 'border-admin-400 bg-admin-50 text-admin-800'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+            }`}
+          >
+            <UserCheck className="h-3.5 w-3.5 shrink-0" />
+            <span className="hidden sm:inline">Solo activos</span>
+          </button>
+
+          {hasFilters && (
             <button
-              onClick={() => setSearchTerm('')}
-              className="h-9 px-3 text-sm text-red-500 border border-red-200 rounded-lg hover:bg-red-50"
+              onClick={() => { setSearchTerm(''); setFilterActiveOnly(false); setCurrentPage(1) }}
+              className="h-9 px-3 text-sm text-red-500 border border-red-200 rounded-lg hover:bg-red-50 flex items-center gap-1 shrink-0"
             >
-              Limpiar
+              <X className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Limpiar</span>
             </button>
           )}
         </div>
@@ -472,31 +572,62 @@ export function AdminCustomers() {
             ) : !loading && customers.length === 0 ? (
               <EmptyState
                 icon={Users}
-                title={debouncedSearch ? 'No se encontraron clientes' : 'No hay clientes registrados'}
-                description={debouncedSearch ? 'Probá ajustar el término de búsqueda.' : 'Agregá tu primer cliente para empezar a gestionar ventas.'}
-                action={!debouncedSearch ? { label: 'Nuevo cliente', onClick: () => setShowForm(true) } : undefined}
+                title={debouncedSearch || filterActiveOnly ? 'No se encontraron clientes' : 'No hay clientes registrados'}
+                description={
+                  debouncedSearch || filterActiveOnly
+                    ? 'Probá ajustar los filtros de búsqueda.'
+                    : 'Agregá tu primer cliente para empezar a gestionar ventas.'
+                }
+                action={
+                  !debouncedSearch && !filterActiveOnly
+                    ? { label: 'Nuevo cliente', onClick: () => setShowForm(true) }
+                    : undefined
+                }
               />
             ) : (
               <>
                 {/* Mobile cards */}
                 <div className="md:hidden divide-y">
                   {customers.map((customer) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     const address = (customer.address || {}) as any
+                    const orderCount = orderCountMap[customer.id] || 0
                     return (
-                      <div key={customer.id} className="p-4 space-y-2">
+                      <div key={customer.id} className={`p-4 space-y-2 ${!customer.is_active ? 'opacity-60' : ''}`}>
                         <div className="flex items-start justify-between gap-2">
                           <Link
                             to={`/customers/${customer.id}`}
                             className="font-medium text-gray-900 hover:text-admin-600 inline-flex items-center gap-1"
                           >
                             {customer.full_name}
+                            {!customer.is_active && (
+                              <span className="text-xs text-gray-400 font-normal">(inactivo)</span>
+                            )}
                             <ExternalLink className="h-3 w-3 text-gray-400" />
                           </Link>
                           <ActionsMenu
                             actions={[
-                              { label: 'WhatsApp', icon: <MessageCircle className="h-4 w-4" />, onClick: () => handleWhatsApp(customer.phone, customer.full_name) },
-                              { label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => handleEdit(customer) },
-                              { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => handleDelete(customer.id), variant: 'danger' },
+                              {
+                                label: 'WhatsApp',
+                                icon: <MessageCircle className="h-4 w-4" />,
+                                onClick: () => handleWhatsApp(customer.phone, customer.full_name),
+                              },
+                              {
+                                label: 'Editar',
+                                icon: <Edit className="h-4 w-4" />,
+                                onClick: () => handleEdit(customer),
+                              },
+                              {
+                                label: customer.is_active ? 'Desactivar' : 'Activar',
+                                icon: customer.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />,
+                                onClick: () => handleToggleActive(customer),
+                              },
+                              {
+                                label: 'Eliminar',
+                                icon: <Trash2 className="h-4 w-4" />,
+                                onClick: () => handleDelete(customer.id),
+                                variant: 'danger',
+                              },
                             ]}
                           />
                         </div>
@@ -504,6 +635,12 @@ export function AdminCustomers() {
                           <Phone className="h-3.5 w-3.5 text-gray-400" />
                           {customer.phone}
                         </div>
+                        {orderCount > 0 && (
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <ShoppingBag className="h-3.5 w-3.5 text-gray-400" />
+                            {orderCount} pedido{orderCount !== 1 ? 's' : ''}
+                          </div>
+                        )}
                         {customer.email && (
                           <div className="flex items-center gap-2 text-sm text-gray-500">
                             <Mail className="h-3.5 w-3.5 text-gray-400" />
@@ -530,43 +667,110 @@ export function AdminCustomers() {
                         <th className="text-left py-3 px-4 font-semibold text-gray-900">Nombre</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-900">Contacto</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-900">Dirección</th>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-900">Fecha Registro</th>
+                        <th className="text-center py-3 px-4 font-semibold text-gray-900">Pedidos</th>
+                        <th className="text-left py-3 px-4 font-semibold text-gray-900">Registro</th>
                         <th className="text-right py-3 px-4 font-semibold text-gray-900">Acciones</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {customers.map((customer) => {
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         const address = (customer.address || {}) as any
+                        const orderCount = orderCountMap[customer.id] || 0
                         return (
-                          <tr key={customer.id} className="hover:bg-gray-50 transition-colors">
+                          <tr
+                            key={customer.id}
+                            className={`hover:bg-gray-50 transition-colors ${!customer.is_active ? 'opacity-60' : ''}`}
+                          >
                             <td className="py-3 px-4">
-                              <Link to={`/customers/${customer.id}`} className="font-medium text-gray-900 hover:text-admin-600 hover:underline inline-flex items-center gap-1">
+                              <Link
+                                to={`/customers/${customer.id}`}
+                                className="font-medium text-gray-900 hover:text-admin-600 hover:underline inline-flex items-center gap-1"
+                              >
                                 {customer.full_name}
                                 <ExternalLink className="h-3 w-3 text-gray-400" />
                               </Link>
+                              {!customer.is_active && (
+                                <span className="ml-2 text-xs text-gray-400">(inactivo)</span>
+                              )}
                             </td>
                             <td className="py-3 px-4">
                               <div className="space-y-1 text-sm">
-                                <div className="flex items-center gap-2 text-gray-600"><Phone className="h-4 w-4" />{customer.phone}</div>
-                                {customer.email && <div className="flex items-center gap-2 text-gray-600"><Mail className="h-4 w-4" />{customer.email}</div>}
-                                {customer.rut && <div className="flex items-center gap-2 text-gray-600"><span className="inline-block h-4 w-4 rounded-sm bg-gray-200 text-[10px] leading-4 text-center font-semibold text-gray-700">R</span>{customer.rut}</div>}
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <Phone className="h-4 w-4" />
+                                  {customer.phone}
+                                </div>
+                                {customer.email && (
+                                  <div className="flex items-center gap-2 text-gray-600">
+                                    <Mail className="h-4 w-4" />
+                                    {customer.email}
+                                  </div>
+                                )}
+                                {customer.rut && (
+                                  <div className="flex items-center gap-2 text-gray-600">
+                                    <span className="inline-block h-4 w-4 rounded-sm bg-gray-200 text-[10px] leading-4 text-center font-semibold text-gray-700">
+                                      R
+                                    </span>
+                                    {customer.rut}
+                                  </div>
+                                )}
                               </div>
                             </td>
                             <td className="py-3 px-4">
                               {address.address ? (
                                 <div className="flex items-start gap-2 text-sm text-gray-600">
                                   <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                                  <div><div>{address.address}</div><div>{address.city}, {address.state}</div></div>
+                                  <div>
+                                    <div>{address.address}</div>
+                                    <div>
+                                      {[address.city, address.state].filter(Boolean).join(', ')}
+                                    </div>
+                                  </div>
                                 </div>
-                              ) : <span className="text-gray-400 text-sm">—</span>}
+                              ) : (
+                                <span className="text-gray-400 text-sm">—</span>
+                              )}
                             </td>
-                            <td className="py-3 px-4"><div className="text-sm text-gray-600">{formatDateShort(customer.created_at, settings)}</div></td>
+                            <td className="py-3 px-4 text-center">
+                              <span
+                                className={`text-sm font-semibold ${orderCount > 0 ? 'text-gray-900' : 'text-gray-400'}`}
+                              >
+                                {orderCount}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="text-sm text-gray-600">
+                                {formatDateShort(customer.created_at, settings)}
+                              </div>
+                            </td>
                             <td className="py-3 px-4 text-right">
-                              <ActionsMenu actions={[
-                                { label: 'WhatsApp', icon: <MessageCircle className="h-4 w-4" />, onClick: () => handleWhatsApp(customer.phone, customer.full_name) },
-                                { label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => handleEdit(customer) },
-                                { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => handleDelete(customer.id), variant: 'danger' },
-                              ]} />
+                              <ActionsMenu
+                                actions={[
+                                  {
+                                    label: 'WhatsApp',
+                                    icon: <MessageCircle className="h-4 w-4" />,
+                                    onClick: () => handleWhatsApp(customer.phone, customer.full_name),
+                                  },
+                                  {
+                                    label: 'Editar',
+                                    icon: <Edit className="h-4 w-4" />,
+                                    onClick: () => handleEdit(customer),
+                                  },
+                                  {
+                                    label: customer.is_active ? 'Desactivar' : 'Activar',
+                                    icon: customer.is_active
+                                      ? <UserX className="h-4 w-4" />
+                                      : <UserCheck className="h-4 w-4" />,
+                                    onClick: () => handleToggleActive(customer),
+                                  },
+                                  {
+                                    label: 'Eliminar',
+                                    icon: <Trash2 className="h-4 w-4" />,
+                                    onClick: () => handleDelete(customer.id),
+                                    variant: 'danger',
+                                  },
+                                ]}
+                              />
                             </td>
                           </tr>
                         )

@@ -202,8 +202,10 @@ Deno.serve(async (req) => {
       return new Response('order not found', { status: 200 })
     }
 
-    // Don't downgrade immutable statuses
-    if (['delivered', 'shipped'].includes(currentOrder.status as string)) {
+    // Don't touch orders in immutable or manually-managed statuses.
+    // pending_allocation means the org handles stock allocation manually —
+    // an MP payment notification should not skip that step.
+    if (['delivered', 'shipped', 'pending_allocation'].includes(currentOrder.status as string)) {
       return new Response('order status is immutable', { status: 200 })
     }
 
@@ -221,19 +223,63 @@ Deno.serve(async (req) => {
       console.log(`[org:${organizationId}] Order ${orderId}: ${currentOrder.status} → ${newStatus} (MP: ${mpStatus}/${mpStatusDetail}, payment: ${mpPaymentId})`)
     }
 
-    // Upsert order_payment record with mp_payment_id and mp_status
-    const { error: paymentUpsertError } = await supabase
+    // Update or insert order_payment keyed by mp_payment_id.
+    // Prefer updating the placeholder row created by create-mp-preference (mp_payment_id IS NULL)
+    // so we don't end up with duplicate rows for the same order.
+    const { data: existingPayment } = await supabase
       .from('order_payments')
-      .upsert({
-        order_id:       orderId,
-        payment_method: 'mercadopago',
-        amount:         (paymentData.transaction_amount as number) ?? 0,
-        mp_payment_id:  mpPaymentId,
-        mp_status:      mpStatus,
-      } as never, { onConflict: 'order_id,payment_method' })
+      .select('id')
+      .eq('order_id', orderId)
+      .eq('mp_payment_id', mpPaymentId)
+      .maybeSingle()
 
-    if (paymentUpsertError) {
-      console.error('Error upserting order_payment:', paymentUpsertError)
+    if (existingPayment) {
+      const { error: paymentUpdateError } = await supabase
+        .from('order_payments')
+        .update({
+          mp_status: mpStatus,
+          amount:    (paymentData.transaction_amount as number) ?? 0,
+        } as never)
+        .eq('id', (existingPayment as { id: string }).id)
+      if (paymentUpdateError) {
+        console.error('Error updating order_payment:', paymentUpdateError)
+      }
+    } else {
+      // Check for the pending placeholder row created when the preference was generated
+      const { data: placeholderPayment } = await supabase
+        .from('order_payments')
+        .select('id')
+        .eq('order_id', orderId)
+        .eq('payment_method', 'mercadopago')
+        .is('mp_payment_id', null)
+        .maybeSingle()
+
+      if (placeholderPayment) {
+        const { error: paymentUpdateError } = await supabase
+          .from('order_payments')
+          .update({
+            mp_payment_id: mpPaymentId,
+            mp_status:     mpStatus,
+            amount:        (paymentData.transaction_amount as number) ?? 0,
+          } as never)
+          .eq('id', (placeholderPayment as { id: string }).id)
+        if (paymentUpdateError) {
+          console.error('Error updating placeholder order_payment:', paymentUpdateError)
+        }
+      } else {
+        const { error: paymentInsertError } = await supabase
+          .from('order_payments')
+          .insert({
+            order_id:       orderId,
+            payment_method: 'mercadopago',
+            amount:         (paymentData.transaction_amount as number) ?? 0,
+            mp_payment_id:  mpPaymentId,
+            mp_status:      mpStatus,
+          } as never)
+        if (paymentInsertError) {
+          console.error('Error inserting order_payment:', paymentInsertError)
+        }
+      }
     }
 
     return new Response(JSON.stringify({ ok: true, order_id: orderId, new_status: newStatus }), {

@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { supabase } from '@/lib/supabase'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 import { BarChart3, Users, Eye, FileText, Monitor, Smartphone, Tablet, RefreshCw } from 'lucide-react'
 import {
   AreaChart,
@@ -60,32 +62,26 @@ const DeviceIcon = ({ type }: { type: string }) => {
 
 export function AdminStoreStats() {
   const { currentOrganization } = useOrganizationStore()
+  const queryClient = useQueryClient()
+  const orgId = currentOrganization?.id
   const [period, setPeriod] = useState<Period>('day')
-  const [data, setData] = useState<AnalyticsData | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  const loadData = async () => {
-    if (!currentOrganization?.id) return
-    setLoading(true)
-    setError(null)
-    try {
+  const { data, isPending: loading, error: queryError } = useQuery({
+    queryKey: queryKeys.reports.storeStats(orgId!, { period }),
+    queryFn: async () => {
       const { data: result, error: rpcError } = await supabase.rpc(
         'get_store_analytics' as any,
-        { p_organization_id: currentOrganization.id, p_period: period }
+        { p_organization_id: orgId, p_period: period }
       )
       if (rpcError) throw rpcError
-      setData(result as AnalyticsData)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar estadísticas')
-    } finally {
-      setLoading(false)
-    }
-  }
+      return result as AnalyticsData
+    },
+    enabled: !!orgId,
+    staleTime: 5 * 60 * 1000,
+  })
 
-  useEffect(() => {
-    loadData()
-  }, [currentOrganization?.id, period])
+  const error = queryError ? (queryError as Error).message : null
+  const loadData = () => queryClient.invalidateQueries({ queryKey: queryKeys.reports.storeStats(orgId!, { period }) })
 
   const summary = data?.summary
 

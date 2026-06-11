@@ -12,18 +12,21 @@ import { deleteImage, uploadProductImage } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, formatPrice, getEffectivePrice, formatDateShort } from '@/lib/utils'
-import type { Branch, Category, Product, ProductImage, ProductInsert, ProductUpdate, ProductVariant, Supplier } from '@/types'
+import type { Category, Product, ProductImage, ProductInsert, ProductUpdate, ProductVariant, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { productSchema } from '@/lib/schemas'
 import type { ProductForm } from '@/lib/schemas'
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Edit, Grid3x3, List, Package, Percent, Plus, ScanLine, Search, Star, Trash2, Truck, Upload, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { getMaxProductImages } from '@/lib/planLimits'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useToastStore } from '@/store/toastStore'
 import { useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
+import { useAdminBranches } from '@/hooks/useAdminBranches'
 
 
 interface ProductImageItem {
@@ -451,18 +454,12 @@ function AdminProductsContent() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const { show } = useToastStore()
-  const { isAtLimit, productCount, limits, tier, refreshCounts } = usePlanLimits()
+  const { isAtLimit, productCount, limits, tier } = usePlanLimits()
   const maxProductImages = getMaxProductImages(tier)
-  const [products, setProducts] = useState<ProductWithImages[]>([])
-  const [productVariantsByProduct, setProductVariantsByProduct] = useState<Record<string, ProductVariantWithInventory[]>>({})
-  const [categories, setCategories] = useState<Category[]>([])
-  const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [branches, setBranches] = useState<Branch[]>([])
+  const queryClient = useQueryClient()
+  const { data: branches = [] } = useAdminBranches(organizationId)
   const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<'products' | 'discounts'>('products')
-  const [discountedProducts, setDiscountedProducts] = useState<ProductWithImages[]>([])
-  const [loadingDiscounts, setLoadingDiscounts] = useState(false)
-  const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithImages | null>(null)
   const [productImages, setProductImages] = useState<ProductImageItem[]>([])
@@ -525,117 +522,95 @@ function AdminProductsContent() {
     },
   })
 
-  const fetchProducts = useCallback(async () => {
-    if (!organizationId) return
-    try {
-      setLoading(true)
+  const { data: categories = [] } = useQuery({
+    queryKey: queryKeys.categories.all(organizationId!),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('organization_id', organizationId!)
+        .order('name')
+      if (error) throw error
+      return (data || []) as Category[]
+    },
+    enabled: !!organizationId,
+    staleTime: 10 * 60 * 1000,
+  })
 
-      // If filtering by supplier, we need to get product IDs first
+  const { data: suppliers = [] } = useQuery({
+    queryKey: queryKeys.suppliers.all(organizationId!),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .eq('organization_id', organizationId!)
+        .eq('is_active', true)
+        .order('name')
+      if (error) throw error
+      return (data || []) as Supplier[]
+    },
+    enabled: !!organizationId,
+    staleTime: 10 * 60 * 1000,
+  })
+
+  const productsQueryKey = queryKeys.products.list(organizationId!, {
+    categoryId: filters.categoryId,
+    supplierId: filters.supplierId,
+    status: filters.status,
+    priceMin: filters.priceMin,
+    priceMax: filters.priceMax,
+    search: appliedSearch,
+  })
+
+  const { data: productsData, isPending: loading } = useQuery({
+    queryKey: productsQueryKey,
+    queryFn: async () => {
       let supplierProductIds: string[] | null = null
       if (filters.supplierId) {
         const { data: productSuppliersData, error: supplierError } = await supabase
           .from('product_suppliers')
           .select('product_id')
           .eq('supplier_id', filters.supplierId)
-
         if (supplierError) throw supplierError
         supplierProductIds = productSuppliersData?.map((ps: { product_id: string }) => ps.product_id) || []
-
-        // If no products found for this supplier, return empty array
-        if (supplierProductIds.length === 0) {
-          setProducts([])
-          setProductVariantsByProduct({})
-          setLoading(false)
-          return
-        }
+        if (supplierProductIds.length === 0) return { products: [], variantsByProduct: {} }
       }
 
-      let query = supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query: any = supabase
         .from('products')
         .select(`
           *,
-          product_images (
-            id,
-            image_url,
-            display_order,
-            is_primary
-          ),
-          category:categories (
-            id,
-            name
-          ),
-          product_categories (
-            category_id,
-            category:categories (
-              id,
-              name
-            )
-          )
+          product_images (id, image_url, display_order, is_primary),
+          category:categories (id, name),
+          product_categories (category_id, category:categories (id, name))
         `)
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId!)
 
-      // Apply filters
-      if (filters.categoryId) {
-        query = query.eq('category_id', filters.categoryId)
-      }
-
-      if (filters.supplierId && supplierProductIds) {
-        query = query.in('id', supplierProductIds)
-      }
-
-      if (filters.status !== 'all') {
-        query = query.eq('is_active', filters.status === 'active')
-      }
-
-      if (filters.priceMin) {
-        query = query.gte('price', parseFloat(filters.priceMin))
-      }
-
-      if (filters.priceMax) {
-        query = query.lte('price', parseFloat(filters.priceMax))
-      }
-
+      if (filters.categoryId) query = query.eq('category_id', filters.categoryId)
+      if (filters.supplierId && supplierProductIds) query = query.in('id', supplierProductIds)
+      if (filters.status !== 'all') query = query.eq('is_active', filters.status === 'active')
+      if (filters.priceMin) query = query.gte('price', parseFloat(filters.priceMin))
+      if (filters.priceMax) query = query.lte('price', parseFloat(filters.priceMax))
       if (appliedSearch) {
         const term = appliedSearch.replace(/[%]/g, '').replace(/,/g, ' ').trim()
-        if (term) {
-          query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%,sku.ilike.%${term}%`)
-        }
-      }
-
-      if (filters.stock !== 'all') {
-        // Stock filtering is applied client-side using branch_inventory aggregated stock.
+        if (term) query = query.or(`name.ilike.%${term}%,description.ilike.%${term}%,sku.ilike.%${term}%`)
       }
 
       const { data, error } = await query.order('created_at', { ascending: false })
-
       if (error) throw error
-      const productsData = (data || []) as unknown as ProductWithImages[]
 
-      const loadedProductIds = productsData.map((p) => p.id)
+      const productsResult = (data || []) as unknown as ProductWithImages[]
+      const loadedProductIds = productsResult.map((p) => p.id)
       let inventoryStockByProduct = new Map<string, number>()
-      let variantsByProduct: Record<string, ProductVariantWithInventory[]> = {}
+      const variantsByProduct: Record<string, ProductVariantWithInventory[]> = {}
+
       if (loadedProductIds.length > 0) {
         const [directStockRes, variantStockRes, variantsRes, variantInventoryRes] = await Promise.all([
-          supabase
-            .from('branch_inventory')
-            .select('product_id, stock, branches!inner(organization_id)')
-            .in('product_id', loadedProductIds)
-            .eq('branches.organization_id', organizationId),
-          supabase
-            .from('branch_inventory')
-            .select('stock, product_variants!inner(product_id), branches!inner(organization_id)')
-            .not('variant_id', 'is', null)
-            .eq('branches.organization_id', organizationId),
-          supabase
-            .from('product_variants')
-            .select('id, product_id, name, sku, price, stock, is_active, low_stock_threshold, min_stock, image_url, attributes, unit, created_at, updated_at')
-            .in('product_id', loadedProductIds)
-            .order('name', { ascending: true }),
-          supabase
-            .from('branch_inventory')
-            .select('variant_id, stock, branches!inner(organization_id)')
-            .not('variant_id', 'is', null)
-            .eq('branches.organization_id', organizationId),
+          supabase.from('branch_inventory').select('product_id, stock, branches!inner(organization_id)').in('product_id', loadedProductIds).eq('branches.organization_id', organizationId!),
+          supabase.from('branch_inventory').select('stock, product_variants!inner(product_id), branches!inner(organization_id)').not('variant_id', 'is', null).eq('branches.organization_id', organizationId!),
+          supabase.from('product_variants').select('id, product_id, name, sku, price, stock, is_active, low_stock_threshold, min_stock, image_url, attributes, unit, created_at, updated_at').in('product_id', loadedProductIds).order('name', { ascending: true }),
+          supabase.from('branch_inventory').select('variant_id, stock, branches!inner(organization_id)').not('variant_id', 'is', null).eq('branches.organization_id', organizationId!),
         ])
 
         if (directStockRes.error) throw directStockRes.error
@@ -644,68 +619,77 @@ function AdminProductsContent() {
         if (variantInventoryRes.error) throw variantInventoryRes.error
 
         inventoryStockByProduct = new Map<string, number>()
-
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(directStockRes.data || []).forEach((row: any) => {
           const productId = row.product_id as string | null
           if (!productId) return
-          const prev = inventoryStockByProduct.get(productId) || 0
-          inventoryStockByProduct.set(productId, prev + (row.stock || 0))
+          inventoryStockByProduct.set(productId, (inventoryStockByProduct.get(productId) || 0) + (row.stock || 0))
         })
-
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(variantStockRes.data || []).forEach((row: any) => {
           const productId = row.product_variants?.product_id as string | null
-          if (!productId) return
-          if (!loadedProductIds.includes(productId)) return
-          const prev = inventoryStockByProduct.get(productId) || 0
-          inventoryStockByProduct.set(productId, prev + (row.stock || 0))
+          if (!productId || !loadedProductIds.includes(productId)) return
+          inventoryStockByProduct.set(productId, (inventoryStockByProduct.get(productId) || 0) + (row.stock || 0))
         })
 
         const inventoryStockByVariant = new Map<string, number>()
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(variantInventoryRes.data || []).forEach((row: any) => {
           const variantId = row.variant_id as string | null
           if (!variantId) return
-          const prev = inventoryStockByVariant.get(variantId) || 0
-          inventoryStockByVariant.set(variantId, prev + (row.stock || 0))
+          inventoryStockByVariant.set(variantId, (inventoryStockByVariant.get(variantId) || 0) + (row.stock || 0))
         })
-
         ;(variantsRes.data || []).forEach((variant) => {
           const variantWithInventory: ProductVariantWithInventory = {
             ...(variant as ProductVariantWithInventory),
             inventory_stock: inventoryStockByVariant.get(variant.id) ?? (variant.stock || 0),
           }
-          if (!variantsByProduct[variant.product_id]) {
-            variantsByProduct[variant.product_id] = []
-          }
+          if (!variantsByProduct[variant.product_id]) variantsByProduct[variant.product_id] = []
           variantsByProduct[variant.product_id].push(variantWithInventory)
         })
       }
 
-      setProducts(
-        productsData.map((product) => ({
+      return {
+        products: productsResult.map((product) => ({
           ...product,
-          // Fallback to legacy/master stock when there is no branch_inventory row yet.
           inventory_stock: inventoryStockByProduct.get(product.id) ?? (product.stock || 0),
-        }))
-      )
-      setProductVariantsByProduct(variantsByProduct)
-    } catch (error) {
-      console.error('Error fetching products:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [organizationId, filters.categoryId, filters.supplierId, filters.status, filters.priceMin, filters.priceMax, filters.stock, appliedSearch])
+        })),
+        variantsByProduct,
+      }
+    },
+    enabled: !!organizationId,
+    staleTime: 60 * 1000,
+  })
 
-  useEffect(() => {
-    if (organizationId) {
-      fetchCategories()
-      fetchSuppliers()
-      fetchBranches()
-    }
-  }, [organizationId])
+  const products = productsData?.products ?? []
+  const productVariantsByProduct = productsData?.variantsByProduct ?? {}
 
-  useEffect(() => {
-    fetchProducts()
-  }, [fetchProducts])
+  const discountsQueryKey = queryKeys.products.list(organizationId!, { hasDiscount: true })
+  const { data: discountedProducts = [], isPending: loadingDiscounts } = useQuery({
+    queryKey: discountsQueryKey,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          product_images (id, image_url, display_order, is_primary),
+          category:categories (id, name)
+        `)
+        .eq('organization_id', organizationId!)
+        .not('discount_percentage', 'is', null)
+        .order('discount_expires_at', { ascending: true, nullsFirst: false })
+      if (error) throw error
+      return (data || []) as unknown as ProductWithImages[]
+    },
+    enabled: !!organizationId,
+    staleTime: 2 * 60 * 1000,
+  })
+
+  const invalidateProducts = () => {
+    queryClient.invalidateQueries({ queryKey: queryKeys.products.all(organizationId!) })
+    queryClient.invalidateQueries({ queryKey: ['store', organizationId!, 'products'] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.config.planLimits(organizationId!) })
+  }
 
   // Filter products client-side only for stock and ordering.
   const filteredProducts = useMemo(() => {
@@ -776,83 +760,6 @@ function AdminProductsContent() {
       setPage(safePage)
     }
   }, [page, safePage])
-
-  const fetchCategories = useCallback(async () => {
-    if (!organizationId) return
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('name')
-
-      if (error) throw error
-      setCategories(data || [])
-    } catch (error) {
-      console.error('Error fetching categories:', error)
-    }
-  }, [organizationId])
-
-  const fetchSuppliers = useCallback(async () => {
-    if (!organizationId) return
-    try {
-      const { data, error } = await supabase
-        .from('suppliers')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name')
-
-      if (error) throw error
-      setSuppliers(data || [])
-    } catch (error) {
-      console.error('Error fetching suppliers:', error)
-    }
-  }, [organizationId])
-
-  const fetchBranches = useCallback(async () => {
-    if (!organizationId) return
-    try {
-      const { data, error } = await supabase
-        .from('branches')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name')
-
-      if (error) throw error
-      setBranches((data || []) as Branch[])
-    } catch (error) {
-      console.error('Error fetching branches:', error)
-    }
-  }, [organizationId])
-
-  const fetchDiscountedProducts = useCallback(async () => {
-    if (!organizationId) return
-    try {
-      setLoadingDiscounts(true)
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          product_images (id, image_url, display_order, is_primary),
-          category:categories (id, name)
-        `)
-        .eq('organization_id', organizationId)
-        .not('discount_percentage', 'is', null)
-        .order('discount_expires_at', { ascending: true, nullsFirst: false })
-      if (error) throw error
-      setDiscountedProducts((data || []) as unknown as ProductWithImages[])
-    } catch (err) {
-      console.error('Error fetching discounted products:', err)
-    } finally {
-      setLoadingDiscounts(false)
-    }
-  }, [organizationId])
-
-  useEffect(() => {
-    if (organizationId) fetchDiscountedProducts()
-  }, [fetchDiscountedProducts])
 
   const handleImageAdd = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -1258,9 +1165,7 @@ function AdminProductsContent() {
       setProductImages([])
       setSelectedCategoryIds([])
       setInitialBranchId('')
-      await fetchProducts()
-      refreshCounts()
-      fetchDiscountedProducts()
+      invalidateProducts()
     } catch (error: any) {
       console.error('Error saving product:', error)
       show(error?.message || 'Error al guardar el producto', 'error')
@@ -1322,7 +1227,7 @@ function AdminProductsContent() {
       setSelectedProductIds(new Set())
       setBulkAction(null)
       setBulkPricePct('')
-      fetchProducts()
+      invalidateProducts()
     } catch (err: any) {
       show(err?.message || 'Error al aplicar la acción masiva', 'error')
     } finally {
@@ -1373,7 +1278,7 @@ function AdminProductsContent() {
         .eq('id', id)
 
       if (error) throw error
-      fetchProducts()
+      invalidateProducts()
     } catch (error) {
       console.error('Error deleting product:', error)
       alert('Error al eliminar el producto')
@@ -1645,7 +1550,7 @@ function AdminProductsContent() {
           allProducts={products}
           loading={loadingDiscounts}
           settings={settings}
-          onRefresh={fetchDiscountedProducts}
+          onRefresh={invalidateProducts}
         />
       )}
 
@@ -2371,10 +2276,7 @@ function AdminProductsContent() {
           organizationId={organizationId}
           branches={branches}
           onClose={() => setIsImportModalOpen(false)}
-          onImported={() => {
-            fetchProducts()
-            fetchDiscountedProducts()
-          }}
+          onImported={() => { invalidateProducts() }}
         />
       )}
     </div>

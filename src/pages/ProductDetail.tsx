@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { useProductVariants } from '@/hooks/useProductVariants'
 import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
@@ -38,7 +39,10 @@ export function ProductDetail() {
   const [quantity, setQuantity] = useState(1)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedVariant, setSelectedVariant] = useState<{ image_url?: string | null; price?: number | null; stock?: number; unit?: string | null } | null>(null)
-  const [hasActiveVariants, setHasActiveVariants] = useState(false)
+
+  // useProductVariants comparte caché con VariantSelector — un solo request de red
+  const { data: variants = [] } = useProductVariants(id)
+  const hasActiveVariants = variants.length > 0
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [imageLoading, setImageLoading] = useState(true)
   const [fadeIn, setFadeIn] = useState(false)
@@ -90,20 +94,11 @@ export function ProductDetail() {
       if (error) throw error
 
       setProduct(data as ProductWithCategory & { product_images?: ProductImage[] })
-      setCurrentImageIndex(0) // Reset image index when product changes
+      setCurrentImageIndex(0)
       setImageLoading(true)
       setFadeIn(false)
       setAllImagesFailed(false)
 
-      // Determine if product has active variants (to enforce selection flow)
-      const { count: activeVariantsCount } = await supabase
-        .from('product_variants')
-        .select('id', { head: true, count: 'exact' })
-        .eq('product_id', id)
-        .eq('is_active', true)
-
-      setHasActiveVariants((activeVariantsCount || 0) > 0)
-      
       if (data) {
         const productData = data as ProductWithCategory & { product_images?: ProductImage[] }
         getProductStock(productData.id as string, null, null, productData.organization_id || null)
@@ -164,28 +159,21 @@ export function ProductDetail() {
     setAllImagesFailed(false)
 
     if (variantId) {
-      supabase
-        .from('product_variants')
-        .select('*')
-        .eq('id', variantId)
-        .single()
-        .then(({ data }) => {
-          if (data) {
-            setSelectedVariant(data)
-            setQuantity(1)
-            // Use denormalized stock from product_variants (works for anonymous users)
-            getProductStock(product.id, variantId, null, product.organization_id || null)
-              .then((stock) => setVariantStock(stock))
-              .catch(() => setVariantStock(0))
-          }
-        })
+      const variant = variants.find((v) => v.id === variantId)
+      if (variant) {
+        setSelectedVariant(variant)
+        setQuantity(1)
+        getProductStock(product.id, variantId, null, product.organization_id || null)
+          .then((stock) => setVariantStock(stock))
+          .catch(() => setVariantStock(0))
+      }
       return
     }
 
     setSelectedVariant(null)
     setVariantStock(null)
     setQuantity(1)
-  }, [product])
+  }, [product, variants])
 
   if (loading) {
     return (

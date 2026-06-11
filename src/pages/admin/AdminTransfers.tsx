@@ -1,5 +1,8 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
+import { useOrganization } from '@/hooks/useOrganization'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
@@ -36,19 +39,15 @@ const getTransferTypeLabel = (type: string | null) => {
 export function AdminTransfers() {
   const { show } = useToastStore()
   const settings = useOrgSettings()
+  const { organizationId } = useOrganization()
   const { canUseFeature } = usePlanLimits()
-  const [transfers, setTransfers] = useState<TransferWithDetails[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('')
 
-  useEffect(() => {
-    fetchTransfers()
-  }, [])
-
-  const fetchTransfers = async () => {
-    try {
-      setLoading(true)
+  const { data: transfers = [], isPending: loading } = useQuery({
+    queryKey: queryKeys.inventory.transfers(organizationId!),
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('inventory_transfers')
         .select(`
@@ -58,78 +57,56 @@ export function AdminTransfers() {
           product:products(id, name),
           variant:product_variants(id, name)
         `)
+        .eq('organization_id', organizationId!)
         .order('created_at', { ascending: false })
-
       if (error) throw error
-
-      const transferRows = (data || []) as Array<
-        InventoryTransfer & {
-          from_branch?: { name?: string } | null
-          to_branch?: { name?: string } | null
-          product?: { name?: string } | null
-          variant?: { name?: string } | null
-        }
-      >
-
-      const transfersWithDetails: TransferWithDetails[] = transferRows.map((t) => ({
+      return (data ?? []).map((t: any) => ({
         ...t,
         from_branch_name: t.from_branch?.name || 'N/A',
         to_branch_name: t.to_branch?.name || 'N/A',
         product_name: t.product?.name || null,
         variant_name: t.variant?.name || null,
-      }))
+      })) as TransferWithDetails[]
+    },
+    enabled: !!organizationId,
+    staleTime: 2 * 60 * 1000,
+  })
 
-      setTransfers(transfersWithDetails)
-    } catch (error) {
-      console.error('Error fetching transfers:', error)
-      show('Error al cargar las transferencias', 'error')
-    } finally {
-      setLoading(false)
+  const invalidateTransfers = () => {
+    if (organizationId) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.transfers(organizationId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.inventory.all(organizationId) })
     }
   }
 
-  const handleCompleteTransfer = async (transferId: string) => {
-    if (!confirm('¿Confirmar recepción de esta transferencia? El stock se agregará a la sucursal destino.')) {
-      return
-    }
-
-    try {
+  const completeTransfer = useMutation({
+    mutationFn: async (transferId: string) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.rpc as any)('complete_inventory_transfer', {
-        p_transfer_id: transferId,
-      })
-
+      const { error } = await (supabase.rpc as any)('complete_inventory_transfer', { p_transfer_id: transferId })
       if (error) throw error
+    },
+    onSuccess: () => { show('Transferencia completada exitosamente', 'success'); invalidateTransfers() },
+    onError: (err: unknown) => show(err instanceof Error ? err.message : 'Error al completar la transferencia', 'error'),
+  })
 
-      show('Transferencia completada exitosamente', 'success')
-      fetchTransfers()
-    } catch (error: unknown) {
-      console.error('Error completing transfer:', error)
-      const message = error instanceof Error ? error.message : 'Error al completar la transferencia'
-      show(message, 'error')
-    }
+  const cancelTransfer = useMutation({
+    mutationFn: async (transferId: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase.rpc as any)('cancel_inventory_transfer', { p_transfer_id: transferId })
+      if (error) throw error
+    },
+    onSuccess: () => { show('Transferencia cancelada. Stock restituido a la sucursal origen.', 'success'); invalidateTransfers() },
+    onError: (err: unknown) => show(err instanceof Error ? err.message : 'Error al cancelar la transferencia', 'error'),
+  })
+
+  const handleCompleteTransfer = (transferId: string) => {
+    if (!confirm('¿Confirmar recepción de esta transferencia? El stock se agregará a la sucursal destino.')) return
+    completeTransfer.mutate(transferId)
   }
 
-  const handleCancelTransfer = async (transferId: string) => {
-    if (!confirm('¿Cancelar esta transferencia? El stock será devuelto a la sucursal origen.')) {
-      return
-    }
-
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error } = await (supabase.rpc as any)('cancel_inventory_transfer', {
-        p_transfer_id: transferId,
-      })
-
-      if (error) throw error
-
-      show('Transferencia cancelada. Stock restituido a la sucursal origen.', 'success')
-      fetchTransfers()
-    } catch (error: unknown) {
-      console.error('Error cancelling transfer:', error)
-      const message = error instanceof Error ? error.message : 'Error al cancelar la transferencia'
-      show(message, 'error')
-    }
+  const handleCancelTransfer = (transferId: string) => {
+    if (!confirm('¿Cancelar esta transferencia? El stock será devuelto a la sucursal origen.')) return
+    cancelTransfer.mutate(transferId)
   }
 
   const getStatusColor = (status: string | null) => {

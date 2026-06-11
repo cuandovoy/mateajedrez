@@ -1,16 +1,18 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
+import { queryKeys } from '@/lib/queryKeys'
+import { useOrganizationStore } from '@/store/organizationStore'
+import { useAuthStore } from '@/store/authStore'
+import { useToastStore } from '@/store/toastStore'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
-import { supabase } from '@/lib/supabase'
-import { useOrganizationStore } from '@/store/organizationStore'
-import { useAuthStore } from '@/store/authStore'
-import { useToastStore } from '@/store/toastStore'
-import { Building2, Plus, Pencil, Bug, Clock, RotateCcw, Trash2 } from 'lucide-react'
-import { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { CreateOrganizationModal } from '@/components/admin/CreateOrganizationModal'
 import { EditOrganizationModal } from '@/components/admin/EditOrganizationModal'
+import { Building2, Plus, Pencil, Bug, Clock, RotateCcw, Trash2 } from 'lucide-react'
 import type { Organization } from '@/types/database.types'
 
 type OrgWithRole = Organization & { memberRole?: string }
@@ -22,61 +24,71 @@ export function AdminOrganizations() {
   const { show } = useToastStore()
   const canAdmin = profile?.role === 'admin'
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null)
-  const [allOrgs, setAllOrgs] = useState<OrgWithRole[]>([])
-
-  const fetchAllOrgs = useCallback(async () => {
-    if (!user) return
-    const { data: members, error } = await supabase
-      .from('organization_members')
-      .select(`
-        role,
-        organizations(id, name, slug, logo_url, deleted_at, subscription_tier, subscription_status, trial_ends_at, subscription_expires_at, created_at, updated_at, settings, primary_color, secondary_color, accent_color, font_family, font_heading, border_radius, button_style, cover_image_url)
-      `)
-      .eq('user_id', user.id)
-    if (error) { console.error(error); return }
-    const orgs: OrgWithRole[] = (members || [])
-      .filter((m: { organizations: unknown }) => m.organizations != null)
-      .map((m) => ({ ...(m.organizations as Organization), memberRole: m.role }))
-    setAllOrgs(orgs)
-  }, [user])
 
   useEffect(() => {
-    if (!isAdmin) {
-      navigate('/')
-      return
-    }
-    fetchAllOrgs()
-  }, [isAdmin, navigate, fetchAllOrgs])
+    if (!isAdmin) navigate('/')
+  }, [isAdmin, navigate])
 
-  const handleSoftDelete = async (id: string) => {
-    if (!confirm('¿Marcar esta organización para eliminar? Los usuarios ya no podrán acceder a ella.')) return
-    const { error } = await supabase
-      .from('organizations')
-      .update({ deleted_at: new Date().toISOString() } as never)
-      .eq('id', id)
-    if (error) {
-      show('Error al marcar la organización para eliminar', 'error')
-      return
+  const { data: allOrgs = [] } = useQuery({
+    queryKey: queryKeys.myOrganizations.list(user?.id ?? ''),
+    queryFn: async () => {
+      const { data: members, error } = await supabase
+        .from('organization_members')
+        .select(`
+          role,
+          organizations(id, name, slug, logo_url, deleted_at, subscription_tier, subscription_status, trial_ends_at, subscription_expires_at, created_at, updated_at, settings, primary_color, secondary_color, accent_color, font_family, font_heading, border_radius, button_style, cover_image_url)
+        `)
+        .eq('user_id', user!.id)
+      if (error) throw error
+      return (members || [])
+        .filter((m: { organizations: unknown }) => m.organizations != null)
+        .map((m) => ({ ...(m.organizations as Organization), memberRole: m.role })) as OrgWithRole[]
+    },
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const invalidateOrgs = () => {
+    if (user?.id) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.myOrganizations.list(user.id) })
     }
-    show('Organización marcada para eliminar', 'success')
-    fetchAllOrgs()
     fetchOrganizations()
   }
 
-  const handleRestore = async (id: string) => {
-    const { error } = await supabase
-      .from('organizations')
-      .update({ deleted_at: null } as never)
-      .eq('id', id)
-    if (error) {
-      show('Error al restaurar la organización', 'error')
-      return
-    }
-    show('Organización restaurada', 'success')
-    fetchAllOrgs()
-    fetchOrganizations()
+  const softDeleteOrg = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('organizations')
+        .update({ deleted_at: new Date().toISOString() } as never)
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => { show('Organización marcada para eliminar', 'success'); invalidateOrgs() },
+    onError: () => show('Error al marcar la organización para eliminar', 'error'),
+  })
+
+  const restoreOrg = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('organizations')
+        .update({ deleted_at: null } as never)
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => { show('Organización restaurada', 'success'); invalidateOrgs() },
+    onError: () => show('Error al restaurar la organización', 'error'),
+  })
+
+  const handleSoftDelete = (id: string) => {
+    if (!confirm('¿Marcar esta organización para eliminar? Los usuarios ya no podrán acceder a ella.')) return
+    softDeleteOrg.mutate(id)
+  }
+
+  const handleRestore = (id: string) => {
+    restoreOrg.mutate(id)
   }
 
   const runDebugCanCreateOrg = async () => {
@@ -251,12 +263,12 @@ export function AdminOrganizations() {
       </Card>
 
       {createModalOpen && (
-        <CreateOrganizationModal onClose={() => { setCreateModalOpen(false); fetchAllOrgs() }} />
+        <CreateOrganizationModal onClose={() => { setCreateModalOpen(false); invalidateOrgs() }} />
       )}
       {editingOrg && (
         <EditOrganizationModal
           organization={editingOrg}
-          onClose={() => { setEditingOrg(null); fetchAllOrgs() }}
+          onClose={() => { setEditingOrg(null); invalidateOrgs() }}
         />
       )}
     </div>

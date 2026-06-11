@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { getProductsStock } from '@/lib/stock'
+import { queryKeys } from '@/lib/queryKeys'
 import type { Product, ProductImage } from '@/types'
 
 export type ProductWithImages = Product & { product_images?: ProductImage[] }
@@ -48,10 +49,10 @@ async function fetchStoreProducts(organizationId: string): Promise<ProductWithIm
 
 export function useStoreProducts(organizationId: string) {
   return useQuery({
-    queryKey: ['store-products', organizationId],
+    queryKey: queryKeys.store.products(organizationId),
     queryFn: () => fetchStoreProducts(organizationId),
     enabled: !!organizationId,
-    staleTime: 3 * 60 * 1000, // 3 min — productos cambian más seguido que categorías
+    staleTime: 3 * 60 * 1000,
   })
 }
 
@@ -127,11 +128,10 @@ export function useFilteredProducts(organizationId: string | null, filters: Prod
   }
 
   return useQuery({
-    // Cada combinación org + filtros + página tiene su propia entrada en cache
-    queryKey: ['filtered-products', organizationId, normalizedFilters],
+    queryKey: queryKeys.store.filteredProducts(organizationId!, normalizedFilters),
     queryFn: () => fetchFilteredProducts(organizationId!, normalizedFilters),
     enabled: !!organizationId,
-    staleTime: 2 * 60 * 1000, // 2 min — filtros cambian seguido, cache más corto
-    placeholderData: (prev) => prev, // mantiene datos anteriores mientras carga nuevos filtros
+    staleTime: 2 * 60 * 1000,
+    placeholderData: (prev) => prev,
   })
 }

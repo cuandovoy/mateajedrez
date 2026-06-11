@@ -9,12 +9,15 @@ import { trackAuditAction } from '@/lib/audit'
 import { capitalizeFirst, formatDateTime, formatPrice } from '@/lib/utils'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
-import type { Branch, Order, OrderItem } from '@/types'
+import type { Order, OrderItem } from '@/types'
 import type { OrderPayment } from '@/types/database.types'
 import { obtenerPDF, anularComprobante, BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import type { BillerConfig } from '@/types/biller'
 import { ArrowLeft, Calendar, DollarSign, Edit2, FileText, MapPin, Minus, Package, Phone, Plus, Receipt, Save, Trash2, User, X } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
+import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { Link, useParams } from 'react-router-dom'
 
 const getStatusLabel = (status: string | null): string => {
@@ -94,9 +97,6 @@ export function AdminOrderDetail() {
   const { show } = useToastStore()
   const organizationId = useOrganizationStore((s) => s.currentOrganization?.id)
   const { methods: paymentMethods } = useOrgPaymentMethods(organizationId)
-  const [order, setOrder] = useState<OrderWithItems | null>(null)
-  const [orderPayments, setOrderPayments] = useState<OrderPayment[]>([])
-  const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingBranch, setSavingBranch] = useState(false)
@@ -108,18 +108,8 @@ export function AdminOrderDetail() {
   const [paymentToDelete, setPaymentToDelete] = useState<OrderPayment | null>(null)
   const [returningItemId, setReturningItemId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [products, setProducts] = useState<
-    Array<{
-      id: string
-      name: string
-      price: number
-      sku: string
-      defaultVariant?: { id: string; price: number | null }
-    }>
-  >([])
   const [productSearch, setProductSearch] = useState('')
   const [showProductSearch, setShowProductSearch] = useState(false)
-  const [orgBranches, setOrgBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState<string>('')
 
   const [editShipping, setEditShipping] = useState<ShippingAddress>({
@@ -134,16 +124,8 @@ export function AdminOrderDetail() {
   const [editPaymentMethod, setEditPaymentMethod] = useState('')
   const [editPaymentAmount, setEditPaymentAmount] = useState('')
   const [editItems, setEditItems] = useState<OrderItemWithProduct[]>([])
-  const [orderDiscountRules, setOrderDiscountRules] = useState<SalesDiscountRule[]>([])
-  const [itemDiscountRules, setItemDiscountRules] = useState<SalesDiscountRule[]>([])
-  const [billerComprobante, setBillerComprobante] = useState<{
-    id: string; biller_id: number; tipo_comprobante: number; serie: string | null
-    numero: number | null; estado: string
-  } | null>(null)
-  const [billerConfig, setBillerConfig] = useState<BillerConfig | null>(null)
   const [downloadingPDF, setDownloadingPDF] = useState(false)
   const [annullingCFE, setAnnullingCFE] = useState(false)
-  const [orderManualItems, setOrderManualItems] = useState<{ id: string; description: string; quantity: number; price: number; created_at: string }[]>([])
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [isPartialReturnModalOpen, setIsPartialReturnModalOpen] = useState(false)
@@ -160,11 +142,14 @@ export function AdminOrderDetail() {
   const [isManualDiscount, setIsManualDiscount] = useState(false)
   const [isAnnulCFEConfirmOpen, setIsAnnulCFEConfirmOpen] = useState(false)
 
-  const fetchOrder = useCallback(async () => {
-    if (!id) return
-    setLoading(true)
-    try {
-      const { data: orderData, error: orderError } = await supabase
+  const queryClient = useQueryClient()
+  const { data: branches = [] } = useAdminBranches(organizationId)
+
+  const orderKey = queryKeys.orders.detail(organizationId!, id!)
+  const { data: orderData, isPending: loading } = useQuery({
+    queryKey: orderKey,
+    queryFn: async () => {
+      const { data: orderRaw, error: orderError } = await supabase
         .from('orders')
         .select(`
           *,
@@ -174,28 +159,12 @@ export function AdminOrderDetail() {
             variant:product_variants (id, name, sku, attributes, image_url, price)
           )
         `)
-        .eq('id', id)
+        .eq('id', id!)
         .single()
-
       if (orderError) throw orderError
-      if (!orderData) return
+      if (!orderRaw) throw new Error('Orden no encontrada')
 
-      const ord = orderData as OrderWithItems
-      const shipping = (ord.shipping_address as ShippingAddress) ?? {}
-      setEditShipping({
-        fullName: shipping.fullName ?? '',
-        email: shipping.email ?? '',
-        phone: shipping.phone ?? '',
-        address: shipping.address ?? '',
-        city: shipping.city ?? '',
-        state: shipping.state ?? '',
-        zipCode: shipping.zipCode ?? '',
-        country: shipping.country ?? '',
-      })
-      setEditPaymentMethod(ord.payment_method ?? '')
-      setEditItems(ord.order_items ?? [])
-      setSelectedBranchId(ord.branch_id ?? '')
-
+      const ord = orderRaw as OrderWithItems
       const [
         paymentsResult,
         userProfileResult,
@@ -204,7 +173,7 @@ export function AdminOrderDetail() {
         cfeResult,
         billerConfigResult,
       ] = await Promise.all([
-        supabase.from('order_payments').select('*').eq('order_id', id),
+        supabase.from('order_payments').select('*').eq('order_id', id!),
         ord.user_id
           ? supabase.from('user_profiles').select('full_name').eq('user_id', ord.user_id).single()
           : Promise.resolve({ data: null, error: null }),
@@ -215,13 +184,13 @@ export function AdminOrderDetail() {
         (supabase as any)
           .from('order_manual_items')
           .select('id, description, quantity, price, created_at')
-          .eq('order_id', id)
+          .eq('order_id', id!)
           .order('created_at', { ascending: true }),
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (supabase as any)
           .from('biller_comprobantes')
           .select('id, biller_id, tipo_comprobante, serie, numero, estado')
-          .eq('order_id', id)
+          .eq('order_id', id!)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle(),
@@ -236,56 +205,41 @@ export function AdminOrderDetail() {
       ])
 
       const payments = (paymentsResult.data ?? []) as OrderPayment[]
-      setOrderPayments(payments)
-      const mainPayment = payments.find((p) => p.payment_method === ord.payment_method) ?? payments[0]
-      setEditPaymentAmount(mainPayment ? String(mainPayment.amount) : String(ord.total))
-
       let userProfile: { full_name: string | null; email: string } | null = null
       if (userProfileResult.data) {
-        userProfile = {
-          full_name: (userProfileResult.data as { full_name: string }).full_name,
-          email: 'N/A',
-        }
+        userProfile = { full_name: (userProfileResult.data as { full_name: string }).full_name, email: 'N/A' }
       }
-
       const customer = customerResult.data as { email: string | null; full_name: string } | null
 
-      setOrder({
-        ...ord,
-        order_items: ord.order_items ?? [],
-        user_profile: userProfile,
-        customer,
-      })
+      return {
+        order: { ...ord, order_items: ord.order_items ?? [], user_profile: userProfile, customer } as OrderWithItems,
+        payments,
+        manualItems: (manualItemsResult.data ?? []) as { id: string; description: string; quantity: number; price: number; created_at: string }[],
+        cfe: (cfeResult.data ?? null) as { id: string; biller_id: number; tipo_comprobante: number; serie: string | null; numero: number | null; estado: string } | null,
+        billerConfig: (billerConfigResult.data ?? null) as BillerConfig | null,
+      }
+    },
+    enabled: !!id && !!organizationId,
+  })
 
-      setOrderManualItems(manualItemsResult.data ?? [])
-      setBillerComprobante(cfeResult.data ?? null)
-      setBillerConfig(billerConfigResult.data ?? null)
-    } catch (error) {
-      console.error('Error fetching order:', error)
-      show('Error al cargar la orden', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [id, show])
+  const order = orderData?.order ?? null
+  const orderPayments = orderData?.payments ?? []
+  const orderManualItems = orderData?.manualItems ?? []
+  const billerComprobante = orderData?.cfe ?? null
+  const billerConfig = orderData?.billerConfig ?? null
+  const invalidateOrder = () => queryClient.invalidateQueries({ queryKey: orderKey })
 
-  useEffect(() => {
-    fetchOrder()
-  }, [fetchOrder])
-
-  useEffect(() => {
-    if (!organizationId || !isEditing) return
-    const loadProducts = async () => {
+  const { data: products = [] } = useQuery({
+    queryKey: ['admin', organizationId!, 'products', 'with-default-variants'],
+    queryFn: async () => {
       const { data: productsData } = await supabase
         .from('products')
         .select('id, name, price, sku')
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId!)
         .eq('is_active', true)
         .order('name')
       const prods = (productsData ?? []) as Array<{ id: string; name: string; price: number; sku: string }>
-      if (prods.length === 0) {
-        setProducts([])
-        return
-      }
+      if (prods.length === 0) return []
       const { data: allVariants } = await supabase
         .from('product_variants')
         .select('id, product_id, price, sku')
@@ -298,50 +252,53 @@ export function AdminOrderDetail() {
       for (const v of (allVariants ?? []) as Array<{ id: string; product_id: string; price: number | null; sku: string }>) {
         if (v.sku.endsWith('-DEFAULT')) variantMap[v.product_id] = { id: v.id, price: v.price }
       }
-      setProducts(prods.map((p) => ({ ...p, defaultVariant: variantMap[p.id] })))
-    }
-    loadProducts()
-  }, [organizationId, isEditing])
+      return prods.map((p) => ({ ...p, defaultVariant: variantMap[p.id] }))
+    },
+    enabled: !!organizationId && isEditing,
+    staleTime: 5 * 60 * 1000,
+  })
 
-  useEffect(() => {
-    if (!organizationId) return
-
-    supabase
-      .from('branches')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .eq('is_active', true)
-      .order('name')
-      .then(({ data }) => {
-        setOrgBranches((data || []) as Branch[])
-      })
-  }, [organizationId])
-
-  useEffect(() => {
-    if (!organizationId) return
-    const fetchDiscountRules = async () => {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const [{ data: orderRules }, { data: itemRules }] = await Promise.all([
-          (supabase.rpc as any)('list_active_sales_discount_rules', {
-            p_organization_id: organizationId,
-            p_scope: 'order',
-          }),
-          (supabase.rpc as any)('list_active_sales_discount_rules', {
-            p_organization_id: organizationId,
-            p_scope: 'item',
-          }),
-        ])
-        setOrderDiscountRules((Array.isArray(orderRules) ? orderRules : []) as SalesDiscountRule[])
-        setItemDiscountRules((Array.isArray(itemRules) ? itemRules : []) as SalesDiscountRule[])
-      } catch (error) {
-        console.error('Error fetching discount rules:', error)
-        setOrderDiscountRules([])
-        setItemDiscountRules([])
+  const { data: discountRulesData } = useQuery({
+    queryKey: ['admin', organizationId!, 'discount-rules'],
+    queryFn: async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const [{ data: orderRules }, { data: itemRules }] = await Promise.all([
+        (supabase.rpc as any)('list_active_sales_discount_rules', { p_organization_id: organizationId, p_scope: 'order' }),
+        (supabase.rpc as any)('list_active_sales_discount_rules', { p_organization_id: organizationId, p_scope: 'item' }),
+      ])
+      return {
+        orderRules: (Array.isArray(orderRules) ? orderRules : []) as SalesDiscountRule[],
+        itemRules: (Array.isArray(itemRules) ? itemRules : []) as SalesDiscountRule[],
       }
-    }
-    fetchDiscountRules()
-  }, [organizationId])
+    },
+    enabled: !!organizationId,
+    staleTime: 5 * 60 * 1000,
+  })
+  const orderDiscountRules = discountRulesData?.orderRules ?? []
+  const itemDiscountRules = discountRulesData?.itemRules ?? []
+
+  // Initialize edit state when order data loads or refreshes (only when not actively editing)
+  useEffect(() => {
+    if (!orderData || isEditing) return
+    const { order: ord, payments } = orderData
+    const shipping = (ord.shipping_address as ShippingAddress) ?? {}
+    setEditShipping({
+      fullName: shipping.fullName ?? '',
+      email: shipping.email ?? '',
+      phone: shipping.phone ?? '',
+      address: shipping.address ?? '',
+      city: shipping.city ?? '',
+      state: shipping.state ?? '',
+      zipCode: shipping.zipCode ?? '',
+      country: shipping.country ?? '',
+    })
+    setEditPaymentMethod(ord.payment_method ?? '')
+    setEditItems(ord.order_items ?? [])
+    setSelectedBranchId(ord.branch_id ?? '')
+    const mainPayment = payments.find((p) => p.payment_method === ord.payment_method) ?? payments[0]
+    setEditPaymentAmount(mainPayment ? String(mainPayment.amount) : String(ord.total))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderData])
 
   const openOrderDiscountModal = () => {
     setDiscountTarget('order')
@@ -393,7 +350,7 @@ export function AdminOrderDetail() {
         show('Descuento de ítem aplicado.', 'success')
       }
       setIsDiscountModalOpen(false)
-      await fetchOrder()
+      invalidateOrder()
     } catch (error: unknown) {
       console.error('Error applying discount:', error)
       show(error instanceof Error ? error.message : 'No se pudo aplicar el descuento.', 'error')
@@ -410,7 +367,7 @@ export function AdminOrderDetail() {
       })
       if (error) throw error
       show('Descuento de orden removido.', 'success')
-      await fetchOrder()
+      invalidateOrder()
     } catch (error: unknown) {
       console.error('Error removing order discount:', error)
       show(error instanceof Error ? error.message : 'No se pudo remover el descuento.', 'error')
@@ -439,7 +396,7 @@ export function AdminOrderDetail() {
       })
       if (error) throw error
       show('Descuento de ítem removido.', 'success')
-      await fetchOrder()
+      invalidateOrder()
     } catch (error: unknown) {
       console.error('Error removing item discount:', error)
       show(error instanceof Error ? error.message : 'No se pudo remover el descuento de ítem.', 'error')
@@ -487,7 +444,7 @@ export function AdminOrderDetail() {
         oldData: { status: previousStatus },
         newData: { status: newStatus },
       })
-      setOrder({ ...order, status: newStatus })
+      invalidateOrder()
       show('Estado actualizado', 'success')
     } catch (error) {
       console.error('Error updating order status:', error)
@@ -534,7 +491,7 @@ export function AdminOrderDetail() {
         newData: { status: 'cancelled' },
       })
 
-      setOrder({ ...order, status: 'cancelled' })
+      invalidateOrder()
       setIsCancelModalOpen(false)
       setCancelReason('')
       show('Orden anulada correctamente. Se restauró stock y se registró la devolución total.', 'success')
@@ -569,7 +526,7 @@ export function AdminOrderDetail() {
         newData: { branch_id: selectedBranchId },
       })
 
-      setOrder({ ...order, branch_id: selectedBranchId })
+      invalidateOrder()
       show('Sucursal de la orden actualizada.', 'success')
     } catch (error) {
       console.error('Error updating order branch:', error)
@@ -724,7 +681,7 @@ export function AdminOrderDetail() {
 
       show('Orden actualizada correctamente', 'success')
       setIsEditing(false)
-      fetchOrder()
+      invalidateOrder()
     } catch (error) {
       console.error('Error saving order:', error)
       show('Error al guardar los cambios', 'error')
@@ -917,7 +874,7 @@ export function AdminOrderDetail() {
 
       setIsCollectModalOpen(false)
       show('Cobro registrado correctamente', 'success')
-      await fetchOrder()
+      invalidateOrder()
     } catch (error) {
       console.error('Error registering collection:', error)
       show('No se pudo registrar el cobro', 'error')
@@ -985,7 +942,7 @@ export function AdminOrderDetail() {
 
       setPaymentToDelete(null)
       show('Cobro eliminado correctamente', 'success')
-      await fetchOrder()
+      invalidateOrder()
     } catch (error) {
       console.error('Error deleting payment:', error)
       const rawMessage =
@@ -1066,7 +1023,7 @@ export function AdminOrderDetail() {
       setIsPartialReturnModalOpen(false)
       setPartialReturnItem(null)
       show('Devolución parcial registrada correctamente.', 'success')
-      await fetchOrder()
+      invalidateOrder()
     } catch (error) {
       console.error('Error processing partial return:', error)
       show('No se pudo registrar la devolución parcial.', 'error')
@@ -1098,9 +1055,9 @@ export function AdminOrderDetail() {
         .from('biller_comprobantes')
         .update({ estado: 'anulado' })
         .eq('id', billerComprobante.id)
-      setBillerComprobante({ ...billerComprobante, estado: 'anulado' })
       setIsAnnulCFEConfirmOpen(false)
       show('Comprobante anulado correctamente', 'success')
+      invalidateOrder()
     } catch (e) {
       show(e instanceof BillerApiError ? e.message : 'Error al anular el comprobante', 'error')
     } finally {
@@ -1162,8 +1119,8 @@ export function AdminOrderDetail() {
       : { label: 'Cobrada', color: 'bg-green-100 text-green-800' }
   const hasDiscount = Number(order.discount_total ?? 0) > 0
   const assignableBranches = (settings.checkout_exclude_isolated_warehouses !== false
-    ? orgBranches.filter((branch) => !branch.is_isolated_warehouse)
-    : orgBranches)
+    ? branches.filter((branch) => !branch.is_isolated_warehouse)
+    : branches)
     .filter((branch) => branch.is_active !== false)
   const statusOptions =
     order.status === 'pending_allocation'

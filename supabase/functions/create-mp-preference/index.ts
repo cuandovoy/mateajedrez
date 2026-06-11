@@ -105,19 +105,7 @@ Deno.serve(async (req) => {
 
     const typedOrder = order as unknown as Order
 
-    // 3. Build MP preference items from order_items
-    const mpItems = typedOrder.order_items.map((item) => {
-      const variantSuffix = item.variant?.name ? ` - ${item.variant.name}` : ''
-      return {
-        id:          `${order_id}-${item.product.name}`,
-        title:       `${item.product.name}${variantSuffix}`,
-        quantity:    item.quantity,
-        unit_price:  item.price,
-        currency_id: currencyId,
-      }
-    })
-
-    // Fetch org slug and currency from settings
+    // 3. Fetch org slug and currency (must come before mpItems to avoid TDZ on currencyId)
     const { data: orgRow } = await supabase
       .from('organizations')
       .select('slug, settings')
@@ -129,7 +117,19 @@ Deno.serve(async (req) => {
     const currencyId = (orgSettings.currency as string | undefined) ?? 'UYU'
     const orderRef = typedOrder.order_number ?? order_id.slice(0, 8)
 
-    // 4. POST to MP Preferences API
+    // 4. Build MP preference items from order_items
+    const mpItems = typedOrder.order_items.map((item) => {
+      const variantSuffix = item.variant?.name ? ` - ${item.variant.name}` : ''
+      return {
+        id:          `${order_id}-${item.product.name}`,
+        title:       `${item.product.name}${variantSuffix}`,
+        quantity:    item.quantity,
+        unit_price:  item.price,
+        currency_id: currencyId,
+      }
+    })
+
+    // 5. POST to MP Preferences API
     // Include org_id in the webhook URL so mp-webhook knows which secret to use
     const notificationUrl = `${SUPABASE_FUNCTIONS_URL}/functions/v1/mp-webhook?org=${organization_id}`
     const preference = {
@@ -171,11 +171,16 @@ Deno.serve(async (req) => {
 
     const mpData = await mpResponse.json() as { id: string; init_point: string; sandbox_init_point: string }
 
-    // 5. Save preference_id on the order for traceability
+    // 6. Create a placeholder order_payment row (mp_payment_id = NULL).
+    // The webhook will fill in the real mp_payment_id and mp_status once the payment completes.
     await supabase
-      .from('orders')
-      .update({ notes: `mp_preference_id:${mpData.id}` } as never)
-      .eq('id', order_id)
+      .from('order_payments')
+      .insert({
+        order_id:       order_id,
+        payment_method: 'mercadopago',
+        amount:         typedOrder.total,
+        mp_status:      'pending',
+      } as never)
 
     const initPoint = isSandbox ? mpData.sandbox_init_point : mpData.init_point
 

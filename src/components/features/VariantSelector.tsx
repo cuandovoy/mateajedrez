@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { useProductVariants } from '@/hooks/useProductVariants'
 import { capitalizeFirst, cn, formatPrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { ProductVariant, Product } from '@/types'
-import { PostgrestError } from '@supabase/supabase-js'
 
 function isValidImageUrl(url: unknown): url is string {
   if (!url || typeof url !== 'string') return false
@@ -25,143 +24,101 @@ interface VariantSelectorProps {
 
 export function VariantSelector({ product, selectedVariantId, onVariantChange }: VariantSelectorProps) {
   const settings = useOrgSettings()
-  const [variants, setVariants] = useState<ProductVariant[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: variants = [], isPending: loading } = useProductVariants(product.id)
   const [attributes, setAttributes] = useState<Record<string, string[]>>({})
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({})
-  const [variantStocks, setVariantStocks] = useState<Record<string, number>>({}) // variant.id -> stock
+  const [variantStocks, setVariantStocks] = useState<Record<string, number>>({})
   const [productStock, setProductStock] = useState<number | null>(null)
   const [imageLoadFailed, setImageLoadFailed] = useState(false)
 
+  // Reset selector state when product changes
   useEffect(() => {
     setSelectedAttributes({})
     onVariantChange('')
-    fetchVariants()
-    // Only reset selector when the product changes.
-    // onVariantChange comes from parent and can be a new function on rerenders.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.id])
 
+  // Extract unique attributes from variants
   useEffect(() => {
-    if (variants.length > 0) {
-      // Extract unique attributes from variants
-      const attrs: Record<string, Set<string>> = {}
-      variants.forEach((variant) => {
-        if (variant.attributes && typeof variant.attributes === 'object') {
-          Object.entries(variant.attributes as Record<string, string>).forEach(([key, value]) => {
-            if (!attrs[key]) {
-              attrs[key] = new Set()
-            }
-            attrs[key].add(value)
-          })
-        }
-      })
-      setAttributes(
-        Object.fromEntries(
-          Object.entries(attrs).map(([key, values]) => [key, Array.from(values)])
-        )
-      )
-    }
+    if (variants.length === 0) return
+    const attrs: Record<string, Set<string>> = {}
+    variants.forEach((variant) => {
+      if (variant.attributes && typeof variant.attributes === 'object') {
+        Object.entries(variant.attributes as Record<string, string>).forEach(([key, value]) => {
+          if (!attrs[key]) attrs[key] = new Set()
+          attrs[key].add(value)
+        })
+      }
+    })
+    setAttributes(
+      Object.fromEntries(Object.entries(attrs).map(([key, values]) => [key, Array.from(values)]))
+    )
   }, [variants])
 
+  // Auto-select single variant
   useEffect(() => {
     if (variants.length === 1 && !selectedVariantId) {
       const onlyVariant = variants[0]
       const stock = variantStocks[onlyVariant.id] ?? 0
-      if (onlyVariant.is_active && stock > 0) {
-        onVariantChange(onlyVariant.id)
-      }
+      if (onlyVariant.is_active && stock > 0) onVariantChange(onlyVariant.id)
     }
   }, [variants, selectedVariantId, variantStocks, onVariantChange])
+
+  // Fetch stock for all variants when list changes
+  useEffect(() => {
+    if (variants.length === 0) return
+    Promise.all(
+      variants.map(async (variant: ProductVariant) => {
+        try {
+          const stock = await getProductStock(product.id, variant.id, null, product.organization_id || null)
+          return { variantId: variant.id, stock }
+        } catch {
+          return { variantId: variant.id, stock: 0 }
+        }
+      })
+    ).then((results) => {
+      const stockMap: Record<string, number> = {}
+      results.forEach(({ variantId, stock }) => { stockMap[variantId] = stock })
+      setVariantStocks(stockMap)
+    })
+
+    getProductStock(product.id, null, null, product.organization_id || null)
+      .then((stock) => setProductStock(stock))
+      .catch(() => setProductStock(0))
+  }, [variants, product.id, product.organization_id])
 
   useEffect(() => {
     setImageLoadFailed(false)
   }, [selectedVariantId, product.id])
 
-  const fetchVariants = async () => {
-    setLoading(true)
-    try {
-      const { data, error }: { data: ProductVariant[] | null, error: PostgrestError | null } = await supabase
-        .from('product_variants')
-        .select('*')
-        .eq('product_id', product.id)
-        .eq('is_active', true)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      setVariants(data || [])
-      
-      // Fetch stock for all variants from branch_inventory
-      if (data && data.length > 0) {
-        const stockPromises = data.map(async (variant) => {
-          try {
-            const stock = await getProductStock(product.id, variant.id, null, product.organization_id || null)
-            return { variantId: variant.id, stock }
-          } catch (error) {
-            console.error('Error fetching stock for variant:', variant.id, error)
-            return { variantId: variant.id, stock: 0 }
-          }
-        })
-        
-        const stockResults = await Promise.all(stockPromises)
-        const stockMap: Record<string, number> = {}
-        stockResults.forEach(({ variantId, stock }) => {
-          stockMap[variantId] = stock
-        })
-        setVariantStocks(stockMap)
-      }
-      
-      // Fetch product stock (for products without variants)
-      getProductStock(product.id, null, null, product.organization_id || null)
-        .then((stock) => setProductStock(stock))
-        .catch((error) => {
-          console.error('Error fetching product stock:', error)
-          setProductStock(0)
-        })
-      
-    } catch (error) {
-      console.error('Error fetching variants:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleAttributeChange = (attributeKey: string, value: string) => {
-    // If clicking the same value, deselect it
     if (selectedAttributes[attributeKey] === value) {
       const newSelected = { ...selectedAttributes }
       delete newSelected[attributeKey]
       setSelectedAttributes(newSelected)
-      // Clear variant selection if no complete match
       onVariantChange('')
       return
     }
 
-    // Update selected attributes
     const newSelected = { ...selectedAttributes, [attributeKey]: value }
     setSelectedAttributes(newSelected)
 
-    // Find variant matching all selected attributes (only one variant can be selected at a time)
     const matchingVariant = variants.find((variant) => {
       if (!variant.attributes || typeof variant.attributes !== 'object') return false
       const variantAttrs = variant.attributes as Record<string, string>
       return Object.entries(newSelected).every(([key, val]) => variantAttrs[key] === val)
     })
 
-    // Only select variant if there's a complete match (all attributes selected)
     if (matchingVariant && matchingVariant.is_active) {
       onVariantChange(matchingVariant.id)
     } else {
-      // Clear selection if no complete match
       onVariantChange('')
     }
   }
 
   const selectedVariant = variants.find((v) => v.id === selectedVariantId)
   const displayPrice = selectedVariant?.price ?? product.price
-  const displayStock = selectedVariantId 
-    ? (variantStocks[selectedVariantId] ?? null)
-    : (productStock ?? null)
+  const displayStock = selectedVariantId ? (variantStocks[selectedVariantId] ?? null) : (productStock ?? null)
   const variantImage = isValidImageUrl(selectedVariant?.image_url) ? selectedVariant.image_url : null
   const showImage = Boolean(variantImage && !imageLoadFailed)
 
@@ -173,10 +130,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
     )
   }
 
-  // If no variants, don't show selector.
-  if (variants.length === 0) {
-    return null
-  }
+  if (variants.length === 0) return null
 
   const hasAttributeOptions = Object.keys(attributes).length > 0
 
@@ -192,7 +146,6 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
     <div className="space-y-4">
       {hasAttributeOptions ? (
         <>
-          {/* Attribute Selectors */}
           {Object.entries(attributes).map(([key, values]) => (
             <div key={key}>
               <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
@@ -268,7 +221,6 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
         </div>
       )}
 
-      {/* Selected Variant Info */}
       {selectedVariant && (
         <div className="p-4 bg-gray-50 rounded-lg space-y-2">
           <div className="flex justify-between items-center">
@@ -296,7 +248,6 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
         </div>
       )}
 
-      {/* Variant Image Preview */}
       {selectedVariant && (
         <div className="mt-4">
           {showImage && (
@@ -304,9 +255,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
               src={variantImage as string}
               alt={capitalizeFirst(selectedVariant?.name || product.name)}
               className="w-full h-64 object-cover rounded-lg"
-              onError={() => {
-                setImageLoadFailed(true)
-              }}
+              onError={() => setImageLoadFailed(true)}
             />
           )}
         </div>
