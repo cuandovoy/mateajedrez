@@ -12,30 +12,30 @@ import {
 describe('getPlanLimits', () => {
   it('starter tiene límite de productos', () => {
     const limits = getPlanLimits(PLAN_STARTER)
-    expect(limits.products).toBe(700)
+    expect(limits.products).toBe(2000)
     expect(limits.branches).toBe(1)
   })
 
-  it('profesional no tiene límite de productos ni sucursales', () => {
+  it('profesional no tiene límite de sucursales', () => {
     const limits = getPlanLimits(PLAN_PROFESIONAL)
-    expect(limits.products).toBeNull()
+    expect(limits.products).toBe(2000)
     expect(limits.branches).toBeNull()
   })
 
   it('tier desconocido cae a límites de starter', () => {
     const limits = getPlanLimits('enterprise')
-    expect(limits.products).toBe(700)
+    expect(limits.products).toBe(2000)
     expect(limits.branches).toBe(1)
   })
 })
 
 describe('getProductLimit', () => {
-  it('starter retorna 700', () => {
-    expect(getProductLimit(PLAN_STARTER)).toBe(700)
+  it('starter retorna 2000', () => {
+    expect(getProductLimit(PLAN_STARTER)).toBe(2000)
   })
 
-  it('profesional retorna null (ilimitado)', () => {
-    expect(getProductLimit(PLAN_PROFESIONAL)).toBeNull()
+  it('profesional retorna 2000', () => {
+    expect(getProductLimit(PLAN_PROFESIONAL)).toBe(2000)
   })
 })
 

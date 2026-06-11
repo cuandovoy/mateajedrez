@@ -301,8 +301,8 @@ if (isAtLimit('products')) { /* Bloquear creación */ }
 ```
 
 ### Tiers
-- `starter` — límites en productos (700), sucursales (1), imágenes por producto (1)
-- `profesional` — sin límites (null), hasta 3 imágenes por producto
+- `starter` — límites en productos (2000), sucursales (1), imágenes por producto (1)
+- `profesional` — límite de productos (2000), sucursales sin límite (null), hasta 3 imágenes por producto
 
 ---
 

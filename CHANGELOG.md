@@ -4,6 +4,13 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-11 — Actualización de tests y CLAUDE.md por nuevo límite de productos (2000)
+
+- **Archivos modificados:** `src/lib/planLimits.test.ts`, `CLAUDE.md`
+- **Qué cambió:** Los tests y la documentación se actualizaron para reflejar el nuevo límite de productos de 2000 para ambos planes (starter y profesional); el plan profesional mantiene sucursales ilimitadas.
+
+---
+
 ## 2026-06-11 — Límites de plan simplificados, fix skeleton en filtros y corrección modal productos
 
 - **Archivos modificados:**
