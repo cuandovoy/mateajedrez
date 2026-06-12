@@ -171,14 +171,15 @@ Deno.serve(async (req) => {
 
     const mpData = await mpResponse.json() as { id: string; init_point: string; sandbox_init_point: string }
 
-    // 6. Create a placeholder order_payment row (mp_payment_id = NULL).
-    // The webhook will fill in the real mp_payment_id and mp_status once the payment completes.
+    // 6. Create a placeholder order_payment row (mp_payment_id = NULL, amount = 0).
+    // amount stays 0 until the webhook confirms the real transaction_amount — this prevents
+    // the admin from showing the order as "Cobrada" before MP processes the payment.
     await supabase
       .from('order_payments')
       .insert({
         order_id:       order_id,
         payment_method: 'mercadopago',
-        amount:         typedOrder.total,
+        amount:         0,
         mp_status:      'pending',
       } as never)
 

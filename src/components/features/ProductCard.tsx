@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ShoppingCart } from 'lucide-react'
+import { ShoppingCart, Package } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
@@ -16,7 +16,6 @@ interface ProductCardProps {
   basePath?: string
 }
 
-// Helper function to validate image URLs
 function isValidImageUrl(url: string | null | undefined): boolean {
   if (!url || typeof url !== 'string') return false
   if (url.trim() === '') return false
@@ -39,7 +38,7 @@ export function ProductCard({
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  const [stock, setStock] = useState<number | null>(null) // null = loading, number = loaded
+  const [stock, setStock] = useState<number | null>(null)
 
   const handleAddToCart = async () => {
     setIsAdding(true)
@@ -52,29 +51,21 @@ export function ProductCard({
     }
   }
 
-  // Get all available image URLs in priority order
   const imageUrls: string[] = []
-  
-  // 1. Product images (sorted by is_primary and display_order)
   if (product.product_images && product.product_images.length > 0) {
     const sorted = [...product.product_images]
       .filter((img) => isValidImageUrl(img.image_url))
       .sort((a, b) => {
-        // Primary images first
         if (a.is_primary && !b.is_primary) return -1
         if (!a.is_primary && b.is_primary) return 1
-        // Then by display_order
         return a.display_order - b.display_order
       })
-    
     sorted.forEach((img) => {
       if (img.image_url && !imageUrls.includes(img.image_url)) {
         imageUrls.push(img.image_url)
       }
     })
   }
-  
-  // 2. Legacy image_url (if exists and valid)
   if (product.image_url && isValidImageUrl(product.image_url) && !imageUrls.includes(product.image_url)) {
     imageUrls.push(product.image_url)
   }
@@ -94,99 +85,108 @@ export function ProductCard({
   }, [product.id, product.organization_id, stockProp])
 
   const hasStock = stock !== null ? stock > 0 : false
+  const productUrl = `${basePath}/product/${product.id}`
+  const showAddButton = !noAddToCart && !hasVariants && stock !== null && hasStock
 
   return (
-    <div 
-      className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 flex flex-col h-full group"
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--org-primary-color, #6366f1)'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = ''
-      }}
-    >
-      <Link to={`${basePath}/product/${product.id}`} className="block overflow-hidden">
-        <div className="w-full bg-gray-200 relative" style={{ aspectRatio: '16/9', minHeight: '192px' }}>
-          {currentImageUrl ? (
-            <img
-              key={currentImageIndex}
-              src={currentImageUrl}
-              alt={capitalizeFirst(product.name)}
-              loading="lazy"
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-              style={{ aspectRatio: '16/9' }}
-              onError={() => {
-                console.error('Error loading product image:', currentImageUrl)
-                // Try next image if available
-                if (currentImageIndex < imageUrls.length - 1) {
-                  setCurrentImageIndex(currentImageIndex + 1)
-                } else {
-                  setCurrentImageIndex(-1)
-                }
-              }}
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-400" style={{ aspectRatio: '16/9' }}>
-              Sin imagen
-            </div>
-          )}
-        </div>
-      </Link>
+    <div className="group bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 flex flex-col h-full">
+      {/* Image area */}
+      <div className="relative overflow-hidden">
+        <Link to={productUrl}>
+          <div className="aspect-square bg-gray-50">
+            {currentImageUrl ? (
+              <img
+                key={currentImageIndex}
+                src={currentImageUrl}
+                alt={capitalizeFirst(product.name)}
+                loading="lazy"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                onError={() => {
+                  if (currentImageIndex < imageUrls.length - 1) {
+                    setCurrentImageIndex(currentImageIndex + 1)
+                  } else {
+                    setCurrentImageIndex(-1)
+                  }
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-200">
+                <Package className="h-14 w-14" />
+              </div>
+            )}
+          </div>
+        </Link>
+
+        {/* Discount badge */}
+        {hasActiveDiscount(product) && (
+          <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm z-10">
+            -{product.discount_percentage}%
+          </span>
+        )}
+
+        {/* Out of stock overlay */}
+        {stock !== null && !hasStock && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+            <span className="bg-gray-800/90 text-white text-xs font-medium px-3 py-1.5 rounded-full tracking-wide">
+              Sin stock
+            </span>
+          </div>
+        )}
+
+        {/* Add to cart button — always visible on mobile, hover-only on desktop */}
+        {showAddButton && (
+          <button
+            onClick={handleAddToCart}
+            disabled={isAdding}
+            className="absolute bottom-3 right-3 rounded-full p-2.5 md:p-3 text-white shadow-lg z-10 md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300 disabled:opacity-50"
+            style={{ backgroundColor: 'var(--org-primary-color, #6366f1)' }}
+            aria-label="Agregar al carrito"
+          >
+            {isAdding ? (
+              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <ShoppingCart className="h-4 w-4" />
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Info */}
       <div className="p-4 flex flex-col flex-grow">
-        <Link to={`${basePath}/product/${product.id}`} className="group/link">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover/link:text-primary-600 transition-colors duration-300">
+        <Link to={productUrl}>
+          <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-snug mb-3 hover:opacity-70 transition-opacity">
             {capitalizeFirst(product.name)}
           </h3>
         </Link>
-        <p className="text-gray-600 text-sm mb-3 line-clamp-2 flex-grow">
-          {capitalizeFirst(product.description) || 'Sin descripción'}
-        </p>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex flex-col gap-0.5">
+
+        <div className="mt-auto flex items-end justify-between gap-2">
+          <div className="min-w-0">
             {hasActiveDiscount(product) && (
-              <div className="flex items-center gap-2">
-                <span className="inline-block bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded">
-                  -{product.discount_percentage}%
-                </span>
-                <span className="text-sm text-gray-400 line-through">
-                  {formatPrice(product.price, settings)}
-                </span>
-              </div>
+              <span className="text-xs text-gray-400 line-through block">
+                {formatPrice(product.price, settings)}
+              </span>
             )}
             <span
-              className="text-2xl font-bold transition-colors"
+              className="text-base font-bold leading-none"
               style={{ color: 'var(--org-primary-color, #6366f1)' }}
             >
               {formatPrice(getEffectivePrice(product), settings)}
             </span>
           </div>
-          <div className="flex items-center space-x-2">
-            {stock === null ? (
-              <span className="text-sm text-gray-400 font-medium">Cargando...</span>
-            ) : hasStock ? (
-              <span className="text-sm text-green-600 font-medium">
-                {hasVariants ? 'En stock (variantes)' : 'En stock'}
-              </span>
-            ) : (
-              <span className="text-sm text-red-600 font-medium">Sin stock</span>
-            )}
-          </div>
+
+          {stock !== null && hasStock && (
+            <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-600">
+              En stock
+            </span>
+          )}
         </div>
-        {!noAddToCart && !hasVariants && (
-          <Button
-            variant="primary"
-            className="w-full mt-auto hover:shadow-md transition-all duration-300 font-semibold"
-            onClick={handleAddToCart}
-            disabled={!hasStock || isAdding}
-            isLoading={isAdding}
-          >
-            <ShoppingCart className="h-4 w-4 mr-2" />
-            Agregar al carrito
-          </Button>
-        )}
+
         {!noAddToCart && hasVariants && (
-          <Link to={`${basePath}/product/${product.id}`} className="mt-auto">
-            <Button variant="outline" className="w-full font-semibold" disabled={!hasStock}>
+          <Link to={productUrl} className="mt-3">
+            <Button variant="outline" size="sm" className="w-full text-xs rounded-xl" disabled={!hasStock}>
               {hasStock ? 'Ver opciones' : 'Sin stock'}
             </Button>
           </Link>

@@ -294,7 +294,7 @@ export function OrderConfirmation() {
     <div className="container-custom py-8">
       <div className="max-w-3xl mx-auto">
 
-        {/* MP-specific status banners — shown when MP redirects back with ?mp_status= */}
+        {/* MP-specific status banners */}
         {order.payment_method === 'mercadopago' && mpStatus === 'failure' && (
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4">
             <AlertCircle className="h-5 w-5 shrink-0 text-red-500 mt-0.5" />
@@ -307,7 +307,19 @@ export function OrderConfirmation() {
           </div>
         )}
 
-        {order.payment_method === 'mercadopago' && mpStatus === 'pending' && (
+        {order.payment_method === 'mercadopago' && order.status === 'processing' && (
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-green-800">Pago confirmado por Mercado Pago</p>
+              <p className="text-sm text-green-700 mt-0.5">
+                Tu pago fue acreditado correctamente. Ya estamos preparando tu orden.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {order.payment_method === 'mercadopago' && order.status === 'pending' && mpStatus !== 'failure' && (
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
             <Clock className="h-5 w-5 shrink-0 text-yellow-600 mt-0.5" />
             <div className="flex-1 min-w-0">

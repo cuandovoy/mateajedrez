@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ProductCard } from '@/components/features/ProductCard'
 import { CategoryCard } from '@/components/features/CategoryCard'
+import { Skeleton, SkeletonProductCard } from '@/components/ui/Skeleton'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { usePublicCategories } from '@/hooks/usePublicCategories'
 import { useStoreProducts } from '@/hooks/usePublicProducts'
@@ -119,7 +120,6 @@ export function PublicStore() {
       : []
   const hasCoverImages = coverImages.length > 0
 
-  // Vitrina settings
   const heroShowTitle    = (settings.store_hero_show_title as boolean) !== false
   const heroShowSubtitle = (settings.store_hero_show_subtitle as boolean) !== false
   const heroShowCta      = (settings.store_hero_show_cta as boolean) !== false
@@ -148,11 +148,16 @@ export function PublicStore() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div 
-          className="animate-spin rounded-full h-12 w-12 border-b-2"
-          style={{ borderColor: `var(--org-primary-color, #6366f1)` }}
-        ></div>
+      <div className="bg-white">
+        <Skeleton className="w-full h-64 md:h-96 rounded-none" />
+        <div className="container-custom py-12">
+          <Skeleton className="h-8 w-40 mx-auto mb-10 rounded-xl" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <SkeletonProductCard key={i} />
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -192,7 +197,7 @@ export function PublicStore() {
                 style={{
                   color: hasCoverImages ? heroTextColor : `var(--org-primary-color, #6366f1)`,
                   fontFamily: `var(--org-font-heading, var(--org-font-family, Poppins))`,
-                  textShadow: hasCoverImages ? '0 1px 2px rgba(0,0,0,0.3)' : undefined,
+                  textShadow: hasCoverImages ? '0 1px 3px rgba(0,0,0,0.25)' : undefined,
                 }}
               >
                 {organization.name}
@@ -201,10 +206,10 @@ export function PublicStore() {
 
             {heroShowSubtitle && (
               <p
-                className="text-lg md:text-xl mb-8"
+                className="text-lg md:text-xl mb-8 max-w-xl"
                 style={{
                   color: hasCoverImages ? heroTextColor : 'rgb(75 85 99)',
-                  textShadow: hasCoverImages ? '0 1px 2px rgba(0,0,0,0.25)' : undefined,
+                  textShadow: hasCoverImages ? '0 1px 2px rgba(0,0,0,0.2)' : undefined,
                 }}
               >
                 {heroSubtitleText}
@@ -215,14 +220,14 @@ export function PublicStore() {
               <Link to={`/${slug}/products`}>
                 <Button
                   size="lg"
-                  className="px-8 py-4 md:px-12 md:py-5 text-base md:text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                  className="px-8 py-4 md:px-10 md:py-4 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-full"
                   style={{
                     backgroundColor: `var(--org-primary-color, #6366f1)`,
                     color: 'white',
                   }}
                 >
-                  Ver Productos
-                  <ArrowRight className="w-5 h-5 ml-2" />
+                  Ver productos
+                  <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
             )}
@@ -232,10 +237,11 @@ export function PublicStore() {
                 {coverImages.map((_, index) => (
                   <span
                     key={`indicator-${index}`}
-                    className="h-2 w-2 rounded-full transition-all"
+                    className="h-1.5 rounded-full transition-all duration-300"
                     style={{
                       backgroundColor: heroTextColor,
-                      opacity: index === currentCoverIndex ? 1 : 0.45,
+                      opacity: index === currentCoverIndex ? 1 : 0.4,
+                      width: index === currentCoverIndex ? '24px' : '6px',
                     }}
                   />
                 ))}
@@ -247,113 +253,74 @@ export function PublicStore() {
 
       {/* Categories Section */}
       {categories.length > 0 && (
-        <section className="py-12 md:py-16 bg-gray-50 border-b border-gray-200">
+        <section className="py-10 md:py-14">
           <div className="container-custom">
-            <div className="text-center mb-10 md:mb-12">
-              <h2 
-                className="text-3xl md:text-4xl font-bold text-gray-900 mb-2"
+            <div className="flex items-center justify-between mb-6">
+              <h2
+                className="text-xl md:text-2xl font-bold text-gray-900"
                 style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, Poppins))` }}
               >
-                Nuestras Categorías
+                Categorías
               </h2>
-              <p className="text-gray-600 text-lg md:text-xl">
-                Explora nuestras colecciones
-              </p>
+              <Link
+                to={`/${slug}/products`}
+                className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
+                style={{ color: 'var(--org-primary-color, #6366f1)' }}
+              >
+                Ver todo
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
-            <div className="w-full max-w-7xl mx-auto px-4 md:px-6">
-              {categories.length <= 2 ? (
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-6 md:gap-8 lg:gap-12">
-                  {categories.map((category) => (
-                    <div key={category.id} className="w-full sm:w-[400px] md:w-[450px] lg:w-[500px]">
-                      <CategoryCard
-                        category={category}
-                        basePath={`/${slug}`}
-                        fallbackImages={categoryFallbackImages.get(category.id) ?? []}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : categories.length <= 4 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 md:gap-8 max-w-4xl mx-auto">
-                  {categories.map((category) => (
-                    <div key={category.id} className="w-full">
-                      <CategoryCard
-                        category={category}
-                        basePath={`/${slug}`}
-                        fallbackImages={categoryFallbackImages.get(category.id) ?? []}
-                      />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
-                  {categories.map((category) => (
-                    <div key={category.id} className="w-full">
-                      <CategoryCard
-                        category={category}
-                        basePath={`/${slug}`}
-                        fallbackImages={categoryFallbackImages.get(category.id) ?? []}
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
+              {categories.map((category) => (
+                <CategoryCard
+                  key={category.id}
+                  category={category}
+                  basePath={`/${slug}`}
+                  fallbackImages={categoryFallbackImages.get(category.id) ?? []}
+                />
+              ))}
             </div>
           </div>
         </section>
       )}
 
       {/* Featured Products Section */}
-      <section className="py-12 md:py-16 bg-white">
-        <div className="container-custom">
-          <div className="text-center mb-10 md:mb-12">
-            <h2 
-              className="text-3xl md:text-4xl font-bold text-gray-900 mb-2"
-              style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, Poppins))` }}
-            >
-              Productos Destacados
-            </h2>
-            <p className="text-gray-600 text-lg md:text-xl">
-              Lo más nuevo de nuestra colección
-            </p>
-          </div>
-
-          {products.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-gray-600 text-lg">
-                No hay productos disponibles
-              </p>
-            </div>
-          ) : (
-            <div className="w-full max-w-7xl mx-auto px-4 md:px-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
-                {products.slice(0, 8).map((product) => (
-                  <div key={product.id} className="w-full">
-                    <ProductCard product={product} noAddToCart={false} basePath={`/${slug}`} />
-                  </div>
-                ))}
-              </div>
-              {products.length > 8 && (
-                <div className="text-center mt-10 md:mt-12">
-                  <Link to={`/${slug}/products`}>
-                    <Button 
-                      size="lg" 
-                      className="px-8 py-3 text-base font-semibold flex items-center justify-center gap-2"
-                      style={{
-                        backgroundColor: `var(--org-primary-color, #6366f1)`,
-                        color: 'white'
-                      }}
-                    >
-                      Ver todos los productos
-                      <ArrowRight className="w-4 h-4" />
-                    </Button>
-                  </Link>
-                </div>
+      {products.length > 0 && (
+        <section className={`py-10 md:py-14 ${categories.length > 0 ? 'border-t border-gray-100' : ''}`}>
+          <div className="container-custom">
+            <div className="flex items-center justify-between mb-6">
+              <h2
+                className="text-xl md:text-2xl font-bold text-gray-900"
+                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, Poppins))` }}
+              >
+                Productos destacados
+              </h2>
+              {products.length > 10 && (
+                <Link
+                  to={`/${slug}/products`}
+                  className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
+                  style={{ color: 'var(--org-primary-color, #6366f1)' }}
+                >
+                  Ver todos
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
               )}
             </div>
-          )}
-        </div>
-      </section>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
+              {products.slice(0, 10).map((product, index) => (
+                <div
+                  key={product.id}
+                  className="animate-fade-in-up"
+                  style={{ animationDelay: `${Math.min(index * 40, 280)}ms` }}
+                >
+                  <ProductCard product={product} noAddToCart={false} basePath={`/${slug}`} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   )
 }

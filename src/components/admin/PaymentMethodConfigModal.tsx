@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react'
 type Props = {
   method: OrganizationPaymentMethod
   onClose: () => void
-  onSaved: () => void
+  onSaved: () => void | Promise<void>
 }
 
 function getConfigValue(config: Record<string, unknown>, field: ConfigField): string | boolean {
@@ -38,8 +38,7 @@ export function PaymentMethodConfigModal({ method, onClose, onSaved }: Props) {
     setValues((prev) => ({ ...prev, [key]: value }))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
     setLoading(true)
     try {
       const configUpdate: Record<string, unknown> = {}
@@ -56,14 +55,16 @@ export function PaymentMethodConfigModal({ method, onClose, onSaved }: Props) {
         }
       }
 
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('organization_payment_methods')
-        .update({ config: configUpdate, updated_at: new Date().toISOString() } as never)
+        .update({ config: configUpdate } as never)
         .eq('id', method.id)
+        .select('id')
 
       if (error) throw error
+      if (!updated || updated.length === 0) throw new Error('No se pudo guardar: sin permisos o fila no encontrada')
       show('Configuración guardada', 'success')
-      onSaved()
+      await onSaved()
       onClose()
     } catch (err) {
       show(err instanceof Error ? err.message : 'Error al guardar', 'error')
@@ -90,7 +91,7 @@ export function PaymentMethodConfigModal({ method, onClose, onSaved }: Props) {
             <X className="h-5 w-5" />
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <div className="p-4 overflow-y-auto space-y-4 flex-1">
             {schema.map((field) => (
               <div key={field.key}>
@@ -104,6 +105,20 @@ export function PaymentMethodConfigModal({ method, onClose, onSaved }: Props) {
                     />
                     <span className="text-sm font-medium text-gray-700">{field.label}</span>
                   </label>
+                ) : field.type === 'textarea' ? (
+                  <>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      {field.label}
+                      {field.required && <span className="text-red-500 ml-0.5">*</span>}
+                    </label>
+                    <textarea
+                      rows={5}
+                      value={String(values[field.key] ?? '')}
+                      onChange={(e) => handleChange(field.key, e.target.value)}
+                      placeholder={field.placeholder}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 resize-none"
+                    />
+                  </>
                 ) : (
                   <>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -127,14 +142,14 @@ export function PaymentMethodConfigModal({ method, onClose, onSaved }: Props) {
             ))}
           </div>
           <div className="flex gap-2 px-4 py-3 border-t shrink-0">
-            <Button type="submit" disabled={loading} className="flex-1">
+            <Button type="button" onClick={handleSubmit} disabled={loading} className="flex-1">
               {loading ? 'Guardando...' : 'Guardar'}
             </Button>
             <Button type="button" variant="outline" onClick={onClose} className="flex-1">
               Cancelar
             </Button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   )

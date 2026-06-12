@@ -14,7 +14,7 @@ export function useOrgPaymentMethods(
 ): {
   methods: OrganizationPaymentMethod[]
   loading: boolean
-  refetch: () => void
+  refetch: () => Promise<void>
 } {
   const { includeInactive = false } = options ?? {}
   const currentOrgId = useOrganizationStore((s) => s.currentOrganization?.id)

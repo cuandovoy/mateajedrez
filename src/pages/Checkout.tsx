@@ -319,6 +319,7 @@ function CheckoutInner() {
       show('Por favor, completa todos los campos obligatorios', 'error')
       return
     }
+    debugger
 
     if (items.length === 0) {
       show('Tu carrito está vacío', 'error')
@@ -333,22 +334,23 @@ function CheckoutInner() {
     }
 
     // reCAPTCHA v3 validation
-    if (executeRecaptcha) {
-      try {
-        const token = await executeRecaptcha('checkout')
-        const { data: captchaResult, error: captchaError } = await supabase.functions.invoke('validate-recaptcha', {
-          body: { token },
-        })
-        if (captchaError || !captchaResult?.success || (captchaResult.score !== null && captchaResult.score < 0.5)) {
-          show('Verificación de seguridad fallida. Por favor intentá de nuevo.', 'error')
-          return
-        }
-      } catch {
-        // Si falla la verificación por error de red/config, se bloquea la orden
-        show('No se pudo completar la verificación de seguridad. Revisá tu conexión.', 'error')
-        return
-      }
-    }
+    // if (executeRecaptcha) {
+    //   try {
+    //     const token = await executeRecaptcha('checkout')
+    //     const { data: captchaResult, error: captchaError } = await supabase.functions.invoke('validate-recaptcha', {
+    //       body: { token },
+    //     })
+    //     if (captchaError || !captchaResult?.success || (captchaResult.score !== null && captchaResult.score < 0.5)) {
+    //       show('Verificación de seguridad fallida. Por favor intentá de nuevo.', 'error')
+    //       return
+    //     }
+    //   } catch (error) {
+    //     console.error('Error during reCAPTCHA validation:', error)
+    //     // Si falla la verificación por error de red/config, se bloquea la orden
+    //     show('No se pudo completar la verificación de seguridad. Revisá tu conexión.', 'error')
+    //     return
+    //   }
+    // }
 
     setLoading(true)
 
@@ -875,8 +877,8 @@ function CheckoutInner() {
 export function Checkout() {
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY ?? ''
   return (
-    <GoogleReCaptchaProvider reCaptchaKey={siteKey}>
+    // <GoogleReCaptchaProvider reCaptchaKey={siteKey}>
+    // </GoogleReCaptchaProvider>
       <CheckoutInner />
-    </GoogleReCaptchaProvider>
   )
 }

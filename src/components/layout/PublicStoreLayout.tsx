@@ -1,5 +1,6 @@
 import { useEffect, ReactNode } from 'react'
 import { PublicStoreHeader } from './PublicStoreHeader'
+import { PublicStoreFooter } from './Footer'
 import { PublicStoreProvider } from '@/contexts/PublicStoreContext'
 import type { Organization } from '@/types/database.types'
 
@@ -49,17 +50,7 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
         <main className="flex-1">
           {children}
         </main>
-        {/* Footer básico opcional */}
-        <footer className="border-t bg-gray-50 py-8 mt-16">
-          <div className="container-custom">
-            <div className="text-center text-gray-600">
-              <p className="font-semibold" style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, Poppins))` }}>
-                {organization.name}
-              </p>
-              <p className="text-sm mt-2">© {new Date().getFullYear()} Todos los derechos reservados</p>
-            </div>
-          </div>
-        </footer>
+        <PublicStoreFooter />
       </div>
     </PublicStoreProvider>
   )

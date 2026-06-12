@@ -4,6 +4,60 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-12 — Mejora visual de la home de la tienda pública (PublicStore)
+
+- **Archivos modificados:** `src/pages/PublicStore.tsx`
+- **Qué cambió:** Sección de categorías rediseñada: se eliminó la lógica de widths condicionales (400-500px para pocas categorías) y se unificó en un grid `grid-cols-2 sm:grid-cols-3 md:grid-cols-4` consistente. Se agregó el link "Ver todo" al header de la sección de categorías. Sección de productos: renombrada a "Productos destacados", headers más compactos (`text-xl` en lugar de `text-2xl md:text-3xl`), espaciado reducido de `py-12 md:py-16` a `py-10 md:py-14` para mayor densidad visual. El threshold de "Ver todos" subió a >10 productos (antes >8).
+
+## 2026-06-12 — Footer profesional con categorías en la tienda pública
+
+- **Archivos modificados:** `src/components/layout/Footer.tsx`, `src/components/layout/PublicStoreLayout.tsx`
+- **Qué cambió:** Se reescribió `Footer.tsx` como `PublicStoreFooter` que usa el contexto de la tienda (`usePublicStore`) y el hook `usePublicCategoriesForMenu` (caché compartido con el header, sin query extra). Muestra: logo + nombre de la org, links rápidos (Ver todos / Carrito), árbol de categorías con subcategorías anidadas bajo una línea izquierda del color primario, y barra de copyright. El `PublicStoreLayout` reemplaza su footer inline por este componente. El color de fondo, bordes y acentos usan el `primaryColor` de la organización con opacidades bajas.
+
+## 2026-06-12 — Fix: filtro de subcategoría mostraba todos los productos del padre
+
+- **Archivos modificados:** `src/pages/CategoryProducts.tsx`
+- **Qué cambió:** Bug de semántica en la lógica de filtrado por subcategoría. La condición `effectiveSelected.length === subcats.length` se disparaba cuando había UNA sola subcategoría y estaba seleccionada (1 === 1), cayendo en la rama "mostrar todo incluyendo padre". Fix: se rediseñó la semántica a `[] = sin filtro, mostrar todo` vs `[ids...] = filtrar a esas subcategorías`. Cambios: (1) `fetchProductsForCategory` solo usa el branch "mostrar todo" cuando `effectiveSelected.length === 0`; (2) al navegar al padre se inicializa con `[]`, al navegar a una subcategoría con `[subcatId]`; (3) "Todas" button siempre pone `[]`; (4) `clearFilters` pone `[]`; (5) `hasActiveFilters` es true cuando `selectedSubcategories.length > 0`; (6) chips UI usan `length === 0` para "Todas" activo.
+
+## 2026-06-12 — Fix: productos de subcategoría no aparecían (product_categories)
+
+- **Archivos modificados:** `src/pages/CategoryProducts.tsx`
+- **Qué cambió:** El filtro de productos solo miraba `products.category_id`, pero los productos pueden tener `category_id` apuntando al padre aunque su subcategoría esté registrada únicamente en `product_categories`. Se refactorizó `fetchProductsForCategory` para: (1) consultar primero la junction table `product_categories` para obtener los IDs de productos en las categorías filtradas, y (2) usar un OR (`category_id.in.(...)` + `id.in.(...)`) para unir ambas fuentes. Si `product_categories` no tiene entradas se usa directamente el filtro por `category_id` como fallback.
+
+## 2026-06-12 — Fix: subcategorías no mostraban productos propios
+
+- **Archivos modificados:** `src/pages/CategoryProducts.tsx`
+- **Qué cambió:** Bug de stale closure en `fetchCategoryAndProducts`. `setParentCategory` se llamaba antes del await de subcategorías, disparando el useEffect de productos con `selectedSubcategories = []` (closure viejo), lo que hacía que la query filtrara por todos los IDs o por el padre en vez de la subcategoría seleccionada. Fix: (1) todos los setters de estado (`setCurrentCategory`, `setParentCategory`, `setSubcategories`, `setSelectedSubcategories`) se agruparon en un solo batch después del último await; (2) se agregó parámetro `overrideSelectedIds` a `fetchProductsForCategory` para pasarle los IDs correctos en la llamada directa inicial, independientemente del estado del closure.
+
+## 2026-06-12 — Rediseño del header de la tienda pública
+
+- **Archivos modificados:** `src/components/layout/PublicStoreHeader.tsx`
+- **Qué cambió:** Rediseño completo del header público. Se eliminó el componente `Dropdown` genérico para categorías (parecía un `<select>`) y la barra de búsqueda siempre visible. Nuevo diseño: (1) Categorías como nav links en el centro con underline animado en hover; las que tienen subcategorías muestran un flyout dropdown con CSS `group-hover:` (sin JS de mouse). (2) Búsqueda expandible: ícono que al hacer click transiciona de `w-9` circular a `w-52` pill con input interno. (3) Mobile menu como accordion — toggle expand/collapse por categoría con subcategorías. (4) Se extrajeron `CategoryNavItem` y `MobileCategoryItem` como subcomponentes. Se eliminaron las dependencias de `Button` y `Dropdown`.
+
+## 2026-06-11 — Refinamiento visual de la tienda pública
+
+- **Archivos modificados:** `src/index.css`, `src/components/ui/Skeleton.tsx`, `src/components/features/ProductCard.tsx`, `src/components/features/CategoryCard.tsx`, `src/components/layout/PublicStoreHeader.tsx`, `src/pages/PublicStore.tsx`, `src/pages/Products.tsx`, `src/pages/CategoryProducts.tsx`, `src/pages/ProductDetail.tsx`
+- **Qué cambió:** Renovación completa del look & feel de la tienda pública: (1) `ProductCard` con imagen cuadrada (1:1), botón flotante de carrito que aparece al hover en desktop / siempre visible en mobile, sin hover JS. (2) `CategoryCard` con overlay de gradiente sobre la imagen en vez de texto debajo — look editorial. (3) Header con `backdrop-blur` y fondo semi-transparente (frosted glass). (4) Filtros de productos y categorías reemplazados por chip pills horizontales (se eliminó el sidebar y el panel mobile colapsable). (5) Vista de lista desktop (`ProductListItem`) reemplazada por grid uniforme en todos los breakpoints. (6) `Skeleton` de loading en lugar de spinners en todas las páginas públicas, más `SkeletonProductCard` nuevo. (7) `ProductDetail` sin `<Card>` pesada — selector de cantidad como botones circulares con `border-t` como separador. (8) Animación de entrada `fadeInUp` escalonada para cards. (9) Sección "Cargar más" con botón pill redondeado.
+
+## 2026-06-11 — Fix orden MP marcada como Cobrada antes de pago y estado de pago en confirmación
+
+- **Archivos modificados:** `supabase/functions/create-mp-preference/index.ts`, `src/pages/OrderConfirmation.tsx`, `src/lib/paymentMethodConfig.ts`, `src/components/admin/PaymentMethodConfigModal.tsx`
+- **Qué cambió:** (1) El placeholder de `order_payment` para MP se insertaba con `amount = total`, haciendo que admin mostrara "Cobrada" inmediatamente. Ahora se inserta con `amount = 0`; el webhook actualiza el monto real al confirmar. (2) La página de confirmación no tenía banner de éxito para MP: ahora muestra verde cuando `order.status === 'processing'` y amarillo con botón "Verificar" cuando `order.status === 'pending'`. (3) Se agrega schema `transfer` en `paymentMethodConfig` con campo `textarea` para instrucciones bancarias, y soporte de `textarea` en el modal de config.
+
+---
+
+## 2026-06-11 — Fix RLS de organization_payment_methods bloquea UPDATE silenciosamente
+
+- **Archivos modificados:** `supabase/migrations/128_fix_payment_methods_rls.sql`, `src/components/admin/PaymentMethodConfigModal.tsx`
+- **Qué cambió:** La política FOR ALL usaba `is_org_admin()` (solo role='admin') mientras el resto del proyecto usa `is_org_admin_or_manager()`. El UPDATE devolvía 0 filas sin error. Se reemplaza la política y se agrega `.select('id')` al update para detectar fallos silenciosos.
+
+## 2026-06-11 — Fix configuración de métodos de pago no persiste al reabrir
+
+- **Archivos modificados:** `src/components/admin/PaymentMethodConfigModal.tsx`, `src/hooks/useOrgPaymentMethods.ts`
+- **Qué cambió:** `handleSubmit` no awaiteaba `onSaved()` antes de cerrar el modal. `invalidateQueries` dispara un refetch async; si el usuario reabrıa el modal antes de que terminara, `configMethod` aún tenía el objeto stale (config vacío). Se agrega `await` y se actualiza el tipo de retorno de `refetch` a `Promise<void>`.
+
+---
+
 ## 2026-06-11 — Fix: aislamiento del carrito por organización en tienda pública
 
 - **Archivos modificados:** `src/store/cartStore.ts`, `src/components/layout/PublicStoreHeader.tsx`

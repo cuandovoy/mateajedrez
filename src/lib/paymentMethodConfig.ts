@@ -4,7 +4,7 @@
  * Escalable: agregar nuevos métodos sin migraciones.
  */
 
-export type ConfigFieldType = 'text' | 'password' | 'number' | 'boolean'
+export type ConfigFieldType = 'text' | 'textarea' | 'password' | 'number' | 'boolean'
 
 export type ConfigField = {
   key: string
@@ -16,6 +16,15 @@ export type ConfigField = {
 }
 
 export const PAYMENT_METHOD_CONFIG_SCHEMAS: Record<string, ConfigField[]> = {
+  transfer: [
+    {
+      key: 'transfer_instructions',
+      label: 'Instrucciones de transferencia',
+      type: 'textarea',
+      placeholder: 'Banco: ...\nCuenta corriente: ...\nAlias / CBU: ...',
+      help: 'Texto que verá el cliente en la confirmación de su compra. Incluí banco, número de cuenta y alias.',
+    },
+  ],
   mercadopago: [
     {
       key: 'access_token',

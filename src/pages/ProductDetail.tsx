@@ -1,7 +1,6 @@
 import { ProductCard } from '@/components/features/ProductCard'
 import { VariantSelector } from '@/components/features/VariantSelector'
 import { Button } from '@/components/ui/Button'
-import { Card, CardContent } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useProductVariants } from '@/hooks/useProductVariants'
@@ -177,11 +176,21 @@ export function ProductDetail() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div
-          className="animate-spin rounded-full h-12 w-12 border-b-2"
-          style={{ borderColor: 'var(--org-primary-color, #6366f1)' }}
-        />
+      <div className="container-custom py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+          <div className="aspect-square bg-gray-100 rounded-2xl animate-pulse" />
+          <div className="space-y-4">
+            <div className="h-5 w-24 bg-gray-100 rounded-full animate-pulse" />
+            <div className="h-9 w-3/4 bg-gray-100 rounded-xl animate-pulse" />
+            <div className="h-7 w-32 bg-gray-100 rounded-xl animate-pulse" />
+            <div className="space-y-2 pt-4">
+              <div className="h-4 w-full bg-gray-100 rounded animate-pulse" />
+              <div className="h-4 w-5/6 bg-gray-100 rounded animate-pulse" />
+              <div className="h-4 w-4/6 bg-gray-100 rounded animate-pulse" />
+            </div>
+            <div className="h-12 w-full bg-gray-100 rounded-xl animate-pulse mt-6" />
+          </div>
+        </div>
       </div>
     )
   }
@@ -447,64 +456,57 @@ export function ProductDetail() {
             />
           </div>
 
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="flex items-center space-x-4 mb-4">
-                <label className="text-sm font-medium text-gray-700">Cantidad:</label>
-                <div className="flex items-center space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={quantity <= 1 || (hasActiveVariants && !selectedVariantId)}
-                  >
-                    -
-                  </Button>
-                  <span className="w-12 text-center font-semibold">{quantity}</span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const currentStock = selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)
-                      setQuantity(Math.min(currentStock, quantity + 1))
-                    }}
-                    disabled={
-                      (hasActiveVariants && !selectedVariantId) ||
-                      quantity >= (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0))
-                    }
-                  >
-                    +
-                  </Button>
-                </div>
+          <div className="mb-6 pt-6 border-t border-gray-100">
+            <div className="flex items-center gap-6 mb-4">
+              <span className="text-sm font-medium text-gray-700">Cantidad</span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  disabled={quantity <= 1 || (hasActiveVariants && !selectedVariantId)}
+                  className="h-9 w-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition-colors text-lg font-light"
+                >
+                  −
+                </button>
+                <span className="w-10 text-center font-semibold text-lg">{quantity}</span>
+                <button
+                  onClick={() => {
+                    const currentStock = selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)
+                    setQuantity(Math.min(currentStock, quantity + 1))
+                  }}
+                  disabled={
+                    (hasActiveVariants && !selectedVariantId) ||
+                    quantity >= (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0))
+                  }
+                  className="h-9 w-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition-colors text-lg font-light"
+                >
+                  +
+                </button>
               </div>
-              <div className="mb-4">
-                <p className="text-sm text-gray-600">
-                  Stock disponible: <span className="font-semibold">
-                    {hasActiveVariants && !selectedVariantId
-                      ? 'Selecciona una variante'
-                      : selectedVariantId
-                      ? (variantStock !== null ? variantStock : 'Cargando...')
-                      : (productStock !== null ? productStock : 'Cargando...')
-                    } {selectedVariant?.unit || product.unit || 'unidad'}
-                  </span>
-                </p>
-              </div>
-              <Button
-                className="w-full"
-                onClick={handleAddToCart}
-                disabled={
-                  (hasActiveVariants && !selectedVariantId) ||
-                  (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)) === 0 ||
-                  isAdding ||
-                  (selectedVariantId ? variantStock === null : productStock === null)
+              <span className="text-sm text-gray-400 ml-auto">
+                {hasActiveVariants && !selectedVariantId
+                  ? 'Seleccioná una variante'
+                  : `${selectedVariantId
+                      ? (variantStock !== null ? variantStock : '…')
+                      : (productStock !== null ? productStock : '…')
+                    } ${selectedVariant?.unit || product.unit || 'unidades'} disponibles`
                 }
-                isLoading={isAdding}
-              >
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                {hasActiveVariants && !selectedVariantId ? 'Selecciona una variante' : 'Agregar al carrito'}
-              </Button>
-            </CardContent>
-          </Card>
+              </span>
+            </div>
+            <Button
+              className="w-full h-12 text-base font-semibold rounded-xl"
+              onClick={handleAddToCart}
+              disabled={
+                (hasActiveVariants && !selectedVariantId) ||
+                (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)) === 0 ||
+                isAdding ||
+                (selectedVariantId ? variantStock === null : productStock === null)
+              }
+              isLoading={isAdding}
+            >
+              <ShoppingCart className="h-5 w-5 mr-2" />
+              {hasActiveVariants && !selectedVariantId ? 'Seleccioná una variante' : 'Agregar al carrito'}
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -27,50 +27,60 @@ export function CategoryCard({ category, basePath = '', fallbackImages = [] }: C
   }, [fallbackImages.length, shouldUseFallback])
 
   return (
-    <Link to={`${basePath}/categories/${category.slug}`}>
-      <div className="group relative bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden hover:shadow-xl hover:border-primary-300 transition-all duration-300 hover:scale-105">
-        <div className="aspect-w-16 aspect-h-9 bg-gray-200 overflow-hidden">
-          {category.image_url ? (
-            <img
-              src={category.image_url}
-              alt={category.name}
-              className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-300"
-            />
-          ) : shouldUseFallback ? (
-            <div className="relative w-full h-48 overflow-hidden">
-              {fallbackImages.map((imageUrl, index) => (
-                <img
-                  key={`${imageUrl}-${index}`}
-                  src={imageUrl}
-                  alt={`${category.name} ${index + 1}`}
-                  className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000"
-                  style={{ opacity: index === fallbackIndex ? 1 : 0 }}
-                />
-              ))}
-              <div className="absolute inset-0 bg-black/10" />
-              {fallbackImages.length > 1 && (
-                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
-                  {fallbackImages.map((_, index) => (
-                    <span
-                      key={`dot-${index}`}
-                      className={`h-1.5 w-1.5 rounded-full ${index === fallbackIndex ? 'bg-white' : 'bg-white/55'}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="w-full h-48 flex items-center justify-center text-gray-400 bg-primary-50">
-              <span className="text-sm">Sin imagen</span>
-            </div>
-          )}
-        </div>
-        <div className="p-4">
-          <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-primary-600 transition-colors duration-300">
+    <Link to={`${basePath}/categories/${category.slug}`} className="block">
+      <div className="group relative rounded-2xl overflow-hidden aspect-[4/3] cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300">
+        {/* Image layer */}
+        {category.image_url ? (
+          <img
+            src={category.image_url}
+            alt={category.name}
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+        ) : shouldUseFallback ? (
+          <div className="absolute inset-0">
+            {fallbackImages.map((imageUrl, index) => (
+              <img
+                key={`${imageUrl}-${index}`}
+                src={imageUrl}
+                alt={`${category.name} ${index + 1}`}
+                className="absolute inset-0 w-full h-full object-cover transition-all duration-1000 group-hover:scale-105"
+                style={{ opacity: index === fallbackIndex ? 1 : 0 }}
+              />
+            ))}
+            {fallbackImages.length > 1 && (
+              <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
+                {fallbackImages.map((_, index) => (
+                  <span
+                    key={`dot-${index}`}
+                    className={`h-1 w-1 rounded-full transition-all ${index === fallbackIndex ? 'bg-white w-3' : 'bg-white/60'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--org-primary-color, #6366f1) 20%, white), color-mix(in srgb, var(--org-secondary-color, #8b5cf6) 15%, white))' }}
+          />
+        )}
+
+        {/* Gradient overlay — always present */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/15 to-transparent" />
+
+        {/* Hover brightening */}
+        <div className="absolute inset-0 bg-white/0 group-hover:bg-white/8 transition-all duration-300" />
+
+        {/* Text */}
+        <div className="absolute bottom-0 left-0 right-0 p-5">
+          <h3
+            className="text-white text-xl font-semibold tracking-tight drop-shadow-sm"
+            style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
+          >
             {category.name}
           </h3>
           {category.description && (
-            <p className="text-gray-600 text-sm line-clamp-2">
+            <p className="text-white/75 text-sm mt-0.5 line-clamp-1">
               {category.description}
             </p>
           )}

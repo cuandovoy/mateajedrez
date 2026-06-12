@@ -27,6 +27,21 @@ export function SkeletonCard() {
   )
 }
 
+export function SkeletonProductCard() {
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white overflow-hidden">
+      <Skeleton className="w-full aspect-square rounded-none" />
+      <div className="p-4 space-y-2">
+        <Skeleton className="h-4 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+        <div className="pt-1">
+          <Skeleton className="h-5 w-24" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function SkeletonTable({ rows = 5 }: { rows?: number }) {
   return (
     <div className="overflow-x-auto">

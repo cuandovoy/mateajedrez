@@ -256,6 +256,34 @@ Principios:
 - No usar `<label>` encima de cada control — el placeholder o el valor seleccionado son suficientes
 - No agregar un campo de solo lectura que no permite interacción (ej: "Ordenar por: Stock")
 
+### Filtros en la tienda pública
+
+**Regla obligatoria**: los filtros de la tienda pública usan **chip pills horizontales**, siempre visibles, sin sidebar ni drawer colapsable.
+
+Principios:
+- Los controles son siempre visibles — no colapsados, no detrás de un botón "Filtros"
+- Contenedor: `flex flex-wrap items-center gap-3`
+- Search: input `rounded-full h-10 pl-9` con ícono `Search` y botón `×` inline
+- Categorías: `<button className="h-10 px-4 rounded-full text-sm font-medium border">` con `style={{ backgroundColor: 'var(--org-primary-color)' }}` cuando está activo
+- Precio: dos inputs `rounded-full h-10 w-28` inline con `—` entre ellos
+- Botón "Limpiar": `text-red-500 border border-red-200 rounded-full hover:bg-red-50`, solo cuando `hasActiveFilters`
+- No usar `<Card>`, `<select>` nativo ni sidebar lateral para filtros de tienda
+
+```tsx
+// Chip de categoría activo
+<button
+  style={{ backgroundColor: 'var(--org-primary-color, #6366f1)' }}
+  className="h-10 px-4 rounded-full text-sm font-medium text-white border-transparent shadow-sm"
+>
+  Nombre categoría
+</button>
+
+// Chip inactivo
+<button className="h-10 px-4 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600 hover:border-gray-300">
+  Nombre categoría
+</button>
+```
+
 ### Responsive
 - Mobile-first siempre: base → `md:` → `lg:`
 - Grids: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3`
@@ -266,6 +294,7 @@ Principios:
 - `.spacing-section` — padding p-4 md:p-6
 - `.focus-ring` — foco tienda pública
 - `.focus-ring-admin` — foco panel admin
+- `.animate-fade-in-up` — animación de entrada para grids de productos (keyframe `fadeInUp` en `index.css`)
 
 ---
 
@@ -456,9 +485,10 @@ function createQueryMock(result: { data: any; error: any }) {
 ### Loading states — usar siempre Skeleton
 - Mientras `loading === true` mostrar skeleton, nunca spinner genérico ni `null`
 - Para tablas admin: `<SkeletonTable rows={pageSize} />`
-- Para cards/grids: `<SkeletonCard />` repetido
+- Para cards/grids admin: `<SkeletonCard />` repetido
+- Para grids de productos en tienda pública: `<SkeletonProductCard />` repetido
 - Para elementos custom: combinar `<Skeleton className="h-4 w-3/4" />` con el layout real
-- Componentes en `src/components/ui/Skeleton.tsx`: `Skeleton`, `SkeletonCard`, `SkeletonTable`
+- Componentes en `src/components/ui/Skeleton.tsx`: `Skeleton`, `SkeletonCard`, `SkeletonTable`, `SkeletonProductCard`
 
 ```tsx
 {loading && <SkeletonTable rows={25} />}
@@ -635,6 +665,31 @@ useEffect(() => {
 
 ---
 
+## Tienda pública — componentes visuales
+
+### ProductCard
+- Imagen: siempre `aspect-square` (1:1) — nunca `16/9` ni altura fija
+- Bordes y sombra: `rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-0.5`
+- Zoom de imagen en hover: `group-hover:scale-105 transition-transform duration-500`
+- Botón "Agregar al carrito": floating `rounded-full` absolutamente posicionado en la esquina inferior derecha de la imagen. En desktop: `md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300`. En mobile: siempre visible. **No** usar un botón `w-full` debajo de la imagen para productos sin variantes.
+- Sin stock: overlay `bg-white/70` con pill `bg-gray-800/90 text-white` centrada — no botón deshabilitado
+- Badge de descuento: `absolute top-3 left-3 rounded-full` — no dentro del body de la card
+
+### CategoryCard
+- Diseño editorial con overlay: imagen a `aspect-[4/3]`, `rounded-2xl`, gradiente `bg-gradient-to-t from-black/65 via-black/15 to-transparent` sobre la imagen
+- Texto (nombre + descripción) sobre el gradiente en la parte inferior — **nunca** en caja blanca debajo de la imagen
+- Hover: `group-hover:scale-105` solo en la imagen, no en la card entera
+
+### Grid de productos
+- Breakpoints estándar: `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5`
+- Vista de lista desktop (`ProductListItem`) **no se usa** en las páginas de tienda — siempre grid
+- Animación de entrada escalonada con `animate-fade-in-up` y `animationDelay: Math.min(index * 35, 260)ms`
+
+### Header de tienda pública
+- Fondo: `backgroundColor: \`${primaryColor}ee\`` (93% opacidad) + `backdropFilter: 'blur(16px)'` — efecto frosted glass
+
+---
+
 ## Lo que NO hacer
 
 - No usar `export default` en componentes
@@ -652,3 +707,8 @@ useEffect(() => {
 - No definir `PAGE_SIZE` en cada componente — importar de `src/lib/constants.ts`
 - No usar `date-fns`, `dayjs` ni `moment` — usar `dateUtils.ts` + `Intl` nativo
 - No suscribirse a Realtime sin filter de `organization_id`
+- No usar sidebar ni drawer colapsable para filtros en la tienda pública — usar chip pills horizontales
+- No usar aspecto `16/9` ni altura fija en imágenes de ProductCard — usar `aspect-square`
+- No mostrar texto de categoría en caja blanca debajo de la imagen en CategoryCard — usar overlay editorial
+- No usar spinner giratorio en grids de productos de la tienda — usar `<SkeletonProductCard />`
+- No usar `onMouseEnter/onMouseLeave` para efectos hover que pueden hacerse con CSS (`group-hover:`)

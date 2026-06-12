@@ -3,11 +3,10 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { ProductCard } from '@/components/features/ProductCard'
-import { ProductListItem } from '@/components/features/ProductListItem'
-import { Input } from '@/components/ui/Input'
+import { Skeleton, SkeletonProductCard } from '@/components/ui/Skeleton'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { ArrowLeft, Filter, X } from 'lucide-react'
+import { ArrowLeft, Search, X, PackageSearch } from 'lucide-react'
 import type { Product, Category } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
 import { getProductsStock } from '@/lib/stock'
@@ -26,13 +25,11 @@ export function CategoryProducts() {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([])
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
-  const [showFilters, setShowFilters] = useState(false)
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const [stockByProduct, setStockByProduct] = useState<Record<string, number>>({})
-
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -47,7 +44,6 @@ export function CategoryProducts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categorySlug, orgId])
 
-  // Debounce search term
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm)
@@ -55,7 +51,6 @@ export function CategoryProducts() {
     return () => clearTimeout(timer)
   }, [searchTerm])
 
-  // Resetear página cuando cambian los filtros
   useEffect(() => {
     setCurrentPage(1)
     setProducts([])
@@ -72,7 +67,6 @@ export function CategoryProducts() {
     if (!categorySlug || !orgId) return
 
     try {
-      // Find category by slug within this org (slug is unique per org)
       const { data: categoryData = null, error: categoryError }: { data: Category | null, error: PostgrestError | null } = await supabase
         .from('categories')
         .select('*')
@@ -83,12 +77,10 @@ export function CategoryProducts() {
       if (categoryError) throw categoryError
 
       if (categoryData) {
-        let parentCategory: Category
+        let parentCat: Category
         let selectedSubcategoryId: string | null = null
 
-        // Check if it's a parent category or a subcategory
         if (categoryData.parent_id) {
-          // It's a subcategory - fetch the parent category
           const { data: parentData, error: parentError } = await supabase
             .from('categories')
             .select('*')
@@ -96,46 +88,38 @@ export function CategoryProducts() {
             .single()
 
           if (parentError) throw parentError
-          if (!parentData) {
-            throw new Error('Parent category not found')
-          }
+          if (!parentData) throw new Error('Parent category not found')
 
-          parentCategory = parentData
+          parentCat = parentData
           selectedSubcategoryId = categoryData.id as string
-          setCurrentCategory(categoryData) // Set the subcategory as current
         } else {
-          // It's a parent category
-          parentCategory = categoryData
-          setCurrentCategory(categoryData) // Set the parent as current
+          parentCat = categoryData
         }
 
-        setParentCategory(parentCategory)
-
-        // Fetch all subcategories of the parent
         const { data: subcats, error: subcatsError }: { data: Category[] | null, error: PostgrestError | null } = await supabase
           .from('categories')
           .select('*')
-          .eq('parent_id', parentCategory.id as string)
+          .eq('parent_id', parentCat.id as string)
           .order('name')
 
+        // Batch all state updates together so the useEffect fires once with correct values
+        setCurrentCategory(categoryData)
+        setParentCategory(parentCat)
+
+        let initialSelectedIds: string[]
         if (!subcatsError && subcats && subcats.length > 0) {
+          // [] = no filter (parent page); [id] = specific subcategory selected
+          initialSelectedIds = selectedSubcategoryId ? [selectedSubcategoryId] : []
           setSubcategories(subcats)
-          
-          // If we navigated to a specific subcategory, select only that one
-          // Otherwise, select all subcategories by default
-          if (selectedSubcategoryId) {
-            setSelectedSubcategories([selectedSubcategoryId])
-          } else {
-            setSelectedSubcategories(subcats.map((cat) => cat.id as string))
-          }
+          setSelectedSubcategories(initialSelectedIds)
         } else {
-          // No subcategories, clear selection
+          initialSelectedIds = []
           setSubcategories([])
           setSelectedSubcategories([])
         }
 
-        // Fetch products initially (pass org from category)
-        await fetchProductsForCategory(parentCategory.id as string, subcats || [], categoryData.organization_id)
+        // Pass initialSelectedIds explicitly — avoids reading stale closure state
+        await fetchProductsForCategory(parentCat.id as string, subcats || [], categoryData.organization_id, 1, false, initialSelectedIds)
       }
     } catch (error) {
       console.error('Error fetching category:', error)
@@ -144,15 +128,32 @@ export function CategoryProducts() {
     }
   }
 
-  const fetchProductsForCategory = async (parentId: string, subcats: Category[], organizationId?: string, page = 1, append = false) => {
+  const fetchProductsForCategory = async (parentId: string, subcats: Category[], organizationId?: string, page = 1, append = false, overrideSelectedIds?: string[]) => {
     try {
-      const allCategoryIds = [parentId]
-      if (subcats.length > 0) {
-        allCategoryIds.push(...subcats.map((cat) => cat.id as string))
+      const effectiveSelected = overrideSelectedIds !== undefined ? overrideSelectedIds : selectedSubcategories
+
+      // [] = no filter → show everything; [ids] = filter to those specific subcategories
+      let filterCategoryIds: string[]
+      if (subcats.length === 0 || effectiveSelected.length === 0) {
+        filterCategoryIds = [parentId, ...subcats.map((c) => c.id as string)]
+      } else {
+        filterCategoryIds = effectiveSelected as string[]
       }
 
+      // Look up product IDs via the product_categories junction table.
+      // Products may have category_id pointing to the parent even when linked to a
+      // subcategory only through product_categories — so we must check both.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = supabase as any
+      const { data: pcLinks } = await sb
+        .from('product_categories')
+        .select('product_id')
+        .in('category_id', filterCategoryIds)
+
+      const junctionProductIds = ((pcLinks ?? []) as { product_id: string }[]).map((l) => l.product_id)
+
       const from = (page - 1) * PAGE_SIZE
-      const to = from + PAGE_SIZE // uno extra para detectar si hay más
+      const to = from + PAGE_SIZE
 
       let query = supabase
         .from('products')
@@ -171,12 +172,14 @@ export function CategoryProducts() {
 
       if (organizationId) query = query.eq('organization_id', organizationId)
 
-      if (subcats.length === 0) {
-        query = query.eq('category_id', parentId as string)
-      } else if (selectedSubcategories.length === 0 || selectedSubcategories.length === subcats.length) {
-        query = query.in('category_id', allCategoryIds)
+      if (junctionProductIds.length > 0) {
+        // Union: products matched via junction OR via direct category_id (legacy)
+        const catList = filterCategoryIds.join(',')
+        const idList = junctionProductIds.join(',')
+        query = query.or(`category_id.in.(${catList}),id.in.(${idList})`)
       } else {
-        query = query.in('category_id', selectedSubcategories as string[])
+        // No junction entries: fall back to direct category_id filter
+        query = query.in('category_id', filterCategoryIds)
       }
 
       if (priceRange.min) query = query.gte('price', parseFloat(priceRange.min))
@@ -214,8 +217,6 @@ export function CategoryProducts() {
     fetchProducts(currentPage + 1, true)
   }
 
-  const filteredProducts = products
-
   const handleSubcategoryToggle = (subcategoryId: string) => {
     setSelectedSubcategories((prev) => {
       if (prev.includes(subcategoryId)) {
@@ -227,40 +228,44 @@ export function CategoryProducts() {
   }
 
   const handleSelectAllSubcategories = () => {
-    if (selectedSubcategories.length === subcategories.length) {
-      // Si todas están seleccionadas, deseleccionar todas
-      setSelectedSubcategories([])
-    } else {
-      // Seleccionar todas
-      setSelectedSubcategories(subcategories.map((cat) => cat.id as string))
-    }
+    setSelectedSubcategories([])
   }
 
   useEffect(() => {
     if (products.length === 0) { setStockByProduct({}); return }
     let cancelled = false
-    const orgId = parentCategory?.organization_id || organization.id
-    getProductsStock(products.map((p) => p.id), null, orgId)
+    const oid = parentCategory?.organization_id || organization.id
+    getProductsStock(products.map((p) => p.id), null, oid)
       .then((stocks) => { if (!cancelled) setStockByProduct(stocks) })
       .catch(() => { if (!cancelled) setStockByProduct({}) })
     return () => { cancelled = true }
   }, [products])
 
   const clearFilters = () => {
-    setSelectedSubcategories(subcategories.map((cat) => cat.id as string))
+    setSelectedSubcategories([])
     setPriceRange({ min: '', max: '' })
     setSearchTerm('')
   }
 
-  const hasActiveFilters = 
-    (selectedSubcategories.length > 0 && selectedSubcategories.length < subcategories.length) ||
-    priceRange.min ||
-    priceRange.max
+  const hasActiveFilters =
+    selectedSubcategories.length > 0 ||
+    !!(priceRange.min || priceRange.max || searchTerm)
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-200"></div>
+      <div className="container-custom py-8">
+        <Skeleton className="h-8 w-48 mb-6 rounded-xl" />
+        <Skeleton className="h-10 w-72 mb-3 rounded-xl" />
+        <div className="flex gap-3 flex-wrap mb-8 mt-6">
+          <Skeleton className="h-10 flex-1 min-w-[200px] rounded-full" />
+          <Skeleton className="h-10 w-20 rounded-full" />
+          <Skeleton className="h-10 w-24 rounded-full" />
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <SkeletonProductCard key={i} />
+          ))}
+        </div>
       </div>
     )
   }
@@ -270,7 +275,7 @@ export function CategoryProducts() {
       <div className="container-custom py-8 text-center">
         <p className="text-gray-600 text-lg mb-4">Categoría no encontrada</p>
         <Link to={slug ? `/${slug}/products` : '/products'}>
-          <Button variant="outline">
+          <Button variant="outline" className="rounded-full">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a productos
           </Button>
@@ -282,270 +287,154 @@ export function CategoryProducts() {
   return (
     <div className="container-custom py-8">
       <Link to={slug ? `/${slug}/products` : '/products'}>
-        <Button variant="ghost" className="mb-6">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a productos
+        <Button variant="ghost" className="mb-6 -ml-2 text-sm rounded-full" size="sm">
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
+          Todos los productos
         </Button>
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <h1
+          className="text-3xl font-bold text-gray-900 mb-1"
+          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
+        >
           {currentCategory?.name || parentCategory?.name}
         </h1>
         {(currentCategory?.description || parentCategory?.description) && (
-          <p className="text-gray-600">
+          <p className="text-gray-500 text-sm mt-1">
             {currentCategory?.description || parentCategory?.description}
           </p>
         )}
-        {currentCategory?.parent_id && parentCategory && (
-          <p className="text-sm text-gray-500 mt-1">
-            Categoría: {parentCategory.name}
-          </p>
-        )}
-        <div className="flex flex-col md:flex-row gap-4 mt-4">
-          <Input
-            type="text"
-            placeholder="Buscar productos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1"
-          />
-          <Button
-            variant="outline"
-            onClick={() => setShowFilters(!showFilters)}
-            className="md:hidden"
-          >
-            <Filter className="h-4 w-4 mr-2" />
-            Filtros
-          </Button>
-        </div>
       </div>
 
-      <div className="flex gap-8">
-        {/* Sidebar de filtros - Desktop */}
-        <aside className="hidden md:block w-64 flex-shrink-0">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Filtros</CardTitle>
-                {hasActiveFilters && (
-                  <button
-                    onClick={clearFilters}
-                    className="text-sm text-primary-200 hover:text-primary-300"
-                  >
-                    Limpiar
-                  </button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Filtro por subcategoría */}
-              {subcategories.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Subcategorías
-                    </label>
-                    <button
-                      onClick={handleSelectAllSubcategories}
-                      className="text-xs text-primary-200 hover:text-primary-300"
-                    >
-                      {selectedSubcategories.length === subcategories.length
-                        ? 'Deseleccionar todas'
-                        : 'Seleccionar todas'}
-                    </button>
-                  </div>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    <label className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={selectedSubcategories.length === subcategories.length}
-                        onChange={handleSelectAllSubcategories}
-                        className="h-4 w-4 text-primary-200 focus:ring-primary-200 border-gray-300 rounded"
-                      />
-                      <span className="text-sm text-gray-700 font-medium">Todas</span>
-                    </label>
-                    {subcategories.map((subcat) => (
-                      <label
-                        key={subcat.id as string}
-                        className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedSubcategories.includes(subcat.id as string as string)}
-                          onChange={() => handleSubcategoryToggle(subcat.id as string)}
-                          className="h-4 w-4 text-primary-200 focus:ring-primary-200 border-gray-300 rounded"
-                        />
-                        <span className="text-sm text-gray-700">{subcat.name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
+      {/* Filter bar */}
+      <div className="flex flex-wrap items-center gap-3 mb-8">
+        {/* Search */}
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar en esta categoría..."
+            className="w-full h-10 pl-9 pr-8 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:ring-2 transition-shadow"
+          />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
 
-              {/* Filtro por precio */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Rango de Precio
-                </label>
-                <div className="space-y-2">
-                  <Input
-                    type="number"
-                    placeholder="Precio mínimo"
-                    value={priceRange.min}
-                    onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Precio máximo"
-                    value={priceRange.max}
-                    onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </aside>
-
-        {/* Filtros móviles */}
-        {showFilters && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 md:hidden">
-            <div className="absolute right-0 top-0 h-full w-80 bg-white shadow-xl overflow-y-auto">
-              <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Filtros</h2>
+        {/* Subcategory chips */}
+        {subcategories.length > 0 && (
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={handleSelectAllSubcategories}
+              className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
+                selectedSubcategories.length === 0
+                  ? 'text-white border-transparent shadow-sm'
+                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+              }`}
+              style={selectedSubcategories.length === 0 ? { backgroundColor: 'var(--org-primary-color, #6366f1)' } : undefined}
+            >
+              Todas
+            </button>
+            {subcategories.map((subcat) => {
+              const isActive = selectedSubcategories.includes(subcat.id as string)
+              return (
                 <button
-                  onClick={() => setShowFilters(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
+                  key={subcat.id as string}
+                  onClick={() => handleSubcategoryToggle(subcat.id as string)}
+                  className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
+                    isActive
+                      ? 'text-white border-transparent shadow-sm'
+                      : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                  style={isActive ? { backgroundColor: 'var(--org-primary-color, #6366f1)' } : undefined}
                 >
-                  <X className="h-5 w-5" />
+                  {subcat.name}
                 </button>
-              </div>
-              <div className="p-4 space-y-6">
-                {subcategories.length > 0 && (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Subcategorías
-                      </label>
-                      <button
-                        onClick={handleSelectAllSubcategories}
-                        className="text-xs text-primary-200 hover:text-primary-300"
-                      >
-                        {selectedSubcategories.length === subcategories.length
-                          ? 'Deseleccionar todas'
-                          : 'Seleccionar todas'}
-                      </button>
-                    </div>
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      <label className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedSubcategories.length === subcategories.length}
-                          onChange={handleSelectAllSubcategories}
-                          className="h-4 w-4 text-primary-200 focus:ring-primary-200 border-gray-300 rounded"
-                        />
-                        <span className="text-sm text-gray-700 font-medium">Todas</span>
-                      </label>
-                      {subcategories.map((subcat) => (
-                        <label
-                          key={subcat.id as string}
-                          className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedSubcategories.includes(subcat.id as string)}
-                            onChange={() => handleSubcategoryToggle(subcat.id as string)}
-                            className="h-4 w-4 text-primary-200 focus:ring-primary-200 border-gray-300 rounded"
-                          />
-                          <span className="text-sm text-gray-700">{subcat.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Rango de Precio
-                  </label>
-                  <div className="space-y-2">
-                    <Input
-                      type="number"
-                      placeholder="Precio mínimo"
-                      value={priceRange.min}
-                      onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Precio máximo"
-                      value={priceRange.max}
-                      onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <Button onClick={() => setShowFilters(false)} className="w-full">
-                  Aplicar Filtros
-                </Button>
-              </div>
-            </div>
+              )
+            })}
           </div>
         )}
 
-        {/* Lista de productos */}
-        <div className="flex-1">
-          {filteredProducts.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600 text-lg">
-                {searchTerm || hasActiveFilters
-                  ? 'No se encontraron productos con los filtros seleccionados'
-                  : 'No hay productos disponibles en esta categoría'}
-              </p>
-              {hasActiveFilters && (
-                <Button onClick={clearFilters} className="mt-4" variant="outline">
-                  Limpiar filtros
-                </Button>
-              )}
-            </div>
-          ) : (
-            <>
-              {/* Vista Cards para móvil y tablet */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:hidden gap-6">
-                {filteredProducts.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    stock={stockByProduct[product.id]}
-                    basePath={slug ? `/${slug}` : ''}
-                  />
-                ))}
-              </div>
-
-              {/* Vista Lista para desktop */}
-              <div className="hidden lg:block space-y-4">
-                {filteredProducts.map((product) => (
-                  <ProductListItem
-                    key={product.id}
-                    product={product}
-                    stock={stockByProduct[product.id]}
-                    basePath={slug ? `/${slug}` : ''}
-                  />
-                ))}
-              </div>
-
-              {(hasMore || isLoadingMore) && (
-                <div className="mt-8 flex justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={handleLoadMore}
-                    disabled={isLoadingMore}
-                  >
-                    {isLoadingMore ? 'Cargando...' : 'Cargar más'}
-                  </Button>
-                </div>
-              )}
-            </>
+        {/* Price range */}
+        <div className="flex items-center gap-2 ml-auto">
+          <input
+            type="number"
+            placeholder="Mín."
+            value={priceRange.min}
+            onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
+            className="w-24 h-10 px-3 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 bg-white"
+          />
+          <span className="text-gray-400 text-sm">—</span>
+          <input
+            type="number"
+            placeholder="Máx."
+            value={priceRange.max}
+            onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
+            className="w-24 h-10 px-3 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 bg-white"
+          />
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="h-10 px-3 text-sm text-red-500 border border-red-200 rounded-full hover:bg-red-50 transition-colors"
+            >
+              Limpiar
+            </button>
           )}
         </div>
       </div>
+
+      {/* Products grid */}
+      {products.length === 0 ? (
+        <EmptyState
+          icon={PackageSearch}
+          title={hasActiveFilters ? 'Sin resultados' : 'Sin productos'}
+          description={
+            hasActiveFilters
+              ? 'No encontramos productos con esos filtros.'
+              : 'No hay productos disponibles en esta categoría.'
+          }
+          action={hasActiveFilters ? { label: 'Limpiar filtros', onClick: clearFilters } : undefined}
+        />
+      ) : (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
+            {products.map((product, index) => (
+              <div
+                key={product.id}
+                className="animate-fade-in-up"
+                style={{ animationDelay: `${Math.min(index * 30, 250)}ms` }}
+              >
+                <ProductCard
+                  product={product}
+                  stock={stockByProduct[product.id]}
+                  basePath={slug ? `/${slug}` : ''}
+                />
+              </div>
+            ))}
+          </div>
+
+          {(hasMore || isLoadingMore) && (
+            <div className="mt-10 flex justify-center">
+              <Button
+                variant="outline"
+                onClick={handleLoadMore}
+                disabled={isLoadingMore}
+                className="rounded-full px-8"
+              >
+                {isLoadingMore ? 'Cargando...' : 'Cargar más'}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
