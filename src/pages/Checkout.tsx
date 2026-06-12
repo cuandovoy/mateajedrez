@@ -1,25 +1,23 @@
+import { BillerCheckoutPanel } from '@/components/features/BillerCheckoutPanel'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
-import { BillerCheckoutPanel } from '@/components/features/BillerCheckoutPanel'
-import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
-import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
-import { supabase } from '@/lib/supabase'
-import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { capitalizeFirst, formatPrice, getEffectivePrice, hasActiveDiscount, getProductImageUrl } from '@/lib/utils'
+import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
+import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
+import { supabase } from '@/lib/supabase'
+import { capitalizeFirst, formatPrice, getEffectivePrice, getProductImageUrl, hasActiveDiscount } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
-import type { Branch, CartItemWithProduct, Order } from '@/types'
-import type { ProductImage } from '@/types'
+import type { Branch, CartItemWithProduct, Order, ProductImage } from '@/types'
+import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { BranchInventory, Customer } from '@/types/database.types'
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3'
 
 // Icon map for known payment method keys
 const PAYMENT_METHOD_ICONS: Record<string, React.ReactNode> = {
@@ -47,7 +45,7 @@ function CheckoutInner() {
   const settings = useOrgSettings()
   const { items, getTotal, clearCart } = useCartStore()
   const { user } = useAuthStore()
-  const { executeRecaptcha } = useGoogleReCaptcha()
+  // const { executeRecaptcha } = useGoogleReCaptcha()
   const orgFromStore = useOrganizationStore((s) => s.currentOrganization?.id)
   const orgFromCart = items[0] && 'product' in items[0] ? (items[0] as CartItemWithProduct).product?.organization_id : null
   const organizationId = orgFromStore ?? orgFromCart
@@ -875,7 +873,7 @@ function CheckoutInner() {
 }
 
 export function Checkout() {
-  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY ?? ''
+  // const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY ?? ''
   return (
     // <GoogleReCaptchaProvider reCaptchaKey={siteKey}>
     // </GoogleReCaptchaProvider>
