@@ -121,12 +121,14 @@ export function POSCheckout({
               'w-full flex items-center gap-3 h-11 px-3 border rounded-lg text-sm transition-colors',
               selectedCustomer
                 ? 'border-admin-300 bg-admin-50 text-admin-800'
+                : isCreditSale
+                ? 'border-amber-300 bg-amber-50 text-amber-700 hover:border-amber-400'
                 : 'border-gray-200 bg-white text-gray-500 hover:border-gray-300'
             )}
           >
-            <UserCheck className={cn('h-4 w-4 flex-shrink-0', selectedCustomer ? 'text-admin-600' : 'text-gray-400')} />
+            <UserCheck className={cn('h-4 w-4 flex-shrink-0', selectedCustomer ? 'text-admin-600' : isCreditSale ? 'text-amber-500' : 'text-gray-400')} />
             <span className="flex-1 text-left truncate">
-              {selectedCustomer ? selectedCustomer.full_name : 'Agregar cliente (opcional)'}
+              {selectedCustomer ? selectedCustomer.full_name : isCreditSale ? 'Cliente requerido para venta a crédito' : 'Agregar cliente (opcional)'}
             </span>
             {selectedCustomer && (
               <span
@@ -248,10 +250,10 @@ export function POSCheckout({
 
           <button
             onClick={handleConfirm}
-            disabled={loading || (!isCreditSale && !paymentMethod)}
+            disabled={loading || (!isCreditSale && !paymentMethod) || (isCreditSale && !selectedCustomer)}
             className={cn(
               'w-full h-12 rounded-xl text-sm font-semibold transition-all',
-              loading || (!isCreditSale && !paymentMethod)
+              loading || (!isCreditSale && !paymentMethod) || (isCreditSale && !selectedCustomer)
                 ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 : 'bg-admin-600 text-white hover:bg-admin-700 active:scale-[0.98]'
             )}

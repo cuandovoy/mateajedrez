@@ -227,7 +227,10 @@ export function AdminOrderDetail() {
   const orderManualItems = orderData?.manualItems ?? []
   const billerComprobante = orderData?.cfe ?? null
   const billerConfig = orderData?.billerConfig ?? null
-  const invalidateOrder = () => queryClient.invalidateQueries({ queryKey: orderKey })
+  const invalidateOrder = () => {
+    queryClient.invalidateQueries({ queryKey: orderKey })
+    queryClient.invalidateQueries({ queryKey: ['admin', organizationId!, 'debtors'] })
+  }
 
   const { data: products = [] } = useQuery({
     queryKey: ['admin', organizationId!, 'products', 'with-default-variants'],

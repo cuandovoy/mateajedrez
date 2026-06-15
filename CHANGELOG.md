@@ -4,6 +4,38 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-15 — Página de deudores y saldo pendiente en detalle de cliente
+
+- **Archivos modificados:** `src/pages/admin/AdminDebtors.tsx` (nuevo), `src/pages/admin/AdminCustomerDetail.tsx`, `src/App.tsx`, `src/components/layout/AdminLayout.tsx`
+- **Qué cambió:** Nueva página `/customers/deudores` que lista clientes con saldo pendiente en órdenes activas, con exportación CSV. En el detalle de cliente: la query de órdenes ahora incluye `order_payments`, se computa el pendiente por orden, se agrega KPI "Saldo pendiente" (solo cuando > 0) y columna "Pendiente" en la tabla de historial. Sidebar actualizado con subItems para Clientes (Todos / Deudores).
+
+---
+
+## 2026-06-15 — Guardia de cliente requerido en ventas a crédito
+
+- **Archivos modificados:** `src/components/pos/POSCheckout.tsx`, `src/components/admin/ManualSaleForm.tsx`
+- **Qué cambió:** Ventas a crédito sin cliente registrado generaban deuda fantasma (órdenes con `customer_id = null` y sin pago registrado, imposibles de cobrar). Ahora: (1) POS — el botón "Confirmar" se deshabilita cuando la condición es crédito y no hay cliente seleccionado; el campo de cliente cambia a ámbar con texto "Cliente requerido para venta a crédito". (2) Venta manual admin — el submit se deshabilita si `sale_condition === 'credito'` y no hay cliente vinculado ni nombre/teléfono ingresados manualmente; aparece mensaje de alerta en la sección de cliente.
+
+## 2026-06-14 — Fix UX baja prioridad en panel de clientes
+
+- **Archivos modificados:** `src/components/pos/POSCustomerSearch.tsx`, `src/pages/admin/AdminCustomerReports.tsx`
+- **Qué cambió:** (1) `POSCustomerSearch`: navegación por teclado completa — ArrowUp/Down mueve el foco entre resultados (con scroll automático), Enter selecciona, Escape cierra. Los clientes recientes (guardados en localStorage por org) se muestran en el estado vacío inicial en lugar de solo texto de ayuda. (2) `AdminCustomerReports`: tabla "Base de clientes" reemplaza el cap fijo de 200 filas por paginación progresiva — 100 filas iniciales, botón "Mostrar más (N restantes)" que añade 100 por click; se reinicia automáticamente cuando cambian filtros o datos.
+
+## 2026-06-14 — Fix UX media prioridad en panel de clientes
+
+- **Archivos modificados:** `src/pages/admin/AdminCustomers.tsx`, `src/pages/admin/AdminCustomerDetail.tsx`, `src/pages/admin/AdminCustomerReports.tsx`, `src/components/pos/POSCustomerSearch.tsx`
+- **Qué cambió:** (1) `AdminCustomers`: sorting por columna en Nombre (server-side) y Pedidos (client-side en la página), con indicador ChevronUp/Down; acción "Ver ficha" agregada como primer ítem en ambos ActionsMenu (mobile y desktop). (2) `AdminCustomerDetail`: teléfono y email son links `tel:` y `mailto:`; badge "Inactivo" en el header cuando corresponde; historial de órdenes muestra 20 a la vez con botón "Mostrar más". (3) `AdminCustomerReports`: gráfico de barras recharts para evolución mensual; botón "Limpiar" en filtros de fecha/sucursal. (4) `POSCustomerSearch`: error de red distinguido del resultado vacío, con botón "Reintentar".
+
+## 2026-06-14 — Fix UX alta prioridad en panel de clientes
+
+- **Archivos modificados:** `src/lib/constants.ts`, `src/pages/admin/AdminCustomers.tsx`, `src/pages/admin/AdminCustomerDetail.tsx`, `src/pages/admin/AdminCustomerReports.tsx`
+- **Qué cambió:** (1) `constants.ts`: agregado `ACTIVE_ORDER_STATUSES` como fuente única de verdad para estados activos de órdenes. (2) `AdminCustomerDetail`: usa la constante compartida; KPI "Órdenes totales" y "Total gastado" ahora excluyen canceladas y son consistentes entre sí y con Reports. (3) `AdminCustomers`: reemplazado `window.confirm` por modal de confirmación con badge de advertencia cuando el cliente tiene órdenes asociadas. (4) `AdminCustomerReports`: primera carga muestra skeleton layout en lugar de spinner; recargas por filtro usan overlay semitransparente + badge "Actualizando..." sin desaparecer el contenido; nombres de clientes en las tres tablas son links clickeables a su ficha.
+
+## 2026-06-14 — Fix UX críticos en panel de clientes
+
+- **Archivos modificados:** `src/pages/admin/AdminCustomerReports.tsx`, `src/pages/admin/AdminCustomerDetail.tsx`, `src/components/pos/POSCustomerSearch.tsx`
+- **Qué cambió:** (1) `AdminCustomerReports`: reemplazado fetch masivo de todas las órdenes con filtrado client-side por dos queries server-side: una con rango de fecha para el período y otra mínima (solo `customer_id, created_at`) para el histórico de primera/última compra por cliente. (2) `AdminCustomerDetail`: agregado modal de edición con campos full_name, email, phone, rut, notas; botón "Editar" en el header; `navigate(-1)` reemplaza `navigate('/customers')` para preservar el estado del listado. (3) `POSCustomerSearch`: cuando la búsqueda no da resultados se muestra "Crear {query}" que abre un mini-form inline para dar de alta el cliente sin salir del POS.
+
 ## 2026-06-12 — Mejora visual de la home de la tienda pública (PublicStore)
 
 - **Archivos modificados:** `src/pages/PublicStore.tsx`

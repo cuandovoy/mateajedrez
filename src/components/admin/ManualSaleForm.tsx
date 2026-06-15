@@ -198,6 +198,13 @@ export function ManualSaleForm({
   })
 
   const saleCondition = watch('sale_condition')
+  const customerNameWatch = watch('customer_name')
+  const customerPhoneWatch = watch('customer_phone')
+  const creditNeedsCustomer =
+    saleCondition === 'credito' &&
+    !linkedCustomer &&
+    !customerNameWatch?.trim() &&
+    !customerPhoneWatch?.trim()
 
   // Update payment method default when cash session or payment methods change
   useEffect(() => {
@@ -1606,6 +1613,10 @@ export function ManualSaleForm({
                     {[linkedCustomer.phone, linkedCustomer.rut ? `RUT ${linkedCustomer.rut}` : ''].filter(Boolean).join(' · ')}
                   </p>
                 </div>
+              ) : creditNeedsCustomer ? (
+                <p className="text-xs text-amber-600 font-medium">
+                  Requerido para ventas a crédito. Elegí un cliente o ingresá nombre/teléfono.
+                </p>
               ) : (
                 <p className="text-xs text-gray-400">Venta mostrador (sin cliente asignado)</p>
               )}
@@ -1646,7 +1657,7 @@ export function ManualSaleForm({
             <Button
               type="submit"
               className="w-full"
-              disabled={loading || saleLines.length === 0}
+              disabled={loading || saleLines.length === 0 || creditNeedsCustomer}
             >
               {loading ? 'Registrando...' : `Registrar Venta · ${formatPrice(total, settings)}`}
             </Button>

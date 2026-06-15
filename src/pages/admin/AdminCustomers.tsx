@@ -13,8 +13,10 @@ import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { useToastStore } from '@/store/toastStore'
 import type { Customer } from '@/types/database.types'
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Download,
   Edit,
   ExternalLink,
@@ -32,7 +34,7 @@ import {
   X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 
 interface CustomerForm {
@@ -64,6 +66,7 @@ export function AdminCustomers() {
   const settings = useOrgSettings()
   const { show } = useToastStore()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   // UI state
   const [searchTerm, setSearchTerm] = useState('')
@@ -75,6 +78,10 @@ export function AdminCustomers() {
   const [formData, setFormData] = useState<CustomerForm>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [exportingCsv, setExportingCsv] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; full_name: string; orderCount: number } | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [sortKey, setSortKey] = useState<'full_name' | 'created_at' | 'orders'>('created_at')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -90,6 +97,8 @@ export function AdminCustomers() {
     page: currentPage,
     search: debouncedSearch,
     activeOnly: filterActiveOnly,
+    sortKey,
+    sortDir,
   })
 
   const { data: listData, isPending: loading } = useQuery({
@@ -98,13 +107,19 @@ export function AdminCustomers() {
       const from = (currentPage - 1) * PAGE_SIZE_ADMIN
       const to = from + PAGE_SIZE_ADMIN - 1
 
+      const ascending = sortDir === 'asc'
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let q = (supabase as any)
         .from('customers')
         .select('*', { count: 'exact' })
         .eq('organization_id', organizationId!)
-        .order('created_at', { ascending: false })
         .range(from, to)
+
+      if (sortKey !== 'orders') {
+        q = q.order(sortKey, { ascending })
+      } else {
+        q = q.order('created_at', { ascending: false })
+      }
 
       if (debouncedSearch.trim())
         q = q.or(
@@ -131,7 +146,15 @@ export function AdminCustomers() {
         }
       }
 
-      return { customers: (customersData || []) as Customer[], totalCount: count || 0, orderCountMap }
+      const rawCustomers = (customersData || []) as Customer[]
+      const sortedCustomers = sortKey === 'orders'
+        ? [...rawCustomers].sort((a, b) => {
+            const diff = (orderCountMap[b.id] ?? 0) - (orderCountMap[a.id] ?? 0)
+            return sortDir === 'asc' ? -diff : diff
+          })
+        : rawCustomers
+
+      return { customers: sortedCustomers, totalCount: count || 0, orderCountMap }
     },
     enabled: !!organizationId,
     placeholderData: keepPreviousData,
@@ -174,6 +197,12 @@ export function AdminCustomers() {
 
   const invalidateCustomers = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.customers.all(organizationId!) })
+
+  const handleSort = (key: typeof sortKey) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+    setCurrentPage(1)
+  }
 
   // ─── HANDLERS ────────────────────────────────────────────────────────────────
 
@@ -244,16 +273,27 @@ export function AdminCustomers() {
     setShowForm(true)
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que deseas eliminar este cliente?')) return
+  const handleDelete = (customer: Customer) => {
+    setDeleteTarget({
+      id: customer.id,
+      full_name: customer.full_name,
+      orderCount: orderCountMap[customer.id] ?? 0,
+    })
+  }
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
-      const { error } = await supabase.from('customers').delete().eq('id', id)
+      const { error } = await supabase.from('customers').delete().eq('id', deleteTarget.id)
       if (error) throw error
       show('Cliente eliminado correctamente', 'success')
       invalidateCustomers()
-    } catch (error) {
-      console.error('Error deleting customer:', error)
+      setDeleteTarget(null)
+    } catch {
       show('Error al eliminar cliente', 'error')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -608,6 +648,11 @@ export function AdminCustomers() {
                           <ActionsMenu
                             actions={[
                               {
+                                label: 'Ver ficha',
+                                icon: <ExternalLink className="h-4 w-4" />,
+                                onClick: () => navigate(`/customers/${customer.id}`),
+                              },
+                              {
                                 label: 'WhatsApp',
                                 icon: <MessageCircle className="h-4 w-4" />,
                                 onClick: () => handleWhatsApp(customer.phone, customer.full_name),
@@ -625,7 +670,7 @@ export function AdminCustomers() {
                               {
                                 label: 'Eliminar',
                                 icon: <Trash2 className="h-4 w-4" />,
-                                onClick: () => handleDelete(customer.id),
+                                onClick: () => handleDelete(customer),
                                 variant: 'danger',
                               },
                             ]}
@@ -664,10 +709,34 @@ export function AdminCustomers() {
                   <table className="w-full">
                     <thead className="border-b">
                       <tr>
-                        <th className="text-left py-3 px-4 font-semibold text-gray-900">Nombre</th>
+                        <th
+                          className="text-left py-3 px-4 font-semibold text-gray-900 cursor-pointer select-none hover:bg-gray-50 group"
+                          onClick={() => handleSort('full_name')}
+                        >
+                          <span className="flex items-center gap-1">
+                            Nombre
+                            <span className="text-gray-400">
+                              {sortKey === 'full_name'
+                                ? (sortDir === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)
+                                : <ChevronUp className="h-3.5 w-3.5 opacity-0 group-hover:opacity-40" />}
+                            </span>
+                          </span>
+                        </th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-900">Contacto</th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-900">Dirección</th>
-                        <th className="text-center py-3 px-4 font-semibold text-gray-900">Pedidos</th>
+                        <th
+                          className="text-center py-3 px-4 font-semibold text-gray-900 cursor-pointer select-none hover:bg-gray-50 group"
+                          onClick={() => handleSort('orders')}
+                        >
+                          <span className="flex items-center justify-center gap-1">
+                            Pedidos
+                            <span className="text-gray-400">
+                              {sortKey === 'orders'
+                                ? (sortDir === 'asc' ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)
+                                : <ChevronUp className="h-3.5 w-3.5 opacity-0 group-hover:opacity-40" />}
+                            </span>
+                          </span>
+                        </th>
                         <th className="text-left py-3 px-4 font-semibold text-gray-900">Registro</th>
                         <th className="text-right py-3 px-4 font-semibold text-gray-900">Acciones</th>
                       </tr>
@@ -747,6 +816,11 @@ export function AdminCustomers() {
                               <ActionsMenu
                                 actions={[
                                   {
+                                    label: 'Ver ficha',
+                                    icon: <ExternalLink className="h-4 w-4" />,
+                                    onClick: () => navigate(`/customers/${customer.id}`),
+                                  },
+                                  {
                                     label: 'WhatsApp',
                                     icon: <MessageCircle className="h-4 w-4" />,
                                     onClick: () => handleWhatsApp(customer.phone, customer.full_name),
@@ -766,7 +840,7 @@ export function AdminCustomers() {
                                   {
                                     label: 'Eliminar',
                                     icon: <Trash2 className="h-4 w-4" />,
-                                    onClick: () => handleDelete(customer.id),
+                                    onClick: () => handleDelete(customer),
                                     variant: 'danger',
                                   },
                                 ]}
@@ -812,6 +886,37 @@ export function AdminCustomers() {
             )}
           </CardContent>
         </Card>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+            <div className="px-6 pt-6 pb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Eliminar cliente</h2>
+              <p className="mt-2 text-sm text-gray-600">
+                ¿Eliminar a <span className="font-medium">{deleteTarget.full_name}</span>?
+                Esta acción no se puede deshacer.
+              </p>
+              {deleteTarget.orderCount > 0 && (
+                <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                  Este cliente tiene <span className="font-semibold">{deleteTarget.orderCount} orden{deleteTarget.orderCount !== 1 ? 'es' : ''}</span> asociada{deleteTarget.orderCount !== 1 ? 's' : ''}. Eliminarlo no borrará las órdenes pero perderás el vínculo con este cliente.
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 px-6 pb-5">
+              <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+              >
+                {deleting ? 'Eliminando...' : 'Eliminar'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

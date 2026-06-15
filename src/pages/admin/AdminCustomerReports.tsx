@@ -8,7 +8,9 @@ import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { Branch } from '@/types'
 import { Calendar, Download, Search, TrendingDown, UserPlus, Users2 } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 
 type ScopeOrder = {
   id: string
@@ -152,8 +154,10 @@ export function AdminCustomerReports() {
   const [searchTerm, setSearchTerm] = useState('')
   const [segmentFilter, setSegmentFilter] = useState<SegmentFilter>('all')
   const [sortKey, setSortKey] = useState<CustomerSortKey>('net_sales')
+  const [visibleCustomers, setVisibleCustomers] = useState(100)
 
   const requestSeqRef = useRef(0)
+  const hasEverLoaded = useRef(false)
   const invalidRange = draftStartDate > draftEndDate
   const hasPendingChanges =
     draftBranchId !== selectedBranchId || draftStartDate !== startDate || draftEndDate !== endDate
@@ -202,6 +206,9 @@ export function AdminCustomerReports() {
       return b.netSales - a.netSales
     })
   }, [customers, searchTerm, segmentFilter, sortKey, startDate, endDate])
+
+  // Reset visible rows whenever the filtered result set changes
+  useEffect(() => { setVisibleCustomers(100) }, [searchTerm, segmentFilter, sortKey, customers])
 
   const pendingPortfolio = useMemo(
     () => customers.reduce((sum, customer) => sum + customer.pending, 0),
@@ -253,6 +260,8 @@ export function AdminCustomerReports() {
         .select('id, customer_id, branch_id, created_at, total, subtotal_before_discount, discount_total, shipping_address')
         .eq('organization_id', organizationId)
         .in('status', ['pending_allocation', 'pending', 'processing', 'shipped', 'delivered'])
+        .gte('created_at', `${startDate}T00:00:00`)
+        .lte('created_at', `${endDate}T23:59:59`)
 
       if (selectedBranchId) {
         ordersQuery = ordersQuery.eq('branch_id', selectedBranchId)
@@ -262,26 +271,36 @@ export function AdminCustomerReports() {
       if (ordersError) throw ordersError
       if (requestId !== requestSeqRef.current) return
 
-      const scopedOrders = (ordersData || []) as ScopeOrder[]
+      const periodOrders = (ordersData || []) as ScopeOrder[]
       const rangeStart = new Date(`${startDate}T00:00:00`)
       const rangeEnd = new Date(`${endDate}T23:59:59`)
       const now = new Date()
 
-      const periodOrders = scopedOrders.filter((o) => {
-        const createdAt = new Date(o.created_at)
-        return createdAt >= rangeStart && createdAt <= rangeEnd
-      })
-
-      const customerIds = [...new Set(scopedOrders.map((o) => o.customer_id).filter(Boolean))] as string[]
+      const periodCustomerIds = [...new Set(periodOrders.map((o) => o.customer_id).filter(Boolean))] as string[]
       const customerMap = new Map<string, CustomerRow>()
-      if (customerIds.length > 0) {
+      if (periodCustomerIds.length > 0) {
         const { data: customersData, error: customersError } = await supabase
           .from('customers')
           .select('id, full_name, email, phone')
-          .in('id', customerIds)
+          .in('id', periodCustomerIds)
         if (customersError) throw customersError
         if (requestId !== requestSeqRef.current) return
         ;(customersData || []).forEach((c) => customerMap.set(c.id, c as CustomerRow))
+      }
+
+      let lifetimeRows: { customer_id: string | null; created_at: string }[] = []
+      if (periodCustomerIds.length > 0) {
+        let lifetimeQuery = supabase
+          .from('orders')
+          .select('customer_id, created_at')
+          .eq('organization_id', organizationId)
+          .in('status', ['pending_allocation', 'pending', 'processing', 'shipped', 'delivered'])
+          .in('customer_id', periodCustomerIds)
+        if (selectedBranchId) lifetimeQuery = lifetimeQuery.eq('branch_id', selectedBranchId)
+        const { data: lifetimeData, error: lifetimeError } = await lifetimeQuery
+        if (lifetimeError) throw lifetimeError
+        if (requestId !== requestSeqRef.current) return
+        lifetimeRows = (lifetimeData || []) as { customer_id: string | null; created_at: string }[]
       }
 
       const periodOrderIds = periodOrders.map((o) => o.id)
@@ -315,7 +334,16 @@ export function AdminCustomerReports() {
 
       const firstPurchaseByCustomer = new Map<string, string>()
       const lastPurchaseByCustomer = new Map<string, string>()
-      scopedOrders.forEach((order) => {
+      lifetimeRows.forEach((order) => {
+        if (!order.customer_id) return
+        const key = `customer:${order.customer_id}`
+        const currentFirst = firstPurchaseByCustomer.get(key)
+        if (!currentFirst || order.created_at < currentFirst) firstPurchaseByCustomer.set(key, order.created_at)
+        const currentLast = lastPurchaseByCustomer.get(key)
+        if (!currentLast || order.created_at > currentLast) lastPurchaseByCustomer.set(key, order.created_at)
+      })
+      periodOrders.forEach((order) => {
+        if (order.customer_id) return
         const key = getCustomerKey(order)
         const currentFirst = firstPurchaseByCustomer.get(key)
         if (!currentFirst || order.created_at < currentFirst) firstPurchaseByCustomer.set(key, order.created_at)
@@ -442,6 +470,7 @@ export function AdminCustomerReports() {
     } finally {
       if (requestId === requestSeqRef.current) {
         setLoading(false)
+        hasEverLoaded.current = true
       }
     }
   }
@@ -452,6 +481,23 @@ export function AdminCustomerReports() {
     setStartDate(draftStartDate)
     setEndDate(draftEndDate)
   }
+
+  const resetFilters = () => {
+    const defaultStart = new Date()
+    defaultStart.setMonth(defaultStart.getMonth() - 2)
+    const start = toDateKey(defaultStart)
+    const end = toDateKey(new Date())
+    setDraftStartDate(start)
+    setDraftEndDate(end)
+    setDraftBranchId('')
+    setStartDate(start)
+    setEndDate(end)
+    setSelectedBranchId('')
+  }
+
+  const defaultStart = (() => { const d = new Date(); d.setMonth(d.getMonth() - 2); return toDateKey(d) })()
+  const defaultEnd = toDateKey(new Date())
+  const hasActiveFilters = draftBranchId !== '' || draftStartDate !== defaultStart || draftEndDate !== defaultEnd
 
   const exportCsv = async () => {
     try {
@@ -520,10 +566,17 @@ export function AdminCustomerReports() {
     }
   }
 
-  if (loading) {
+  if (loading && !hasEverLoaded.current) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-admin-600"></div>
+      <div className="space-y-6">
+        <div className="h-10 w-64 animate-pulse rounded-lg bg-gray-200" />
+        <div className="animate-pulse rounded-xl bg-gray-200 h-40" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="animate-pulse rounded-xl bg-gray-200 h-24" />
+          ))}
+        </div>
+        <div className="animate-pulse rounded-xl bg-gray-200 h-64" />
       </div>
     )
   }
@@ -532,7 +585,10 @@ export function AdminCustomerReports() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Reporte de Clientes</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Reporte de Clientes{' '}
+            {loading && <span className="text-sm text-gray-400 font-normal animate-pulse">Actualizando...</span>}
+          </h1>
           <p className="mt-1 text-gray-600">Recurrencia, valor por cliente, riesgo de abandono y cobranzas.</p>
         </div>
         <Button variant="outline" onClick={exportCsv} disabled={exporting}>
@@ -541,6 +597,7 @@ export function AdminCustomerReports() {
         </Button>
       </div>
 
+      <div className={loading ? 'opacity-60 pointer-events-none' : ''}>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -577,7 +634,12 @@ export function AdminCustomerReports() {
 
           {invalidRange && <p className="mt-3 text-sm text-red-600">La fecha inicio no puede ser mayor que la fecha fin.</p>}
 
-          <div className="mt-4 flex justify-end">
+          <div className="mt-4 flex justify-end gap-2">
+            {hasActiveFilters && (
+              <Button variant="outline" onClick={resetFilters}>
+                Limpiar
+              </Button>
+            )}
             <Button onClick={applyFilters} disabled={invalidRange || !hasPendingChanges}>
               Aplicar filtros
             </Button>
@@ -686,19 +748,34 @@ export function AdminCustomerReports() {
             {monthlySeries.length === 0 ? (
               <p className="text-sm text-gray-500">No hay datos para el período seleccionado.</p>
             ) : (
-              <div className="space-y-2">
-                {monthlySeries.map((row) => (
-                  <div key={row.month} className="flex items-center justify-between rounded bg-gray-50 p-3 text-sm">
-                    <div>
-                      <p className="font-medium text-gray-700">{row.month}</p>
-                      <p className="text-xs text-gray-500">{row.activeCustomers} clientes activos</p>
+              <>
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={monthlySeries} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                    <YAxis
+                      tick={{ fontSize: 11 }}
+                      tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`}
+                      width={48}
+                    />
+                    <Tooltip
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      formatter={(v: any) => [formatPrice(Number(v ?? 0), settings), 'Ventas netas']}
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      labelFormatter={(l: any) => `Mes: ${l}`}
+                    />
+                    <Bar dataKey="netSales" name="Ventas netas" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div className="mt-3 space-y-1">
+                  {monthlySeries.map(row => (
+                    <div key={row.month} className="flex items-center justify-between text-xs text-gray-500 px-1">
+                      <span>{row.month}</span>
+                      <span>{row.activeCustomers} clientes · {formatPrice(row.netSales, settings)}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-900">{formatPrice(row.netSales, settings)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -764,10 +841,19 @@ export function AdminCustomerReports() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredCustomers.slice(0, 200).map((customer) => (
+                  {filteredCustomers.slice(0, visibleCustomers).map((customer) => (
                     <tr key={customer.customerKey}>
                       <td className="px-4 py-2 text-sm">
-                        <p className="font-medium text-gray-800">{customer.customerName}</p>
+                        {customer.customerId ? (
+                          <Link
+                            to={`/customers/${customer.customerId}`}
+                            className="font-medium text-admin-600 hover:underline"
+                          >
+                            {customer.customerName}
+                          </Link>
+                        ) : (
+                          <p className="font-medium text-gray-800">{customer.customerName}</p>
+                        )}
                         <p className="text-xs text-gray-500">{customer.email || customer.phone || 'Sin contacto'}</p>
                       </td>
                       <td className="px-4 py-2 text-right text-sm text-gray-700">{customer.ordersCount}</td>
@@ -782,10 +868,15 @@ export function AdminCustomerReports() {
               </table>
             </div>
           )}
-          {filteredCustomers.length > 200 && (
-            <p className="mt-3 text-xs text-gray-500">
-              Se muestran los primeros 200 resultados para mantener rendimiento. Usá búsqueda/segmento para acotar.
-            </p>
+          {filteredCustomers.length > visibleCustomers && (
+            <div className="mt-4 flex items-center justify-center">
+              <button
+                onClick={() => setVisibleCustomers((v) => v + 100)}
+                className="h-9 px-4 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 font-medium"
+              >
+                Mostrar más ({filteredCustomers.length - visibleCustomers} restantes)
+              </button>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -816,7 +907,16 @@ export function AdminCustomerReports() {
                   {topCustomers.map((c) => (
                     <tr key={c.customerKey}>
                       <td className="px-4 py-2 text-sm">
-                        <p className="font-medium text-gray-800">{c.customerName}</p>
+                        {c.customerId ? (
+                          <Link
+                            to={`/customers/${c.customerId}`}
+                            className="font-medium text-admin-600 hover:underline"
+                          >
+                            {c.customerName}
+                          </Link>
+                        ) : (
+                          <p className="font-medium text-gray-800">{c.customerName}</p>
+                        )}
                         <p className="text-xs text-gray-500">{c.email || c.phone || 'Sin contacto'}</p>
                       </td>
                       <td className="px-4 py-2 text-right text-sm text-gray-700">{c.ordersCount}</td>
@@ -849,7 +949,16 @@ export function AdminCustomerReports() {
                 return (
                   <div key={c.customerKey} className="flex items-center justify-between rounded border p-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-800">{c.customerName}</p>
+                      {c.customerId ? (
+                        <Link
+                          to={`/customers/${c.customerId}`}
+                          className="text-sm font-medium text-admin-600 hover:underline"
+                        >
+                          {c.customerName}
+                        </Link>
+                      ) : (
+                        <p className="text-sm font-medium text-gray-800">{c.customerName}</p>
+                      )}
                       <p className="text-xs text-gray-500">
                         Última compra: {formatDateShort(c.lastPurchase, settings)} · {c.ordersCount} compras en período
                       </p>
@@ -869,6 +978,7 @@ export function AdminCustomerReports() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

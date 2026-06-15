@@ -1,14 +1,16 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice, formatDateShort } from '@/lib/utils'
-import { ArrowLeft, ShoppingCart, DollarSign, Calendar, Package, Plus } from 'lucide-react'
+import { ArrowLeft, ShoppingCart, DollarSign, Calendar, Package, Plus, Edit2, X, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { ACTIVE_ORDER_STATUSES } from '@/lib/constants'
+import { useToastStore } from '@/store/toastStore'
 import type { Customer } from '@/types/database.types'
 import { cn } from '@/lib/utils'
 
@@ -47,6 +49,12 @@ export function AdminCustomerDetail() {
   const navigate = useNavigate()
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
+  const { show } = useToastStore()
+  const queryClient = useQueryClient()
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState({ full_name: '', email: '', phone: '', rut: '', notes: '' })
+  const [saving, setSaving] = useState(false)
+  const [ordersVisible, setOrdersVisible] = useState(20)
 
   const { data, isPending: loading } = useQuery({
     queryKey: queryKeys.customers.detail(organizationId!, id!),
@@ -55,15 +63,32 @@ export function AdminCustomerDetail() {
         supabase.from('customers').select('*').eq('id', id!).eq('organization_id', organizationId!).single(),
         supabase
           .from('orders')
-          .select('*, order_items(id, quantity, unit_price, product_id, products(name, sku))')
+          .select('*, order_items(id, quantity, price, product_id, products(name, sku))')
           .eq('organization_id', organizationId!)
           .eq('customer_id', id!)
           .order('created_at', { ascending: false }),
       ])
       if (customerRes.error) throw customerRes.error
+      if (ordersRes.error) throw ordersRes.error
+
+      const orders = (ordersRes.data ?? []) as any[]
+      const orderIds = orders.map((o) => o.id)
+
+      const paymentsByOrderId: Record<string, number> = {}
+      if (orderIds.length > 0) {
+        const { data: paymentsRaw } = await supabase
+          .from('order_payments')
+          .select('order_id, amount')
+          .in('order_id', orderIds)
+        for (const p of paymentsRaw ?? []) {
+          paymentsByOrderId[p.order_id] = (paymentsByOrderId[p.order_id] || 0) + Number(p.amount || 0)
+        }
+      }
+
       return {
         customer: customerRes.data as Customer,
-        orders: (ordersRes.data ?? []) as any[],
+        orders,
+        paymentsByOrderId,
       }
     },
     enabled: !!organizationId && !!id,
@@ -72,6 +97,7 @@ export function AdminCustomerDetail() {
 
   const customer = data?.customer ?? null
   const orders = data?.orders ?? []
+  const paymentsByOrderId = data?.paymentsByOrderId ?? {}
 
   const topProducts = useMemo<TopProduct[]>(() => {
     const productMap = new Map<string, { name: string; sku: string; quantity: number }>()
@@ -110,17 +136,63 @@ export function AdminCustomerDetail() {
     )
   }
 
+  const openEdit = () => {
+    if (!customer) return
+    setEditForm({
+      full_name: customer.full_name || '',
+      email: customer.email || '',
+      phone: customer.phone || '',
+      rut: customer.rut || '',
+      notes: customer.notes || '',
+    })
+    setEditOpen(true)
+  }
+
+  const saveEdit = async () => {
+    if (!customer || !organizationId || !editForm.full_name.trim()) return
+    setSaving(true)
+    try {
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          full_name: editForm.full_name.trim(),
+          email: editForm.email.trim() || null,
+          phone: editForm.phone.trim() || '',
+          rut: editForm.rut.trim() || null,
+          notes: editForm.notes.trim() || null,
+        })
+        .eq('id', customer.id)
+        .eq('organization_id', organizationId)
+      if (error) throw error
+      await queryClient.invalidateQueries({ queryKey: queryKeys.customers.detail(organizationId, id!) })
+      await queryClient.invalidateQueries({ queryKey: queryKeys.customers.all(organizationId) })
+      setEditOpen(false)
+    } catch {
+      show('No se pudo guardar los cambios.', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (!customer) {
     return (
       <div className="text-center py-20 text-gray-500">
         <p>Cliente no encontrado.</p>
-        <Button className="mt-4" onClick={() => navigate('/customers')}>Volver a clientes</Button>
+        <Button className="mt-4" onClick={() => navigate(-1)}>Volver a clientes</Button>
       </div>
     )
   }
 
-  const completedOrders = orders.filter((o) => ['delivered', 'shipped', 'processing'].includes(o.status || ''))
+  const completedOrders = orders.filter((o) => (ACTIVE_ORDER_STATUSES as readonly string[]).includes(o.status || ''))
   const totalSpent = completedOrders.reduce((sum, o) => sum + (o.total || 0), 0)
+
+  const pendingByOrder = new Map<string, number>()
+  for (const order of completedOrders) {
+    const paid = paymentsByOrderId[order.id] ?? 0
+    pendingByOrder.set(order.id, Math.max(Number(order.total || 0) - paid, 0))
+  }
+  const totalPending = [...pendingByOrder.values()].reduce((s, v) => s + v, 0)
+
   const firstOrder = orders[orders.length - 1]
   const lastOrder = orders[0]
   const address = (customer.address || {}) as any
@@ -129,14 +201,25 @@ export function AdminCustomerDetail() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <button onClick={() => navigate('/customers')} className="text-gray-500 hover:text-gray-700">
+        <button onClick={() => navigate(-1)} className="text-gray-500 hover:text-gray-700">
           <ArrowLeft className="h-5 w-5" />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{customer.full_name}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-gray-900">{customer.full_name}</h1>
+            {!customer.is_active && (
+              <span className="text-xs font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full border border-gray-200">
+                Inactivo
+              </span>
+            )}
+          </div>
           {customer.email && <p className="text-sm text-gray-500">{customer.email}</p>}
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          <Button variant="outline" onClick={openEdit}>
+            <Edit2 className="h-4 w-4 mr-2" />
+            Editar
+          </Button>
           <Button onClick={() => navigate(`/orders?customer_id=${id}`)}>
             <Plus className="h-4 w-4 mr-2" />
             Nueva orden
@@ -164,7 +247,7 @@ export function AdminCustomerDetail() {
             </div>
             <div>
               <p className="text-xs text-gray-500">Órdenes totales</p>
-              <p className="text-xl font-bold text-gray-900">{orders.length}</p>
+              <p className="text-xl font-bold text-gray-900">{completedOrders.length}</p>
             </div>
           </CardContent>
         </Card>
@@ -194,6 +277,19 @@ export function AdminCustomerDetail() {
             </div>
           </CardContent>
         </Card>
+        {totalPending > 0.01 && (
+          <Card>
+            <CardContent className="p-5 flex items-center gap-3">
+              <div className="bg-amber-50 p-2.5 rounded-lg">
+                <AlertCircle className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Saldo pendiente</p>
+                <p className="text-xl font-bold text-amber-700">{formatPrice(totalPending, settings)}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -218,10 +314,11 @@ export function AdminCustomerDetail() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Pendiente</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {orders.map((order) => (
+                      {orders.slice(0, ordersVisible).map((order) => (
                         <tr key={order.id} className="hover:bg-gray-50">
                           <td className="px-4 py-3 text-sm">
                             <Link
@@ -242,10 +339,31 @@ export function AdminCustomerDetail() {
                           <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
                             {formatPrice(order.total || 0, settings)}
                           </td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            {order.status === 'cancelled' ? (
+                              <span className="text-gray-300">—</span>
+                            ) : (pendingByOrder.get(order.id) ?? 0) > 0.01 ? (
+                              <span className="font-semibold text-amber-700">
+                                {formatPrice(pendingByOrder.get(order.id)!, settings)}
+                              </span>
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 text-green-500 ml-auto" />
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                  {orders.length > ordersVisible && (
+                    <div className="px-4 py-3 border-t border-gray-100 text-center">
+                      <button
+                        onClick={() => setOrdersVisible(v => v + 20)}
+                        className="text-sm text-admin-600 hover:text-admin-700 font-medium"
+                      >
+                        Mostrar más ({orders.length - ordersVisible} restantes)
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -259,8 +377,18 @@ export function AdminCustomerDetail() {
               <CardTitle className="text-sm">Datos de contacto</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-gray-700">
-              {customer.phone && <p><span className="text-gray-500">Tel:</span> {customer.phone}</p>}
-              {customer.email && <p><span className="text-gray-500">Email:</span> {customer.email}</p>}
+              {customer.phone && (
+                <p>
+                  <span className="text-gray-500">Tel:</span>{' '}
+                  <a href={`tel:${customer.phone}`} className="text-admin-600 hover:underline">{customer.phone}</a>
+                </p>
+              )}
+              {customer.email && (
+                <p>
+                  <span className="text-gray-500">Email:</span>{' '}
+                  <a href={`mailto:${customer.email}`} className="text-admin-600 hover:underline">{customer.email}</a>
+                </p>
+              )}
               {customer.rut && <p><span className="text-gray-500">RUT:</span> {customer.rut}</p>}
               {address?.address && (
                 <p>
@@ -299,6 +427,74 @@ export function AdminCustomerDetail() {
           )}
         </div>
       </div>
+
+      {editOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-900">Editar cliente</h2>
+              <button onClick={() => setEditOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
+                <input
+                  type="text"
+                  value={editForm.full_name}
+                  onChange={e => setEditForm(f => ({ ...f, full_name: e.target.value }))}
+                  className="w-full h-9 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+                  <input
+                    type="text"
+                    value={editForm.phone}
+                    onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                    className="w-full h-9 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">RUT</label>
+                  <input
+                    type="text"
+                    value={editForm.rut}
+                    onChange={e => setEditForm(f => ({ ...f, rut: e.target.value }))}
+                    className="w-full h-9 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={editForm.email}
+                  onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                  className="w-full h-9 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                <textarea
+                  rows={2}
+                  value={editForm.notes}
+                  onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-admin-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-6 pb-5">
+              <Button variant="outline" onClick={() => setEditOpen(false)} disabled={saving}>Cancelar</Button>
+              <Button onClick={saveEdit} disabled={saving || !editForm.full_name.trim()}>
+                {saving ? 'Guardando...' : 'Guardar'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

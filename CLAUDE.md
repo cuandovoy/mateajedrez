@@ -642,6 +642,28 @@ useEffect(() => {
 
 ---
 
+## TODO activo
+
+**Regla obligatoria:** durante cualquier tarea, si se detecta algo a mejorar, una deuda técnica, un patrón inconsistente, o una oportunidad de optimización — registrarlo inmediatamente en `.claude/TODO.md` sin interrumpir la tarea en curso.
+
+### Formato de entrada
+```markdown
+- 🔴/🟠/🟡/🟢 Descripción clara del problema o mejora — archivo afectado si aplica
+```
+
+### Prioridades
+- 🔴 Crítico — bloquea funcionalidad o introduce riesgo de seguridad/datos
+- 🟠 Alta — deuda técnica importante, falta de cobertura en lógica de negocio crítica
+- 🟡 Media — mejora de calidad, organización, o performance
+- 🟢 Baja — cosmético, limpieza, nice-to-have
+
+### Reglas
+- Agregar la entrada en la sección correspondiente de `.claude/TODO.md`, nunca en el medio del código
+- Cuando un ítem se completa, moverlo a la sección `## Completado ✅` con la fecha
+- No eliminar ítems completados — son historial
+
+---
+
 ## Changelog
 
 **Regla obligatoria:** al finalizar cualquier tarea que modifique archivos del proyecto, Claude Code debe actualizar `CHANGELOG.md` en la raíz.

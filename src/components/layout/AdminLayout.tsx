@@ -164,7 +164,16 @@ export function AdminLayout() {
         { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
         { path: '/billing/comprobantes', label: 'Comprobantes CFE', icon: Receipt, requiresBillerConfig: true },
         { path: '/expenses', label: 'Compras y Egresos', icon: Wallet },
-        { path: '/customers', label: 'Clientes', icon: Users2, permission: 'customers:view' },
+        {
+          path: '/customers',
+          label: 'Clientes',
+          icon: Users2,
+          permission: 'customers:view',
+          subItems: [
+            { path: '/customers', label: 'Todos los clientes' },
+            { path: '/customers/deudores', label: 'Deudores' },
+          ],
+        },
         {
           path: '/cash-register',
           label: 'Punto de Venta',
