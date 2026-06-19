@@ -1,6 +1,7 @@
 import { useEffect, ReactNode } from 'react'
 import { PublicStoreHeader } from './PublicStoreHeader'
 import { PublicStoreFooter } from './Footer'
+import { ToastContainer } from './ToastContainer'
 import { PublicStoreProvider } from '@/contexts/PublicStoreContext'
 import type { Organization } from '@/types/database.types'
 
@@ -51,6 +52,7 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
           {children}
         </main>
         <PublicStoreFooter />
+        <ToastContainer />
       </div>
     </PublicStoreProvider>
   )

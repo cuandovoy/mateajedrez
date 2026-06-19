@@ -6,7 +6,8 @@ import { capitalizeFirst, cn, formatPrice, getProductImageUrl, hasActiveDiscount
 import { getProductStock } from '@/lib/stock'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
-import { Branch, Product, ProductImage } from '@/types'
+import { usePublicStore } from '@/contexts/PublicStoreContext'
+import { Product, ProductImage } from '@/types'
 import { BranchInventory, ProductVariant } from '@/types/database.types'
 import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -15,17 +16,18 @@ import { useNavigate, useParams } from 'react-router-dom'
 function CartContent() {
   const navigate = useNavigate()
   const { slug } = useParams<{ slug?: string }>()
+  const { organization } = usePublicStore()
   const settings = useOrgSettings()
   const { items, loading, fetchCart, updateQuantity, removeFromCart, getTotal } = useCartStore()
   const { user } = useAuthStore()
-  const organizationId = items[0]?.product?.organization_id || null
+  const organizationId = organization.id
   const [stockWarnings, setStockWarnings] = useState<Record<string, { available: number; requested: number }>>({})
   const [mainBranchId, setMainBranchId] = useState<string | null>(null)
   const [itemStocks, setItemStocks] = useState<Record<string, number>>({}) // item.id -> stock
 
   useEffect(() => {
-    fetchCart()
-  }, [user, fetchCart])
+    fetchCart(organizationId)
+  }, [user, fetchCart, organizationId])
 
   // Fetch operational branch for this cart organization (excluding isolated warehouses)
   useEffect(() => {
@@ -36,34 +38,35 @@ function CartContent() {
       }
 
       try {
-        const { data, error }: { data: Branch | null, error: Error | null } = await supabase
+        const { data: mainData } = await supabase
           .from('branches')
           .select('id')
           .eq('organization_id', organizationId)
           .eq('code', 'MAIN')
           .eq('is_active', true)
           .eq('is_isolated_warehouse', false)
-          .single()
+          .maybeSingle()
 
-        if (error) throw error
-        if (data) {
-          setMainBranchId(data.id)
+        if (mainData) {
+          setMainBranchId(mainData.id)
+          return
         }
-      } catch (error) {
-        console.error('Error fetching main branch:', error)
-        // Fallback: try to get first active branch
-        const { data }: { data: {id: string} | null, error: Error | null } = await supabase
+
+        // Fallback: first active non-isolated branch
+        const { data: fallbackData } = await supabase
           .from('branches')
           .select('id')
           .eq('organization_id', organizationId)
           .eq('is_active', true)
           .eq('is_isolated_warehouse', false)
           .limit(1)
-          .single()
+          .maybeSingle()
 
-        if (data) {
-          setMainBranchId(data.id)
+        if (fallbackData) {
+          setMainBranchId(fallbackData.id)
         }
+      } catch (error) {
+        console.error('Error fetching main branch:', error)
       }
     }
 
@@ -92,7 +95,7 @@ function CartContent() {
             .select('stock, variant_id, product_variants(id, is_active)')
             .eq('branch_id', mainBranchId)
             .eq('variant_id', item.variant_id)
-            .single()
+            .maybeSingle()
           
           if (!inventoryError && inventory) {
             const variant = (inventory as BranchInventory & { product_variants?: { id: string; is_active: boolean } | null }).product_variants
@@ -112,7 +115,7 @@ function CartContent() {
             .like('sku', '%-DEFAULT')
             .eq('is_active', true)
             .limit(1)
-            .single()
+            .maybeSingle()
 
           if (defaultVariant) {
             // Check inventory for default variant
@@ -121,7 +124,7 @@ function CartContent() {
               .select('stock, variant_id, product_variants(id, is_active)')
               .eq('branch_id', mainBranchId)
               .eq('variant_id', defaultVariant.id)
-              .single()
+              .maybeSingle()
 
             if (!inventoryError && inventory) {
               const variant = (inventory as BranchInventory & { product_variants?: { id: string; is_active: boolean } | null }).product_variants
@@ -139,7 +142,7 @@ function CartContent() {
               .select('stock, product_id, products(id, is_active)')
               .eq('branch_id', mainBranchId)
               .eq('product_id', item.product_id)
-              .single()
+              .maybeSingle()
 
             if (!inventoryError && inventory) {
               const product = (inventory as BranchInventory & { products?: { id: string; is_active: boolean } | null }).products
@@ -280,16 +283,18 @@ function CartContent() {
                             )}
                           </div>
                         )}
-                        <div className="mt-2">
-                          {!item.variant && hasActiveDiscount(item.product) && (
-                            <p className="text-xs text-gray-400 line-through leading-none">
-                              {formatPrice(item.product.price, settings)}
+                        {item.quantity > 1 && (
+                          <div className="mt-2">
+                            {!item.variant && hasActiveDiscount(item.product) && (
+                              <p className="text-xs text-gray-400 line-through leading-none">
+                                {formatPrice(item.product.price, settings)}
+                              </p>
+                            )}
+                            <p className="text-primary-600 text-sm">
+                              {formatPrice(item.variant?.price ?? getEffectivePrice(item.product), settings)} c/u
                             </p>
-                          )}
-                          <p className="text-primary-600 font-bold text-sm sm:text-base">
-                            {formatPrice(item.variant?.price ?? getEffectivePrice(item.product), settings)}
-                          </p>
-                        </div>
+                          </div>
+                        )}
                         {itemStocks[item.id] !== undefined && itemStocks[item.id] > 0 && (
                           <p className="text-xs text-gray-500 mt-1">
                             Stock disponible: {itemStocks[item.id]} {item.variant?.unit || item.product.unit || 'unidad'}
@@ -305,6 +310,7 @@ function CartContent() {
                           variant="outline"
                           size="sm"
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          disabled={item.quantity <= 1}
                         >
                           <Minus className="h-4 w-4" />
                         </Button>

@@ -10,9 +10,9 @@ import { supabase } from '@/lib/supabase'
 import { capitalizeFirst, formatPrice, getEffectivePrice, getProductImageUrl, hasActiveDiscount } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
-import { useOrganizationStore } from '@/store/organizationStore'
+import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { useToastStore } from '@/store/toastStore'
-import type { Branch, CartItemWithProduct, Order, ProductImage } from '@/types'
+import type { CartItemWithProduct, Order, ProductImage } from '@/types'
 import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { BranchInventory, Customer } from '@/types/database.types'
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark } from 'lucide-react'
@@ -46,9 +46,8 @@ function CheckoutInner() {
   const { items, getTotal, clearCart } = useCartStore()
   const { user } = useAuthStore()
   // const { executeRecaptcha } = useGoogleReCaptcha()
-  const orgFromStore = useOrganizationStore((s) => s.currentOrganization?.id)
-  const orgFromCart = items[0] && 'product' in items[0] ? (items[0] as CartItemWithProduct).product?.organization_id : null
-  const organizationId = orgFromStore ?? orgFromCart
+  const { organization } = usePublicStore()
+  const organizationId = organization.id
   const { methods: paymentMethods } = useOrgPaymentMethods(organizationId)
   const { show } = useToastStore()
   const checkoutFulfillmentMode = settings.checkout_fulfillment_mode === 'main' ? 'main' : 'auto'
@@ -96,9 +95,9 @@ function CheckoutInner() {
           mainQuery = mainQuery.eq('is_isolated_warehouse', false)
         }
 
-        const { data: mainData, error }: { data: Branch | null, error: Error | null } = await mainQuery.single()
+        const { data: mainData } = await mainQuery.maybeSingle()
 
-        if (!error && mainData) {
+        if (mainData) {
           setMainBranchId(mainData.id)
           return
         }
@@ -114,10 +113,10 @@ function CheckoutInner() {
           fallbackQuery = fallbackQuery.eq('is_isolated_warehouse', false)
         }
 
-        const { data }: { data: Branch | null } = await fallbackQuery.single()
+        const { data: fallbackData } = await fallbackQuery.maybeSingle()
 
-        if (data) {
-          setMainBranchId(data.id)
+        if (fallbackData) {
+          setMainBranchId(fallbackData.id)
         }
       } catch (error) {
         console.error('Error fetching main branch:', error)
@@ -174,7 +173,7 @@ function CheckoutInner() {
           .select('stock, variant_id, product_variants(id, name, is_active, product:products(id, name, is_active))')
           .eq('branch_id', branchId)
           .eq('variant_id', cartItem.variant_id)
-          .single()
+          .maybeSingle()
 
         if (inventoryError || !inventory) {
           stockIssues.push(`Inventario no encontrado para "${item.product.name}"`)
@@ -317,7 +316,6 @@ function CheckoutInner() {
       show('Por favor, completa todos los campos obligatorios', 'error')
       return
     }
-    debugger
 
     if (items.length === 0) {
       show('Tu carrito está vacío', 'error')
@@ -409,13 +407,17 @@ function CheckoutInner() {
       // Create or get customer (scoped by org)
       let customer: Customer | null = null
 
-      // Check if customer exists by phone within this org
-      const { data: existingCustomer }: { data: Customer | null, error: Error | null } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('phone', formData.phone)
-        .maybeSingle()
+      const lookupCustomerByPhone = async (): Promise<Customer | null> => {
+        const { data } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .eq('phone', formData.phone)
+          .maybeSingle()
+        return data as Customer | null
+      }
+
+      const existingCustomer = await lookupCustomerByPhone()
 
       if (existingCustomer) {
         customer = existingCustomer
@@ -438,7 +440,6 @@ function CheckoutInner() {
           if (updatedCustomer) customer = updatedCustomer as Customer
         }
       } else {
-        // Create new customer
         const { data: newCustomer, error: customerError } = await supabase
           .from('customers')
           .insert({
@@ -453,11 +454,23 @@ function CheckoutInner() {
           .select()
           .single()
 
-        if (customerError || !newCustomer) {
-          throw customerError || new Error('Failed to create customer')
+        if (customerError) {
+          // Duplicate key: customer exists but RLS blocked the initial SELECT
+          // (guest can't see customers with user_id IS NOT NULL, or migration not applied)
+          // Re-query to get the existing customer ID and proceed
+          if ((customerError as any).code === '23505') {
+            const retryCustomer = await lookupCustomerByPhone()
+            if (retryCustomer) {
+              customer = retryCustomer
+            } else {
+              throw new Error('Ya existe un cliente con ese número de teléfono para esta organización.')
+            }
+          } else {
+            throw customerError
+          }
+        } else {
+          customer = newCustomer
         }
-
-        customer = newCustomer
       }
 
       // Update orderData with customer_id
@@ -544,7 +557,7 @@ function CheckoutInner() {
           .select('id')
           .eq('branch_id', fulfillmentBranchId)
           .is('closed_at', null)
-          .single()
+          .maybeSingle()
 
         if (openSession) {
           cashSessionId = (openSession as { id: string }).id
@@ -570,7 +583,7 @@ function CheckoutInner() {
           .from('cash_sessions')
           .select('opening_amount')
           .eq('id', cashSessionId)
-          .single()
+          .maybeSingle()
 
         const { data: paymentsData } = await supabase
           .from('order_payments')

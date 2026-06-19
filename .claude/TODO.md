@@ -5,6 +5,14 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 
 ---
 
+## Carrito — Tienda Pública
+
+### 🟠 Alta
+
+- ✅ ~~`cartStore.ts` `addToCart` — para usuarios logueados que NO son admin de esa org, `useOrganizationStore` retornaba null. Resuelto: org ID se deriva del producto fetched.~~
+
+---
+
 ## UX — Panel de Clientes (admin)
 
 ### 🔴 Crítico

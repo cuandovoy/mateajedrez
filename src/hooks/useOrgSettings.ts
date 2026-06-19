@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { useContext, useMemo } from 'react'
 import { useOrganizationStore } from '@/store/organizationStore'
+import { PublicStoreContext } from '@/contexts/PublicStoreContext'
 import type { OrganizationSettings } from '@/types/database.types'
 
 const DEFAULT_SETTINGS: Required<Pick<OrganizationSettings, 'currency' | 'locale' | 'timezone' | 'decimal_places'>> = {
@@ -14,7 +15,10 @@ const DEFAULT_SETTINGS: Required<Pick<OrganizationSettings, 'currency' | 'locale
  * Uses current organization from store. Falls back to defaults when no org or no settings.
  */
 export function useOrgSettings(): OrganizationSettings {
-  const currentOrganization = useOrganizationStore((s) => s.currentOrganization)
+  const adminOrg = useOrganizationStore((s) => s.currentOrganization)
+  const publicStore = useContext(PublicStoreContext)
+  // Public store context takes precedence over the admin store
+  const currentOrganization = publicStore?.organization ?? adminOrg
 
   return useMemo(() => {
     const raw = currentOrganization?.settings
@@ -46,5 +50,5 @@ export function useOrgSettings(): OrganizationSettings {
       inventory_transfer_completion_mode: inventoryTransferCompletionMode,
       costing_method: (settings.costing_method as 'weighted_average' | 'fifo') ?? 'weighted_average',
     }
-  }, [currentOrganization?.id, currentOrganization?.settings])
+  }, [currentOrganization?.id, currentOrganization?.settings, publicStore?.organization?.id])
 }

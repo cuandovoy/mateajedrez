@@ -5,7 +5,6 @@ import type { CartItem, CartItemWithProduct, Product, ProductVariant } from '@/t
 import { PostgrestError } from '@supabase/supabase-js'
 import { create } from 'zustand'
 import { useAuthStore } from './authStore'
-import { useOrganizationStore } from './organizationStore'
 import { useToastStore } from './toastStore'
 
 interface LocalCartItem {
@@ -38,7 +37,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   fetchCart: async (orgIdParam?: string) => {
     const { user } = useAuthStore.getState()
-    const organizationId = orgIdParam ?? useOrganizationStore.getState().currentOrganization?.id
+    const organizationId = orgIdParam ?? null
 
     // Clear stale items immediately so we don't flash items from a different org
     set({ loading: true, items: [] })
@@ -72,7 +71,7 @@ export const useCartStore = create<CartState>((set, get) => ({
           })) as CartItemWithProduct[],
         })
       } else {
-        await get().loadLocalCart(organizationId)
+        await get().loadLocalCart(organizationId ?? undefined)
       }
     } catch (error) {
       console.error('Error fetching cart:', error)
@@ -165,55 +164,64 @@ export const useCartStore = create<CartState>((set, get) => ({
 
   syncLocalCart: async () => {
     const { user } = useAuthStore.getState()
-    const organizationId = useOrganizationStore.getState().currentOrganization?.id
-    if (!user || !organizationId) return
+    if (!user) return
 
-    const orgCartKey = localCartKey(organizationId)
-    // Support legacy key for users who had a cart before org-keying was introduced
+    // Collect all org-specific cart keys from localStorage
+    const orgCartKeys = Object.keys(localStorage).filter(k => k.startsWith('local_cart_'))
     const legacyCartKey = 'local_cart'
-    const rawCart = localStorage.getItem(orgCartKey) || localStorage.getItem(legacyCartKey)
-    if (!rawCart) return
+
+    const keysToSync = [...orgCartKeys, legacyCartKey].filter(k => !!localStorage.getItem(k))
+    if (keysToSync.length === 0) return
 
     try {
-      const localItems: LocalCartItem[] = JSON.parse(rawCart)
+      for (const cartKey of keysToSync) {
+        const rawCart = localStorage.getItem(cartKey)
+        if (!rawCart) continue
 
-      for (const localItem of localItems) {
-        let query = supabase
-          .from('cart_items')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('organization_id', organizationId)
-          .eq('product_id', localItem.product_id)
+        // Derive org ID from the key: "local_cart_{orgId}" or legacy "local_cart"
+        const organizationId = cartKey === legacyCartKey ? null : cartKey.slice('local_cart_'.length)
+        if (!organizationId) continue
 
-        if (localItem.variant_id) {
-          query = query.eq('variant_id', localItem.variant_id)
-        } else {
-          query = query.is('variant_id', null)
+        const localItems: LocalCartItem[] = JSON.parse(rawCart)
+
+        for (const localItem of localItems) {
+          let query = supabase
+            .from('cart_items')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('organization_id', organizationId)
+            .eq('product_id', localItem.product_id)
+
+          if (localItem.variant_id) {
+            query = query.eq('variant_id', localItem.variant_id)
+          } else {
+            query = query.is('variant_id', null)
+          }
+
+          const { data: dbItem }: { data: CartItem | null; error: PostgrestError | null } = await query.maybeSingle()
+
+          if (dbItem) {
+            await (supabase
+              .from('cart_items') as any)
+              .update({ quantity: (dbItem?.quantity || 0) + localItem.quantity })
+              .eq('id', dbItem?.id as string)
+          } else {
+            await (supabase
+              .from('cart_items') as any)
+              .insert({
+                organization_id: organizationId,
+                user_id: user.id,
+                product_id: localItem.product_id,
+                variant_id: localItem.variant_id || null,
+                quantity: localItem.quantity,
+              })
+          }
         }
 
-        const { data: dbItem }: { data: CartItem | null; error: PostgrestError | null } = await query.maybeSingle()
-
-        if (dbItem) {
-          await (supabase
-            .from('cart_items') as any)
-            .update({ quantity: (dbItem?.quantity || 0) + localItem.quantity })
-            .eq('id', dbItem?.id as string)
-        } else {
-          await (supabase
-            .from('cart_items') as any)
-            .insert({
-              organization_id: organizationId,
-              user_id: user.id,
-              product_id: localItem.product_id,
-              variant_id: localItem.variant_id || null,
-              quantity: localItem.quantity,
-            })
-        }
+        localStorage.removeItem(cartKey)
       }
 
-      localStorage.removeItem(orgCartKey)
       localStorage.removeItem(legacyCartKey)
-
       await get().fetchCart()
     } catch (error) {
       console.error('Error syncing local cart:', error)
@@ -226,6 +234,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     try {
       let availableStock = 0
       let productName = ''
+      let productOrganizationId: string | null = null
 
       if (variantId) {
         const { data: variant, error: variantError } = await (supabase
@@ -247,7 +256,8 @@ export const useCartStore = create<CartState>((set, get) => ({
           throw new Error('Product or variant is not active')
         }
 
-        availableStock = await getProductStock(productId, variantId, null, product.organization_id || null)
+        productOrganizationId = product.organization_id || null
+        availableStock = await getProductStock(productId, variantId, null, productOrganizationId)
         productName = variant.name || product.name
       } else {
         const { data: product, error: productError }: { data: Product | null, error: PostgrestError | null } = await supabase
@@ -274,7 +284,8 @@ export const useCartStore = create<CartState>((set, get) => ({
           throw new Error('Variant selection required')
         }
 
-        availableStock = await getProductStock(productId, null, null, product.organization_id || null)
+        productOrganizationId = product.organization_id || null
+        availableStock = await getProductStock(productId, null, null, productOrganizationId)
         productName = product.name
       }
 
@@ -311,9 +322,9 @@ export const useCartStore = create<CartState>((set, get) => ({
       }
 
       if (user) {
-        const organizationId = useOrganizationStore.getState().currentOrganization?.id
+        const organizationId = productOrganizationId
         if (!organizationId) {
-          useToastStore.getState().show('Selecciona una organización para agregar al carrito', 'error')
+          useToastStore.getState().show('No se pudo identificar la tienda', 'error')
           return
         }
         const { data, error } = await (supabase

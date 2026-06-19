@@ -4,6 +4,58 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-19 — Fix: duplicate key en customers del checkout + policy ampliada
+
+- **Archivos modificados:** `src/pages/Checkout.tsx`, `supabase/migrations/131_public_storefront_guest_checkout_policies.sql`
+- **Qué cambió:** (1) El código de checkout ahora captura el error `23505` (duplicate key en `idx_customers_org_phone`) y reintenta el SELECT por teléfono — cubre el caso donde la migration 131 no fue aplicada aún o el cliente tiene `user_id IS NOT NULL`. (2) La policy de customers en migration 131 se amplió de `user_id IS NULL` a `is_active = true` para cubrir también clientes registrados que compraron previamente como guest.
+
+---
+
+## 2026-06-19 — Fix: Checkout sin feedback + guests bloqueados por RLS
+
+- **Archivos modificados:** `src/components/layout/PublicStoreLayout.tsx`, `supabase/migrations/131_public_storefront_guest_checkout_policies.sql` (nuevo)
+- **Qué cambió:** (1) `ToastContainer` faltaba en `PublicStoreLayout` — todos los toasts eran invisibles en la tienda pública. Fix: importar y renderizar `<ToastContainer />` en el layout. (2) Guests no podían leer `branches`, `branch_inventory` ni `customers` por falta de políticas RLS públicas — el checkout fallaba silenciosamente. Fix: migración 131 agrega SELECT público para esas tres tablas (branches activas, inventario de branches activas, clientes del storefront).
+
+---
+
+## 2026-06-19 — Fix: métodos de pago desaparecen al cerrar sesión (policy 130)
+
+- **Archivos modificados:** `supabase/migrations/130_fix_public_payment_methods_policy.sql` (nuevo)
+- **Qué cambió:** La policy pública de la migración 129 tenía una subquery a `organizations`, tabla con RLS restrictiva para usuarios anónimos. La subquery devolvía vacío para guests, haciendo que la condición USING siempre fallara. Fix: `USING (is_active = true)` sin subquery. El filtro de `organization_id` ya lo aplica PostgREST desde la query de la app.
+
+---
+
+## 2026-06-19 — Fix: PGRST116 en queries de sucursal e inventario (single → maybeSingle)
+
+- **Archivos modificados:** `src/pages/Cart.tsx`, `src/pages/Checkout.tsx`
+- **Qué cambió:** Todos los lookups que podían devolver 0 filas usaban `.single()` que lanza error 406 PGRST116. Reemplazados por `.maybeSingle()` en: branch lookup (MAIN y fallback en Cart y Checkout), inventario por variante y por producto en Cart, inventario de variante en validateStockForBranch de Checkout, y cash session lookup. Se mantiene `.single()` solo en los 3 casos posteriores a `.insert().select()` o `.update().select()` donde la fila está garantizada.
+
+---
+
+## 2026-06-19 — Fix: métodos de pago no visibles en checkout + useOrgSettings en tienda pública
+
+- **Archivos modificados:** `supabase/migrations/129_public_storefront_payment_methods_select.sql` (nuevo), `src/hooks/useOrgSettings.ts`, `src/pages/Checkout.tsx`
+- **Qué cambió:** La RLS SELECT de `organization_payment_methods` requería ser miembro de la org, bloqueando a compradores guest. Se agrega migración 129 con policy pública para orgs activas. `useOrgSettings` ahora lee del `PublicStoreContext` cuando está disponible (evita usar defaults de admin store en la tienda pública, afectando formateo de precios y configuración de checkout). Se eliminó el `debugger` hardcodeado en `handleSubmit`.
+
+---
+
+## 2026-06-19 — Fix: UX del carrito (precio duplicado, botón menos)
+
+- **Archivos modificados:** `src/pages/Cart.tsx`
+- **Qué cambió:** El precio unitario bajo el nombre del producto ahora solo aparece cuando la cantidad es mayor a 1 (con etiqueta "c/u"), evitando que el mismo número se muestre dos veces cuando hay 1 unidad. El botón "-" se deshabilita cuando la cantidad es 1 — para eliminar el item hay que usar la papelera.
+
+---
+
+## 2026-06-19 — Fix: org ID incorrecto en carrito y checkout de tienda pública
+
+- **Archivos modificados:** `src/pages/Cart.tsx`, `src/pages/Checkout.tsx`, `src/store/cartStore.ts`
+- **Qué cambió:** `useOrganizationStore` (store del panel admin) se estaba usando en la tienda pública para obtener `organizationId`, donde siempre retorna `null`. Consecuencias: carrito vacío al navegar a `/cart`, checkout sin org (todos los DB writes fallaban), usuarios logueados sin poder agregar al carrito, y `syncLocalCart` nunca migraba los items guest a la DB tras el login. Fix: `Cart.tsx` y `Checkout.tsx` usan `usePublicStore()` del `PublicStoreContext`; `addToCart` en cartStore deriva el org ID del propio producto fetched; `syncLocalCart` escanea localStorage por todas las claves `local_cart_*` en vez de depender del store admin; se eliminó el import de `useOrganizationStore` de cartStore.
+
+- **Archivos modificados:** `src/pages/Cart.tsx`
+- **Qué cambió:** `fetchCart()` se llamaba sin `organizationId`, por lo que el store buscaba la org en el store admin (`useOrganizationStore`) que siempre es `null` en la tienda pública. El cart de usuarios guest se guardaba bajo `local_cart_{orgId}` pero se buscaba bajo `local_cart` (sin sufijo). Fix: se obtiene `organization.id` de `PublicStoreContext` y se pasa a `fetchCart`.
+
+---
+
 ## 2026-06-15 — Página de deudores y saldo pendiente en detalle de cliente
 
 - **Archivos modificados:** `src/pages/admin/AdminDebtors.tsx` (nuevo), `src/pages/admin/AdminCustomerDetail.tsx`, `src/App.tsx`, `src/components/layout/AdminLayout.tsx`
