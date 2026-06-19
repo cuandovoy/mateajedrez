@@ -6,3 +6,15 @@ verify_jwt = false
 
 [functions.mp-webhook]
 verify_jwt = false
+
+[functions.mp-payment-reconciler]
+verify_jwt = false
+
+[functions.abandoned-cart-cleanup]
+verify_jwt = false
+
+[functions.stale-orders-notifier]
+verify_jwt = false
+
+[functions.inventory-drift-auditor]
+verify_jwt = false

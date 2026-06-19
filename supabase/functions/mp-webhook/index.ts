@@ -155,15 +155,17 @@ Deno.serve(async (req) => {
     return new Response('no access_token', { status: 200 })
   }
 
-  // Verify signature with the org's own webhook secret
+  // Verify HMAC-SHA256 signature. webhook_secret is mandatory — no secret means
+  // any caller can forge payment notifications, so we reject rather than skip.
   if (!webhookSecret) {
-    console.warn(`Org ${organizationId} has no webhook_secret — skipping signature verification`)
-  } else {
-    const ok = await verifySignature(req, paymentId, webhookSecret)
-    if (!ok) {
-      console.error('Invalid signature for org', organizationId, 'payment', paymentId)
-      return new Response('invalid signature', { status: 401 })
-    }
+    console.error(`[mp-webhook] Org ${organizationId} has no webhook_secret configured — rejecting request`)
+    return new Response('webhook_secret not configured for this organization', { status: 401 })
+  }
+
+  const ok = await verifySignature(req, paymentId, webhookSecret)
+  if (!ok) {
+    console.error('[mp-webhook] Invalid signature for org', organizationId, 'payment', paymentId)
+    return new Response('invalid signature', { status: 401 })
   }
 
   try {

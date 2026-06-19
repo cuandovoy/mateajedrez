@@ -4,6 +4,52 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-19 — Item 06: inventory-drift-auditor (cron diario 3am)
+
+- **Archivos nuevos:** `supabase/functions/inventory-drift-auditor/index.ts`, `supabase/migrations/136_pg_cron_inventory_drift_auditor.sql`
+- **Archivos modificados:** `supabase/config.toml`, `.claude/payment-integrity-plan.md`, `.claude/TODO.md`
+- **Qué cambió:** Edge Function de auditoría de inventario (READ-ONLY). Compara `branch_inventory.stock` vs `new_stock` del último `inventory_movements` para cada entrada vía LATERAL join. Registra discrepancias en `inventory_drift_log` con stock actual, esperado, drift y referencia al último movimiento. Ignora entradas sin movimientos (sin baseline). Agrega TODO para actualizar keys de Twilio en producción.
+
+---
+
+## 2026-06-19 — Item 05: stale-orders-notifier (cron cada 1 h)
+
+- **Archivos nuevos:** `supabase/functions/stale-orders-notifier/index.ts`, `supabase/migrations/135_pg_cron_stale_orders_notifier.sql`
+- **Archivos modificados:** `supabase/config.toml`, `.claude/payment-integrity-plan.md`
+- **Qué cambió:** Edge Function que detecta órdenes stuck por tipo y notifica al merchant vía Twilio (misma infraestructura que daily-sales-summary). Deduplicación vía tabla `stale_order_notification_logs` — máximo una notificación por org cada 6h. La función SQL `get_stale_orders_summary()` agrega los conteos por org y solo devuelve orgs con Twilio configurado.
+
+---
+
+## 2026-06-19 — Item 04: order_payments.updated_at
+
+- **Archivos nuevos:** `supabase/migrations/134_order_payments_updated_at.sql`
+- **Qué cambió:** Agrega `updated_at TIMESTAMPTZ` a `order_payments` con trigger de auto-update (`set_updated_at()`). Filas existentes se inicializan con su `created_at`. La función `set_updated_at()` es genérica y reutilizable en otras tablas.
+
+---
+
+## 2026-06-19 — Item 03: abandoned-cart-cleanup (cron cada 6 h)
+
+- **Archivos nuevos:** `supabase/functions/abandoned-cart-cleanup/index.ts`, `supabase/migrations/133_pg_cron_abandoned_cart_cleanup.sql`
+- **Archivos modificados:** `supabase/config.toml`, `.claude/payment-integrity-plan.md`
+- **Qué cambió:** Edge Function que cancela órdenes MP en `pending` con +24h sin pago activo. Consulta MP por `external_reference`; si encuentra pago `approved` lo recupera, si está `in_process`/`pending` lo saltea, si no hay nada o está rechazado cancela la orden (el trigger existente `restore_branch_inventory_on_order_cancellation` restaura el stock automáticamente). La migración 133 crea `get_abandoned_mp_orders()` y el cron `0 */6 * * *`.
+
+---
+
+## 2026-06-19 — Item 02: webhook-secret-enforcement
+
+- **Archivos modificados:** `supabase/functions/mp-webhook/index.ts`
+- **Qué cambió:** Si una org no tiene `webhook_secret` configurado, el webhook ahora rechaza con 401 en lugar de procesar igual. Antes: `console.warn` + continuar (cualquiera con la URL podía forjar aprobaciones). Ahora: 401 + log de error con el org_id para facilitar el diagnóstico.
+
+---
+
+## 2026-06-19 — Item 01: mp-payment-reconciler (cron cada 15 min)
+
+- **Archivos nuevos:** `supabase/functions/mp-payment-reconciler/index.ts`, `supabase/migrations/132_pg_cron_mp_payment_reconciler.sql`
+- **Archivos modificados:** `supabase/config.toml`, `.claude/payment-integrity-plan.md`
+- **Qué cambió:** Edge Function que detecta órdenes MP stuck en `pending` con placeholder de pago sin `mp_payment_id` (IPN no llegó). Consulta MP API por `external_reference`, aplica el mismo status map que `mp-webhook`, y llena el placeholder. La migración 132 crea la función auxiliar `get_stuck_mp_orders()` y registra el cron en pg_cron. Ventana: órdenes entre 10 min y 24 h de antigüedad.
+
+---
+
 ## 2026-06-19 — Fix: duplicate key en customers del checkout + policy ampliada
 
 - **Archivos modificados:** `src/pages/Checkout.tsx`, `supabase/migrations/131_public_storefront_guest_checkout_policies.sql`
