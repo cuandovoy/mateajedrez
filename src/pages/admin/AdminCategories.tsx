@@ -26,7 +26,7 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp
 
 function AdminCategoriesContent() {
   const { organizationId } = useOrganization()
-  const { can } = usePermission()
+  const { can, loading: permLoading } = usePermission()
   const canManage = can('catalogo:gestionar')
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -222,6 +222,9 @@ function AdminCategoriesContent() {
     reset()
     setIsModalOpen(true)
   }
+
+  if (permLoading) return <Card><CardContent className="p-6"><SkeletonTable rows={5} /></CardContent></Card>
+  if (!can('catalogo:ver')) return null
 
   return (
     <div>
@@ -611,8 +614,5 @@ function AdminCategoriesContent() {
 }
 
 export function AdminCategories() {
-  const { can, loading: permLoading } = usePermission()
-  if (permLoading) return <SkeletonTable rows={5} />
-  if (!can('catalogo:ver')) return null
   return <AdminCategoriesContent />
 }

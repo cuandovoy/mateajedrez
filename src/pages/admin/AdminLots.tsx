@@ -16,7 +16,6 @@ const STALE_DAYS = 60
 
 export function AdminLots() {
   const settings = useOrgSettings()
-  const { can, loading: permLoading } = usePermission()
 
   if (settings.costing_method !== 'fifo') {
     return (
@@ -34,14 +33,12 @@ export function AdminLots() {
     )
   }
 
-  if (permLoading) return null
-  if (!can('inventario:ver')) return null
   return <AdminLotsContent />
 }
 
 function AdminLotsContent() {
   const { organizationId } = useOrganization()
-  const { can: canPerm } = usePermission()
+  const { can: canPerm, loading: permLoading } = usePermission()
   const canManage = canPerm('inventario:gestionar')
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState('')
@@ -104,6 +101,9 @@ function AdminLotsContent() {
     if (lot.urgency === 'ok') return '🟢'
     return '⬜'
   }
+
+  if (permLoading) return null
+  if (!canPerm('inventario:ver')) return null
 
   return (
     <div className="space-y-4">

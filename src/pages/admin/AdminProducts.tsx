@@ -462,7 +462,7 @@ function AdminProductsContent() {
   const settings = useOrgSettings()
   const { show } = useToastStore()
   const { isAtLimit, productCount, limits, tier } = usePlanLimits()
-  const { can } = usePermission()
+  const { can, loading: permLoading } = usePermission()
   const canManage = can('catalogo:gestionar')
   const maxProductImages = getMaxProductImages(tier)
   const queryClient = useQueryClient()
@@ -1449,7 +1449,9 @@ function AdminProductsContent() {
     }
   }
 
-  if (loading && products.length === 0) {
+  if (!permLoading && !can('catalogo:ver')) return null
+
+  if (permLoading || (loading && products.length === 0)) {
     return (
       <div>
         <div className="mb-8">
@@ -2301,8 +2303,5 @@ function AdminProductsContent() {
 }
 
 export function AdminProducts() {
-  const { can, loading: permLoading } = usePermission()
-  if (permLoading) return <SkeletonTable rows={PAGE_SIZE_ADMIN} />
-  if (!can('catalogo:ver')) return null
   return <AdminProductsContent />
 }

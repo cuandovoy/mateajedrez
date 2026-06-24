@@ -45,7 +45,7 @@ type SortDirection = 'asc' | 'desc'
 
 function AdminSuppliersContent() {
   const { organizationId } = useOrganization()
-  const { can } = usePermission()
+  const { can, loading: permLoading } = usePermission()
   const canManage = can('compras:gestionar')
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
@@ -226,6 +226,9 @@ function AdminSuppliersContent() {
     })
     setIsModalOpen(true)
   }
+
+  if (permLoading) return <SkeletonTable rows={5} />
+  if (!can('compras:ver')) return null
 
   return (
     <div>
@@ -719,8 +722,5 @@ function AdminSuppliersContent() {
 }
 
 export function AdminSuppliers() {
-  const { can, loading: permLoading } = usePermission()
-  if (permLoading) return <SkeletonTable rows={5} />
-  if (!can('compras:ver')) return null
   return <AdminSuppliersContent />
 }

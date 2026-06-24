@@ -40,7 +40,7 @@ function AdminBranchesContent() {
   const { organizationId } = useOrganization()
   const { show } = useToastStore()
   const { isAtLimit } = usePlanLimits()
-  const { can } = usePermission()
+  const { can, loading: permLoading } = usePermission()
   const canManage = can('configuracion:gestionar')
   const consignmentEnabled = useOrgFeature('consignment_enabled')
   const [branches, setBranches] = useState<Branch[]>([])
@@ -262,6 +262,9 @@ function AdminBranchesContent() {
     })
     setIsModalOpen(true)
   }
+
+  if (permLoading) return <SkeletonTable rows={5} />
+  if (!can('configuracion:ver')) return null
 
   return (
     <div>
@@ -687,8 +690,5 @@ function AdminBranchesContent() {
 }
 
 export function AdminBranches() {
-  const { can, loading: permLoading } = usePermission()
-  if (permLoading) return <SkeletonTable rows={5} />
-  if (!can('configuracion:ver')) return null
   return <AdminBranchesContent />
 }
