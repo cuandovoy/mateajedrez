@@ -9,7 +9,7 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 import { formatDateShort } from '@/lib/utils'
-import { PAGE_SIZE_ADMIN } from '@/lib/constants'
+import { PAGE_SIZE_ADMIN, ACTIVE_ORDER_STATUSES } from '@/lib/constants'
 import { useToastStore } from '@/store/toastStore'
 import type { Customer } from '@/types/database.types'
 import {
@@ -140,6 +140,7 @@ export function AdminCustomers() {
           .eq('organization_id', organizationId!)
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           .in('customer_id', ids as any)
+          .in('status', ACTIVE_ORDER_STATUSES)
         for (const row of (orderRows || []) as { customer_id: string }[]) {
           if (row.customer_id)
             orderCountMap[row.customer_id] = (orderCountMap[row.customer_id] || 0) + 1

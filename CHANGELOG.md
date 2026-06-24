@@ -4,6 +4,36 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-23 — Limpieza UX panel de clientes + consistencia de órdenes
+
+- **Archivos modificados:** `src/pages/admin/AdminCustomers.tsx`, `src/pages/admin/AdminCustomerReports.tsx`, `src/pages/admin/AdminCustomerDetail.tsx`
+- **Qué cambió:** (1) `AdminCustomers` ahora excluye órdenes canceladas del conteo usando `ACTIVE_ORDER_STATUSES`, alineándose con las otras páginas. (2) `AdminCustomerReports` reemplazó arrays inline de status por la constante compartida. (3) `AdminCustomerDetail` limita la carga del historial a 100 órdenes con aviso + link al historial completo, evitando fetches masivos en clientes con muchas órdenes.
+
+---
+
+## 2026-06-23 — Product Detail View — PR 3: Helpers + Tests
+
+- **Archivos nuevos:** `src/lib/productDetailHelpers.ts`, `src/lib/productDetailHelpers.test.ts`
+- **Qué cambió:** Phase 5 del SDD product-detail-view. Extracción de la lógica de derivación de `useProductHeader` en dos helpers puros: `calcWeightedAvgCost` (promedio ponderado de costo por sucursal, retorna null cuando el stock total es 0) y `calcMargin` (margen porcentual con clasificación green/yellow/red, guarda división por cero y costo null). 17 tests unitarios cubren happy path, edge cases de límite (exactamente 40%, 20%, 19.9%), margen negativo, costo null/undefined/0, stock null/undefined/0, y array vacío. Todos los tests pasan (194 en total), TypeScript sin errores.
+
+---
+
+## 2026-06-23 — Product Detail View — PR 2: Page + Wiring
+
+- **Archivos nuevos:** `src/pages/admin/AdminProductDetail.tsx`
+- **Archivos modificados:** `src/App.tsx`, `src/components/admin/ProductTable.tsx`, `src/pages/admin/AdminExpenses.tsx`
+- **Qué cambió:** Phase 3+4 del SDD product-detail-view. Nueva página `/products/:id` con header de producto (nombre, SKU, badge activo/inactivo, precio con descuento, 3 stat cards: stock total, costo promedio ponderado, margen), barra de tabs con estado en URL (`?tab=`), y 6 paneles de contenido (stock por sucursal, movimientos con filtro y paginación servidor, transferencias, órdenes de compra, ventas con paginación servidor, proveedores con star icon para proveedor principal). Modo degradado para movimientos si el RPC aún no está aplicado. Wiring: nueva ruta en App.tsx, acción "Ver detalle" (Eye) en ProductTable como primer ítem del menú de acciones, y link en nombres de producto en líneas de PO en AdminExpenses.
+
+---
+
+## 2026-06-23 — Product Detail View — PR 1: Foundation + Hooks
+
+- **Archivos nuevos:** `src/hooks/useProductDetail.ts`, `supabase/migrations/137_get_product_movements_rpc.sql`
+- **Archivos modificados:** `src/types/index.ts`, `src/lib/queryKeys.ts`
+- **Qué cambió:** Phase 1+2 del SDD product-detail-view. Se agregaron los tipos `ProductMovementRow` y `PurchaseOrderItemRow`, 7 sub-keys nuevas bajo `products` en queryKeys, la migración SQL del RPC `get_product_movements` (aplicar manualmente), y el módulo `useProductDetail.ts` con los 7 hooks de data layer (header, stockByBranch, movements con modo degradado, transfers, purchaseItems, sales, suppliers).
+
+---
+
 ## 2026-06-19 — Item 06: inventory-drift-auditor (cron diario 3am)
 
 - **Archivos nuevos:** `supabase/functions/inventory-drift-auditor/index.ts`, `supabase/migrations/136_pg_cron_inventory_drift_auditor.sql`

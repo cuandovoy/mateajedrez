@@ -29,3 +29,29 @@ export interface ProductWithCategory extends Product {
 export interface ProductVariantWithProduct extends ProductVariant {
   product: Product
 }
+
+export interface ProductMovementRow {
+  id: string
+  branch_id: string
+  branch_name: string
+  movement_type: string
+  quantity: number
+  previous_stock: number
+  new_stock: number
+  reference_type: string | null
+  reference_id: string | null
+  notes: string | null
+  created_at: string
+  total_count: number
+}
+
+export interface PurchaseOrderItemRow {
+  id: string
+  purchase_order_id: string
+  product_id: string
+  variant_id: string | null
+  quantity_ordered: number
+  quantity_received: number
+  unit_cost: number
+  line_number: number
+}

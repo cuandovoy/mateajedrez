@@ -22,6 +22,20 @@ export const queryKeys = {
       ['admin', orgId, 'products', productId] as const,
     variants: (orgId: string, productId: string) =>
       ['admin', orgId, 'products', productId, 'variants'] as const,
+    header: (orgId: string, productId: string) =>
+      ['admin', orgId, 'products', productId, 'detail-header'] as const,
+    stockByBranch: (orgId: string, productId: string) =>
+      ['admin', orgId, 'products', productId, 'stock'] as const,
+    movements: (orgId: string, productId: string, page: number, type?: string) =>
+      ['admin', orgId, 'products', productId, 'movements', page, type ?? 'all'] as const,
+    detailTransfers: (orgId: string, productId: string) =>
+      ['admin', orgId, 'products', productId, 'transfers'] as const,
+    purchaseItems: (orgId: string, productId: string) =>
+      ['admin', orgId, 'products', productId, 'purchase-items'] as const,
+    sales: (orgId: string, productId: string, page: number) =>
+      ['admin', orgId, 'products', productId, 'sales', page] as const,
+    detailSuppliers: (orgId: string, productId: string) =>
+      ['admin', orgId, 'products', productId, 'suppliers'] as const,
   },
   categories: {
     all: (orgId: string) => ['admin', orgId, 'categories'] as const,

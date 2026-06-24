@@ -15,31 +15,6 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 
 ## UX — Panel de Clientes (admin)
 
-### 🔴 Crítico
-
-- 🔴 `AdminCustomerReports.tsx` — descarga TODO el historial de órdenes al cliente para luego filtrar por fecha en memoria. Con un volumen alto de órdenes, esto colapsa. Hay que mover el filtro de fecha al query de Supabase (`gte`/`lte` en `created_at`)
-- 🔴 `AdminCustomerDetail.tsx` — no hay forma de editar el cliente desde la ficha. El usuario tiene que volver al listado, buscarlo, y usar el menú de acciones. Agregar botón Editar en el header de la ficha
-- 🔴 `POSCustomerSearch.tsx` — si el cliente no existe, no hay forma de crearlo desde el POS. El cajero tiene que salir del POS, ir a Clientes, crear, y volver. Agregar shortcut "Crear cliente" cuando la búsqueda no da resultados
-
-### 🟠 Alta
-
-- 🟠 `AdminCustomerDetail.tsx` — `navigate('/customers')` en el botón volver destruye el estado de filtros y página del listado. Cambiar a `navigate(-1)`
-- 🟠 `AdminCustomerReports.tsx` — spinner de página completa en cada cambio de filtro (toda la UI desaparece). Usar skeleton overlay o stale-while-revalidate
-- 🟠 `AdminCustomerReports.tsx` — no hay ningún link desde las filas de la tabla de reporte a `AdminCustomerDetail`. Click en nombre de cliente debería navegar a la ficha
-- 🟠 `AdminCustomers.tsx` — delete con `window.confirm` directo, sin modal, y sin guardia contra clientes con órdenes (falla silenciosa con toast genérico). Agregar modal de confirmación con warning si tiene órdenes
-- 🟠 Inconsistencia de definición de "orden completada" entre las 3 páginas: `AdminCustomers` cuenta todas, `AdminCustomerDetail` excluye `pending_allocation` y `cancelled`, `AdminCustomerReports` incluye `pending_allocation`. Definir un criterio único en `src/lib/constants.ts`
-
-### 🟡 Media
-
-- 🟡 `AdminCustomers.tsx` — sin sorting por columna. La tabla es siempre `created_at DESC`. Agregar click-to-sort en Nombre, Órdenes
-- 🟡 `AdminCustomers.tsx` — el menú de acciones (ActionsMenu) no tiene "Ver detalle". La única forma es hacer click en el nombre como link. Agregar acción "Ver ficha"
-- 🟡 `AdminCustomerDetail.tsx` — teléfono y email se muestran como texto plano en la card de contacto. Convertirlos en links (`tel:`, `mailto:`, `wa.me/`)
-- 🟡 `AdminCustomerDetail.tsx` — los KPI "Total gastado" y "Total órdenes" son inconsistentes: órdenes cuenta canceladas pero gastado las excluye. El usuario ve números que no cierran
-- 🟡 `AdminCustomerDetail.tsx` — sin badge de estado activo/inactivo en el header. Si el cliente está desactivado, no hay ningún indicador visual
-- 🟡 `AdminCustomerDetail.tsx` — sin paginación en el historial de órdenes. Si el cliente tiene 300 órdenes, se cargan todas de una vez
-- 🟡 `AdminCustomerReports.tsx` — página llamada "Reportes" sin ningún gráfico. La evolución mensual es una lista de texto. Agregar al menos un `BarChart` de recharts para la evolución de ventas mensuales
-- 🟡 `AdminCustomerReports.tsx` — el patrón de filtros es inconsistente: búsqueda/segmento/sort se aplican al instante, pero fecha/sucursal requieren "Aplicar filtros". Todo debería ser consistente
-- 🟡 `POSCustomerSearch.tsx` — errores de red son silenciosos: muestra "No se encontraron clientes" igual que un resultado vacío real. Distinguir los casos con un mensaje de error
 
 ### 🟢 Baja
 

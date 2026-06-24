@@ -1,3 +1,4 @@
+import { ACTIVE_ORDER_STATUSES } from '@/lib/constants'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -259,7 +260,7 @@ export function AdminCustomerReports() {
         .from('orders')
         .select('id, customer_id, branch_id, created_at, total, subtotal_before_discount, discount_total, shipping_address')
         .eq('organization_id', organizationId)
-        .in('status', ['pending_allocation', 'pending', 'processing', 'shipped', 'delivered'])
+        .in('status', ACTIVE_ORDER_STATUSES)
         .gte('created_at', `${startDate}T00:00:00`)
         .lte('created_at', `${endDate}T23:59:59`)
 
@@ -294,7 +295,7 @@ export function AdminCustomerReports() {
           .from('orders')
           .select('customer_id, created_at')
           .eq('organization_id', organizationId)
-          .in('status', ['pending_allocation', 'pending', 'processing', 'shipped', 'delivered'])
+          .in('status', ACTIVE_ORDER_STATUSES)
           .in('customer_id', periodCustomerIds)
         if (selectedBranchId) lifetimeQuery = lifetimeQuery.eq('branch_id', selectedBranchId)
         const { data: lifetimeData, error: lifetimeError } = await lifetimeQuery

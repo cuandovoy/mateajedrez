@@ -10,6 +10,8 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { formatPrice, formatDateShort } from '@/lib/utils'
 import { ArrowLeft, ShoppingCart, DollarSign, Calendar, Package, Plus, Edit2, X, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { ACTIVE_ORDER_STATUSES } from '@/lib/constants'
+
+const ORDERS_PREVIEW_LIMIT = 100
 import { useToastStore } from '@/store/toastStore'
 import type { Customer } from '@/types/database.types'
 import { cn } from '@/lib/utils'
@@ -66,7 +68,8 @@ export function AdminCustomerDetail() {
           .select('*, order_items(id, quantity, price, product_id, products(name, sku))')
           .eq('organization_id', organizationId!)
           .eq('customer_id', id!)
-          .order('created_at', { ascending: false }),
+          .order('created_at', { ascending: false })
+          .limit(ORDERS_PREVIEW_LIMIT),
       ])
       if (customerRes.error) throw customerRes.error
       if (ordersRes.error) throw ordersRes.error
@@ -361,6 +364,17 @@ export function AdminCustomerDetail() {
                         className="text-sm text-admin-600 hover:text-admin-700 font-medium"
                       >
                         Mostrar más ({orders.length - ordersVisible} restantes)
+                      </button>
+                    </div>
+                  )}
+                  {orders.length >= ORDERS_PREVIEW_LIMIT && (
+                    <div className="px-4 py-3 border-t border-gray-100 text-center text-xs text-gray-400">
+                      Mostrando las últimas {ORDERS_PREVIEW_LIMIT} órdenes.{' '}
+                      <button
+                        onClick={() => navigate(`/orders?customer_id=${id}`)}
+                        className="text-admin-600 hover:underline"
+                      >
+                        Ver historial completo
                       </button>
                     </div>
                   )}

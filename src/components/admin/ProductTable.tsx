@@ -1,10 +1,11 @@
-import { Edit, Trash2, Package, Image as ImageIcon, ScanLine, Truck, ChevronDown, ChevronRight } from 'lucide-react'
+import { Edit, Trash2, Package, Image as ImageIcon, ScanLine, Truck, ChevronDown, ChevronRight, Eye } from 'lucide-react'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import type { Product, ProductImage, Category, ProductVariant } from '@/types'
 import { Fragment, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 interface ProductWithCategory extends Product {
   product_images?: ProductImage[]
@@ -45,6 +46,7 @@ export function ProductTable({
   onToggleSelect,
   onSelectAll,
 }: ProductTableProps) {
+  const navigate = useNavigate()
   const settings = useOrgSettings()
   const [expandedProductIds, setExpandedProductIds] = useState<Set<string>>(new Set())
   const bulkEnabled = !!onToggleSelect
@@ -164,6 +166,7 @@ export function ProductTable({
                 <div className="min-h-[44px] min-w-[44px] flex items-center">
                   <ActionsMenu
                     actions={[
+                      { label: 'Ver detalle', icon: <Eye className="h-4 w-4" />, onClick: () => navigate(`/products/${product.id}`) },
                       ...(onManageBarcodes ? [{ label: 'Código de barras', icon: <ScanLine className="h-4 w-4" />, onClick: () => onManageBarcodes(product) }] : []),
                       ...(onManageSuppliers ? [{ label: 'Proveedores', icon: <Truck className="h-4 w-4" />, onClick: () => onManageSuppliers(product) }] : []),
                       ...(onAdjustInventory ? [{ label: 'Ajustar inventario', icon: <Package className="h-4 w-4" />, onClick: () => onAdjustInventory(product) }] : []),
@@ -314,6 +317,11 @@ export function ProductTable({
                   <div className="flex items-center justify-end">
                     <ActionsMenu
                       actions={[
+                        {
+                          label: 'Ver detalle',
+                          icon: <Eye className="h-4 w-4" />,
+                          onClick: () => navigate(`/products/${product.id}`),
+                        },
                         {
                           label: 'Gestionar variantes',
                           icon: <Package className="h-4 w-4" />,

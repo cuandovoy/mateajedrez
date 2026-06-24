@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
@@ -2216,7 +2217,14 @@ export function AdminExpenses() {
                         return (
                           <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
                             <td className="py-2 px-2 text-sm text-gray-700">{item.line_number}</td>
-                            <td className="py-2 px-2 text-sm text-gray-700">{productNameById.get(item.product_id) || 'Producto'}</td>
+                            <td className="py-2 px-2 text-sm text-gray-700">
+                              <Link
+                                to={`/products/${item.product_id}`}
+                                className="text-admin-700 hover:text-admin-900 hover:underline"
+                              >
+                                {productNameById.get(item.product_id) || 'Producto'}
+                              </Link>
+                            </td>
                             <td className="py-2 px-2 text-sm text-gray-500">
                               {item.variant_id
                                 ? (variantsByProduct.get(item.product_id)?.find((v) => v.id === item.variant_id)?.name ?? item.variant_id.slice(0, 8) + '…')

@@ -18,6 +18,7 @@ import { AdminCategories } from '@/pages/admin/AdminCategories'
 import { AdminCustomerReports } from '@/pages/admin/AdminCustomerReports'
 import { AdminCustomers } from '@/pages/admin/AdminCustomers'
 import { AdminCustomerDetail } from '@/pages/admin/AdminCustomerDetail'
+import { AdminProductDetail } from '@/pages/admin/AdminProductDetail'
 import { AdminDebtors } from '@/pages/admin/AdminDebtors'
 import { AdminDashboard } from '@/pages/admin/AdminDashboard'
 import { AdminExpenses } from '@/pages/admin/AdminExpenses'
@@ -98,6 +99,7 @@ function App() {
         <Route element={<AdminLayout />}>
           <Route path="/" element={<AdminDashboard />} />
           <Route path="/products" element={<AdminProducts />} />
+          <Route path="/products/:id" element={<AdminProductDetail />} />
           <Route path="/categories" element={<AdminCategories />} />
           <Route path="/suppliers" element={<AdminSuppliers />} />
           <Route path="/orders" element={<AdminOrders />} />
