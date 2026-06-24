@@ -1,9 +1,11 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useAdminBranches } from '@/hooks/useAdminBranches'
+import { usePermission } from '@/hooks/usePermission'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 import { formatDateShort, formatPrice } from '@/lib/utils'
@@ -102,6 +104,7 @@ export function AdminFinancialReports() {
   const settings = useOrgSettings()
   const { show } = useToastStore()
   const queryClient = useQueryClient()
+  const { can, loading: permLoading } = usePermission()
 
   const [exporting, setExporting] = useState(false)
   const [selectedBranchId, setSelectedBranchId] = useState('')
@@ -355,6 +358,9 @@ export function AdminFinancialReports() {
     () => branches.find((branch) => branch.id === selectedBranchId),
     [branches, selectedBranchId]
   )
+
+  if (permLoading) return <SkeletonTable rows={10} />
+  if (!can('reportes:ver')) return null
 
   if (loading) {
     return (

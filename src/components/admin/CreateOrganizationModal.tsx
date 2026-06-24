@@ -116,14 +116,25 @@ export function CreateOrganizationModal({ onClose }: Props) {
       const orgId = (newOrg as { id: string })?.id
       if (!orgId) throw new Error('No se pudo crear la organización')
 
-      // Add current user as admin of the new org
-      const { error: memberError } = await supabase
+      // The org creation trigger (migration 139) seeds system roles automatically.
+      // Fetch the admin role ID so we can link the founding member immediately.
+      const sb = supabase as any
+      const { data: adminRole } = await sb
+        .from('organization_roles')
+        .select('id')
+        .eq('organization_id', orgId)
+        .eq('base_role_key', 'admin')
+        .eq('is_system', true)
+        .single()
+
+      const { error: memberError } = await sb
         .from('organization_members')
         .insert({
           organization_id: orgId,
           user_id: user.id,
           role: 'admin',
-        } as never)
+          organization_role_id: adminRole?.id ?? null,
+        })
 
       if (memberError) throw memberError
 

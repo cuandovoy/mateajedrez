@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePermission } from '@/hooks/usePermission'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
@@ -40,6 +41,7 @@ export function AdminTransfers() {
   const { show } = useToastStore()
   const settings = useOrgSettings()
   const { organizationId } = useOrganization()
+  const { can, loading: permLoading } = usePermission()
   const { canUseFeature } = usePlanLimits()
   const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState('')
@@ -157,6 +159,10 @@ export function AdminTransfers() {
   }, [transfers, statusFilter, searchTerm])
 
   const pendingTransfers = filteredTransfers.filter((t) => t.status === 'pending').length
+  const canManage = can('inventario:gestionar')
+
+  if (permLoading) return <SkeletonTable rows={5} />
+  if (!can('inventario:ver')) return null
 
   return (
     <PlanGate feature="transfers" canUse={canUseFeature('transfers')}>
@@ -288,7 +294,7 @@ export function AdminTransfers() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {transfer.status === 'pending' && (
+                        {transfer.status === 'pending' && canManage && (
                           <ActionsMenu
                             actions={[
                               {
@@ -300,7 +306,7 @@ export function AdminTransfers() {
                                 label: 'Cancelar Transferencia',
                                 icon: <XCircle className="h-4 w-4" />,
                                 onClick: () => handleCancelTransfer(transfer.id),
-                                variant: 'danger',
+                                variant: 'danger' as const,
                               },
                             ]}
                           />

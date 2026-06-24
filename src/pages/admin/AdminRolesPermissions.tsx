@@ -1,15 +1,19 @@
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { queryKeys } from '@/lib/queryKeys'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { SkeletonCard, SkeletonTable } from '@/components/ui/Skeleton'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePermission } from '@/hooks/usePermission'
 import { useToastStore } from '@/store/toastStore'
-import type { Database } from '@/types/database.types'
-import { Loader, Plus, Save } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
-
-type Permission = Database['public']['Tables']['permissions']['Row']
+import { MODULES, MODULE_META, SYSTEM_ROLE_DEFAULTS, type Permission } from '@/lib/permissions'
+import { ChevronDown, ChevronRight, Plus, Settings, Trash2, Users } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 type OrgRole = {
   id: string
@@ -20,21 +24,13 @@ type OrgRole = {
   is_system: boolean
   base_role_key: string
   is_active: boolean
+  member_count?: number
 }
 
-type RolePermission = {
-  organization_role_id: string
-  permission_id: string
-}
-
-type AssignedUser = {
-  user_id: string
-  full_name: string | null
-}
-
-interface RoleWithPermissions extends OrgRole {
-  permissions: Permission[]
-  users: AssignedUser[]
+type PermissionRow = {
+  id: string
+  key: string
+  name: string
 }
 
 function slugifyRoleKey(value: string): string {
@@ -45,234 +41,272 @@ function slugifyRoleKey(value: string): string {
     .replace(/\p{Diacritic}/gu, '')
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
-
   return base || 'rol_custom'
+}
+
+/** Returns true if this role+module combination should have its toggle disabled */
+function isConfiguracionGestionarLocked(role: OrgRole, module: typeof MODULES[number]): boolean {
+  // Anti-lockout: configuracion:gestionar on the system admin role cannot be disabled
+  return module === 'configuracion' && role.base_role_key === 'admin' && role.is_system
 }
 
 export function AdminRolesPermissions() {
   const { show } = useToastStore()
   const { organizationId } = useOrganization()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sb = supabase as any
 
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [creatingRole, setCreatingRole] = useState(false)
+  const { isAdmin, loading: permLoading } = usePermission()
 
-  const [roles, setRoles] = useState<RoleWithPermissions[]>([])
-  const [permissions, setPermissions] = useState<Permission[]>([])
-  const [selectedRole, setSelectedRole] = useState<RoleWithPermissions | null>(null)
-  const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set())
-
+  const [expandedRoleId, setExpandedRoleId] = useState<string | null>(null)
   const [newRoleName, setNewRoleName] = useState('')
   const [newRoleDescription, setNewRoleDescription] = useState('')
 
-  const sb = supabase as any
-
-  useEffect(() => {
-    fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organizationId])
-
-  const fetchData = async () => {
-    if (!organizationId) return
-    setLoading(true)
-    try {
+  // ─── Fetch all roles with member count ───────────────────────────────────────
+  const { data: roles = [], isLoading: rolesLoading } = useQuery<OrgRole[]>({
+    queryKey: queryKeys.roles.all(organizationId ?? ''),
+    enabled: Boolean(organizationId),
+    queryFn: async () => {
       const { data: rolesData, error: rolesError } = await sb
         .from('organization_roles')
         .select('*')
-        .eq('organization_id', organizationId)
+        .eq('organization_id', organizationId!)
         .eq('is_active', true)
         .order('is_system', { ascending: false })
         .order('name', { ascending: true })
-
       if (rolesError) throw rolesError
 
-      const { data: permissionsData, error: permissionsError } = await supabase
-        .from('permissions')
-        .select('*')
-        .order('category, key')
-
-      if (permissionsError) throw permissionsError
-
       const roleIds = (rolesData || []).map((r: OrgRole) => r.id)
-
-      const rolePermsRes = roleIds.length
-        ? await sb
-            .from('organization_role_permissions')
-            .select('organization_role_id, permission_id')
-            .in('organization_role_id', roleIds)
-        : { data: [], error: null }
-
-      if (rolePermsRes.error) throw rolePermsRes.error
-
-      const membersRes = await sb
-        .from('organization_members')
-        .select('user_id, organization_role_id')
-        .eq('organization_id', organizationId)
-        .not('organization_role_id', 'is', null)
-
-      if (membersRes.error) throw membersRes.error
-
-      const members = (membersRes.data || []) as Array<{ user_id: string; organization_role_id: string | null }>
-      const userIds = members.map((m) => m.user_id).filter(Boolean)
-
-      const profilesRes = userIds.length
-        ? await supabase
-            .from('user_profiles')
-            .select('user_id, full_name')
-            .in('user_id', userIds)
-        : { data: [], error: null }
-
-      if (profilesRes.error) throw profilesRes.error
-
-      const profileByUserId = new Map<string, string | null>()
-      ;(profilesRes.data || []).forEach((p: { user_id: string | null; full_name: string | null }) => {
-        if (p.user_id) profileByUserId.set(p.user_id, p.full_name)
-      })
-
-      const rolePerms = (rolePermsRes.data || []) as RolePermission[]
-      const permsByRole = new Map<string, Permission[]>()
-      rolePerms.forEach((rp) => {
-        const perm = (permissionsData || []).find((p) => p.id === rp.permission_id)
-        if (!perm) return
-        const list = permsByRole.get(rp.organization_role_id) || []
-        list.push(perm)
-        permsByRole.set(rp.organization_role_id, list)
-      })
-
-      const usersByRole = new Map<string, AssignedUser[]>()
-      members.forEach((m) => {
-        if (!m.organization_role_id) return
-        const list = usersByRole.get(m.organization_role_id) || []
-        list.push({
-          user_id: m.user_id,
-          full_name: profileByUserId.get(m.user_id) || null,
+      let memberCountByRole = new Map<string, number>()
+      if (roleIds.length > 0) {
+        const { data: membersData } = await sb
+          .from('organization_members')
+          .select('organization_role_id')
+          .eq('organization_id', organizationId!)
+          .in('organization_role_id', roleIds)
+        ;(membersData || []).forEach((m: { organization_role_id: string }) => {
+          memberCountByRole.set(m.organization_role_id, (memberCountByRole.get(m.organization_role_id) ?? 0) + 1)
         })
-        usersByRole.set(m.organization_role_id, list)
-      })
-
-      const mergedRoles: RoleWithPermissions[] = ((rolesData || []) as OrgRole[]).map((role) => ({
-        ...role,
-        permissions: permsByRole.get(role.id) || [],
-        users: usersByRole.get(role.id) || [],
-      }))
-
-      setPermissions(permissionsData || [])
-      setRoles(mergedRoles)
-
-      if (mergedRoles.length === 0) {
-        setSelectedRole(null)
-        setSelectedPermissions(new Set())
-      } else {
-        const keepSelected = selectedRole ? mergedRoles.find((r) => r.id === selectedRole.id) : null
-        const next = keepSelected || mergedRoles[0]
-        setSelectedRole(next)
-        setSelectedPermissions(new Set(next.permissions.map((p) => p.id)))
       }
-    } catch (error) {
-      console.error('Error fetching role data:', error)
-      show('Error al cargar roles y permisos', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const handlePermissionToggle = (permissionId: string) => {
-    const next = new Set(selectedPermissions)
-    if (next.has(permissionId)) {
-      next.delete(permissionId)
-    } else {
-      next.add(permissionId)
-    }
-    setSelectedPermissions(next)
-  }
+      return (rolesData || []).map((r: OrgRole) => ({
+        ...r,
+        member_count: memberCountByRole.get(r.id) ?? 0,
+      }))
+    },
+  })
 
-  const handleSavePermissions = async () => {
-    if (!selectedRole) return
+  // ─── Fetch module permissions for the expanded role ──────────────────────────
+  const { data: expandedRolePermissions = new Set<string>(), isLoading: permsLoading } = useQuery<Set<string>>({
+    queryKey: queryKeys.roles.permissions(organizationId ?? '', expandedRoleId ?? ''),
+    enabled: Boolean(organizationId) && Boolean(expandedRoleId),
+    queryFn: async () => {
+      // Fetch the 16 module permission rows by exact key list
+      const moduleKeys = MODULES.flatMap((m) => [`${m}:ver`, `${m}:gestionar`])
+      const { data: allModulePerms, error: permsError } = await supabase
+        .from('permissions')
+        .select('id, key, name')
+        .in('key', moduleKeys)
+        .order('key')
+      if (permsError) throw permsError
 
-    setSaving(true)
-    try {
+      const modulePermissions = allModulePerms || []
+      const modulePermIds = modulePermissions.map((p: PermissionRow) => p.id)
+
+      if (modulePermIds.length === 0) return new Set<string>()
+
+      // Fetch which of those are granted to this role
+      const { data: granted, error: grantedError } = await sb
+        .from('organization_role_permissions')
+        .select('permission_id, permissions(key)')
+        .eq('organization_role_id', expandedRoleId!)
+        .in('permission_id', modulePermIds)
+      if (grantedError) throw grantedError
+
+      return new Set<string>(
+        (granted || [])
+          .map((g: { permissions: { key: string } | null }) => g.permissions?.key)
+          .filter(Boolean) as string[]
+      )
+    },
+    select: (data) => data,
+  })
+
+  // ─── Fetch permission ID map (key → id) ──────────────────────────────────────
+  // Needed for the save mutation to convert keys → IDs
+  const { data: permissionIdByKey = new Map<string, string>() } = useQuery<Map<string, string>>({
+    queryKey: ['admin', organizationId, 'module-permission-ids'],
+    enabled: Boolean(organizationId),
+    queryFn: async () => {
+      const moduleKeySet = MODULES.flatMap((m) => [`${m}:ver`, `${m}:gestionar`])
+      const { data, error } = await supabase
+        .from('permissions')
+        .select('id, key')
+        .in('key', moduleKeySet)
+      if (error) throw error
+      return new Map<string, string>((data || []).map((p: { id: string; key: string }) => [p.key, p.id]))
+    },
+  })
+
+  // ─── Mutation: save module permissions (delete-all + re-insert per ADR-4) ────
+  const savePermsMutation = useMutation({
+    mutationFn: async ({ roleId, grantedKeys }: { roleId: string; grantedKeys: string[] }) => {
+      // Only operate on the 16 module permission IDs
+      const modulePermIds = [...permissionIdByKey.values()]
+      if (modulePermIds.length === 0) throw new Error('No se encontraron permisos de módulo en la DB')
+
+      // Delete existing module-key permissions for this role
       const { error: deleteError } = await sb
         .from('organization_role_permissions')
         .delete()
-        .eq('organization_role_id', selectedRole.id)
-
+        .eq('organization_role_id', roleId)
+        .in('permission_id', modulePermIds)
       if (deleteError) throw deleteError
 
-      if (selectedPermissions.size > 0) {
-        const rows = Array.from(selectedPermissions).map((permissionId) => ({
-          organization_role_id: selectedRole.id,
-          permission_id: permissionId,
-        }))
+      // Insert new set
+      if (grantedKeys.length > 0) {
+        const rows = grantedKeys
+          .map((key) => ({ organization_role_id: roleId, permission_id: permissionIdByKey.get(key) }))
+          .filter((r) => r.permission_id != null)
 
-        const { error: insertError } = await sb
-          .from('organization_role_permissions')
-          .upsert(rows, { onConflict: 'organization_role_id,permission_id' })
-
-        if (insertError) throw insertError
+        if (rows.length > 0) {
+          const { error: insertError } = await sb
+            .from('organization_role_permissions')
+            .upsert(rows, { onConflict: 'organization_role_id,permission_id' })
+          if (insertError) throw insertError
+        }
       }
-
-      show(`Permisos guardados para ${selectedRole.name}`, 'success')
-      await fetchData()
-    } catch (error) {
-      console.error('Error saving role permissions:', error)
+    },
+    onSuccess: (_, { roleId }) => {
+      show('Permisos guardados', 'success')
+      queryClient.invalidateQueries({ queryKey: queryKeys.roles.permissions(organizationId ?? '', roleId) })
+    },
+    onError: (error) => {
+      console.error('Error saving permissions:', error)
       show('Error al guardar permisos', 'error')
-    } finally {
-      setSaving(false)
-    }
-  }
+    },
+  })
 
-  const handleCreateRole = async () => {
-    if (!organizationId) return
-    const trimmedName = newRoleName.trim()
-    if (!trimmedName) {
-      show('Ingresa un nombre para el rol', 'error')
-      return
-    }
+  // ─── Mutation: create custom role ────────────────────────────────────────────
+  const createRoleMutation = useMutation({
+    mutationFn: async ({ name, description }: { name: string; description: string }) => {
+      const trimmedName = name.trim()
+      if (!trimmedName) throw new Error('Ingresá un nombre para el rol')
 
-    setCreatingRole(true)
-    try {
       const key = slugifyRoleKey(trimmedName)
-      const { error } = await sb.from('organization_roles').insert({
-        organization_id: organizationId,
-        key,
-        name: trimmedName,
-        description: newRoleDescription.trim() || null,
-        is_system: false,
-        base_role_key: 'custom',
-        is_active: true,
-      })
-
+      const { data: newRole, error } = await sb
+        .from('organization_roles')
+        .insert({
+          organization_id: organizationId!,
+          key,
+          name: trimmedName,
+          description: description.trim() || null,
+          is_system: false,
+          base_role_key: 'custom',
+          is_active: true,
+        })
+        .select('id')
+        .single()
       if (error) throw error
 
+      // Seed with viewer defaults (all 8 :ver keys)
+      const viewerPermIds = SYSTEM_ROLE_DEFAULTS.viewer
+        .map((permKey) => permissionIdByKey.get(permKey))
+        .filter(Boolean) as string[]
+
+      if (viewerPermIds.length > 0 && newRole?.id) {
+        const rows = viewerPermIds.map((pid) => ({
+          organization_role_id: newRole.id,
+          permission_id: pid,
+        }))
+        const { error: seedError } = await sb
+          .from('organization_role_permissions')
+          .upsert(rows, { onConflict: 'organization_role_id,permission_id' })
+        if (seedError) throw seedError
+      }
+    },
+    onSuccess: () => {
+      show('Rol custom creado', 'success')
       setNewRoleName('')
       setNewRoleDescription('')
-      show('Rol custom creado', 'success')
-      await fetchData()
-    } catch (error: any) {
+      queryClient.invalidateQueries({ queryKey: queryKeys.roles.all(organizationId ?? '') })
+    },
+    onError: (error) => {
       console.error('Error creating role:', error)
-      show(error?.message || 'Error al crear rol', 'error')
-    } finally {
-      setCreatingRole(false)
+      show(error instanceof Error ? error.message : 'Error al crear rol', 'error')
+    },
+  })
+
+  // ─── Mutation: delete custom role ────────────────────────────────────────────
+  const deleteRoleMutation = useMutation({
+    mutationFn: async (roleId: string) => {
+      const { error } = await sb
+        .from('organization_roles')
+        .update({ is_active: false })
+        .eq('id', roleId)
+        .eq('is_system', false)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      show('Rol eliminado', 'success')
+      setExpandedRoleId(null)
+      queryClient.invalidateQueries({ queryKey: queryKeys.roles.all(organizationId ?? '') })
+    },
+    onError: (error) => {
+      console.error('Error deleting role:', error)
+      show('Error al eliminar el rol', 'error')
+    },
+  })
+
+  // ─── Handlers ────────────────────────────────────────────────────────────────
+
+  const handleTogglePermission = (role: OrgRole, module: typeof MODULES[number], action: 'ver' | 'gestionar') => {
+    const key = `${module}:${action}` as Permission
+    const verKey = `${module}:ver` as Permission
+
+    // Anti-lockout: cannot uncheck configuracion:gestionar for system admin role
+    if (isConfiguracionGestionarLocked(role, module) && action === 'gestionar') return
+
+    const currentKeys = new Set(expandedRolePermissions)
+
+    if (currentKeys.has(key)) {
+      currentKeys.delete(key)
+      // If unchecking gestionar, also uncheck ver (optional: keep independent)
+    } else {
+      currentKeys.add(key)
+      // UI rule: checking gestionar also checks ver
+      if (action === 'gestionar') {
+        currentKeys.add(verKey)
+      }
     }
+
+    savePermsMutation.mutate({ roleId: role.id, grantedKeys: [...currentKeys] })
   }
 
-  const permissionsByCategory = useMemo(
-    () =>
-      permissions.reduce((acc, perm) => {
-        const category = perm.category || 'other'
-        if (!acc[category]) acc[category] = []
-        acc[category].push(perm)
-        return acc
-      }, {} as Record<string, Permission[]>),
-    [permissions]
-  )
+  const handleDeleteRole = (role: OrgRole) => {
+    if ((role.member_count ?? 0) > 0) {
+      show(`No se puede eliminar: el rol tiene ${role.member_count} miembro(s) asignado(s)`, 'error')
+      return
+    }
+    if (!confirm(`¿Eliminar el rol "${role.name}"? Esta acción no se puede deshacer.`)) return
+    deleteRoleMutation.mutate(role.id)
+  }
 
-  const categories = useMemo(() => Object.keys(permissionsByCategory).sort(), [permissionsByCategory])
+  if (permLoading) return <SkeletonTable rows={5} />
+  if (!isAdmin) { navigate('/'); return null }
 
-  if (loading) {
+  if (rolesLoading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader className="h-8 w-8 animate-spin" />
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Roles y Permisos</h1>
+          <p className="text-gray-600 mt-2">Roles por organización, permisos de módulo y usuarios asignados</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)}
+        </div>
       </div>
     )
   }
@@ -281,9 +315,10 @@ export function AdminRolesPermissions() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Roles y Permisos</h1>
-        <p className="text-gray-600 mt-2">Roles por organización, permisos y usuarios asignados</p>
+        <p className="text-gray-600 mt-2">Roles por organización, permisos de módulo y usuarios asignados</p>
       </div>
 
+      {/* Create custom role */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Crear Rol Custom</CardTitle>
@@ -299,140 +334,152 @@ export function AdminRolesPermissions() {
             value={newRoleDescription}
             onChange={(e) => setNewRoleDescription(e.target.value)}
           />
-          <Button onClick={handleCreateRole} disabled={creatingRole} className="gap-2">
-            {creatingRole ? <Loader className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Crear
+          <Button
+            onClick={() => createRoleMutation.mutate({ name: newRoleName, description: newRoleDescription })}
+            disabled={createRoleMutation.isPending || !newRoleName.trim()}
+            className="gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            {createRoleMutation.isPending ? 'Creando...' : 'Crear'}
           </Button>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Roles</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {roles.map((role) => (
+      {/* Role cards */}
+      {roles.length === 0 ? (
+        <EmptyState
+          icon={Settings}
+          title="No hay roles"
+          description="Creá un rol custom para comenzar."
+        />
+      ) : (
+        <div className="space-y-3">
+          {roles.map((role) => {
+            const isExpanded = expandedRoleId === role.id
+
+            return (
+              <Card key={role.id} className="overflow-hidden">
+                {/* Role header */}
                 <button
-                  key={role.id}
-                  onClick={() => {
-                    setSelectedRole(role)
-                    setSelectedPermissions(new Set(role.permissions.map((p) => p.id)))
-                  }}
-                  className={cn(
-                    'w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left',
-                    selectedRole?.id === role.id
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 hover:bg-gray-200 text-gray-900'
-                  )}
+                  type="button"
+                  onClick={() => setExpandedRoleId(isExpanded ? null : role.id)}
+                  className="w-full px-5 py-4 flex items-center justify-between gap-3 hover:bg-gray-50 transition-colors text-left"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="font-semibold truncate">{role.name}</div>
-                    {role.is_system && (
-                      <span className="text-[10px] bg-gray-200 text-gray-800 px-1.5 py-0.5 rounded">Sistema</span>
-                    )}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={cn(
+                        'px-2 py-0.5 rounded-full text-xs font-semibold shrink-0',
+                        role.base_role_key === 'admin' ? 'bg-purple-100 text-purple-800' :
+                        role.base_role_key === 'manager' ? 'bg-emerald-100 text-emerald-800' :
+                        role.base_role_key === 'viewer' ? 'bg-gray-200 text-gray-700' :
+                        role.base_role_key === 'user' ? 'bg-blue-100 text-blue-800' :
+                        'bg-orange-100 text-orange-800'
+                      )}>
+                        {role.name}
+                      </span>
+                      {role.is_system && (
+                        <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-medium shrink-0">
+                          Sistema
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 text-sm text-gray-500 shrink-0">
+                      <Users className="h-3.5 w-3.5" />
+                      <span>{role.member_count ?? 0}</span>
+                    </div>
                   </div>
-                  <div className="text-xs opacity-75 mt-1">
-                    {role.permissions.length} permisos | {role.users.length} usuarios
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!role.is_system && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteRole(role) }}
+                        disabled={deleteRoleMutation.isPending}
+                        title={(role.member_count ?? 0) > 0 ? 'No se puede eliminar: tiene miembros' : 'Eliminar rol'}
+                        className={cn(
+                          'p-1.5 rounded transition-colors',
+                          (role.member_count ?? 0) > 0
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                        )}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                    {isExpanded
+                      ? <ChevronDown className="h-4 w-4 text-gray-400" />
+                      : <ChevronRight className="h-4 w-4 text-gray-400" />
+                    }
                   </div>
                 </button>
-              ))}
-              {roles.length === 0 && <p className="text-sm text-gray-500">No hay roles para esta organización.</p>}
-            </CardContent>
-          </Card>
-        </div>
 
-        <div className="lg:col-span-3">
-          {selectedRole ? (
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-start gap-3">
-                  <div>
-                    <CardTitle>Permisos - {selectedRole.name}</CardTitle>
-                    <p className="text-sm text-gray-600 mt-1">{selectedRole.description || 'Sin descripción'}</p>
-                  </div>
-                  {selectedRole.is_system && (
-                    <span className="text-xs bg-gray-200 text-gray-800 px-2 py-1 rounded">Sistema</span>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6 rounded-lg border border-gray-200 p-3">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Usuarios con este rol ({selectedRole.users.length})</p>
-                  {selectedRole.users.length === 0 ? (
-                    <p className="text-sm text-gray-500">Sin usuarios asignados</p>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {selectedRole.users.map((u) => (
-                        <span key={u.user_id} className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
-                          {u.full_name || u.user_id.slice(0, 8)}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-6">
-                  {categories.map((category) => (
-                    <div key={category}>
-                      <h3 className="font-semibold text-gray-900 mb-3 capitalize">{category}</h3>
-                      <div className="space-y-2">
-                        {permissionsByCategory[category].map((perm) => (
-                          <label
-                            key={perm.id}
-                            className="flex items-start space-x-3 p-2 rounded hover:bg-gray-50 cursor-pointer"
-                          >
-                            <div className="flex items-center h-5 mt-0.5">
-                              <input
-                                type="checkbox"
-                                checked={selectedPermissions.has(perm.id)}
-                                onChange={() => handlePermissionToggle(perm.id)}
-                                className="h-4 w-4 rounded border-gray-300"
-                              />
-                            </div>
-                            <div className="flex-1">
-                              <div className="font-medium text-sm text-gray-900">{perm.name}</div>
-                              <div className="text-xs text-gray-600">{perm.description}</div>
-                            </div>
-                            <div className="text-xs text-gray-400 font-mono">{perm.key}</div>
-                          </label>
-                        ))}
+                {/* Module permission matrix */}
+                {isExpanded && (
+                  <div className="border-t border-gray-100 px-5 py-4">
+                    {permsLoading ? (
+                      <div className="h-40 flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-admin-600" />
                       </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-8 flex gap-2 border-t pt-6">
-                  <Button
-                    onClick={handleSavePermissions}
-                    disabled={saving}
-                    className="flex items-center gap-2"
-                  >
-                    {saving ? (
-                      <>
-                        <Loader className="h-4 w-4 animate-spin" />
-                        Guardando...
-                      </>
                     ) : (
-                      <>
-                        <Save className="h-4 w-4" />
-                        Guardar Cambios
-                      </>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-100">
+                              <th className="text-left py-2 pr-4 font-semibold text-gray-700 w-1/2">Módulo</th>
+                              <th className="text-center py-2 px-4 font-semibold text-gray-700">Ver</th>
+                              <th className="text-center py-2 px-4 font-semibold text-gray-700">Gestionar</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {MODULES.map((module) => {
+                              const verKey = `${module}:ver`
+                              const gestionarKey = `${module}:gestionar`
+                              const hasVer = expandedRolePermissions.has(verKey)
+                              const hasGestionar = expandedRolePermissions.has(gestionarKey)
+                              const gestionarLocked = isConfiguracionGestionarLocked(role, module)
+
+                              return (
+                                <tr key={module} className="border-b border-gray-50 hover:bg-gray-50">
+                                  <td className="py-2.5 pr-4">
+                                    <span className="font-medium text-gray-800">
+                                      {MODULE_META[module].label}
+                                    </span>
+                                  </td>
+                                  <td className="py-2.5 px-4 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={hasVer}
+                                      onChange={() => handleTogglePermission(role, module, 'ver')}
+                                      disabled={savePermsMutation.isPending || gestionarLocked}
+                                      className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500 disabled:opacity-50"
+                                    />
+                                  </td>
+                                  <td className="py-2.5 px-4 text-center">
+                                    <input
+                                      type="checkbox"
+                                      checked={hasGestionar}
+                                      onChange={() => handleTogglePermission(role, module, 'gestionar')}
+                                      disabled={savePermsMutation.isPending || gestionarLocked}
+                                      title={gestionarLocked ? 'Requerido para el rol Admin del sistema' : undefined}
+                                      className="h-4 w-4 rounded border-gray-300 text-admin-600 focus:ring-admin-500 disabled:opacity-50"
+                                    />
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                        {savePermsMutation.isPending && (
+                          <p className="mt-2 text-xs text-gray-500 animate-pulse">Guardando...</p>
+                        )}
+                      </div>
                     )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-gray-600">Selecciona un rol para editar permisos</p>
-              </CardContent>
-            </Card>
-          )}
+                  </div>
+                )}
+              </Card>
+            )
+          })}
         </div>
-      </div>
+      )}
     </div>
   )
 }

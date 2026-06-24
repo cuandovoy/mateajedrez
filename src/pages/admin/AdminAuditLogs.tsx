@@ -1,8 +1,10 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePermission } from '@/hooks/usePermission'
 import { formatDateTime } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
@@ -80,6 +82,7 @@ export function AdminAuditLogs() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const queryClient = useQueryClient()
+  const { can, loading: permLoading } = usePermission()
   const [page, setPage] = useState(1)
   const [filters, setFilters] = useState({
     table_name: '',
@@ -264,6 +267,9 @@ export function AdminAuditLogs() {
   } 
 
   const totalPages = Math.ceil(totalCount / pageSize)
+
+  if (permLoading) return <SkeletonTable rows={10} />
+  if (!can('reportes:ver')) return null
 
   return (
     <div className="space-y-6">

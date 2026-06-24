@@ -1,4 +1,5 @@
 import { CartItem, Category, Product, ProductVariant } from './database.types'
+import type { Permission } from '@/lib/permissions'
 
 export type {
   CartItem, Category, CategoryInsert,
@@ -14,8 +15,37 @@ export type {
   OrderPayment, OrderPaymentInsert, OrderPaymentUpdate,
   AuditLog, AuditLogInsert, AuditLogUpdate,
   InventoryMovement, InventoryMovementInsert, InventoryMovementUpdate,
-  InventoryTransfer, InventoryTransferInsert, InventoryTransferUpdate
+  InventoryTransfer, InventoryTransferInsert, InventoryTransferUpdate,
+  OrganizationMember,
 } from './database.types'
+
+/**
+ * The resolved org-scoped role for the current user in the active organization.
+ * Populated by organizationStore.fetchOrganizations() and stored as orgRole.
+ */
+export interface OrgRoleResolved {
+  roleId: string | null
+  baseRoleKey: 'admin' | 'manager' | 'viewer' | 'user' | 'custom' | null
+  permissions: Permission[]
+}
+
+/**
+ * Extended organization member with org-role fields that migration 089 added.
+ * The generated database.types.ts does not yet include organization_role_id,
+ * so we extend here until types are regenerated.
+ */
+export interface OrganizationMemberExtended {
+  id: string
+  user_id: string
+  organization_id: string
+  role: string
+  organization_role_id: string | null
+  base_role_key?: string | null
+  joined_at?: string | null
+  invited_by?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
 
 export interface CartItemWithProduct extends CartItem {
   product: Product

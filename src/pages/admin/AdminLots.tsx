@@ -2,6 +2,7 @@ import { LotDetailPanel } from '@/components/admin/LotDetailPanel'
 import { LotReceptionModal } from '@/components/admin/LotReceptionModal'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePermission } from '@/hooks/usePermission'
 import { useLots, type LotWithDetails } from '@/hooks/useLots'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
@@ -15,6 +16,7 @@ const STALE_DAYS = 60
 
 export function AdminLots() {
   const settings = useOrgSettings()
+  const { can, loading: permLoading } = usePermission()
 
   if (settings.costing_method !== 'fifo') {
     return (
@@ -32,11 +34,15 @@ export function AdminLots() {
     )
   }
 
+  if (permLoading) return null
+  if (!can('inventario:ver')) return null
   return <AdminLotsContent />
 }
 
 function AdminLotsContent() {
   const { organizationId } = useOrganization()
+  const { can: canPerm } = usePermission()
+  const canManage = canPerm('inventario:gestionar')
   const [branches, setBranches] = useState<Branch[]>([])
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [search, setSearch] = useState('')
@@ -128,13 +134,15 @@ function AdminLotsContent() {
             </div>
           )}
         </div>
-        <button
-          onClick={() => setShowReception(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-admin-600 hover:bg-admin-700 text-white text-sm font-medium rounded-lg transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Recibí mercadería
-        </button>
+        {canManage && (
+          <button
+            onClick={() => setShowReception(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-admin-600 hover:bg-admin-700 text-white text-sm font-medium rounded-lg transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Recibí mercadería
+          </button>
+        )}
       </div>
 
       <div className={cn('flex gap-4', selectedLot ? 'lg:gap-5' : '')}>
@@ -288,7 +296,7 @@ function AdminLotsContent() {
           <div className="w-full lg:w-80 xl:w-96 bg-white rounded-xl border border-gray-200 overflow-hidden flex-shrink-0">
             <LotDetailPanel
               lot={selectedLot}
-              onWriteOff={handleWriteOff}
+              onWriteOff={canManage ? handleWriteOff : undefined}
               onLoadMovements={getLotMovements}
               onClose={() => setSelectedLot(null)}
             />

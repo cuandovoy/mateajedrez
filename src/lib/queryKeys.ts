@@ -137,4 +137,14 @@ export const queryKeys = {
   notifications: {
     list: (orgId: string) => ['notifications', orgId] as const,
   },
+
+  // ─── ADMIN — ROLES Y MIEMBROS ────────────────────────────────────────────────
+  roles: {
+    /** All organization roles (for role list and dropdown options) */
+    all: (orgId: string) => ['admin', orgId, 'roles'] as const,
+    /** Organization members with their assigned role (for AdminUsers) */
+    members: (orgId: string) => ['admin', orgId, 'roles', 'members'] as const,
+    /** Permission keys granted to a specific role (for AdminRolesPermissions) */
+    permissions: (orgId: string, roleId: string) => ['admin', orgId, 'roles', roleId, 'permissions'] as const,
+  },
 } as const

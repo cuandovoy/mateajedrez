@@ -6,8 +6,8 @@ import { Edit, Image as ImageIcon, Trash2, Folder } from 'lucide-react'
 
 interface CategoryTableProps {
   categories: Category[]
-  onEdit: (category: Category) => void
-  onDelete: (id: string) => void
+  onEdit?: (category: Category) => void
+  onDelete?: (id: string) => void
 }
 
 export function CategoryTable({
@@ -64,10 +64,10 @@ export function CategoryTable({
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">Principal</span>
-                    <ActionsMenu actions={[
-                      { label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(category) },
-                      { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(category.id), variant: 'danger' },
-                    ]} />
+                    {(onEdit || onDelete) && <ActionsMenu actions={[
+                      ...(onEdit ? [{ label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(category) }] : []),
+                      ...(onDelete ? [{ label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(category.id), variant: 'danger' as const }] : []),
+                    ]} />}
                   </div>
                 </div>
                 {subcategories.length > 0 && (
@@ -92,10 +92,10 @@ export function CategoryTable({
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="inline-flex px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">Sub</span>
-                      <ActionsMenu actions={[
-                        { label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(sub) },
-                        { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(sub.id), variant: 'danger' },
-                      ]} />
+                      {(onEdit || onDelete) && <ActionsMenu actions={[
+                        ...(onEdit ? [{ label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(sub) }] : []),
+                        ...(onDelete ? [{ label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(sub.id), variant: 'danger' as const }] : []),
+                      ]} />}
                     </div>
                   </div>
                 </div>
@@ -175,21 +175,14 @@ export function CategoryTable({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end">
-                      <ActionsMenu
-                        actions={[
-                          {
-                            label: 'Editar',
-                            icon: <Edit className="h-4 w-4" />,
-                            onClick: () => onEdit(category),
-                          },
-                          {
-                            label: 'Eliminar',
-                            icon: <Trash2 className="h-4 w-4" />,
-                            onClick: () => onDelete(category.id),
-                            variant: 'danger',
-                          },
-                        ]}
-                      />
+                      {(onEdit || onDelete) && (
+                        <ActionsMenu
+                          actions={[
+                            ...(onEdit ? [{ label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(category) }] : []),
+                            ...(onDelete ? [{ label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(category.id), variant: 'danger' as const }] : []),
+                          ]}
+                        />
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -240,21 +233,14 @@ export function CategoryTable({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end">
-                        <ActionsMenu
-                          actions={[
-                            {
-                              label: 'Editar',
-                              icon: <Edit className="h-4 w-4" />,
-                              onClick: () => onEdit(subcategory),
-                            },
-                            {
-                              label: 'Eliminar',
-                              icon: <Trash2 className="h-4 w-4" />,
-                              onClick: () => onDelete(subcategory.id),
-                              variant: 'danger',
-                            },
-                          ]}
-                        />
+                        {(onEdit || onDelete) && (
+                          <ActionsMenu
+                            actions={[
+                              ...(onEdit ? [{ label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(subcategory) }] : []),
+                              ...(onDelete ? [{ label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(subcategory.id), variant: 'danger' as const }] : []),
+                            ]}
+                          />
+                        )}
                       </div>
                     </td>
                   </tr>

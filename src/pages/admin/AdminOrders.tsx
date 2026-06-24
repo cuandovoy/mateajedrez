@@ -11,6 +11,7 @@ import { SkeletonTable } from '@/components/ui/Skeleton'
 import { ManualSaleForm } from '@/components/admin/ManualSaleForm'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePermission } from '@/hooks/usePermission'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { Search, Calendar, ChevronLeft, ChevronRight, Eye, Plus, ShoppingCart, X } from 'lucide-react'
@@ -86,6 +87,8 @@ export function AdminOrders() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const queryClient = useQueryClient()
+  const { can, loading: permLoading } = usePermission()
+  const canManage = can('ventas:gestionar')
   const [searchParams, setSearchParams] = useSearchParams()
   const [currentPage, setCurrentPage] = useState(1)
   const statusFromUrl = searchParams.get('status') as OrderStatus | null
@@ -286,6 +289,9 @@ export function AdminOrders() {
     }
   }
 
+  if (permLoading) return <SkeletonTable rows={PAGE_SIZE_ADMIN} />
+  if (!can('ventas:ver')) return null
+
   return (
     <div>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -293,13 +299,15 @@ export function AdminOrders() {
           <h1 className="text-3xl font-bold text-gray-900">Órdenes</h1>
           <p className="text-gray-600 mt-1">Gestiona todas las órdenes de la tienda</p>
         </div>
-        <Button
-          onClick={() => setIsManualSaleOpen(true)}
-          disabled={branches.length === 0}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nueva orden
-        </Button>
+        {canManage && (
+          <Button
+            onClick={() => setIsManualSaleOpen(true)}
+            disabled={branches.length === 0}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nueva orden
+          </Button>
+        )}
       </div>
 
       {/* Filter toolbar */}
@@ -564,7 +572,7 @@ export function AdminOrders() {
         </CardContent>
       </Card>
 
-      {isManualSaleOpen && saleBranchId && (
+      {canManage && isManualSaleOpen && saleBranchId && (
         <ManualSaleForm
           branchId={saleBranchId}
           openCashSession={openCashSessions.find((s) => s.branch_id === saleBranchId) || null}

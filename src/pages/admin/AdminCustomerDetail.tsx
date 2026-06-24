@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePermission } from '@/hooks/usePermission'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { formatPrice, formatDateShort } from '@/lib/utils'
 import { ArrowLeft, ShoppingCart, DollarSign, Calendar, Package, Plus, Edit2, X, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { ACTIVE_ORDER_STATUSES } from '@/lib/constants'
@@ -51,6 +53,7 @@ export function AdminCustomerDetail() {
   const navigate = useNavigate()
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
+  const { can, loading: permLoading } = usePermission()
   const { show } = useToastStore()
   const queryClient = useQueryClient()
   const [editOpen, setEditOpen] = useState(false)
@@ -199,6 +202,10 @@ export function AdminCustomerDetail() {
   const firstOrder = orders[orders.length - 1]
   const lastOrder = orders[0]
   const address = (customer.address || {}) as any
+  const canManage = can('clientes:gestionar')
+
+  if (permLoading) return <SkeletonTable rows={8} />
+  if (!can('clientes:ver')) return null
 
   return (
     <div className="space-y-6">
@@ -219,14 +226,18 @@ export function AdminCustomerDetail() {
           {customer.email && <p className="text-sm text-gray-500">{customer.email}</p>}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button variant="outline" onClick={openEdit}>
-            <Edit2 className="h-4 w-4 mr-2" />
-            Editar
-          </Button>
-          <Button onClick={() => navigate(`/orders?customer_id=${id}`)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva orden
-          </Button>
+          {canManage && (
+            <Button variant="outline" onClick={openEdit}>
+              <Edit2 className="h-4 w-4 mr-2" />
+              Editar
+            </Button>
+          )}
+          {canManage && (
+            <Button onClick={() => navigate(`/orders?customer_id=${id}`)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva orden
+            </Button>
+          )}
         </div>
       </div>
 

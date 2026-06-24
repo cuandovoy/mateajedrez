@@ -22,6 +22,16 @@ _(todos completados)_
 
 ---
 
+## Permisos — Panel Admin
+
+### 🟡 Media
+
+- 🟡 `AdminProductDetail.tsx` — no tiene guard de permisos (`catalogo:ver` / `catalogo:gestionar`). Es solo lectura pero el botón de edición tampoco está gateado.
+- 🟡 `AdminStoreStats.tsx` — sin guard. Es solo lectura pero no hay verificación de acceso.
+- 🟡 Los componentes modales de inventario (`InventoryAdjustmentModal`, `InventoryReceiptModal`, `InventoryTransferModal`, `ManualSaleForm`, `PaymentMethodsManager`, `EditOrganizationModal`) no tienen `usePermission` interno — confían en que el padre ya gateó el botón que los abre. Considerar agregar un check interno para mayor robustez.
+
+---
+
 ## Testing
 
 - 🟠 Agregar tests para `src/lib/biller.ts` — lógica de integración DGI sin cobertura

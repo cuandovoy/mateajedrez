@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePermission } from '@/hooks/usePermission'
 import { Plus, Edit, Trash2, Upload, X, Grid3x3, List, Search, ArrowUpDown } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useForm } from 'react-hook-form'
@@ -25,6 +26,8 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp
 
 function AdminCategoriesContent() {
   const { organizationId } = useOrganization()
+  const { can } = usePermission()
+  const canManage = can('catalogo:gestionar')
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -244,10 +247,12 @@ function AdminCategoriesContent() {
               <Grid3x3 className="h-4 w-4" />
             </button>
           </div>
-          <Button onClick={handleNew}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Categoría
-          </Button>
+          {canManage && (
+            <Button onClick={handleNew}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Categoría
+            </Button>
+          )}
         </div>
       </div>
 
@@ -415,8 +420,8 @@ function AdminCategoriesContent() {
           <CardContent className="p-0">
             <CategoryTable
               categories={filteredCategories}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
+              onEdit={canManage ? handleEdit : undefined}
+              onDelete={canManage ? handleDelete : undefined}
             />
           </CardContent>
         </Card>
@@ -606,5 +611,8 @@ function AdminCategoriesContent() {
 }
 
 export function AdminCategories() {
+  const { can, loading: permLoading } = usePermission()
+  if (permLoading) return <SkeletonTable rows={5} />
+  if (!can('catalogo:ver')) return null
   return <AdminCategoriesContent />
 }

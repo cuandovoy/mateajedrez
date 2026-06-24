@@ -2,9 +2,11 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Input } from '@/components/ui/Input'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { supabase } from '@/lib/supabase'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePermission } from '@/hooks/usePermission'
 import { trackAuditAction } from '@/lib/audit'
 import { capitalizeFirst, formatDateTime, formatPrice } from '@/lib/utils'
 import { useOrganizationStore } from '@/store/organizationStore'
@@ -142,6 +144,8 @@ export function AdminOrderDetail() {
   const [isManualDiscount, setIsManualDiscount] = useState(false)
   const [isAnnulCFEConfirmOpen, setIsAnnulCFEConfirmOpen] = useState(false)
 
+  const { can, loading: permLoading } = usePermission()
+  const canManage = can('ventas:gestionar')
   const queryClient = useQueryClient()
   const { data: branches = [] } = useAdminBranches(organizationId)
 
@@ -1082,6 +1086,9 @@ export function AdminOrderDetail() {
       p.sku.toLowerCase().includes(productSearch.toLowerCase())
   ).slice(0, 8)
 
+  if (permLoading) return <SkeletonTable rows={10} />
+  if (!can('ventas:ver')) return null
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -1238,10 +1245,12 @@ export function AdminOrderDetail() {
                 <FileText className="h-4 w-4 mr-2" />
                 Comprobante
               </Button>
-              <Button onClick={() => setIsEditing(true)} size="sm">
-                <Edit2 className="h-4 w-4 mr-2" />
-                Editar
-              </Button>
+              {canManage && (
+                <Button onClick={() => setIsEditing(true)} size="sm">
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Editar
+                </Button>
+              )}
             </div>
           ) : (
             <div className="flex gap-2 shrink-0">
@@ -1299,7 +1308,7 @@ export function AdminOrderDetail() {
                 </div>
               </div>
 
-              {!isEditing && order.status !== 'cancelled' && pendingAmount > 0 && (
+              {canManage && !isEditing && order.status !== 'cancelled' && pendingAmount > 0 && (
                 <div className="pt-2">
                   <Button onClick={handleOpenCollectModal} size="sm" variant="secondary">
                     <DollarSign className="h-4 w-4 mr-2" />
@@ -1346,52 +1355,54 @@ export function AdminOrderDetail() {
                 )
               )}
 
-              <div>
-                {order.status === 'pending_allocation' && (
-                  <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-3">
-                    <p className="text-sm font-medium text-orange-900 mb-2">Asignar sucursal para reservar stock</p>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <select
-                        value={selectedBranchId}
-                        onChange={(e) => setSelectedBranchId(e.target.value)}
-                        className="min-w-[240px] px-3 py-2 border border-orange-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
-                        disabled={savingBranch}
-                      >
-                        <option value="">Seleccionar sucursal...</option>
-                        {assignableBranches.map((branch) => (
-                          <option key={branch.id} value={branch.id}>
-                            {branch.name}
-                            {branch.code ? ` (${branch.code})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        size="sm"
-                        onClick={handleBranchAssignmentSave}
-                        disabled={savingBranch || !selectedBranchId || selectedBranchId === (order.branch_id ?? '')}
-                      >
-                        {savingBranch ? 'Guardando...' : 'Guardar sucursal'}
-                      </Button>
+              {canManage && (
+                <div>
+                  {order.status === 'pending_allocation' && (
+                    <div className="mb-4 rounded-lg border border-orange-200 bg-orange-50 p-3">
+                      <p className="text-sm font-medium text-orange-900 mb-2">Asignar sucursal para reservar stock</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={selectedBranchId}
+                          onChange={(e) => setSelectedBranchId(e.target.value)}
+                          className="min-w-[240px] px-3 py-2 border border-orange-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          disabled={savingBranch}
+                        >
+                          <option value="">Seleccionar sucursal...</option>
+                          {assignableBranches.map((branch) => (
+                            <option key={branch.id} value={branch.id}>
+                              {branch.name}
+                              {branch.code ? ` (${branch.code})` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <Button
+                          size="sm"
+                          onClick={handleBranchAssignmentSave}
+                          disabled={savingBranch || !selectedBranchId || selectedBranchId === (order.branch_id ?? '')}
+                        >
+                          {savingBranch ? 'Guardando...' : 'Guardar sucursal'}
+                        </Button>
+                      </div>
+                      <p className="mt-2 text-xs text-orange-800">
+                        Al pasar de "Pendiente de asignación" a un estado operativo, se descontará stock de esta sucursal.
+                      </p>
                     </div>
-                    <p className="mt-2 text-xs text-orange-800">
-                      Al pasar de "Pendiente de asignación" a un estado operativo, se descontará stock de esta sucursal.
-                    </p>
-                  </div>
-                )}
-                <p className="text-sm text-gray-600 mb-2">Actualizar Estado</p>
-                <select
-                  value={order.status ?? ''}
-                  onChange={(e) => handleStatusUpdate(e.target.value as Order['status'])}
-                  disabled={updating}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-admin-500 text-sm"
-                >
-                  {statusOptions.map((status) => (
-                    <option key={status} value={status}>
-                      {getStatusLabel(status)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                  )}
+                  <p className="text-sm text-gray-600 mb-2">Actualizar Estado</p>
+                  <select
+                    value={order.status ?? ''}
+                    onChange={(e) => handleStatusUpdate(e.target.value as Order['status'])}
+                    disabled={updating}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-admin-500 text-sm"
+                  >
+                    {statusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {getStatusLabel(status)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {!isEditing && orderPayments.length > 0 && (
                 <div>
@@ -1418,14 +1429,16 @@ export function AdminOrderDetail() {
                             </span>
                             <div className="flex items-center gap-2">
                               <span className="font-medium text-gray-900">{formatPrice(payment.amount, settings)}</span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                onClick={() => setPaymentToDelete(payment)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {canManage && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => setPaymentToDelete(payment)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </div>
                           {payment.mp_payment_id && (
@@ -1559,7 +1572,7 @@ export function AdminOrderDetail() {
                                 Devuelto: {getReturnedQuantity(item)} / {item.quantity}
                               </p>
                             )}
-                            {order.status !== 'cancelled' && (
+                            {canManage && order.status !== 'cancelled' && (
                               <div className="mt-2 flex flex-wrap gap-2">
                                 <Button
                                   variant="secondary"
@@ -1637,7 +1650,7 @@ export function AdminOrderDetail() {
                     <span>{formatPrice(displayTotal, settings)}</span>
                   </div>
                 </div>
-                {!isEditing && order.status !== 'cancelled' && (
+                {canManage && !isEditing && order.status !== 'cancelled' && (
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={openOrderDiscountModal}>
                       <Plus className="h-4 w-4 mr-2" />
@@ -1723,15 +1736,17 @@ export function AdminOrderDetail() {
                       <FileText className="h-4 w-4 mr-2" />
                       {downloadingPDF ? 'Descargando...' : 'Descargar PDF'}
                     </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => setIsAnnulCFEConfirmOpen(true)}
-                      disabled={annullingCFE}
-                    >
-                      <X className="h-4 w-4 mr-2" />
-                      {annullingCFE ? 'Anulando...' : 'Anular CFE'}
-                    </Button>
+                    {canManage && (
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => setIsAnnulCFEConfirmOpen(true)}
+                        disabled={annullingCFE}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        {annullingCFE ? 'Anulando...' : 'Anular CFE'}
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -1870,7 +1885,7 @@ export function AdminOrderDetail() {
         </div>
       </div>
 
-      {isCollectModalOpen && (
+      {canManage && isCollectModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader className="pb-4 border-b">
@@ -1963,7 +1978,7 @@ export function AdminOrderDetail() {
         onCancel={() => { if (!annullingCFE) setIsAnnulCFEConfirmOpen(false) }}
       />
 
-      {isCancelModalOpen && (
+      {canManage && isCancelModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader className="pb-4 border-b">
@@ -2002,7 +2017,7 @@ export function AdminOrderDetail() {
         </div>
       )}
 
-      {isPartialReturnModalOpen && partialReturnItem && (
+      {canManage && isPartialReturnModalOpen && partialReturnItem && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <Card className="w-full max-w-md">
             <CardHeader className="pb-4 border-b">

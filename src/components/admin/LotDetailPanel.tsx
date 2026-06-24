@@ -15,7 +15,7 @@ interface Movement {
 
 interface LotDetailPanelProps {
   lot: LotWithDetails
-  onWriteOff: (id: string, reason: string, quantity: number) => Promise<void>
+  onWriteOff?: (id: string, reason: string, quantity: number) => Promise<void>
   onLoadMovements: (lotId: string) => Promise<Movement[]>
   onClose: () => void
 }
@@ -129,15 +129,17 @@ export function LotDetailPanel({ lot, onWriteOff, onLoadMovements, onClose }: Lo
         </div>
 
         {/* Acciones */}
-        <div className="p-4 border-b border-gray-100 space-y-2">
-          <Button
-            variant="outline"
-            className="w-full text-red-600 border-red-200 hover:bg-red-50"
-            onClick={() => setShowWriteOff(true)}
-          >
-            Registrar baja
-          </Button>
-        </div>
+        {onWriteOff && (
+          <div className="p-4 border-b border-gray-100 space-y-2">
+            <Button
+              variant="outline"
+              className="w-full text-red-600 border-red-200 hover:bg-red-50"
+              onClick={() => setShowWriteOff(true)}
+            >
+              Registrar baja
+            </Button>
+          </div>
+        )}
 
         {/* Historial de movimientos */}
         <div className="flex-1 overflow-y-auto p-4">
@@ -169,7 +171,7 @@ export function LotDetailPanel({ lot, onWriteOff, onLoadMovements, onClose }: Lo
       {showWriteOff && (
         <LotWriteOffModal
           lot={lot}
-          onConfirm={async (reason, qty) => { await onWriteOff(lot.id, reason, qty) }}
+          onConfirm={async (reason, qty) => { if (onWriteOff) await onWriteOff(lot.id, reason, qty) }}
           onClose={() => setShowWriteOff(false)}
         />
       )}

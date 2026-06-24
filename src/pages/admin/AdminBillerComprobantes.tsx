@@ -8,11 +8,13 @@ import { obtenerPDF, BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useBillerConfig } from '@/hooks/useBillerConfig'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePermission } from '@/hooks/usePermission'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { Receipt, Search, Calendar, ChevronLeft, ChevronRight, ExternalLink, Download, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -52,6 +54,7 @@ export function AdminBillerComprobantes() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const { show } = useToastStore()
+  const { can, loading: permLoading } = usePermission()
 
   const [comprobantes, setComprobantes] = useState<Comprobante[]>([])
   const [loading, setLoading] = useState(true)
@@ -149,6 +152,9 @@ export function AdminBillerComprobantes() {
     setSearchTerm('')
     setCurrentPage(1)
   }
+
+  if (permLoading) return <SkeletonTable rows={10} />
+  if (!can('ventas:ver')) return null
 
   if (billerConfigLoading) {
     return (

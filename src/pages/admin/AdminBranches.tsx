@@ -13,6 +13,7 @@ import { BranchTable } from '@/components/admin/BranchTable'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { usePermission } from '@/hooks/usePermission'
 import { useOrgFeature } from '@/hooks/useOrgFeature'
 import { useToastStore } from '@/store/toastStore'
 import {
@@ -39,6 +40,8 @@ function AdminBranchesContent() {
   const { organizationId } = useOrganization()
   const { show } = useToastStore()
   const { isAtLimit } = usePlanLimits()
+  const { can } = usePermission()
+  const canManage = can('configuracion:gestionar')
   const consignmentEnabled = useOrgFeature('consignment_enabled')
   const [branches, setBranches] = useState<Branch[]>([])
   const [loading, setLoading] = useState(true)
@@ -284,10 +287,12 @@ function AdminBranchesContent() {
               <Grid3x3 className="h-4 w-4" />
             </button>
           </div>
-          <Button onClick={handleNew} disabled={isAtLimit('branches')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nueva Sucursal
-          </Button>
+          {canManage && (
+            <Button onClick={handleNew} disabled={isAtLimit('branches')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nueva Sucursal
+            </Button>
+          )}
         </div>
       </div>
 
@@ -329,6 +334,7 @@ function AdminBranchesContent() {
           {filteredBranches.map((branch) => (
             <Card key={branch.id} className={`relative ${branch.deleted_at ? 'border-red-200 bg-red-50/30' : ''}`}>
               <CardContent className="p-6">
+                {canManage && (
                 <div className="absolute top-4 right-4">
                   <ActionsMenu
                     actions={
@@ -356,6 +362,7 @@ function AdminBranchesContent() {
                     }
                   />
                 </div>
+                )}
                 <div className="pr-8">
                   <div className="flex items-center space-x-2 mb-3">
                     <Building2 className={`h-5 w-5 ${branch.deleted_at ? 'text-red-400' : 'text-admin-600'}`} />
@@ -427,9 +434,9 @@ function AdminBranchesContent() {
           <CardContent className="p-0">
             <BranchTable
               branches={filteredBranches}
-              onEdit={handleEdit}
-              onSoftDelete={handleSoftDelete}
-              onRestore={handleRestore}
+              onEdit={canManage ? handleEdit : undefined}
+              onSoftDelete={canManage ? handleSoftDelete : undefined}
+              onRestore={canManage ? handleRestore : undefined}
             />
           </CardContent>
         </Card>
@@ -680,5 +687,8 @@ function AdminBranchesContent() {
 }
 
 export function AdminBranches() {
+  const { can, loading: permLoading } = usePermission()
+  if (permLoading) return <SkeletonTable rows={5} />
+  if (!can('configuracion:ver')) return null
   return <AdminBranchesContent />
 }

@@ -12,6 +12,7 @@ import type { SupplierForm } from '@/lib/schemas'
 import type { Supplier, SupplierInsert, SupplierUpdate } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePermission } from '@/hooks/usePermission'
 import { ArrowUpDown, Building2, Edit, Globe, Grid3x3, List, Mail, MapPin, Phone, Plus, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -44,6 +45,8 @@ type SortDirection = 'asc' | 'desc'
 
 function AdminSuppliersContent() {
   const { organizationId } = useOrganization()
+  const { can } = usePermission()
+  const canManage = can('compras:gestionar')
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -248,10 +251,12 @@ function AdminSuppliersContent() {
               <Grid3x3 className="h-4 w-4" />
             </button>
           </div>
-          <Button onClick={handleNew}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Proveedor
-          </Button>
+          {canManage && (
+            <Button onClick={handleNew}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Proveedor
+            </Button>
+          )}
         </div>
       </div>
 
@@ -399,8 +404,8 @@ function AdminSuppliersContent() {
           <CardContent className="p-0">
             <SupplierTable
               suppliers={filteredSuppliers}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
+              onEdit={canManage ? handleEdit : undefined}
+              onDelete={canManage ? handleDelete : undefined}
             />
           </CardContent>
         </Card>
@@ -714,5 +719,8 @@ function AdminSuppliersContent() {
 }
 
 export function AdminSuppliers() {
+  const { can, loading: permLoading } = usePermission()
+  if (permLoading) return <SkeletonTable rows={5} />
+  if (!can('compras:ver')) return null
   return <AdminSuppliersContent />
 }

@@ -3,11 +3,14 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePermission } from '@/hooks/usePermission'
 import { trackAuditAction } from '@/lib/audit'
 import { supabase } from '@/lib/supabase'
 import { formatDateShort, formatPrice } from '@/lib/utils'
+import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { useToastStore } from '@/store/toastStore'
 import { BookOpen, ChevronDown, ClipboardList, CreditCard, Plus, Receipt, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -180,6 +183,8 @@ export function AdminExpenses() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const { show } = useToastStore()
+  const { can, loading: permLoading } = usePermission()
+  const canManage = can('compras:gestionar')
 
   const queryClient = useQueryClient()
   const [saving, setSaving] = useState(false)
@@ -1347,6 +1352,9 @@ export function AdminExpenses() {
     setExpenseLedgerPage(1)
   }
 
+  if (permLoading) return <SkeletonTable rows={PAGE_SIZE_ADMIN} />
+  if (!can('compras:ver')) return null
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[40vh]">
@@ -1394,9 +1402,11 @@ export function AdminExpenses() {
           <CardHeader>
             <div className="flex items-center justify-between gap-3">
               <CardTitle>Ordenes de compra</CardTitle>
-              <Button onClick={() => setCreateOrderModalOpen(true)}>
-                Nueva orden de compra
-              </Button>
+              {canManage && (
+                <Button onClick={() => setCreateOrderModalOpen(true)}>
+                  Nueva orden de compra
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1427,7 +1437,9 @@ export function AdminExpenses() {
                     <p className="text-xs text-gray-400">{formatDateShort(purchaseOrder.created_at, settings)}</p>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-bold text-gray-900">{formatPrice(Number(purchaseOrder.total || 0), settings)}</p>
-                      <ActionsMenu actions={[{ label: 'Editar orden', onClick: () => openPurchaseOrderEditor(purchaseOrder.id) }]} className="inline-flex" />
+                      {canManage && (
+                        <ActionsMenu actions={[{ label: 'Editar orden', onClick: () => openPurchaseOrderEditor(purchaseOrder.id) }]} className="inline-flex" />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1463,10 +1475,14 @@ export function AdminExpenses() {
                       <td className="px-2 py-2 text-right text-sm font-semibold text-gray-900">{formatPrice(Number(purchaseOrder.total || 0), settings)}</td>
                       <td className="px-2 py-2 text-sm text-gray-700">{formatDateShort(purchaseOrder.created_at, settings)}</td>
                       <td className="px-2 py-2 text-right">
-                        <ActionsMenu
-                          actions={[{ label: 'Editar orden', onClick: () => openPurchaseOrderEditor(purchaseOrder.id) }]}
-                          className="inline-flex"
-                        />
+                        {canManage ? (
+                          <ActionsMenu
+                            actions={[{ label: 'Editar orden', onClick: () => openPurchaseOrderEditor(purchaseOrder.id) }]}
+                            className="inline-flex"
+                          />
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1496,14 +1512,14 @@ export function AdminExpenses() {
                 <p className="py-6 text-center text-sm text-gray-500">No hay facturas cargadas.</p>
               )}
               {supplierInvoices.map((invoice) => {
-                const invoiceActions = [
+                const invoiceActions = canManage ? [
                   ...(Number(invoice.outstanding_amount) > 0 ? [{
                     label: 'Pagar factura',
                     onClick: () => { setPaymentModalInvoice(invoice); setPaymentForm((prev) => ({ ...prev, supplier_invoice_id: invoice.id, amount: String(invoice.outstanding_amount) })) },
                   }] : []),
                   ...(invoice.status === 'partially_paid' || invoice.status === 'paid' ? [{ label: 'Revertir ultimo pago', onClick: () => reverseLatestSupplierPayment(invoice) }] : []),
                   ...(Number(invoice.paid_amount) === 0 ? [{ label: 'Anular factura', onClick: () => cancelSupplierInvoice(invoice) }] : []),
-                ]
+                ] : []
                 return (
                   <div key={invoice.id} className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
                     <div className="flex items-start justify-between gap-2">
@@ -1557,7 +1573,7 @@ export function AdminExpenses() {
                       <td className="px-2 py-2 text-right text-sm text-gray-900">{formatPrice(Number(invoice.total_amount), settings)}</td>
                       <td className="px-2 py-2 text-right text-sm font-semibold text-gray-900">{formatPrice(Number(invoice.outstanding_amount), settings)}</td>
                       <td className="px-2 py-2 text-right">
-                        {invoice.status !== 'cancelled' ? (
+                        {invoice.status !== 'cancelled' && canManage ? (
                           <ActionsMenu
                             actions={[
                               ...(Number(invoice.outstanding_amount) > 0
@@ -1769,10 +1785,12 @@ export function AdminExpenses() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Historial de gastos</CardTitle>
-                <Button onClick={() => setDirectExpenseModalOpen(true)}>
-                  <Plus className="h-4 w-4 mr-1.5" />
-                  Registrar nuevo gasto
-                </Button>
+                {canManage && (
+                  <Button onClick={() => setDirectExpenseModalOpen(true)}>
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Registrar nuevo gasto
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent>
@@ -1820,15 +1838,17 @@ export function AdminExpenses() {
                             </td>
                             <td className="px-2 py-2 text-right text-sm font-semibold text-gray-900">{formatPrice(Number(expense.amount), settings)}</td>
                             <td className="px-2 py-2 text-right">
-                              <button
-                                type="button"
-                                onClick={() => deleteDirectExpense(expense.id)}
-                                className="rounded p-1 text-red-500 hover:bg-red-50 transition-colors"
-                                aria-label="Eliminar"
-                                disabled={saving}
-                              >
-                                <X className="h-4 w-4" />
-                              </button>
+                              {canManage && (
+                                <button
+                                  type="button"
+                                  onClick={() => deleteDirectExpense(expense.id)}
+                                  className="rounded p-1 text-red-500 hover:bg-red-50 transition-colors"
+                                  aria-label="Eliminar"
+                                  disabled={saving}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -1867,15 +1887,17 @@ export function AdminExpenses() {
                           </div>
                           <div className="flex flex-col items-end gap-1">
                             <span className="text-sm font-bold text-gray-900">{formatPrice(Number(expense.amount), settings)}</span>
-                            <button
-                              type="button"
-                              onClick={() => deleteDirectExpense(expense.id)}
-                              className="rounded p-1 text-red-500 hover:bg-red-50 transition-colors"
-                              aria-label="Eliminar"
-                              disabled={saving}
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
+                            {canManage && (
+                              <button
+                                type="button"
+                                onClick={() => deleteDirectExpense(expense.id)}
+                                className="rounded p-1 text-red-500 hover:bg-red-50 transition-colors"
+                                aria-label="Eliminar"
+                                disabled={saving}
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

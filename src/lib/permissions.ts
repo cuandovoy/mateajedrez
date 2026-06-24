@@ -1,186 +1,129 @@
 // src/lib/permissions.ts
-// Permission definitions and role-permission mapping
+// 16 module-level permission keys (8 modules x {ver, gestionar}).
+// DB is the runtime authority; these constants are for seeding, labelling, and type safety only.
 
-export type Permission =
-  // Products
-  | 'products:view'
-  | 'products:create'
-  | 'products:edit'
-  | 'products:delete'
-  | 'products:manage_stock'
-  
-  // Categories
-  | 'categories:view'
-  | 'categories:create'
-  | 'categories:edit'
-  | 'categories:delete'
-  
-  // Orders
-  | 'orders:view'
-  | 'orders:view_own'
-  | 'orders:edit'
-  | 'orders:delete'
-  
-  // Users
-  | 'users:view'
-  | 'users:edit'
-  | 'users:manage_roles'
-  | 'users:delete'
-  
-  // Customers
-  | 'customers:view'
-  | 'customers:create'
-  | 'customers:edit'
-  | 'customers:delete'
-  | 'customers:export'
-  
-  // Cash Register
-  | 'cash_register:access'
-  | 'cash_register:view_sessions'
-  | 'cash_register:close_session'
-  
-  // Inventory
-  | 'inventory:view'
-  | 'inventory:manage'
-  
-  // Reports
-  | 'reports:view'
-  | 'reports:export'
-  
-  // Settings
-  | 'settings:manage'
-  | 'settings:manage_roles'
-  | 'settings:audit_logs';
+export const MODULES = [
+  'ventas',
+  'catalogo',
+  'inventario',
+  'compras',
+  'clientes',
+  'caja',
+  'reportes',
+  'configuracion',
+] as const
 
-export type UserRole = 'user' | 'viewer' | 'manager' | 'admin';
+export type Module = typeof MODULES[number]
 
-// Local permission matrix (source of truth for checks)
-// This is synced with DB but kept here for performance
-export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  admin: [
-    // All permissions for admin
-    'products:view',
-    'products:create',
-    'products:edit',
-    'products:delete',
-    'products:manage_stock',
-    'categories:view',
-    'categories:create',
-    'categories:edit',
-    'categories:delete',
-    'orders:view',
-    'orders:view_own',
-    'orders:edit',
-    'orders:delete',
-    'users:view',
-    'users:edit',
-    'users:manage_roles',
-    'users:delete',
-    'customers:view',
-    'customers:create',
-    'customers:edit',
-    'customers:delete',
-    'customers:export',
-    'cash_register:access',
-    'cash_register:view_sessions',
-    'cash_register:close_session',
-    'inventory:view',
-    'inventory:manage',
-    'reports:view',
-    'reports:export',
-    'settings:manage',
-    'settings:manage_roles',
-    'settings:audit_logs',
-  ],
-  
-  manager: [
-    'products:view',
-    'products:create',
-    'products:edit',
-    'products:manage_stock',
-    'categories:view',
-    'categories:create',
-    'categories:edit',
-    'orders:view',
-    'orders:edit',
-    'customers:view',
-    'customers:create',
-    'customers:edit',
-    'cash_register:access',
-    'cash_register:view_sessions',
-    'cash_register:close_session',
-    'inventory:view',
-    'inventory:manage',
-    'reports:view',
-  ],
-  
-  viewer: [
-    'products:view',
-    'categories:view',
-    'orders:view',
-    'customers:view',
-    'inventory:view',
-    'reports:view',
-  ],
-  
-  user: [
-    'products:view',
-    'categories:view',
-    'orders:view_own',
-  ],
-};
+export type Action = 'ver' | 'gestionar'
+
+/** 16 valid permission keys: {module}:{action} */
+export type Permission = `${Module}:${Action}`
+
+/** Legacy role string — still used in DB columns and legacy contexts */
+export type UserRole = 'user' | 'viewer' | 'manager' | 'admin'
+
+/** UI metadata for the Roles page: display label and associated admin routes */
+export const MODULE_META: Record<Module, { label: string; routes: string[] }> = {
+  ventas:        { label: 'Ventas',         routes: ['/orders', '/billing'] },
+  catalogo:      { label: 'Catálogo',       routes: ['/products', '/categories'] },
+  inventario:    { label: 'Inventario',     routes: ['/inventory', '/reposicion', '/branches', '/transfers'] },
+  compras:       { label: 'Compras',        routes: ['/expenses', '/suppliers'] },
+  clientes:      { label: 'Clientes',       routes: ['/customers'] },
+  caja:          { label: 'Caja',           routes: ['/cash-register'] },
+  reportes:      { label: 'Reportes',       routes: ['/reports'] },
+  // org settings; /users and /roles-permissions stay adminOnly, not module-gated
+  configuracion: { label: 'Configuración',  routes: [] },
+}
 
 /**
- * Check if user has a specific permission
+ * Seed map of default permissions for system roles.
+ * Used to generate the DB migration and to reset roles to defaults in the UI.
+ * NOT consulted at permission-check time — usePermission reads the DB-loaded list.
+ */
+export const SYSTEM_ROLE_DEFAULTS: Record<'admin' | 'manager' | 'viewer' | 'user', Permission[]> = {
+  admin: [
+    'ventas:ver', 'ventas:gestionar',
+    'catalogo:ver', 'catalogo:gestionar',
+    'inventario:ver', 'inventario:gestionar',
+    'compras:ver', 'compras:gestionar',
+    'clientes:ver', 'clientes:gestionar',
+    'caja:ver', 'caja:gestionar',
+    'reportes:ver', 'reportes:gestionar',
+    'configuracion:ver', 'configuracion:gestionar',
+  ],
+  manager: [
+    'ventas:ver', 'ventas:gestionar',
+    'catalogo:ver', 'catalogo:gestionar',
+    'inventario:ver', 'inventario:gestionar',
+    'compras:ver', 'compras:gestionar',
+    'clientes:ver', 'clientes:gestionar',
+    'caja:ver', 'caja:gestionar',
+    'reportes:ver', 'reportes:gestionar',
+    // configuracion:ver and configuracion:gestionar are intentionally excluded
+  ],
+  viewer: [
+    'ventas:ver',
+    'catalogo:ver',
+    'inventario:ver',
+    'compras:ver',
+    'clientes:ver',
+    'caja:ver',
+    'reportes:ver',
+    'configuracion:ver',
+  ],
+  user: [
+    'ventas:ver',
+    'catalogo:ver',
+  ],
+}
+
+/**
+ * Check if a permission list includes a specific permission.
+ * Operates on the DB-resolved permission array, NOT a role string.
  */
 export function hasPermission(
-  userRole: UserRole | null | undefined,
+  permissionsList: Permission[] | null | undefined,
   permission: Permission
 ): boolean {
-  if (!userRole) return false;
-  const rolePerms = ROLE_PERMISSIONS[userRole] || [];
-  return rolePerms.includes(permission);
+  if (!permissionsList || permissionsList.length === 0) return false
+  return permissionsList.includes(permission)
 }
 
 /**
- * Check if user has at least one of the given permissions
+ * Check if a permission list includes at least one of the given permissions.
  */
 export function hasAnyPermission(
-  userRole: UserRole | null | undefined,
+  permissionsList: Permission[] | null | undefined,
   permissions: Permission[]
 ): boolean {
-  if (!userRole) return false;
-  return permissions.some((p) => hasPermission(userRole, p));
+  if (!permissionsList || permissionsList.length === 0) return false
+  return permissions.some((p) => permissionsList.includes(p))
 }
 
 /**
- * Check if user has all of the given permissions
+ * Check if a permission list includes all of the given permissions.
  */
 export function hasAllPermissions(
-  userRole: UserRole | null | undefined,
+  permissionsList: Permission[] | null | undefined,
   permissions: Permission[]
 ): boolean {
-  if (!userRole) return false;
-  return permissions.every((p) => hasPermission(userRole, p));
+  if (!permissionsList || permissionsList.length === 0) return false
+  return permissions.every((p) => permissionsList.includes(p))
 }
 
 /**
- * Get all permissions for a role
- */
-export function getPermissionsByRole(role: UserRole): Permission[] {
-  return ROLE_PERMISSIONS[role] || [];
-}
-
-/**
- * Get permission category from permission key
+ * Get the module (category) from a permission key.
+ * e.g. 'ventas:gestionar' → 'ventas'
  */
 export function getPermissionCategory(permission: Permission): string {
-  return permission.split(':')[0];
+  return permission.split(':')[0]
 }
 
 /**
- * Get permission action from permission key
+ * Get the action from a permission key.
+ * e.g. 'ventas:gestionar' → 'gestionar'
  */
 export function getPermissionAction(permission: Permission): string {
-  return permission.split(':')[1];
+  return permission.split(':')[1]
 }

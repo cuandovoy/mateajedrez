@@ -5,9 +5,9 @@ import type { Branch } from '@/types'
 
 interface BranchTableProps {
   branches: Branch[]
-  onEdit: (branch: Branch) => void
-  onSoftDelete: (id: string) => void
-  onRestore: (id: string) => void
+  onEdit?: (branch: Branch) => void
+  onSoftDelete?: (id: string) => void
+  onRestore?: (id: string) => void
 }
 
 function StatusBadge({ branch }: { branch: Branch }) {
@@ -28,31 +28,16 @@ function StatusBadge({ branch }: { branch: Branch }) {
 
 function getBranchActions(
   branch: Branch,
-  onEdit: (b: Branch) => void,
-  onSoftDelete: (id: string) => void,
-  onRestore: (id: string) => void,
+  onEdit?: (b: Branch) => void,
+  onSoftDelete?: (id: string) => void,
+  onRestore?: (id: string) => void,
 ) {
   if (branch.deleted_at) {
-    return [
-      {
-        label: 'Restaurar',
-        icon: <RotateCcw className="h-4 w-4" />,
-        onClick: () => onRestore(branch.id),
-      },
-    ]
+    return onRestore ? [{ label: 'Restaurar', icon: <RotateCcw className="h-4 w-4" />, onClick: () => onRestore(branch.id) }] : []
   }
   return [
-    {
-      label: 'Editar',
-      icon: <Edit className="h-4 w-4" />,
-      onClick: () => onEdit(branch),
-    },
-    {
-      label: 'Marcar para eliminar',
-      icon: <Trash2 className="h-4 w-4" />,
-      onClick: () => onSoftDelete(branch.id),
-      variant: 'danger' as const,
-    },
+    ...(onEdit ? [{ label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(branch) }] : []),
+    ...(onSoftDelete ? [{ label: 'Marcar para eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onSoftDelete(branch.id), variant: 'danger' as const }] : []),
   ]
 }
 

@@ -99,13 +99,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (data) {
         const profile = data as UserProfile
         const { useOrganizationStore } = await import('./organizationStore')
-        const orgs = useOrganizationStore.getState().organizations
-        const isAdminInOrg = orgs.some((o) => o.member?.role === 'admin')
-        const isManagerInOrg = orgs.some((o) => o.member?.role === 'manager')
+        // Derive isAdmin and canAccessAdminPanel from the org-scoped role (ADR-2).
+        // profile.role === 'admin' check is intentional: it guards platform-level admin
+        // features (e.g. /organizations, canCreateOrganization) distinct from org-level admin.
+        const orgRole = useOrganizationStore.getState().orgRole
+        const baseRoleKey = orgRole?.baseRoleKey ?? null
+        const isOrgAdmin = baseRoleKey === 'admin'
+        const isOrgManager = baseRoleKey === 'manager'
+        // canAccessAdminPanel: org admin/manager OR at least one :ver permission granted
+        const hasAnyVerPermission = (orgRole?.permissions ?? []).some((p) => p.endsWith(':ver'))
         set({
           profile,
-          isAdmin: profile.role === 'admin' || isAdminInOrg,
-          canAccessAdminPanel: profile.role === 'admin' || isAdminInOrg || isManagerInOrg,
+          isAdmin: profile.role === 'admin' || isOrgAdmin,
+          canAccessAdminPanel: profile.role === 'admin' || isOrgAdmin || isOrgManager || hasAnyVerPermission,
         })
       }
     } catch (error) {

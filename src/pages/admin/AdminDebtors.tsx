@@ -4,6 +4,7 @@ import { Download, CheckCircle, AlertCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePermission } from '@/hooks/usePermission'
 import { formatPrice, formatDateShort } from '@/lib/utils'
 import { ACTIVE_ORDER_STATUSES } from '@/lib/constants'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -89,6 +90,7 @@ async function fetchDebtors(organizationId: string): Promise<Debtor[]> {
 export function AdminDebtors() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
+  const { can, loading: permLoading } = usePermission()
 
   const { data: debtors = [], isPending: loading } = useQuery({
     queryKey: ['admin', organizationId, 'debtors'],
@@ -98,6 +100,9 @@ export function AdminDebtors() {
   })
 
   const totalDebt = debtors.reduce((s, d) => s + d.pending, 0)
+
+  if (permLoading) return <SkeletonTable rows={10} />
+  if (!can('clientes:ver')) return null
 
   const handleExport = () => {
     const headers = ['Cliente', 'Teléfono', 'Email', 'Deuda total', 'Órdenes con deuda', 'Última compra']

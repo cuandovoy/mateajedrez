@@ -30,6 +30,7 @@ interface ProductTableProps {
   selectedIds?: Set<string>
   onToggleSelect?: (id: string) => void
   onSelectAll?: (allSelected: boolean) => void
+  canManage?: boolean
 }
 
 export function ProductTable({
@@ -45,6 +46,7 @@ export function ProductTable({
   selectedIds,
   onToggleSelect,
   onSelectAll,
+  canManage = true,
 }: ProductTableProps) {
   const navigate = useNavigate()
   const settings = useOrgSettings()
@@ -147,14 +149,16 @@ export function ProductTable({
                 </div>
               )}
               <div className="mt-4 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => onEdit(product)}
-                  className="min-h-[44px] min-w-[44px] flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-admin-500"
-                >
-                  <Edit className="h-4 w-4" />
-                  Editar
-                </button>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(product)}
+                    className="min-h-[44px] min-w-[44px] flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-admin-500"
+                  >
+                    <Edit className="h-4 w-4" />
+                    Editar
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => onManageVariants(product)}
@@ -170,7 +174,7 @@ export function ProductTable({
                       ...(onManageBarcodes ? [{ label: 'Código de barras', icon: <ScanLine className="h-4 w-4" />, onClick: () => onManageBarcodes(product) }] : []),
                       ...(onManageSuppliers ? [{ label: 'Proveedores', icon: <Truck className="h-4 w-4" />, onClick: () => onManageSuppliers(product) }] : []),
                       ...(onAdjustInventory ? [{ label: 'Ajustar inventario', icon: <Package className="h-4 w-4" />, onClick: () => onAdjustInventory(product) }] : []),
-                      { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(product.id), variant: 'danger' as const },
+                      ...(canManage ? [{ label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(product.id), variant: 'danger' as const }] : []),
                     ]}
                   />
                 </div>
@@ -354,17 +358,19 @@ export function ProductTable({
                               },
                             ]
                           : []),
-                        {
-                          label: 'Editar',
-                          icon: <Edit className="h-4 w-4" />,
-                          onClick: () => onEdit(product),
-                        },
-                        {
-                          label: 'Eliminar',
-                          icon: <Trash2 className="h-4 w-4" />,
-                          onClick: () => onDelete(product.id),
-                          variant: 'danger',
-                        },
+                        ...(canManage ? [
+                          {
+                            label: 'Editar',
+                            icon: <Edit className="h-4 w-4" />,
+                            onClick: () => onEdit(product),
+                          },
+                          {
+                            label: 'Eliminar',
+                            icon: <Trash2 className="h-4 w-4" />,
+                            onClick: () => onDelete(product.id),
+                            variant: 'danger' as const,
+                          },
+                        ] : []),
                       ]}
                     />
                   </div>

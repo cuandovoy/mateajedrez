@@ -27,6 +27,8 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
 import { useAdminBranches } from '@/hooks/useAdminBranches'
+import { usePermission } from '@/hooks/usePermission'
+import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 
 
 interface ProductImageItem {
@@ -87,9 +89,10 @@ interface DiscountsTabProps {
   loading: boolean
   settings: ReturnType<typeof import('@/hooks/useOrgSettings').useOrgSettings>
   onRefresh: () => void
+  canManage: boolean
 }
 
-function DiscountsTab({ products, allProducts, loading, settings, onRefresh }: DiscountsTabProps) {
+function DiscountsTab({ products, allProducts, loading, settings, onRefresh, canManage }: DiscountsTabProps) {
   const { show } = useToastStore()
   const now = new Date()
   const [modalOpen, setModalOpen] = useState(false)
@@ -214,13 +217,15 @@ function DiscountsTab({ products, allProducts, loading, settings, onRefresh }: D
             </span>
           </td>
           <td className="px-4 py-3 text-center">
-            <button
-              onClick={() => openEdit(p)}
-              className="p-1.5 text-gray-400 hover:text-admin-600 hover:bg-admin-50 rounded transition-colors"
-              title="Editar descuento"
-            >
-              <Edit className="h-4 w-4" />
-            </button>
+            {canManage && (
+              <button
+                onClick={() => openEdit(p)}
+                className="p-1.5 text-gray-400 hover:text-admin-600 hover:bg-admin-50 rounded transition-colors"
+                title="Editar descuento"
+              >
+                <Edit className="h-4 w-4" />
+              </button>
+            )}
           </td>
         </tr>
       )
@@ -247,10 +252,12 @@ function DiscountsTab({ products, allProducts, loading, settings, onRefresh }: D
         <p className="text-sm text-gray-500">
           {products.length === 0 ? 'Sin descuentos configurados' : `${active.length} vigente${active.length !== 1 ? 's' : ''}, ${expired.length} vencido${expired.length !== 1 ? 's' : ''}`}
         </p>
-        <Button onClick={openNew} size="sm">
-          <Plus className="h-4 w-4 mr-1.5" />
-          Nuevo descuento
-        </Button>
+        {canManage && (
+          <Button onClick={openNew} size="sm">
+            <Plus className="h-4 w-4 mr-1.5" />
+            Nuevo descuento
+          </Button>
+        )}
       </div>
 
       {loading ? (
@@ -455,6 +462,8 @@ function AdminProductsContent() {
   const settings = useOrgSettings()
   const { show } = useToastStore()
   const { isAtLimit, productCount, limits, tier } = usePlanLimits()
+  const { can } = usePermission()
+  const canManage = can('catalogo:gestionar')
   const maxProductImages = getMaxProductImages(tier)
   const queryClient = useQueryClient()
   const { data: branches = [] } = useAdminBranches(organizationId)
@@ -1499,18 +1508,22 @@ function AdminProductsContent() {
             <Download className="h-4 w-4 mr-2" />
             {exportingPdf ? 'Exportando...' : 'PDF'}
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => setIsImportModalOpen(true)}
-            disabled={isAtLimit('products')}
-          >
-            <Upload className="h-4 w-4 mr-2" />
-            Importar
-          </Button>
-          <Button onClick={handleNew} disabled={isAtLimit('products')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Producto
-          </Button>
+          {canManage && (
+            <Button
+              variant="outline"
+              onClick={() => setIsImportModalOpen(true)}
+              disabled={isAtLimit('products')}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Importar
+            </Button>
+          )}
+          {canManage && (
+            <Button onClick={handleNew} disabled={isAtLimit('products')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Producto
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1551,6 +1564,7 @@ function AdminProductsContent() {
           loading={loadingDiscounts}
           settings={settings}
           onRefresh={invalidateProducts}
+          canManage={canManage}
         />
       )}
 
@@ -1689,17 +1703,19 @@ function AdminProductsContent() {
                           icon: <Package className="h-4 w-4" />,
                           onClick: () => goToInventoryAdjustment(product),
                         },
-                        {
-                          label: 'Editar',
-                          icon: <Edit className="h-4 w-4" />,
-                          onClick: () => handleEdit(product),
-                        },
-                        {
-                          label: 'Eliminar',
-                          icon: <Trash2 className="h-4 w-4" />,
-                          onClick: () => handleDelete(product.id),
-                          variant: 'danger',
-                        },
+                        ...(canManage ? [
+                          {
+                            label: 'Editar',
+                            icon: <Edit className="h-4 w-4" />,
+                            onClick: () => handleEdit(product),
+                          },
+                          {
+                            label: 'Eliminar',
+                            icon: <Trash2 className="h-4 w-4" />,
+                            onClick: () => handleDelete(product.id),
+                            variant: 'danger' as const,
+                          },
+                        ] : []),
                       ]}
                     />
                   </div>
@@ -1756,13 +1772,14 @@ function AdminProductsContent() {
               selectedIds={selectedProductIds}
               onToggleSelect={handleToggleSelect}
               onSelectAll={handleSelectAll}
+              canManage={canManage}
             />
           </CardContent>
         </Card>
       )}
 
       {/* Floating bulk action bar */}
-      {selectedProductIds.size > 0 && (
+      {canManage && selectedProductIds.size > 0 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-2xl ring-1 ring-black/5">
           <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">
             {selectedProductIds.size} {selectedProductIds.size === 1 ? 'producto' : 'productos'} seleccionado{selectedProductIds.size !== 1 ? 's' : ''}
@@ -2284,5 +2301,8 @@ function AdminProductsContent() {
 }
 
 export function AdminProducts() {
+  const { can, loading: permLoading } = usePermission()
+  if (permLoading) return <SkeletonTable rows={PAGE_SIZE_ADMIN} />
+  if (!can('catalogo:ver')) return null
   return <AdminProductsContent />
 }

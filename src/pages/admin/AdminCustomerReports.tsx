@@ -2,8 +2,10 @@ import { ACTIVE_ORDER_STATUSES } from '@/lib/constants'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePermission } from '@/hooks/usePermission'
 import { supabase } from '@/lib/supabase'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
@@ -115,6 +117,7 @@ export function AdminCustomerReports() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const { show } = useToastStore()
+  const { can, loading: permLoading } = usePermission()
 
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -566,6 +569,9 @@ export function AdminCustomerReports() {
       setExporting(false)
     }
   }
+
+  if (permLoading) return <SkeletonTable rows={10} />
+  if (!can('reportes:ver')) return null
 
   if (loading && !hasEverLoaded.current) {
     return (

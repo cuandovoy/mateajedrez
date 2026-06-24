@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import { useAdminStore } from '@/store/adminStore'
 import { useAuthStore } from '@/store/authStore'
 import { useOrganizationStore } from '@/store/organizationStore'
+import { usePermission } from '@/hooks/usePermission'
 import {
   LayoutDashboard,
   Package,
@@ -40,7 +41,6 @@ import { ToastContainer } from './ToastContainer'
 import { CreateOrganizationModal } from '@/components/admin/CreateOrganizationModal'
 import { ShareStoreModal } from '@/components/admin/ShareStoreModal'
 import { EditOrganizationModal } from '@/components/admin/EditOrganizationModal'
-import { PermissionGate } from '@/components/features/PermissionGate'
 import { OrgAccessGate } from '@/components/features/OrgAccessGate'
 import type { Permission } from '@/lib/permissions'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
@@ -78,7 +78,11 @@ type NavSection = {
 
 export function AdminLayout() {
   const { user, isAdmin, canAccessAdminPanel, signOut, loading, profile } = useAuthStore()
+  // canCreateOrganization reads the GLOBAL platform-admin role (user_profiles.role),
+  // NOT the org-level role. This is intentional — do not change to org role check.
   const canCreateOrganization = profile?.role === 'admin'
+  const { orgRole } = useOrganizationStore()
+  const { can } = usePermission()
   const { currentOrganization, organizations, setCurrentOrganization, fetchOrganizations, switchingOrganization } = useOrganizationStore()
   const { canUseFeature, branchCount } = usePlanLimits()
   const { config: billerConfig, loading: billerConfigLoading } = useBillerConfig(currentOrganization?.id ?? null)
@@ -161,14 +165,14 @@ export function AdminLayout() {
       title: 'Operación',
       icon: ShoppingCart,
       items: [
-        { path: '/orders', label: 'Órdenes', icon: ShoppingCart },
-        { path: '/billing/comprobantes', label: 'Comprobantes CFE', icon: Receipt, requiresBillerConfig: true },
-        { path: '/expenses', label: 'Compras y Egresos', icon: Wallet },
+        { path: '/orders', label: 'Órdenes', icon: ShoppingCart, permission: 'ventas:ver' as const },
+        { path: '/billing/comprobantes', label: 'Comprobantes CFE', icon: Receipt, requiresBillerConfig: true, permission: 'ventas:ver' as const },
+        { path: '/expenses', label: 'Compras y Egresos', icon: Wallet, permission: 'compras:ver' as const },
         {
           path: '/customers',
           label: 'Clientes',
           icon: Users2,
-          permission: 'customers:view',
+          permission: 'clientes:ver' as const,
           subItems: [
             { path: '/customers', label: 'Todos los clientes' },
             { path: '/customers/deudores', label: 'Deudores' },
@@ -178,44 +182,46 @@ export function AdminLayout() {
           path: '/cash-register',
           label: 'Punto de Venta',
           icon: StoreIcon,
-          planFeature: 'cash_register',
+          planFeature: 'cash_register' as const,
+          permission: 'caja:ver' as const,
           subItems: [
             { path: '/cash-register', label: 'Vista completa' },
             { path: '/pos', label: 'Modo operador' },
           ],
         },
-        { path: '/transfers', label: 'Transferencias', icon: ArrowRight, planFeature: 'transfers', minBranches: 2 },
+        { path: '/transfers', label: 'Transferencias', icon: ArrowRight, planFeature: 'transfers' as const, minBranches: 2, permission: 'inventario:ver' as const },
       ],
     },
     {
       title: 'Catálogo',
       icon: Package,
       items: [
-        { path: '/products', label: 'Productos', icon: Package },
-        { path: '/categories', label: 'Categorías', icon: Folder },
+        { path: '/products', label: 'Productos', icon: Package, permission: 'catalogo:ver' as const },
+        { path: '/categories', label: 'Categorías', icon: Folder, permission: 'catalogo:ver' as const },
         {
           path: '/inventory',
           label: 'Inventario',
           icon: Warehouse,
+          permission: 'inventario:ver' as const,
           subItems: [
             { path: '/inventory', label: 'Stock actual' },
             { path: '/inventory/lots', label: 'Lotes', requiresFifo: true },
           ],
         },
-        { path: '/reposicion', label: 'Reposición', icon: RefreshCw },
-        { path: '/suppliers', label: 'Proveedores', icon: Truck },
-        { path: '/branches', label: 'Sucursales', icon: Building2 },
+        { path: '/reposicion', label: 'Reposición', icon: RefreshCw, permission: 'inventario:ver' as const },
+        { path: '/suppliers', label: 'Proveedores', icon: Truck, permission: 'compras:ver' as const },
+        { path: '/branches', label: 'Sucursales', icon: Building2, permission: 'configuracion:ver' as const },
       ],
     },
     {
       title: 'Reportes',
       icon: BarChart3,
       items: [
-        { path: '/reports/sales', label: 'Ventas', icon: BarChart3, planFeature: 'advanced_reports' },
-        { path: '/reports/financial', label: 'Finanzas', icon: Wallet, planFeature: 'advanced_reports' },
-        { path: '/reports/audit-logs', label: 'Auditoría', icon: FileText, planFeature: 'advanced_reports' },
-        { path: '/reports/customers', label: 'Clientes', icon: Users2, planFeature: 'advanced_reports' },
-        { path: '/reports/inventory', label: 'Inventario', icon: Warehouse, planFeature: 'advanced_reports' },
+        { path: '/reports/sales', label: 'Ventas', icon: BarChart3, planFeature: 'advanced_reports' as const, permission: 'reportes:ver' as const },
+        { path: '/reports/financial', label: 'Finanzas', icon: Wallet, planFeature: 'advanced_reports' as const, permission: 'reportes:ver' as const },
+        { path: '/reports/audit-logs', label: 'Auditoría', icon: FileText, planFeature: 'advanced_reports' as const, permission: 'reportes:ver' as const },
+        { path: '/reports/customers', label: 'Clientes', icon: Users2, planFeature: 'advanced_reports' as const, permission: 'reportes:ver' as const },
+        { path: '/reports/inventory', label: 'Inventario', icon: Warehouse, planFeature: 'advanced_reports' as const, permission: 'reportes:ver' as const },
       ],
     },
     {
@@ -246,8 +252,9 @@ export function AdminLayout() {
       items: [
         { path: '/organizations', label: 'Organizaciones', icon: Building2, adminOnly: true },
         { path: '/planes', label: 'Planes', icon: CreditCard },
+        // /users and /roles-permissions require configuracion:gestionar (admin only)
         { path: '/users', label: 'Usuarios', icon: Users, adminOnly: true },
-        { path: '/roles-permissions', label: 'Roles', icon: FileText, permission: 'settings:manage_roles' },
+        { path: '/roles-permissions', label: 'Roles', icon: FileText, adminOnly: true },
         {
           path: '#configuraciones',
           label: 'Configuraciones',
@@ -373,9 +380,9 @@ export function AdminLayout() {
                             </span>
                             <span className={cn(
                               'px-1.5 py-0.5 rounded text-[10px] font-medium',
-                              org.member?.role === 'admin' ? 'bg-admin-100 text-admin-800' : 'bg-gray-200 text-gray-700'
+                              (org.member as { base_role_key?: string | null } | undefined)?.base_role_key === 'admin' ? 'bg-admin-100 text-admin-800' : 'bg-gray-200 text-gray-700'
                             )}>
-                              {org.member?.role === 'admin' ? 'Admin' : 'Manager'}
+                              {{ admin: 'Admin', manager: 'Gerente', viewer: 'Viewer', user: 'Usuario', custom: 'Custom' }[(org.member as { base_role_key?: string | null } | undefined)?.base_role_key ?? ''] ?? 'Miembro'}
                             </span>
                           </div>
                         </button>
@@ -422,9 +429,9 @@ export function AdminLayout() {
                   <span className="text-xs text-slate-300 truncate max-w-[140px]">
                     {profile?.full_name ?? user.email}
                   </span>
-                  {profile?.role && (
+                  {orgRole?.baseRoleKey && (
                     <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-white/10 text-slate-400 leading-none shrink-0">
-                      {{ admin: 'Admin', manager: 'Gerente', user: 'Usuario', viewer: 'Viewer' }[profile.role] ?? profile.role}
+                      {{ admin: 'Admin', manager: 'Gerente', user: 'Usuario', viewer: 'Viewer', custom: 'Custom' }[orgRole.baseRoleKey] ?? orgRole.baseRoleKey}
                     </span>
                   )}
                 </div>
@@ -466,6 +473,8 @@ export function AdminLayout() {
                   if (item.adminOnly && !isAdmin) return false
                   if (item.minBranches && branchCount < item.minBranches) return false
                   if (item.requiresBillerConfig && (billerConfigLoading || !billerConfig)) return false
+                  // Module permission gate: hide item if user lacks the required module permission
+                  if (item.permission && !can(item.permission)) return false
                   if (section.title === 'Reportes') return true
                   return !item.planFeature || canUseFeature(item.planFeature)
                 }) ?? []
@@ -644,14 +653,8 @@ export function AdminLayout() {
                             </li>
                           )
 
-                          if (item.permission) {
-                            return (
-                              <PermissionGate permission={item.permission} key={item.path}>
-                                {content}
-                              </PermissionGate>
-                            )
-                          }
-
+                          // Permission filtering is handled in filteredItems above (can(item.permission)).
+                          // No need for PermissionGate wrapper here.
                           return content
                         })}
                       </ul>

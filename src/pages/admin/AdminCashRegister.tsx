@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { CashSessionTable } from '@/components/admin/CashSessionTable'
 import { CashSessionPayments } from '@/components/admin/CashSessionPayments'
 import { ManualSaleForm } from '@/components/admin/ManualSaleForm'
@@ -26,8 +27,10 @@ import { PlanGate } from '@/components/features/PlanGate'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { usePermission } from '@/hooks/usePermission'
 import { trackAuditAction } from '@/lib/audit'
 import { formatDateShort, formatPrice } from '@/lib/utils'
+import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { useAuthStore } from '@/store/authStore'
 import type { CashSession, CashSessionInsert, CashSessionUpdate } from '@/types'
 
@@ -79,6 +82,9 @@ function AdminCashRegisterContent() {
   } = useForm<CloseSessionForm>({
     resolver: zodResolver(closeSessionSchema),
   })
+
+  const { can } = usePermission()
+  const canManage = can('caja:gestionar')
 
   const { data: branches = [] } = useAdminBranches(organizationId)
 
@@ -317,7 +323,7 @@ function AdminCashRegisterContent() {
           <p className="text-gray-500 mt-1 text-sm">Gestiona las cajas abiertas y el historial de sesiones</p>
         </div>
         <div className="flex items-center gap-2">
-          {branches.length > 0 && (
+          {canManage && branches.length > 0 && (
             <Button
               variant="outline"
               size="sm"
@@ -331,10 +337,12 @@ function AdminCashRegisterContent() {
               Nueva Venta
             </Button>
           )}
-          <Button onClick={handleNew} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Abrir Caja
-          </Button>
+          {canManage && (
+            <Button onClick={handleNew} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Abrir Caja
+            </Button>
+          )}
         </div>
       </div>
 
@@ -364,10 +372,12 @@ function AdminCashRegisterContent() {
             <p className="mt-2 text-sm text-gray-500 max-w-sm mx-auto">
               Una sesión de caja te permite registrar ventas, cobros y hacer el cierre diario con el resumen de movimientos. Abrí una caja para comenzar.
             </p>
-            <Button className="mt-6" onClick={handleNew} size="lg">
-              <Plus className="h-5 w-5 mr-2" />
-              Abrir Caja
-            </Button>
+            {canManage && (
+              <Button className="mt-6" onClick={handleNew} size="lg">
+                <Plus className="h-5 w-5 mr-2" />
+                Abrir Caja
+              </Button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -424,24 +434,28 @@ function AdminCashRegisterContent() {
 
                   {/* Card actions */}
                   <div className="px-5 pb-5 flex flex-col gap-2">
-                    <Button
-                      className="w-full"
-                      onClick={() => {
-                        setSelectedBranchForSale(session.branch_id)
-                        setIsManualSaleOpen(true)
-                      }}
-                    >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      Nueva Venta
-                    </Button>
-                    <div className="flex gap-2">
+                    {canManage && (
                       <Button
-                        variant="outline"
-                        className="flex-1 text-sm"
-                        onClick={() => handleCloseSession(session)}
+                        className="w-full"
+                        onClick={() => {
+                          setSelectedBranchForSale(session.branch_id)
+                          setIsManualSaleOpen(true)
+                        }}
                       >
-                        Cerrar Caja
+                        <ShoppingCart className="h-4 w-4 mr-2" />
+                        Nueva Venta
                       </Button>
+                    )}
+                    <div className="flex gap-2">
+                      {canManage && (
+                        <Button
+                          variant="outline"
+                          className="flex-1 text-sm"
+                          onClick={() => handleCloseSession(session)}
+                        >
+                          Cerrar Caja
+                        </Button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setViewingPaymentsSessionId(session.id)}
@@ -561,14 +575,18 @@ function AdminCashRegisterContent() {
                       >
                         Ver ventas
                       </button>
-                      <span className="text-gray-300">·</span>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(session.id)}
-                        className="text-xs text-red-500 hover:underline"
-                      >
-                        Eliminar
-                      </button>
+                      {canManage && (
+                        <>
+                          <span className="text-gray-300">·</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(session.id)}
+                            className="text-xs text-red-500 hover:underline"
+                          >
+                            Eliminar
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )
@@ -790,6 +808,11 @@ function AdminCashRegisterContent() {
 
 export function AdminCashRegister() {
   const { canUseFeature } = usePlanLimits()
+  const { can, loading: permLoading } = usePermission()
+
+  if (permLoading) return <SkeletonTable rows={PAGE_SIZE_ADMIN} />
+  if (!can('caja:ver')) return null
+
   return (
     <PlanGate feature="cash_register" canUse={canUseFeature('cash_register')}>
       <AdminCashRegisterContent />

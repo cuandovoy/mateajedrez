@@ -4,6 +4,32 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-24 — Guards de permisos completos en todo el panel admin
+
+- **Archivos modificados:** `src/pages/admin/AdminCustomers.tsx`, `src/pages/admin/AdminCustomerDetail.tsx`, `src/pages/admin/AdminNotificationSettings.tsx`, `src/pages/admin/AdminBranches.tsx`, `src/pages/admin/AdminTransfers.tsx`, `src/pages/admin/AdminLots.tsx`, `src/pages/admin/AdminCategories.tsx`, `src/pages/admin/AdminSuppliers.tsx`, `src/components/admin/BranchTable.tsx`, `src/components/admin/CategoryTable.tsx`, `src/components/admin/SupplierTable.tsx`, `src/components/admin/LotDetailPanel.tsx`, `src/components/layout/AdminLayout.tsx`
+- **Qué cambió:** Agrega guards `usePermission` a todas las páginas admin restantes. Cada página muestra skeleton mientras cargan los permisos, retorna `null` sin acceso `ver`, y oculta acciones de mutación sin `gestionar`. Los table components (`BranchTable`, `CategoryTable`, `SupplierTable`, `LotDetailPanel`) tienen sus props de mutación ahora opcionales, ocultando el ActionsMenu cuando no se pasa el handler. Fix: nav de `/branches` corregido de `inventario:ver` a `configuracion:ver`.
+
+## 2026-06-24 — Guards de permisos en 5 páginas del panel admin
+
+- **Archivos modificados:** `src/pages/admin/AdminExpenses.tsx`, `src/pages/admin/AdminCashRegister.tsx`, `src/pages/admin/AdminInventory.tsx`, `src/pages/admin/AdminProducts.tsx`, `src/pages/admin/AdminReposicion.tsx`, `src/components/admin/ProductTable.tsx`
+- **Qué cambió:** Agrega guards de permisos de módulo (`usePermission`) en 5 páginas admin. Cada página muestra `SkeletonTable` mientras cargan los permisos, retorna `null` si el usuario no tiene permiso `ver`, y oculta botones/acciones de mutación si no tiene permiso `gestionar`. `ProductTable` recibe prop `canManage` para controlar visibilidad de Editar/Eliminar en ambas vistas (mobile y desktop).
+
+---
+
+## 2026-06-24 — Trigger para seed automático de roles en nuevas organizaciones
+
+- **Archivos modificados:** `supabase/migrations/139_seed_system_roles_trigger.sql`, `src/components/admin/CreateOrganizationModal.tsx`
+- **Qué cambió:** Agrega un trigger `AFTER INSERT ON organizations` que llama a `seed_org_system_roles()` y crea automáticamente los 4 roles del sistema (admin, manager, viewer, user) con sus 16 permisos de módulo para cada org nueva. Backfill incluido para orgs creadas entre la migración 089 y esta. `CreateOrganizationModal` actualizado para vincular al miembro fundador con `organization_role_id` desde el momento de creación. Migration 139 la aplica el usuario manualmente.
+
+---
+
+## 2026-06-24 — Permisos de módulo unificados a roles de organización
+
+- **Archivos modificados:** `supabase/migrations/138_module_permissions_seed.sql`, `src/lib/permissions.ts`, `src/lib/queryKeys.ts`, `src/store/organizationStore.ts`, `src/store/authStore.ts`, `src/hooks/usePermission.ts`, `src/hooks/useOrganization.ts`, `src/components/features/ProtectedRoute.tsx`, `src/components/layout/AdminLayout.tsx`, `src/pages/admin/AdminUsers.tsx`, `src/pages/admin/AdminRolesPermissions.tsx`, `src/types/index.ts`, `src/lib/permissions.test.ts`
+- **Qué cambió:** Reemplaza el sistema dual (user_profiles.role + matriz TS de 28 claves hardcodeadas) por el modelo org-scoped existente (migration 089). 16 claves de módulo (8 módulos × {ver, gestionar}) pasan a ser la única autoridad de permisos en el frontend. `usePermission`, `authStore.isAdmin`, `useOrganization.isAdmin/isManager` derivan ahora de `organization_role_id` → `organization_role_permissions`. Se corrige bug de rules-of-hooks en `ProtectedRoute`. UI de Usuarios migrada a TanStack Query con `useMutation` para cambio de rol. UI de Roles reescrita con tabla de 8 módulos × Ver/Gestionar; guarda con delete-all + re-insert. Migration 138 siembra las 16 claves y backfilla los 4 roles sistema (admin, manager, viewer, user). El usuario aplica la migration manualmente.
+
+---
+
 ## 2026-06-23 — Limpieza UX panel de clientes + consistencia de órdenes
 
 - **Archivos modificados:** `src/pages/admin/AdminCustomers.tsx`, `src/pages/admin/AdminCustomerReports.tsx`, `src/pages/admin/AdminCustomerDetail.tsx`

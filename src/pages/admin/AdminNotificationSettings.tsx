@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/Input'
 import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
+import { usePermission } from '@/hooks/usePermission'
 import { Bell, MessageCircle, Clock, Phone, Calendar, CheckCircle, XCircle } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -88,6 +89,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 export function AdminNotificationSettings() {
   const { currentOrganization } = useOrganizationStore()
   const { show: showToast } = useToastStore()
+  const { can, loading: permLoading } = usePermission()
 
   const [config, setConfig]     = useState<DailySummaryConfig>(DEFAULT_CONFIG)
   const [logs, setLogs]         = useState<SummaryLog[]>([])
@@ -147,6 +149,9 @@ export function AdminNotificationSettings() {
 
   const fmt = (n: number) =>
     new Intl.NumberFormat('es-UY', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n)
+
+  if (permLoading) return null
+  if (!can('configuracion:gestionar')) return null
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">

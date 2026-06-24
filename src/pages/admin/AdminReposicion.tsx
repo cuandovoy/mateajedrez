@@ -2,8 +2,10 @@ import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { useOrganization } from '@/hooks/useOrganization'
+import { usePermission } from '@/hooks/usePermission'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
+import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useToastStore } from '@/store/toastStore'
 import {
@@ -423,6 +425,12 @@ export function AdminReposicion() {
 
   const hasFilters = search || filterBranch || filterSupplier
 
+  const { can, loading: permLoading } = usePermission()
+  const canManage = can('inventario:gestionar')
+
+  if (permLoading) return <SkeletonTable rows={PAGE_SIZE_ADMIN} />
+  if (!can('inventario:ver')) return null
+
   return (
     <div className="space-y-6 pb-24">
       {/* Header */}
@@ -679,7 +687,7 @@ export function AdminReposicion() {
       )}
 
       {/* Sticky footer — visible when items are selected */}
-      {selected.size > 0 && (
+      {canManage && selected.size > 0 && (
         <div className="fixed bottom-0 left-0 md:left-64 right-0 bg-white border-t border-gray-200 px-4 md:px-6 py-3 flex items-center justify-between z-40 shadow-lg">
           <div className="flex items-center gap-2 text-sm">
             <AlertTriangle className="h-4 w-4 text-admin-600" />

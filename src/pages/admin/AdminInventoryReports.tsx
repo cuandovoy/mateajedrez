@@ -1,8 +1,10 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useAdminBranches } from '@/hooks/useAdminBranches'
+import { usePermission } from '@/hooks/usePermission'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 import { formatPrice } from '@/lib/utils'
@@ -37,6 +39,7 @@ export function AdminInventoryReports() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
   const { show } = useToastStore()
+  const { can, loading: permLoading } = usePermission()
   const [exporting, setExporting] = useState(false)
   const [selectedBranchId, setSelectedBranchId] = useState('')
 
@@ -90,6 +93,9 @@ export function AdminInventoryReports() {
       setExporting(false)
     }
   }
+
+  if (permLoading) return <SkeletonTable rows={10} />
+  if (!can('reportes:ver')) return null
 
   if (loading) {
     return (

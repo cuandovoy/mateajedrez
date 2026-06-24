@@ -5,8 +5,9 @@ import type { Supplier } from '@/types'
 
 interface SupplierTableProps {
   suppliers: Supplier[]
-  onEdit: (supplier: Supplier) => void
-  onDelete: (id: string) => void
+  onEdit?: (supplier: Supplier) => void
+  onDelete?: (id: string) => void
+  readOnly?: boolean
 }
 
 export function SupplierTable({
@@ -38,10 +39,10 @@ export function SupplierTable({
                 <span className={`inline-flex px-2 py-0.5 text-xs font-semibold rounded-full ${supplier.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                   {supplier.is_active ? 'Activo' : 'Inactivo'}
                 </span>
-                <ActionsMenu actions={[
-                  { label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(supplier) },
-                  { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(supplier.id), variant: 'danger' },
-                ]} />
+                {(onEdit || onDelete) && <ActionsMenu actions={[
+                  ...(onEdit ? [{ label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(supplier) }] : []),
+                  ...(onDelete ? [{ label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(supplier.id), variant: 'danger' as const }] : []),
+                ]} />}
               </div>
             </div>
             <div className="space-y-1">
@@ -163,21 +164,12 @@ export function SupplierTable({
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                 <div className="flex items-center justify-end">
-                  <ActionsMenu
+                  {(onEdit || onDelete) && <ActionsMenu
                     actions={[
-                      {
-                        label: 'Editar',
-                        icon: <Edit className="h-4 w-4" />,
-                        onClick: () => onEdit(supplier),
-                      },
-                      {
-                        label: 'Eliminar',
-                        icon: <Trash2 className="h-4 w-4" />,
-                        onClick: () => onDelete(supplier.id),
-                        variant: 'danger',
-                      },
+                      ...(onEdit ? [{ label: 'Editar', icon: <Edit className="h-4 w-4" />, onClick: () => onEdit(supplier) }] : []),
+                      ...(onDelete ? [{ label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(supplier.id), variant: 'danger' as const }] : []),
                     ]}
-                  />
+                  />}
                 </div>
               </td>
             </tr>

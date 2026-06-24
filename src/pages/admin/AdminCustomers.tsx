@@ -6,6 +6,7 @@ import { SkeletonTable } from '@/components/ui/Skeleton'
 import { Input } from '@/components/ui/Input'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { usePermission } from '@/hooks/usePermission'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 import { formatDateShort } from '@/lib/utils'
@@ -64,6 +65,7 @@ const EMPTY_FORM: CustomerForm = {
 export function AdminCustomers() {
   const { organizationId } = useOrganization()
   const settings = useOrgSettings()
+  const { can, loading: permLoading } = usePermission()
   const { show } = useToastStore()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -392,6 +394,10 @@ export function AdminCustomers() {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE_ADMIN))
   const hasFilters = !!searchTerm || filterActiveOnly
+  const canManage = can('clientes:gestionar')
+
+  if (permLoading) return <SkeletonTable rows={PAGE_SIZE_ADMIN} />
+  if (!can('clientes:ver')) return null
 
   return (
     <div className="space-y-6">
@@ -417,7 +423,7 @@ export function AdminCustomers() {
             </p>
           )}
         </div>
-        {!showForm && (
+        {!showForm && canManage && (
           <div className="flex items-center gap-2 shrink-0">
             <Button variant="outline" size="sm" onClick={handleExportCsv} disabled={exportingCsv}>
               <Download className="h-4 w-4 mr-2" />
@@ -658,22 +664,24 @@ export function AdminCustomers() {
                                 icon: <MessageCircle className="h-4 w-4" />,
                                 onClick: () => handleWhatsApp(customer.phone, customer.full_name),
                               },
-                              {
-                                label: 'Editar',
-                                icon: <Edit className="h-4 w-4" />,
-                                onClick: () => handleEdit(customer),
-                              },
-                              {
-                                label: customer.is_active ? 'Desactivar' : 'Activar',
-                                icon: customer.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />,
-                                onClick: () => handleToggleActive(customer),
-                              },
-                              {
-                                label: 'Eliminar',
-                                icon: <Trash2 className="h-4 w-4" />,
-                                onClick: () => handleDelete(customer),
-                                variant: 'danger',
-                              },
+                              ...(canManage ? [
+                                {
+                                  label: 'Editar',
+                                  icon: <Edit className="h-4 w-4" />,
+                                  onClick: () => handleEdit(customer),
+                                },
+                                {
+                                  label: customer.is_active ? 'Desactivar' : 'Activar',
+                                  icon: customer.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />,
+                                  onClick: () => handleToggleActive(customer),
+                                },
+                                {
+                                  label: 'Eliminar',
+                                  icon: <Trash2 className="h-4 w-4" />,
+                                  onClick: () => handleDelete(customer),
+                                  variant: 'danger' as const,
+                                },
+                              ] : []),
                             ]}
                           />
                         </div>
@@ -787,14 +795,16 @@ export function AdminCustomers() {
                               </div>
                             </td>
                             <td className="py-3 px-4">
-                              {address.address ? (
+                              {(address.address || address.city || address.state) ? (
                                 <div className="flex items-start gap-2 text-sm text-gray-600">
                                   <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
                                   <div>
-                                    <div>{address.address}</div>
-                                    <div>
-                                      {[address.city, address.state].filter(Boolean).join(', ')}
-                                    </div>
+                                    {address.address && <div>{address.address}</div>}
+                                    {(address.city || address.state) && (
+                                      <div className={address.address ? 'text-xs text-gray-400' : ''}>
+                                        {[address.city, address.state].filter(Boolean).join(', ')}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               ) : (
@@ -826,24 +836,26 @@ export function AdminCustomers() {
                                     icon: <MessageCircle className="h-4 w-4" />,
                                     onClick: () => handleWhatsApp(customer.phone, customer.full_name),
                                   },
-                                  {
-                                    label: 'Editar',
-                                    icon: <Edit className="h-4 w-4" />,
-                                    onClick: () => handleEdit(customer),
-                                  },
-                                  {
-                                    label: customer.is_active ? 'Desactivar' : 'Activar',
-                                    icon: customer.is_active
-                                      ? <UserX className="h-4 w-4" />
-                                      : <UserCheck className="h-4 w-4" />,
-                                    onClick: () => handleToggleActive(customer),
-                                  },
-                                  {
-                                    label: 'Eliminar',
-                                    icon: <Trash2 className="h-4 w-4" />,
-                                    onClick: () => handleDelete(customer),
-                                    variant: 'danger',
-                                  },
+                                  ...(canManage ? [
+                                    {
+                                      label: 'Editar',
+                                      icon: <Edit className="h-4 w-4" />,
+                                      onClick: () => handleEdit(customer),
+                                    },
+                                    {
+                                      label: customer.is_active ? 'Desactivar' : 'Activar',
+                                      icon: customer.is_active
+                                        ? <UserX className="h-4 w-4" />
+                                        : <UserCheck className="h-4 w-4" />,
+                                      onClick: () => handleToggleActive(customer),
+                                    },
+                                    {
+                                      label: 'Eliminar',
+                                      icon: <Trash2 className="h-4 w-4" />,
+                                      onClick: () => handleDelete(customer),
+                                      variant: 'danger' as const,
+                                    },
+                                  ] : []),
                                 ]}
                               />
                             </td>

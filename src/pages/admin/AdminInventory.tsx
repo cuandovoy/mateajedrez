@@ -6,11 +6,14 @@ import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { SkeletonTable } from '@/components/ui/Skeleton'
 import { useOrganization } from '@/hooks/useOrganization'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useAdminBranches } from '@/hooks/useAdminBranches'
+import { usePermission } from '@/hooks/usePermission'
 import { trackAuditAction } from '@/lib/audit'
 import { capitalizeFirst, formatDateShort } from '@/lib/utils'
+import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { queryKeys } from '@/lib/queryKeys'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
@@ -97,6 +100,8 @@ export function AdminInventory() {
   const { organizationId, isAdmin } = useOrganization()
   const { show } = useToastStore()
   const { canUseFeature } = usePlanLimits()
+  const { can, loading: permLoading } = usePermission()
+  const canManage = can('inventario:gestionar')
   const [selectedBranch, setSelectedBranch] = useState<string>('')
   const [editingItem, setEditingItem] = useState<{ id: string; stock: number; min_stock: number; low_stock_threshold: number } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -965,7 +970,10 @@ export function AdminInventory() {
   const totalPages = isPaginated ? Math.max(1, Math.ceil(displayTotalCount / pageSize)) : 1
   const hasPrev = isPaginated && page > 0
   const hasNext = isPaginated && page < totalPages - 1
-  
+
+  if (permLoading) return <SkeletonTable rows={PAGE_SIZE_ADMIN} />
+  if (!can('inventario:ver')) return null
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
@@ -1445,10 +1453,12 @@ export function AdminInventory() {
                                 onClick: () => handleSyncItemStock(item),
                                 disabled: syncingItemId !== null || item.source_stock === null,
                               },
-                              { label: 'Editar Stock', icon: <Edit className="h-4 w-4" />, onClick: () => handleEdit(item) },
-                              { label: 'Ingreso manual', icon: <Plus className="h-4 w-4" />, onClick: () => setReceiptModalItem(item) },
-                              { label: 'Ajuste de Inventario', icon: <Edit className="h-4 w-4" />, onClick: () => setAdjustmentModalItem(item) },
-                              ...(canUseFeature('transfers') ? [{ label: 'Transferir', icon: <ArrowRight className="h-4 w-4" />, onClick: () => setTransferModalItem(item) }] : []),
+                              ...(canManage ? [
+                                { label: 'Editar Stock', icon: <Edit className="h-4 w-4" />, onClick: () => handleEdit(item) },
+                                { label: 'Ingreso manual', icon: <Plus className="h-4 w-4" />, onClick: () => setReceiptModalItem(item) },
+                                { label: 'Ajuste de Inventario', icon: <Edit className="h-4 w-4" />, onClick: () => setAdjustmentModalItem(item) },
+                                ...(canUseFeature('transfers') ? [{ label: 'Transferir', icon: <ArrowRight className="h-4 w-4" />, onClick: () => setTransferModalItem(item) }] : []),
+                              ] : []),
                               { label: 'Ver Historial', icon: <History className="h-4 w-4" />, onClick: () => setMovementsModalItem(item) },
                             ]}
                           />
@@ -1688,30 +1698,32 @@ export function AdminInventory() {
                                 onClick: () => handleSyncItemStock(item),
                                 disabled: syncingItemId !== null || item.source_stock === null,
                               },
-                              {
-                                label: 'Editar Stock',
-                                icon: <Edit className="h-4 w-4" />,
-                                onClick: () => handleEdit(item),
-                              },
-                              {
-                                label: 'Ingreso manual de stock',
-                                icon: <Plus className="h-4 w-4" />,
-                                onClick: () => setReceiptModalItem(item),
-                              },
-                              {
-                                label: 'Ajuste de Inventario',
-                                icon: <Edit className="h-4 w-4" />,
-                                onClick: () => setAdjustmentModalItem(item),
-                              },
-                              ...(canUseFeature('transfers')
-                                ? [
-                                    {
-                                      label: 'Transferir a otra Sucursal',
-                                      icon: <ArrowRight className="h-4 w-4" />,
-                                      onClick: () => setTransferModalItem(item),
-                                    },
-                                  ]
-                                : []),
+                              ...(canManage ? [
+                                {
+                                  label: 'Editar Stock',
+                                  icon: <Edit className="h-4 w-4" />,
+                                  onClick: () => handleEdit(item),
+                                },
+                                {
+                                  label: 'Ingreso manual de stock',
+                                  icon: <Plus className="h-4 w-4" />,
+                                  onClick: () => setReceiptModalItem(item),
+                                },
+                                {
+                                  label: 'Ajuste de Inventario',
+                                  icon: <Edit className="h-4 w-4" />,
+                                  onClick: () => setAdjustmentModalItem(item),
+                                },
+                                ...(canUseFeature('transfers')
+                                  ? [
+                                      {
+                                        label: 'Transferir a otra Sucursal',
+                                        icon: <ArrowRight className="h-4 w-4" />,
+                                        onClick: () => setTransferModalItem(item),
+                                      },
+                                    ]
+                                  : []),
+                              ] : []),
                               {
                                 label: 'Ver Historial',
                                 icon: <History className="h-4 w-4" />,

@@ -1,49 +1,66 @@
 // src/hooks/usePermission.ts
-// Hook to check permissions in components
+// Resolves permissions from the org-scoped role loaded in organizationStore (ADR-2).
+// Do NOT read profile.role from authStore for permission gating.
 
-import { useAuthStore } from '@/store/authStore'
+import { useOrganizationStore } from '@/store/organizationStore'
 import {
   hasPermission,
   hasAnyPermission,
   hasAllPermissions,
   type Permission,
-  type UserRole,
 } from '@/lib/permissions'
 
 /**
- * Hook for checking user permissions
- * 
+ * Hook for checking user permissions against the org-scoped role.
+ *
+ * While org role data is loading, all checks return false (default-deny).
+ *
  * Usage:
- * const { can, canAny, canAll, role } = usePermission()
- * if (can('products:edit')) { ... }
+ *   const { can, canAny, canAll, isAdmin, isManager } = usePermission()
+ *   if (can('ventas:ver')) { ... }
  */
 export function usePermission() {
-  const role = useAuthStore((state) => state.profile?.role) as UserRole | null
+  const orgRole = useOrganizationStore((state) => state.orgRole)
+  const orgRoleLoading = useOrganizationStore((state) => state.orgRoleLoading)
+
+  const permissions = orgRole?.permissions ?? []
 
   return {
     /**
-     * Check if user has a specific permission
+     * Check if the current user has a specific permission.
+     * Returns false while loading or when no org role is resolved.
      */
-    can: (permission: Permission) => hasPermission(role, permission),
+    can: (permission: Permission): boolean =>
+      orgRoleLoading ? false : hasPermission(permissions, permission),
 
     /**
-     * Check if user has at least one of the given permissions
+     * Check if the current user has at least one of the given permissions.
      */
-    canAny: (permissions: Permission[]) => hasAnyPermission(role, permissions),
+    canAny: (perms: Permission[]): boolean =>
+      orgRoleLoading ? false : hasAnyPermission(permissions, perms),
 
     /**
-     * Check if user has all of the given permissions
+     * Check if the current user has all of the given permissions.
      */
-    canAll: (permissions: Permission[]) => hasAllPermissions(role, permissions),
+    canAll: (perms: Permission[]): boolean =>
+      orgRoleLoading ? false : hasAllPermissions(permissions, perms),
 
     /**
-     * Current user role
+     * True iff base_role_key === 'admin' in the current org.
      */
-    role,
+    isAdmin: !orgRoleLoading && orgRole?.baseRoleKey === 'admin',
 
     /**
-     * Check if user is admin
+     * True iff base_role_key is 'admin' or 'manager' in the current org.
      */
-    isAdmin: role === 'admin',
+    isManager: !orgRoleLoading && ['admin', 'manager'].includes(orgRole?.baseRoleKey ?? ''),
+
+    /**
+     * The resolved base role key for display purposes (not for gating logic).
+     */
+    baseRoleKey: orgRole?.baseRoleKey ?? null,
+
+    /** True while the org role permissions are being loaded */
+    loading: orgRoleLoading,
   }
 }
