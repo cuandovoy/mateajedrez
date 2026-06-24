@@ -161,7 +161,6 @@ export function useProductTransfers(
         .from('inventory_transfers')
         .select('*, from_branch:branches!from_branch_id(name), to_branch:branches!to_branch_id(name)')
         .eq('product_id', productId!)
-        .eq('organization_id', orgId!)
         .order('created_at', { ascending: false })
         .limit(50)
 
@@ -190,8 +189,8 @@ export function useProductPurchaseItems(
           '*, purchase_order:purchase_orders(id, created_at, status, organization_id, order_number, supplier:suppliers(name))'
         )
         .eq('product_id', productId!)
-        .eq('purchase_order.organization_id', orgId!)
-        .order('purchase_order.created_at', { ascending: false })
+        .eq('organization_id', orgId!)
+        .order('created_at', { ascending: false })
         .limit(50)
 
       if (error) throw error
