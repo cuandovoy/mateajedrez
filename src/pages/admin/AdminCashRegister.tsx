@@ -55,6 +55,7 @@ function AdminCashRegisterContent() {
   const { user } = useAuthStore()
   const settings = useOrgSettings()
   const queryClient = useQueryClient()
+  const { can, loading: permLoading } = usePermission()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
   const [editingSession, setEditingSession] = useState<CashSession | null>(null)
@@ -83,7 +84,6 @@ function AdminCashRegisterContent() {
     resolver: zodResolver(closeSessionSchema),
   })
 
-  const { can } = usePermission()
   const canManage = can('caja:gestionar')
 
   const { data: branches = [] } = useAdminBranches(organizationId)
@@ -305,6 +305,9 @@ function AdminCashRegisterContent() {
     resetOpen()
     setIsModalOpen(true)
   }
+
+  if (permLoading) return <SkeletonTable rows={PAGE_SIZE_ADMIN} />
+  if (!can('caja:ver')) return null
 
   if (loading) {
     return (
@@ -808,10 +811,6 @@ function AdminCashRegisterContent() {
 
 export function AdminCashRegister() {
   const { canUseFeature } = usePlanLimits()
-  const { can, loading: permLoading } = usePermission()
-
-  if (permLoading) return <SkeletonTable rows={PAGE_SIZE_ADMIN} />
-  if (!can('caja:ver')) return null
 
   return (
     <PlanGate feature="cash_register" canUse={canUseFeature('cash_register')}>

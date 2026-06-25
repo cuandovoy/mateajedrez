@@ -82,7 +82,7 @@ export function AdminLayout() {
   // NOT the org-level role. This is intentional — do not change to org role check.
   const canCreateOrganization = profile?.role === 'admin'
   const { orgRole } = useOrganizationStore()
-  const { can } = usePermission()
+  const { can, loading: permLoading } = usePermission()
   const { currentOrganization, organizations, setCurrentOrganization, fetchOrganizations, switchingOrganization } = useOrganizationStore()
   const { canUseFeature, branchCount } = usePlanLimits()
   const { config: billerConfig, loading: billerConfigLoading } = useBillerConfig(currentOrganization?.id ?? null)
@@ -474,7 +474,7 @@ export function AdminLayout() {
                   if (item.minBranches && branchCount < item.minBranches) return false
                   if (item.requiresBillerConfig && (billerConfigLoading || !billerConfig)) return false
                   // Module permission gate: hide item if user lacks the required module permission
-                  if (item.permission && !can(item.permission)) return false
+                  if (item.permission && !permLoading && !can(item.permission)) return false
                   if (section.title === 'Reportes') return true
                   return !item.planFeature || canUseFeature(item.planFeature)
                 }) ?? []
