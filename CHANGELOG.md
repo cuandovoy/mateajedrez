@@ -4,6 +4,23 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-06-26 — Quick access bar global sticky en AdminLayout
+
+- **Archivos modificados:** `src/components/admin/QuickAccess.tsx`, `src/components/layout/AdminLayout.tsx`, `src/pages/admin/AdminDashboard.tsx`
+- **Qué cambió:** Agrega prop `compact?: boolean` a `QuickAccess` que reduce padding (`p-3`), ícono (`h-5 w-5`) y label (`text-xs`) para uso en espacios reducidos. Inserta una barra sticky `top-[52px]` con `<QuickAccess compact />` como primer hijo de `<main>` en `AdminLayout`, visible solo en desktop (`hidden lg:block`). Elimina `<QuickAccess />` y su wrapper `<div className="mb-6" />` de `AdminDashboard` para evitar duplicado.
+
+## 2026-06-26 — Quick access panel en el dashboard admin y simplificación de métricas
+
+- **Archivos modificados:** `src/components/admin/QuickAccess.tsx` (nuevo), `src/components/admin/DashboardMetrics.tsx`, `src/pages/admin/AdminDashboard.tsx`
+- **Qué cambió:** Crea el componente `QuickAccess` con 6 botones de acceso rápido en grilla responsive (2/3/6 columnas). Elimina `TrendsSection` (bar chart de recharts) de `DashboardMetrics` y extrae el top-5 de productos como componente standalone `TopProductsCard`. Agrega `<QuickAccess />` como primer elemento del dashboard, antes de los modales de bienvenida.
+
+## 2026-06-25 — Infraestructura legal: Política de Privacidad, Términos y Condiciones y consentimiento
+
+- **Archivos modificados:** `src/pages/PoliticaPrivacidad.tsx` (nuevo), `src/pages/TerminosCondiciones.tsx` (nuevo), `src/pages/Register.tsx`, `src/pages/Checkout.tsx`, `src/App.tsx`
+- **Qué cambió:** Crea dos nuevas páginas legales públicas (`/legal/privacidad` y `/legal/terminos`) con contenido específico para Uruguay (Ley 18.331, Decreto 414/009, derechos ARCO, Biller v2 como subprocesador, jurisdicción Montevideo). Agrega checkbox de consentimiento obligatorio en el formulario de registro (`z.literal(true)` en el schema Zod). Agrega aviso de privacidad junto al botón de confirmación en Checkout. Registra ambas rutas como públicas en `App.tsx`, fuera de todos los layouts protegidos.
+
+---
+
 ## 2026-06-24 — Guards de permisos completos en todo el panel admin
 
 - **Archivos modificados:** `src/pages/admin/AdminCustomers.tsx`, `src/pages/admin/AdminCustomerDetail.tsx`, `src/pages/admin/AdminNotificationSettings.tsx`, `src/pages/admin/AdminBranches.tsx`, `src/pages/admin/AdminTransfers.tsx`, `src/pages/admin/AdminLots.tsx`, `src/pages/admin/AdminCategories.tsx`, `src/pages/admin/AdminSuppliers.tsx`, `src/components/admin/BranchTable.tsx`, `src/components/admin/CategoryTable.tsx`, `src/components/admin/SupplierTable.tsx`, `src/components/admin/LotDetailPanel.tsx`, `src/components/layout/AdminLayout.tsx`

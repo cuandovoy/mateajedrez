@@ -13,6 +13,7 @@ const registerSchema = z.object({
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   confirmPassword: z.string(),
   fullName: z.string().optional(),
+  acceptedTerms: z.literal(true, { errorMap: () => ({ message: 'Debés aceptar los términos para continuar' }) }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Las contraseñas no coinciden',
   path: ['confirmPassword'],
@@ -84,6 +85,28 @@ export function Register() {
               {...register('confirmPassword')}
               error={errors.confirmPassword?.message}
             />
+            <div className="space-y-1">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  {...register('acceptedTerms')}
+                />
+                <span className="text-sm text-gray-600">
+                  Acepto los{' '}
+                  <Link to="/legal/terminos" target="_blank" className="text-primary-600 hover:underline">
+                    Términos y Condiciones
+                  </Link>{' '}
+                  y la{' '}
+                  <Link to="/legal/privacidad" target="_blank" className="text-primary-600 hover:underline">
+                    Política de Privacidad
+                  </Link>
+                </span>
+              </label>
+              {errors.acceptedTerms && (
+                <p className="text-sm text-red-600">{errors.acceptedTerms.message}</p>
+              )}
+            </div>
             <Button type="submit" className="w-full" isLoading={isLoading}>
               Registrarse
             </Button>

@@ -45,6 +45,8 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { Landing } from './pages/Landing'
 import { LandingFacturacion } from './pages/LandingFacturacion'
+import { PoliticaPrivacidad } from './pages/PoliticaPrivacidad'
+import { TerminosCondiciones } from './pages/TerminosCondiciones'
 import { POSHome } from '@/pages/pos/POSHome'
 import { POSSale } from '@/pages/pos/POSSale'
 
@@ -83,6 +85,10 @@ function App() {
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/landing/app" element={<Landing />} />
         <Route path="/facturacion-electronica" element={<LandingFacturacion />} />
+
+        {/* Legal — páginas públicas sin autenticación */}
+        <Route path="/legal/privacidad" element={<PoliticaPrivacidad />} />
+        <Route path="/legal/terminos" element={<TerminosCondiciones />} />
 
         {/* Rutas públicas de tienda por slug */}
         <Route element={<PublicStoreWrapper />}>

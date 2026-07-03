@@ -17,7 +17,7 @@ import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { BranchInventory, Customer } from '@/types/database.types'
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 // Icon map for known payment method keys
 const PAYMENT_METHOD_ICONS: Record<string, React.ReactNode> = {
@@ -876,6 +876,13 @@ function CheckoutInner() {
                 >
                   {loading ? 'Procesando...' : 'Confirmar Orden'}
                 </Button>
+                <p className="text-xs text-gray-500 text-center">
+                  Al realizar tu pedido aceptás nuestra{' '}
+                  <Link to="/legal/privacidad" target="_blank" className="underline hover:text-gray-700">
+                    Política de Privacidad
+                  </Link>
+                  .
+                </p>
               </form>
             </CardContent>
           </Card>

@@ -20,7 +20,14 @@ export function useOrganization() {
   } = useOrganizationStore()
 
   useEffect(() => {
-    fetchOrganizations()
+    // Evita refetch en cada mount: si ya hay organizaciones cargadas (o se están
+    // cargando), no repetir la llamada. Un refetch explícito tras mutaciones
+    // (crear/editar org, cambiar rol) sigue funcionando via fetchOrganizations()
+    // directo desde esos componentes.
+    const state = useOrganizationStore.getState()
+    if (state.organizations.length === 0 && !state.loading) {
+      fetchOrganizations()
+    }
   }, [fetchOrganizations])
 
   return {

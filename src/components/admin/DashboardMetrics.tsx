@@ -14,16 +14,6 @@ import { useMoneyMetrics, type MoneyMetrics } from '@/hooks/useMoneyMetrics'
 import { useOperationalMetrics, type OperationalMetrics } from '@/hooks/useOperationalMetrics'
 import { useLowStockProducts } from '@/hooks/useLowStockProducts'
 import { useTrendsMetrics } from '@/hooks/useTrendsMetrics'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from 'recharts'
 
 // ─── Delta inline ─────────────────────────────────────────────────────────────
 
@@ -267,96 +257,56 @@ function SecondaryStats({ money, loading }: { money: MoneyMetrics | null; loadin
   )
 }
 
-// ─── Trends & top products ────────────────────────────────────────────────────
+// ─── Top products card ────────────────────────────────────────────────────────
 
-function TrendsSection() {
+function TopProductsCard() {
   const settings = useOrgSettings()
   const { data, loading } = useTrendsMetrics()
   const fmt = (n: number) => formatPrice(n, settings)
 
-  const chartData = (data?.weekly ?? []).map((w) => ({
-    name: `S${w.week}`,
-    'Mes anterior': w.prev,
-    'Este mes': w.current,
-  }))
-
   const maxRevenue = data?.topProducts[0]?.revenue ?? 1
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-      <Card className="lg:col-span-3">
-        <CardContent className="p-6">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-5">
-            Ingresos semana a semana
-          </p>
-          {loading ? (
-            <div className="h-56 animate-pulse bg-gray-100 rounded-lg" />
-          ) : (
-            <ResponsiveContainer width="100%" height={224}>
-              <BarChart data={chartData} barCategoryGap="30%" barGap={4}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f5f5f5" vertical={false} />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tick={{ fontSize: 11 }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`}
-                  width={36}
-                />
-                <Tooltip
-                  formatter={(value) => fmt(Number(value))}
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }}
-                />
-                <Legend iconType="square" iconSize={10} wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="Mes anterior" fill="#e5e7eb" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="Este mes" fill="#3b82f6" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="lg:col-span-2">
-        <CardContent className="p-6">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-5">
-            Top 5 productos
-          </p>
-          {loading ? (
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="animate-pulse flex items-center gap-3">
-                  <div className="h-3 w-4 bg-gray-200 rounded" />
-                  <div className="h-3 bg-gray-200 rounded flex-1" />
-                  <div className="h-3 w-16 bg-gray-200 rounded" />
-                </div>
-              ))}
-            </div>
-          ) : (data?.topProducts ?? []).length === 0 ? (
-            <p className="text-sm text-gray-400 mt-4">Sin ventas este mes</p>
-          ) : (
-            <ol className="space-y-4">
-              {(data?.topProducts ?? []).map((p, i) => {
-                const barPct = maxRevenue > 0 ? (p.revenue / maxRevenue) * 100 : 0
-                return (
-                  <li key={p.name} className="flex items-center gap-3">
-                    <span className="text-xs font-bold text-gray-300 w-4 shrink-0 text-center">{i + 1}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-800 truncate mb-1">{p.name}</p>
-                      <div className="h-1 bg-gray-100 rounded-full">
-                        <div className="h-full bg-blue-400 rounded-full" style={{ width: `${barPct}%` }} />
-                      </div>
+    <Card>
+      <CardContent className="p-6">
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-5">
+          Top 5 productos
+        </p>
+        {loading ? (
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="animate-pulse flex items-center gap-3">
+                <div className="h-3 w-4 bg-gray-200 rounded" />
+                <div className="h-3 bg-gray-200 rounded flex-1" />
+                <div className="h-3 w-16 bg-gray-200 rounded" />
+              </div>
+            ))}
+          </div>
+        ) : (data?.topProducts ?? []).length === 0 ? (
+          <p className="text-sm text-gray-400 mt-4">Sin ventas este mes</p>
+        ) : (
+          <ol className="space-y-4">
+            {(data?.topProducts ?? []).map((p, i) => {
+              const barPct = maxRevenue > 0 ? (p.revenue / maxRevenue) * 100 : 0
+              return (
+                <li key={p.name} className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-gray-300 w-4 shrink-0 text-center">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 truncate mb-1">{p.name}</p>
+                    <div className="h-1 bg-gray-100 rounded-full">
+                      <div className="h-full bg-blue-400 rounded-full" style={{ width: `${barPct}%` }} />
                     </div>
-                    <span className="text-xs font-semibold text-gray-600 shrink-0 w-20 text-right">
-                      {fmt(p.revenue)}
-                    </span>
-                  </li>
-                )
-              })}
-            </ol>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-gray-600 shrink-0 w-20 text-right">
+                    {fmt(p.revenue)}
+                  </span>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -371,7 +321,7 @@ export function DashboardMetrics() {
       <AlertStrip money={money} ops={ops} />
       <PrimaryMetrics money={money} ops={ops} moneyLoading={moneyLoading} opsLoading={opsLoading} />
       <SecondaryStats money={money} loading={moneyLoading} />
-      <TrendsSection />
+      <TopProductsCard />
     </div>
   )
 }

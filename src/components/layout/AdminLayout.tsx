@@ -42,6 +42,7 @@ import { CreateOrganizationModal } from '@/components/admin/CreateOrganizationMo
 import { ShareStoreModal } from '@/components/admin/ShareStoreModal'
 import { EditOrganizationModal } from '@/components/admin/EditOrganizationModal'
 import { OrgAccessGate } from '@/components/features/OrgAccessGate'
+import { QuickAccess } from '@/components/admin/QuickAccess'
 import type { Permission } from '@/lib/permissions'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { useBillerConfig } from '@/hooks/useBillerConfig'
@@ -90,13 +91,7 @@ export function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1024)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem('admin-sidebar-collapsed') === 'true'
-    } catch {
-      return false
-    }
-  })
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.innerWidth < 1280)
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(() => {
     try {
       const saved = localStorage.getItem('admin-sidebar-sections')
@@ -121,17 +116,7 @@ export function AdminLayout() {
   const [pendingOrgSwitch, setPendingOrgSwitch] = useState<typeof organizations[0] | null>(null)
   const hasUnsavedChanges = useAdminStore((s) => s.hasUnsavedChanges)
 
-  const toggleSidebarCollapsed = () => {
-    setSidebarCollapsed((prev) => {
-      const next = !prev
-      try {
-        localStorage.setItem('admin-sidebar-collapsed', String(next))
-      } catch {
-        // Ignore storage errors (private mode / blocked localStorage).
-      }
-      return next
-    })
-  }
+  const toggleSidebarCollapsed = () => setSidebarCollapsed((prev) => !prev)
 
   useEffect(() => {
     if (user) fetchOrganizations()
@@ -694,6 +679,12 @@ export function AdminLayout() {
           'flex-1 min-w-0 bg-gray-50 min-h-[calc(100vh-52px)] relative transition-all duration-300',
           sidebarCollapsed ? 'lg:ml-14' : 'lg:ml-64'
         )}>
+          {/* Quick access bar — sticky below header */}
+          <div className="sticky top-[52px] z-20 bg-white border-b border-gray-100 hidden lg:block">
+            <div className="px-4 md:px-6 py-3">
+              <QuickAccess compact />
+            </div>
+          </div>
           {switchingOrganization && (
             <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-admin-600" />
