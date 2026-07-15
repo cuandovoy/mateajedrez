@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useProductVariants } from '@/hooks/useProductVariants'
-import { capitalizeFirst, cn, formatPrice } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { ProductVariant, Product } from '@/types'
 
@@ -117,7 +117,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
   }
 
   const selectedVariant = variants.find((v) => v.id === selectedVariantId)
-  const displayPrice = selectedVariant?.price ?? product.price
+  const displayPrice = selectedVariant?.price ?? getEffectivePrice(product)
   const displayStock = selectedVariantId ? (variantStocks[selectedVariantId] ?? null) : (productStock ?? null)
   const variantImage = isValidImageUrl(selectedVariant?.image_url) ? selectedVariant.image_url : null
   const showImage = Boolean(variantImage && !imageLoadFailed)
@@ -125,7 +125,10 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
   if (loading) {
     return (
       <div className="flex items-center justify-center py-4">
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+        <div
+          className="animate-spin rounded-full h-6 w-6 border-b-2"
+          style={{ borderColor: 'var(--org-primary-color, #6366f1)' }}
+        ></div>
       </div>
     )
   }
@@ -171,10 +174,19 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
                       className={cn(
                         'px-4 py-2 rounded-lg border-2 transition-colors',
                         isSelected
-                          ? 'border-primary-600 bg-primary-50 text-primary-700 font-medium'
-                          : 'border-gray-300 bg-white text-gray-700 hover:border-primary-300',
+                          ? 'font-medium'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400',
                         !isAvailable && 'opacity-50 cursor-not-allowed'
                       )}
+                      style={
+                        isSelected
+                          ? {
+                              borderColor: 'var(--org-primary-color, #6366f1)',
+                              backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #6366f1) 15%, white)',
+                              color: 'var(--org-primary-color, #6366f1)',
+                            }
+                          : undefined
+                      }
                     >
                       {value}
                     </button>
@@ -202,11 +214,17 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
                   disabled={!isAvailable}
                   className={cn(
                     'w-full rounded-lg border px-3 py-2 text-left transition-colors',
-                    isSelected
-                      ? 'border-primary-600 bg-primary-50'
-                      : 'border-gray-300 bg-white hover:border-primary-300',
+                    isSelected ? '' : 'border-gray-300 bg-white hover:border-gray-400',
                     !isAvailable && 'opacity-50 cursor-not-allowed'
                   )}
+                  style={
+                    isSelected
+                      ? {
+                          borderColor: 'var(--org-primary-color, #6366f1)',
+                          backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #6366f1) 15%, white)',
+                        }
+                      : undefined
+                  }
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-gray-800">{variant.name || variant.sku}</span>
@@ -225,7 +243,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
         <div className="p-4 bg-gray-50 rounded-lg space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-700">Precio:</span>
-            <span className="text-lg font-bold text-primary-600">
+            <span className="text-lg font-bold" style={{ color: 'var(--org-primary-color, #6366f1)' }}>
               {formatPrice(displayPrice, settings)}
             </span>
           </div>

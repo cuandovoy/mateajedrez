@@ -2126,6 +2126,9 @@ export type OrganizationSettings = {
   costing_method?: 'weighted_average' | 'fifo' | null
   store_logo_minimal_url?: string | null
   store_cover_image_urls?: string[] | null
+  store_whatsapp_number?: string | null
+  branches_enabled?: boolean | null
+  transfers_enabled?: boolean | null
   [key: string]: unknown
 }
 

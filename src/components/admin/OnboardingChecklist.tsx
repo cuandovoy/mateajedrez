@@ -236,7 +236,7 @@ export function OnboardingChecklist() {
       }`}
     >
       {/* Top band */}
-      <div className="relative flex items-center gap-5 bg-[#1c1d33] px-5 py-4 sm:px-6">
+      <div className="relative flex items-center gap-5 bg-admin-900 px-5 py-4 sm:px-6">
         {/* SVG ring */}
         <div className="relative shrink-0">
           <svg width="76" height="76" viewBox="0 0 100 100" className="-rotate-90">

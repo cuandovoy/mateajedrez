@@ -95,16 +95,17 @@ export function AdminOrganizations() {
     const { data, error } = await supabase.rpc('debug_can_create_org' as never)
     if (error) {
       console.error('debug_can_create_org', error)
-      alert(`Error: ${error.message}`)
+      show(`Error: ${error.message}`, 'error')
       return
     }
     type DebugRow = { uid: string; has_profile: boolean; profile_role: string | null; is_admin_role: boolean; org_count: number; can_bootstrap: boolean; would_allow_insert: boolean }
     const row = (Array.isArray(data) ? data[0] : data) as DebugRow | null
     console.table(row ?? data)
-    alert(
+    show(
       row
         ? `uid: ${row.uid}\nhas_profile: ${row.has_profile}\nprofile_role: ${row.profile_role}\nis_admin_role: ${row.is_admin_role}\norg_count: ${row.org_count}\ncan_bootstrap: ${row.can_bootstrap}\nwould_allow_insert: ${row.would_allow_insert}`
-        : JSON.stringify(data)
+        : JSON.stringify(data),
+      'info'
     )
   }
 
@@ -114,7 +115,7 @@ export function AdminOrganizations() {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Organizaciones</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Organizaciones</h1>
           <p className="text-gray-600 mt-2">
             Administra tus organizaciones y cambia entre ellas
           </p>
@@ -269,6 +270,7 @@ export function AdminOrganizations() {
         <EditOrganizationModal
           organization={editingOrg}
           onClose={() => { setEditingOrg(null); invalidateOrgs() }}
+          hiddenTabs={canAdmin ? [] : ['modulos']}
         />
       )}
     </div>

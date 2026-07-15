@@ -180,7 +180,7 @@ function AdminBranchesContent() {
       fetchBranches()
     } catch (error) {
       console.error('Error saving branch:', error)
-      alert('Error al guardar la sucursal')
+      show('Error al guardar la sucursal', 'error')
     }
   }
 

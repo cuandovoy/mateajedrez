@@ -3,6 +3,7 @@ import { PublicStoreHeader } from './PublicStoreHeader'
 import { PublicStoreFooter } from './Footer'
 import { ToastContainer } from './ToastContainer'
 import { PublicStoreProvider } from '@/contexts/PublicStoreContext'
+import { getReadableTextColor } from '@/lib/colorContrast'
 import type { Organization } from '@/types/database.types'
 
 interface PublicStoreLayoutProps {
@@ -27,12 +28,20 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
     root.style.setProperty('--org-accent-color', accentColor)
     root.style.setProperty('--org-font-family', fontFamily)
     root.style.setProperty('--org-font-heading', fontHeading)
-    
+
+    // Texto legible (blanco o tinta oscura) sobre cada color de marca — una
+    // org puede elegir un color claro/pastel, y un text-white fijo se vuelve
+    // invisible en ese caso. Se calcula acá, el único lugar que conoce el hex
+    // real; el resto de la tienda solo consume var(--org-*-ink, white).
+    root.style.setProperty('--org-primary-ink', getReadableTextColor(primaryColor))
+    root.style.setProperty('--org-secondary-ink', getReadableTextColor(secondaryColor))
+    root.style.setProperty('--org-accent-ink', getReadableTextColor(accentColor))
+
     // Aplicar fuente al body
     if (fontFamily) {
       document.body.style.fontFamily = `"${fontFamily}", sans-serif`
     }
-    
+
     return () => {
       // Limpiar estilos al desmontar
       root.style.removeProperty('--org-primary-color')
@@ -40,6 +49,9 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
       root.style.removeProperty('--org-accent-color')
       root.style.removeProperty('--org-font-family')
       root.style.removeProperty('--org-font-heading')
+      root.style.removeProperty('--org-primary-ink')
+      root.style.removeProperty('--org-secondary-ink')
+      root.style.removeProperty('--org-accent-ink')
       document.body.style.fontFamily = ''
     }
   }, [organization])

@@ -336,10 +336,10 @@ export function CategoryProducts() {
               onClick={handleSelectAllSubcategories}
               className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
                 selectedSubcategories.length === 0
-                  ? 'text-white border-transparent shadow-sm'
+                  ? 'border-transparent shadow-sm'
                   : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
-              style={selectedSubcategories.length === 0 ? { backgroundColor: 'var(--org-primary-color, #6366f1)' } : undefined}
+              style={selectedSubcategories.length === 0 ? { backgroundColor: 'var(--org-primary-color, #6366f1)', color: 'var(--org-primary-ink, white)' } : undefined}
             >
               Todas
             </button>
@@ -351,10 +351,10 @@ export function CategoryProducts() {
                   onClick={() => handleSubcategoryToggle(subcat.id as string)}
                   className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
                     isActive
-                      ? 'text-white border-transparent shadow-sm'
+                      ? 'border-transparent shadow-sm'
                       : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
                   }`}
-                  style={isActive ? { backgroundColor: 'var(--org-primary-color, #6366f1)' } : undefined}
+                  style={isActive ? { backgroundColor: 'var(--org-primary-color, #6366f1)', color: 'var(--org-primary-ink, white)' } : undefined}
                 >
                   {subcat.name}
                 </button>
@@ -370,7 +370,7 @@ export function CategoryProducts() {
             placeholder="Mín."
             value={priceRange.min}
             onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
-            className="w-24 h-10 px-3 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 bg-white"
+            className="w-28 h-10 px-3 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 bg-white"
           />
           <span className="text-gray-400 text-sm">—</span>
           <input
@@ -378,7 +378,7 @@ export function CategoryProducts() {
             placeholder="Máx."
             value={priceRange.max}
             onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
-            className="w-24 h-10 px-3 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 bg-white"
+            className="w-28 h-10 px-3 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 bg-white"
           />
           {hasActiveFilters && (
             <button

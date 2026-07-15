@@ -8,7 +8,7 @@ import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice } fr
 import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
 import type { Product, ProductWithCategory, ProductImage } from '@/types'
-import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -209,6 +209,14 @@ export function ProductDetail() {
     )
   }
 
+  const currentStock = selectedVariantId ? variantStock : productStock
+  const isOutOfStock = !(hasActiveVariants && !selectedVariantId) && currentStock !== null && currentStock <= 0
+  const whatsappHref = settings.store_whatsapp_number
+    ? `https://wa.me/${settings.store_whatsapp_number.replace(/\D/g, '')}?text=${encodeURIComponent(
+        `Hola! Quiero consultar sobre la disponibilidad de "${product.name}" (${window.location.href})`
+      )}`
+    : null
+
   return (
     <div className="container-custom py-8">
       <Link to={slug ? `/${slug}/products` : '/products'}>
@@ -321,8 +329,15 @@ export function ProductDetail() {
                         <div className="text-gray-400">Cargando...</div>
                       </div>
                     )}
+                    {isOutOfStock && (
+                      <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                        <span className="bg-gray-800/90 text-white text-xs font-medium px-3 py-1.5 rounded-full tracking-wide">
+                          Sin stock
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  
+
                   {/* Navigation buttons - only show if multiple images */}
                   {hasMultipleImages && (
                     <>
@@ -427,7 +442,7 @@ export function ProductDetail() {
                 style={{ color: 'var(--org-primary-color, #6366f1)' }}
               >
                 {formatPrice(
-                  selectedVariant ? (selectedVariant.price ?? product.price) : getEffectivePrice(product),
+                  selectedVariant ? (selectedVariant.price ?? getEffectivePrice(product)) : getEffectivePrice(product),
                   settings
                 )}
               </p>
@@ -457,55 +472,76 @@ export function ProductDetail() {
           </div>
 
           <div className="mb-6 pt-6 border-t border-gray-100">
-            <div className="flex items-center gap-6 mb-4">
-              <span className="text-sm font-medium text-gray-700">Cantidad</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1 || (hasActiveVariants && !selectedVariantId)}
-                  className="h-9 w-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition-colors text-lg font-light"
-                >
-                  −
-                </button>
-                <span className="w-10 text-center font-semibold text-lg">{quantity}</span>
-                <button
-                  onClick={() => {
-                    const currentStock = selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)
-                    setQuantity(Math.min(currentStock, quantity + 1))
-                  }}
-                  disabled={
-                    (hasActiveVariants && !selectedVariantId) ||
-                    quantity >= (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0))
+            {!isOutOfStock && (
+              <div className="flex items-center gap-6 mb-4">
+                <span className="text-sm font-medium text-gray-700">Cantidad</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1 || (hasActiveVariants && !selectedVariantId)}
+                    className="h-9 w-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition-colors text-lg font-light"
+                  >
+                    −
+                  </button>
+                  <span className="w-10 text-center font-semibold text-lg">{quantity}</span>
+                  <button
+                    onClick={() => {
+                      const maxStock = selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)
+                      setQuantity(Math.min(maxStock, quantity + 1))
+                    }}
+                    disabled={
+                      (hasActiveVariants && !selectedVariantId) ||
+                      quantity >= (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0))
+                    }
+                    className="h-9 w-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition-colors text-lg font-light"
+                  >
+                    +
+                  </button>
+                </div>
+                <span className="text-sm text-gray-400 ml-auto">
+                  {hasActiveVariants && !selectedVariantId
+                    ? 'Seleccioná una variante'
+                    : `${selectedVariantId
+                        ? (variantStock !== null ? variantStock : '…')
+                        : (productStock !== null ? productStock : '…')
+                      } ${selectedVariant?.unit || product.unit || 'unidades'} disponibles`
                   }
-                  className="h-9 w-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition-colors text-lg font-light"
-                >
-                  +
-                </button>
+                </span>
               </div>
-              <span className="text-sm text-gray-400 ml-auto">
-                {hasActiveVariants && !selectedVariantId
-                  ? 'Seleccioná una variante'
-                  : `${selectedVariantId
-                      ? (variantStock !== null ? variantStock : '…')
-                      : (productStock !== null ? productStock : '…')
-                    } ${selectedVariant?.unit || product.unit || 'unidades'} disponibles`
+            )}
+            {isOutOfStock && (
+              <p className="text-sm text-gray-500 mb-4">Este producto no tiene stock disponible.</p>
+            )}
+            {isOutOfStock && whatsappHref ? (
+              <a
+                href={whatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full h-12 inline-flex items-center justify-center gap-2 text-base font-semibold rounded-xl transition-colors"
+                style={{
+                  backgroundColor: 'var(--org-primary-color, #6366f1)',
+                  color: 'var(--org-primary-ink, white)',
+                }}
+              >
+                <MessageCircle className="h-5 w-5" />
+                Consultar disponibilidad
+              </a>
+            ) : (
+              <Button
+                className="w-full h-12 text-base font-semibold rounded-xl"
+                onClick={handleAddToCart}
+                disabled={
+                  (hasActiveVariants && !selectedVariantId) ||
+                  (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)) === 0 ||
+                  isAdding ||
+                  (selectedVariantId ? variantStock === null : productStock === null)
                 }
-              </span>
-            </div>
-            <Button
-              className="w-full h-12 text-base font-semibold rounded-xl"
-              onClick={handleAddToCart}
-              disabled={
-                (hasActiveVariants && !selectedVariantId) ||
-                (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)) === 0 ||
-                isAdding ||
-                (selectedVariantId ? variantStock === null : productStock === null)
-              }
-              isLoading={isAdding}
-            >
-              <ShoppingCart className="h-5 w-5 mr-2" />
-              {hasActiveVariants && !selectedVariantId ? 'Seleccioná una variante' : 'Agregar al carrito'}
-            </Button>
+                isLoading={isAdding}
+              >
+                <ShoppingCart className="h-5 w-5 mr-2" />
+                {hasActiveVariants && !selectedVariantId ? 'Seleccioná una variante' : 'Agregar al carrito'}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -513,7 +549,7 @@ export function ProductDetail() {
       {/* Productos relacionados */}
       {relatedProducts.length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">
             Productos relacionados
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

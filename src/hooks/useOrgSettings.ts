@@ -2,6 +2,7 @@ import { useContext, useMemo } from 'react'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { PublicStoreContext } from '@/contexts/PublicStoreContext'
 import type { OrganizationSettings } from '@/types/database.types'
+import { resolveBranchesEnabled, resolveTransfersEnabled } from '@/lib/orgModules'
 
 const DEFAULT_SETTINGS: Required<Pick<OrganizationSettings, 'currency' | 'locale' | 'timezone' | 'decimal_places'>> = {
   currency: 'ARS',
@@ -49,6 +50,13 @@ export function useOrgSettings(): OrganizationSettings {
       checkout_stock_allocation_mode: checkoutStockAllocationMode,
       inventory_transfer_completion_mode: inventoryTransferCompletionMode,
       costing_method: (settings.costing_method as 'weighted_average' | 'fifo') ?? 'weighted_average',
+      // Valores efectivos (ya aplican la cascada sucursales -> transferencias)
+      branches_enabled: resolveBranchesEnabled(settings),
+      transfers_enabled: resolveTransfersEnabled(settings),
+      store_whatsapp_number:
+        typeof settings.store_whatsapp_number === 'string' && settings.store_whatsapp_number.trim()
+          ? settings.store_whatsapp_number
+          : null,
     }
   }, [currentOrganization?.id, currentOrganization?.settings, publicStore?.organization?.id])
 }

@@ -183,7 +183,10 @@ function CartContent() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div
+          className="animate-spin rounded-full h-12 w-12 border-b-2"
+          style={{ borderColor: 'var(--org-primary-color, #6366f1)' }}
+        ></div>
       </div>
     )
   }
@@ -194,7 +197,7 @@ function CartContent() {
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-gray-600 text-lg mb-4">Tu carrito está vacío</p>
-            <Button onClick={() => navigate(slug ? `/${slug}` : '/')} className='bg-primary-400 text-white'>
+            <Button onClick={() => navigate(slug ? `/${slug}` : '/')}>
               Continuar Comprando
             </Button>
           </CardContent>
@@ -290,7 +293,7 @@ function CartContent() {
                                 {formatPrice(item.product.price, settings)}
                               </p>
                             )}
-                            <p className="text-primary-600 text-sm">
+                            <p className="text-sm" style={{ color: 'var(--org-primary-color, #6366f1)' }}>
                               {formatPrice(item.variant?.price ?? getEffectivePrice(item.product), settings)} c/u
                             </p>
                           </div>
@@ -311,6 +314,7 @@ function CartContent() {
                           size="sm"
                           onClick={() => updateQuantity(item.id, item.quantity - 1)}
                           disabled={item.quantity <= 1}
+                          aria-label="Disminuir cantidad"
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
@@ -322,6 +326,7 @@ function CartContent() {
                           size="sm"
                           onClick={() => updateQuantity(item.id, item.quantity + 1)}
                           disabled={item.quantity >= (itemStocks[item.id] ?? 0)}
+                          aria-label="Aumentar cantidad"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
@@ -335,6 +340,7 @@ function CartContent() {
                           size="sm"
                           onClick={() => removeFromCart(item.id)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          aria-label="Eliminar producto del carrito"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -371,7 +377,7 @@ function CartContent() {
                 </div>
               )}
               <Button
-                className="w-full text-white bg-primary-300 hover:bg-primary-400"
+                className="w-full"
                 onClick={handleCheckout}
                 disabled={Object.keys(stockWarnings).length > 0}
               >

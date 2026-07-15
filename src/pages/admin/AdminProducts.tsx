@@ -6,6 +6,7 @@ import { VariantManager } from '@/components/admin/VariantManager'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Input } from '@/components/ui/Input'
 import { Skeleton, SkeletonTable } from '@/components/ui/Skeleton'
 import { useAdminBranches } from '@/hooks/useAdminBranches'
@@ -264,15 +265,12 @@ function DiscountsTab({ products, allProducts, loading, settings, onRefresh, can
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-admin-600" />
         </div>
       ) : products.length === 0 ? (
-        <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-lg">
-          <Percent className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-          <p className="font-medium text-gray-500">No hay descuentos configurados</p>
-          <p className="text-sm text-gray-400 mt-1 mb-4">Creá tu primer descuento con el botón de arriba.</p>
-          <Button onClick={openNew} size="sm" variant="outline">
-            <Plus className="h-4 w-4 mr-1.5" />
-            Nuevo descuento
-          </Button>
-        </div>
+        <EmptyState
+          icon={Percent}
+          title="No hay descuentos configurados"
+          description="Creá tu primer descuento con el botón de arriba."
+          action={{ label: 'Nuevo descuento', onClick: openNew }}
+        />
       ) : (
         <div className="space-y-6">
           <Card>
@@ -333,6 +331,7 @@ function DiscountsTab({ products, allProducts, loading, settings, onRefresh, can
               </div>
               <button
                 onClick={closeModal}
+                aria-label="Cerrar"
                 className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
               >
                 <X className="h-5 w-5" />
@@ -787,12 +786,12 @@ function AdminProductsContent() {
 
     filesToAdd.forEach((file) => {
       if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-        alert(`Tipo de archivo no permitido para ${file.name}. Use JPG, PNG o WEBP`)
+        show(`Tipo de archivo no permitido para ${file.name}. Use JPG, PNG o WEBP`, 'error')
         return
       }
 
       if (file.size > MAX_IMAGE_SIZE) {
-        alert(`La imagen ${file.name} es demasiado grande. Máximo 5MB`)
+        show(`La imagen ${file.name} es demasiado grande. Máximo 5MB`, 'error')
         return
       }
 
@@ -891,11 +890,11 @@ function AdminProductsContent() {
     // When creating with stock > 0, branch is required for inventory
     if (!editingProduct && data.stock > 0) {
       if (branches.length === 0) {
-        alert('No hay sucursales disponibles. Crea una sucursal primero o deja el stock en 0.')
+        show('No hay sucursales disponibles. Crea una sucursal primero o deja el stock en 0.', 'error')
         return
       }
       if (!initialBranchId) {
-        alert('Si indicas stock inicial, debes seleccionar la sucursal donde se cargará el inventario.')
+        show('Si indicas stock inicial, debes seleccionar la sucursal donde se cargará el inventario.', 'error')
         return
       }
     }
@@ -985,7 +984,7 @@ function AdminProductsContent() {
                 })
             } else {
               console.error('Error loading initial inventory:', updateError)
-              alert('Producto creado pero no se pudo cargar el stock inicial. Ajusta el inventario manualmente.')
+              show('Producto creado pero no se pudo cargar el stock inicial. Ajusta el inventario manualmente.', 'error')
             }
           }
         }
@@ -1289,7 +1288,7 @@ function AdminProductsContent() {
       invalidateProducts()
     } catch (error) {
       console.error('Error deleting product:', error)
-      alert('Error al eliminar el producto')
+      show('Error al eliminar el producto', 'error')
     }
   }
 

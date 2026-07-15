@@ -11,13 +11,15 @@ import { useAdminStore } from '@/store/adminStore'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Tables } from '@/types/database.types'
-import { Bell, Building2, CreditCard, Globe, Upload, X, ShoppingCart, AlertTriangle, RefreshCw, DollarSign, Calendar, CheckCircle, Clock, Trash2, Store, Eye, EyeOff, Receipt } from 'lucide-react'
+import { Bell, Building2, CreditCard, Globe, Upload, X, ShoppingCart, AlertTriangle, RefreshCw, DollarSign, Calendar, CheckCircle, Clock, Trash2, Store, Eye, EyeOff, Receipt, LayoutGrid } from 'lucide-react'
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { NOTIFICATION_TYPES, parseInappConfig, type InappNotificationsConfig, type NotificationType } from '@/lib/notification-types'
 import { getOrgAccessStatus } from '@/lib/orgAccess'
 import { emitirComprobante, BillerApiError } from '@/lib/biller'
 import { TIPO_COMPROBANTE, FORMA_PAGO, INDICADOR_FACTURACION } from '@/types/biller'
 import type { BillerConfig } from '@/types/biller'
+import { resolveBranchesEnabled, resolveTransfersEnabledRaw } from '@/lib/orgModules'
+import { cn } from '@/lib/utils'
 
 const INAPP_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   ShoppingCart,
@@ -134,7 +136,7 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '')
 }
 
-type TabValue = 'general' | 'estilos' | 'formato' | 'pagos' | 'notificaciones' | 'vitrina' | 'suscripcion' | 'facturacion'
+type TabValue = 'general' | 'estilos' | 'formato' | 'pagos' | 'notificaciones' | 'vitrina' | 'suscripcion' | 'facturacion' | 'modulos'
 
 type Props = {
   organization: Organization
@@ -189,6 +191,8 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
     (rawSettings.consignment_default_warehouse_branch_id as string) ?? ''
   )
   const [transferContactPhone, setTransferContactPhone] = useState((rawSettings.transfer_contact_phone as string) ?? '')
+  const [branchesEnabled, setBranchesEnabled] = useState(resolveBranchesEnabled(rawSettings))
+  const [transfersEnabled, setTransfersEnabled] = useState(resolveTransfersEnabledRaw(rawSettings))
   const [orgBranches, setOrgBranches] = useState<
     Array<{ id: string; name: string; kind: string; is_active: boolean | null; is_isolated_warehouse: boolean }>
   >([])
@@ -222,6 +226,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
   const [heroTextColor, setHeroTextColor]       = useState<string>((rawSettings.store_hero_text_color as string) ?? '#ffffff')
   const [heroTextPosition, setHeroTextPosition] = useState<'center'|'left'|'bottom-left'>((rawSettings.store_hero_text_position as 'center'|'left'|'bottom-left') ?? 'center')
   const [heroHeight, setHeroHeight]             = useState<'sm'|'md'|'lg'|'xl'>((rawSettings.store_hero_height as 'sm'|'md'|'lg'|'xl') ?? 'md')
+  const [storeWhatsappNumber, setStoreWhatsappNumber] = useState((rawSettings.store_whatsapp_number as string) ?? '')
 
   const [transferMethodId, setTransferMethodId] = useState<string | null>(null)
   const [transferMethodConfig, setTransferMethodConfig] = useState<Record<string, unknown>>({})
@@ -471,6 +476,8 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
     setConsignmentAllowSellerToSeller((s.consignment_allow_seller_to_seller as boolean) ?? false)
     setConsignmentDefaultWarehouseBranchId((s.consignment_default_warehouse_branch_id as string) ?? '')
     setTransferContactPhone((s.transfer_contact_phone as string) ?? '')
+    setBranchesEnabled(resolveBranchesEnabled(s))
+    setTransfersEnabled(resolveTransfersEnabledRaw(s))
     setNotificationEmail((s.notification_email as string) ?? '')
     setNewOrderNotify((s.new_order_notify as boolean) ?? false)
     setLowStockNotify((s.low_stock_notify as boolean) ?? false)
@@ -600,6 +607,8 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
     consignmentAllowSellerToSeller !== ((prevSettings.consignment_allow_seller_to_seller as boolean) ?? false) ||
     consignmentDefaultWarehouseBranchId !== ((prevSettings.consignment_default_warehouse_branch_id as string) ?? '') ||
     transferContactPhone !== ((prevSettings.transfer_contact_phone as string) ?? '') ||
+    branchesEnabled !== resolveBranchesEnabled(prevSettings) ||
+    transfersEnabled !== resolveTransfersEnabledRaw(prevSettings) ||
     transferInstructions !== initialTransferInstructions ||
     notificationEmail !== ((prevSettings.notification_email as string) ?? '') ||
     newOrderNotify !== ((prevSettings.new_order_notify as boolean) ?? false) ||
@@ -836,6 +845,8 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
             ? consignmentDefaultWarehouseBranchId
             : null,
         transfer_contact_phone: transferContactPhone.trim() || undefined,
+        branches_enabled: branchesEnabled,
+        transfers_enabled: transfersEnabled, // valor crudo, preservado; la cascada se aplica en tiempo de lectura
         notification_email: notificationEmail.trim() || undefined,
         new_order_notify: newOrderNotify,
         low_stock_notify: lowStockNotify,
@@ -860,6 +871,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
         store_hero_text_color: heroTextColor,
         store_hero_text_position: heroTextPosition,
         store_hero_height: heroHeight,
+        store_whatsapp_number: storeWhatsappNumber.trim() || null,
       }
       const { data, error: updateError } = await supabase
         .from('organizations')
@@ -997,6 +1009,12 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                   <TabsTrigger value="facturacion">
                     <Receipt className="h-4 w-4 shrink-0 text-gray-400" />
                     Facturación
+                  </TabsTrigger>
+                )}
+                {!hiddenTabs.includes('modulos') && (
+                  <TabsTrigger value="modulos">
+                    <LayoutGrid className="h-4 w-4 shrink-0 text-gray-400" />
+                    Módulos
                   </TabsTrigger>
                 )}
               </TabsList>
@@ -1279,7 +1297,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                   <select
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value)}
-                    className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                    className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
                   >
                     {!CURRENCIES.some((c) => c.value === currency) && (
                       <option value={currency}>{currency} (actual)</option>
@@ -1296,7 +1314,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                   <select
                     value={locale}
                     onChange={(e) => setLocale(e.target.value)}
-                    className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                    className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
                   >
                     {!LOCALES.some((l) => l.value === locale) && (
                       <option value={locale}>{locale} (actual)</option>
@@ -1313,7 +1331,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                   <select
                     value={timezone}
                     onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                    className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
                   >
                     {!TIMEZONES.some((t) => t.value === timezone) && (
                       <option value={timezone}>{timezone} (actual)</option>
@@ -1383,7 +1401,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                     <select
                       value={checkoutFulfillmentMode}
                       onChange={(e) => setCheckoutFulfillmentMode(e.target.value === 'main' ? 'main' : 'auto')}
-                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
                     >
                       <option value="auto">Automática (recomendada)</option>
                       <option value="main">Sucursal principal (MAIN)</option>
@@ -1401,7 +1419,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                       onChange={(e) =>
                         setCheckoutStockAllocationMode(e.target.value === 'manual' ? 'manual' : 'immediate')
                       }
-                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
                     >
                       <option value="immediate">Inmediato (al crear orden)</option>
                       <option value="manual">Manual (al confirmar en backoffice)</option>
@@ -1433,7 +1451,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                       onChange={(e) =>
                         setInventoryTransferCompletionMode(e.target.value === 'automatic' ? 'automatic' : 'manual')
                       }
-                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
                     >
                       <option value="manual">Manual (pendiente + confirmar recepción)</option>
                       <option value="automatic">Automática (se completa al crear)</option>
@@ -1477,7 +1495,7 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                         <select
                           value={consignmentDefaultWarehouseBranchId}
                           onChange={(e) => setConsignmentDefaultWarehouseBranchId(e.target.value)}
-                          className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white"
+                          className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
                         >
                           <option value="">Sin depósito por defecto</option>
                           {warehouseBranches.map((branch) => (
@@ -1787,6 +1805,31 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                         })}
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                <hr className="border-gray-100" />
+
+                {/* Contacto */}
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-800">Contacto</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Se usa para el botón "Consultar" que ven los clientes en la ficha de un producto sin stock.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">WhatsApp para consultas de stock</label>
+                    <input
+                      type="text"
+                      value={storeWhatsappNumber}
+                      onChange={(e) => setStoreWhatsappNumber(e.target.value)}
+                      placeholder="Ej: 59899123456"
+                      className="w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500 focus:border-transparent bg-white"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Código de país + número, sin espacios ni símbolos. Dejalo vacío para no mostrar el botón "Consultar".
+                    </p>
                   </div>
                 </div>
 
@@ -2236,6 +2279,46 @@ export function EditOrganizationModal({ organization, onClose, hiddenTabs = [] }
                     </div>
                   </div>
                 )}
+              </TabsContent>
+
+              <TabsContent value="modulos" className="p-6 space-y-6">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">Módulos</h3>
+                  <p className="text-sm text-gray-500">
+                    Habilitá o deshabilitá módulos completos para esta organización. Solo afecta la visibilidad — no reemplaza los permisos ni los límites del plan.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={branchesEnabled}
+                      onChange={(e) => setBranchesEnabled(e.target.checked)}
+                      className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Sucursales</span>
+                  </label>
+                  <p className="text-xs text-gray-500">
+                    Controla el acceso a la sección de Sucursales y a las Transferencias, que depende de este módulo.
+                  </p>
+                </div>
+
+                <div className={cn('space-y-1', !branchesEnabled && 'opacity-50')}>
+                  <label className={cn('flex items-center gap-2', branchesEnabled ? 'cursor-pointer' : 'cursor-not-allowed')}>
+                    <input
+                      type="checkbox"
+                      checked={transfersEnabled}
+                      disabled={!branchesEnabled}
+                      onChange={(e) => setTransfersEnabled(e.target.checked)}
+                      className="rounded border-gray-300 text-admin-600 focus:ring-admin-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Transferencias</span>
+                  </label>
+                  {!branchesEnabled && (
+                    <p className="text-xs text-gray-500">Requiere el módulo Sucursales activo</p>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
 

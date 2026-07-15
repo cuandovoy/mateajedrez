@@ -6,6 +6,7 @@ import { usePermission } from '@/hooks/usePermission'
 import { supabase } from '@/lib/supabase'
 import { queryKeys } from '@/lib/queryKeys'
 import { PAGE_SIZE_ADMIN } from '@/lib/constants'
+import { getStockLevelColor, getStockLevelFromDays } from '@/lib/statusColors'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useToastStore } from '@/store/toastStore'
 import {
@@ -235,7 +236,9 @@ function ReposicionPOModal({ selectedItems, organizationId, branches, onClose, o
                           {item.sku && <p className="text-xs text-gray-400 font-mono">{item.sku}</p>}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <span className="text-sm font-semibold text-red-600">{item.stock_actual}</span>
+                          <span className="text-sm font-semibold text-red-600">
+                            {item.stock_actual}
+                          </span>
                         </td>
                         <td className="px-3 py-2 text-center">
                           <input
@@ -567,7 +570,9 @@ export function AdminReposicion() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="text-sm font-semibold text-red-600">{item.stock_actual}</span>
+                        <span className="text-sm font-semibold text-red-600">
+                          {item.stock_actual}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="text-sm text-gray-500">{item.low_stock_threshold}</span>
@@ -576,9 +581,7 @@ export function AdminReposicion() {
                         {item.dias_stock === null ? (
                           <span className="text-xs text-gray-400">Sin datos</span>
                         ) : (
-                          <span className={`text-sm font-mono font-semibold ${
-                            item.dias_stock < 7 ? 'text-red-600' : item.dias_stock < 14 ? 'text-yellow-600' : 'text-gray-700'
-                          }`}>
+                          <span className={`text-sm font-mono font-semibold ${getStockLevelColor(getStockLevelFromDays(item.dias_stock)).text}`}>
                             {item.dias_stock}d
                           </span>
                         )}
@@ -633,16 +636,16 @@ export function AdminReposicion() {
                         {item.sku && <p className="text-xs text-gray-400 font-mono">{item.sku}</p>}
                       </div>
                       <div className="shrink-0 text-right">
-                        <span className="text-lg font-bold text-red-600">{item.stock_actual}</span>
+                        <span className="text-lg font-bold text-red-600">
+                          {item.stock_actual}
+                        </span>
                         <p className="text-xs text-gray-400">/ {item.low_stock_threshold} umbral</p>
                       </div>
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2 text-xs">
                       <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{item.branch_name}</span>
                       {item.dias_stock !== null && (
-                        <span className={`px-2 py-0.5 rounded font-mono font-semibold ${
-                          item.dias_stock < 7 ? 'bg-red-100 text-red-700' : item.dias_stock < 14 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'
-                        }`}>
+                        <span className={`px-2 py-0.5 rounded font-mono font-semibold ${getStockLevelColor(getStockLevelFromDays(item.dias_stock)).badge}`}>
                           {item.dias_stock}d de stock
                         </span>
                       )}

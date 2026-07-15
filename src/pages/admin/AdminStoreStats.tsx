@@ -3,6 +3,7 @@ import { useOrganizationStore } from '@/store/organizationStore'
 import { supabase } from '@/lib/supabase'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
+import { CHART_COLORS, CHART_TOOLTIP_SHADOW } from '@/lib/chartColors'
 import { BarChart3, Users, Eye, FileText, Monitor, Smartphone, Tablet, RefreshCw } from 'lucide-react'
 import {
   AreaChart,
@@ -90,7 +91,7 @@ export function AdminStoreStats() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Estadísticas de la tienda</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Estadísticas de la tienda</h1>
           <p className="text-sm text-gray-500 mt-0.5">Visitas y actividad de tu tienda pública</p>
         </div>
         <div className="flex items-center gap-2">
@@ -157,7 +158,7 @@ export function AdminStoreStats() {
           {/* Legend */}
           <div className="flex items-center gap-5 mb-4">
             <span className="flex items-center gap-1.5 text-xs text-gray-500">
-              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: '#8F5F2C' }} />
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: CHART_COLORS.primary }} />
               Visitas
             </span>
             <span className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -176,24 +177,24 @@ export function AdminStoreStats() {
                 <AreaChart data={data.time_series} margin={{ top: 4, right: 4, left: -24, bottom: 0 }}>
                   <defs>
                     <linearGradient id="gradViews" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8F5F2C" stopOpacity={0.25} />
-                      <stop offset="95%" stopColor="#8F5F2C" stopOpacity={0} />
+                      <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.25} />
+                      <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="gradVisitors" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                      <stop offset="5%" stopColor={CHART_COLORS.secondary} stopOpacity={0.2} />
+                      <stop offset="95%" stopColor={CHART_COLORS.secondary} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
                   <XAxis
                     dataKey="bucket"
-                    tick={{ fontSize: 10, fill: '#9ca3af', fontFamily: 'monospace' }}
+                    tick={{ fontSize: 10, fill: CHART_COLORS.axis, fontFamily: 'monospace' }}
                     axisLine={false}
                     tickLine={false}
                     interval="preserveStartEnd"
                   />
                   <YAxis
-                    tick={{ fontSize: 10, fill: '#9ca3af' }}
+                    tick={{ fontSize: 10, fill: CHART_COLORS.axis }}
                     axisLine={false}
                     tickLine={false}
                     allowDecimals={false}
@@ -201,34 +202,34 @@ export function AdminStoreStats() {
                   <Tooltip
                     contentStyle={{
                       borderRadius: '10px',
-                      border: '1px solid #e5d1bc',
+                      border: `1px solid ${CHART_COLORS.tooltipBorder}`,
                       fontSize: '12px',
-                      boxShadow: '0 4px 16px rgba(143,95,44,0.10)',
+                      boxShadow: CHART_TOOLTIP_SHADOW,
                       background: '#fff',
                     }}
-                    labelStyle={{ fontWeight: 600, color: '#374151', marginBottom: '4px', fontFamily: 'monospace' }}
-                    itemStyle={{ color: '#6b7280' }}
-                    cursor={{ stroke: '#d4b596', strokeWidth: 1, strokeDasharray: '4 2' }}
+                    labelStyle={{ fontWeight: 600, color: CHART_COLORS.tooltipLabel, marginBottom: '4px', fontFamily: 'monospace' }}
+                    itemStyle={{ color: CHART_COLORS.tooltipItem }}
+                    cursor={{ stroke: CHART_COLORS.cursorLine, strokeWidth: 1, strokeDasharray: '4 2' }}
                   />
                   <Area
                     type="monotone"
                     dataKey="views"
                     name="Visitas"
-                    stroke="#8F5F2C"
+                    stroke={CHART_COLORS.primary}
                     strokeWidth={2}
                     fill="url(#gradViews)"
                     dot={false}
-                    activeDot={{ r: 4, fill: '#8F5F2C', strokeWidth: 0 }}
+                    activeDot={{ r: 4, fill: CHART_COLORS.primary, strokeWidth: 0 }}
                   />
                   <Area
                     type="monotone"
                     dataKey="visitors"
                     name="Únicos"
-                    stroke="#10b981"
+                    stroke={CHART_COLORS.secondary}
                     strokeWidth={2}
                     fill="url(#gradVisitors)"
                     dot={false}
-                    activeDot={{ r: 4, fill: '#10b981', strokeWidth: 0 }}
+                    activeDot={{ r: 4, fill: CHART_COLORS.secondary, strokeWidth: 0 }}
                   />
                 </AreaChart>
               </ResponsiveContainer>

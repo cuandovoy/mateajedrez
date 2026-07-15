@@ -21,6 +21,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { queryKeys } from '@/lib/queryKeys'
 import { useAdminBranches } from '@/hooks/useAdminBranches'
 import { Link, useParams } from 'react-router-dom'
+import { getOrderStatusColor } from '@/lib/statusColors'
 
 const getStatusLabel = (status: string | null): string => {
   const statusMap: Record<string, string> = {
@@ -32,18 +33,6 @@ const getStatusLabel = (status: string | null): string => {
     cancelled: 'Cancelado',
   }
   return (status && statusMap[status]) || status || 'Sin estado'
-}
-
-const getStatusColor = (status: string | null): string => {
-  const colorMap: Record<string, string> = {
-    pending_allocation: 'bg-orange-100 text-orange-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-    processing: 'bg-blue-100 text-blue-800',
-    shipped: 'bg-purple-100 text-purple-800',
-    delivered: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-  }
-  return (status && colorMap[status]) || 'bg-gray-100 text-gray-800'
 }
 
 const formatOrderDisplayNumber = (orderId: string, orderNumber?: number | null): string => {
@@ -1276,7 +1265,7 @@ export function AdminOrderDetail() {
                   <Package className="h-5 w-5" />
                   <span>Información de la Orden</span>
                 </span>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${getOrderStatusColor(order.status)}`}>
                   {getStatusLabel(order.status)}
                 </span>
               </CardTitle>

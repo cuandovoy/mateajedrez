@@ -11,6 +11,8 @@ export function PublicStoreFooter() {
   const { categoriesWithSubs } = usePublicCategoriesForMenu(organization.id)
 
   const primaryColor = organization.primary_color || '#6366f1'
+  const isValidHex = (v: string) => /^#[0-9a-fA-F]{6}$/.test(v)
+  const safePrimaryColor = isValidHex(primaryColor) ? primaryColor : '#6366f1'
   const settings = (organization.settings as Record<string, unknown>) ?? {}
   const logoUrl = organization.logo_url || null
   const showName = (settings.store_header_show_name as boolean) !== false
@@ -21,8 +23,8 @@ export function PublicStoreFooter() {
     <footer
       className="mt-16 border-t"
       style={{
-        backgroundColor: `${primaryColor}10`,
-        borderColor: `${primaryColor}22`,
+        backgroundColor: `${safePrimaryColor}10`,
+        borderColor: `${safePrimaryColor}22`,
       }}
     >
       <div className="container-custom py-10 md:py-14">
@@ -39,8 +41,8 @@ export function PublicStoreFooter() {
                 />
               ) : (
                 <div
-                  className="h-10 w-10 rounded-lg flex items-center justify-center text-white font-bold text-base shrink-0"
-                  style={{ backgroundColor: primaryColor }}
+                  className="h-10 w-10 rounded-lg flex items-center justify-center font-bold text-base shrink-0"
+                  style={{ backgroundColor: primaryColor, color: 'var(--org-primary-ink, white)' }}
                 >
                   {organization.name.charAt(0).toUpperCase()}
                 </div>
@@ -91,7 +93,7 @@ export function PublicStoreFooter() {
                       {cat.label}
                     </Link>
                     {cat.subcategories && cat.subcategories.length > 0 && (
-                      <ul className="mt-1.5 ml-3 space-y-1.5 border-l-2 pl-3" style={{ borderColor: `${primaryColor}30` }}>
+                      <ul className="mt-1.5 ml-3 space-y-1.5 border-l-2 pl-3" style={{ borderColor: `${safePrimaryColor}30` }}>
                         {cat.subcategories.map((sub) => (
                           <li key={sub.value}>
                             <Link
@@ -119,7 +121,7 @@ export function PublicStoreFooter() {
       {/* Bottom bar */}
       <div
         className="border-t"
-        style={{ borderColor: `${primaryColor}18` }}
+        style={{ borderColor: `${safePrimaryColor}18` }}
       >
         <div className="container-custom py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-xs text-gray-400">

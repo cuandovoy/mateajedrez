@@ -12,6 +12,7 @@ import { SkeletonTable } from '@/components/ui/Skeleton'
 import { formatPrice, formatDateShort } from '@/lib/utils'
 import { ArrowLeft, ShoppingCart, DollarSign, Calendar, Package, Plus, Edit2, X, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { ACTIVE_ORDER_STATUSES } from '@/lib/constants'
+import { getOrderStatusColor } from '@/lib/statusColors'
 
 const ORDERS_PREVIEW_LIMIT = 100
 import { useToastStore } from '@/store/toastStore'
@@ -28,18 +29,6 @@ const getStatusLabel = (status: string | null): string => {
     cancelled: 'Cancelado',
   }
   return (status && map[status]) || status || 'Sin estado'
-}
-
-const getStatusColor = (status: string | null): string => {
-  const map: Record<string, string> = {
-    pending_allocation: 'bg-orange-100 text-orange-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-    processing: 'bg-blue-100 text-blue-800',
-    shipped: 'bg-purple-100 text-purple-800',
-    delivered: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-  }
-  return (status && map[status]) || 'bg-gray-100 text-gray-800'
 }
 
 interface TopProduct {
@@ -346,7 +335,7 @@ export function AdminCustomerDetail() {
                             {formatDateShort(order.created_at, settings)}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', getStatusColor(order.status))}>
+                            <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', getOrderStatusColor(order.status))}>
                               {getStatusLabel(order.status)}
                             </span>
                           </td>

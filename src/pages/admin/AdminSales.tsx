@@ -1,6 +1,5 @@
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
-import { Input } from '@/components/ui/Input'
 import { SkeletonTable } from '@/components/ui/Skeleton'
 import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
@@ -13,13 +12,13 @@ import { useQuery } from '@tanstack/react-query'
 import {
   BarChart3,
   Building2,
-  Calendar,
   CreditCard,
   Download,
   DollarSign,
   Info,
   TrendingDown,
   TrendingUp,
+  X,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
@@ -105,6 +104,11 @@ const getPaymentMethodLabel = (method: string): string => {
 
 const toDateKey = (date: Date): string => date.toISOString().split('T')[0]
 
+const getCurrentMonthValue = (): string => {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
 const monthRangeFromValue = (value: string): { start: Date; end: Date } => {
   const [year, month] = value.split('-').map(Number)
   const start = new Date(year, month - 1, 1)
@@ -163,10 +167,7 @@ export function AdminSales() {
 
   const [selectedBranchId, setSelectedBranchId] = useState('')
   const [periodMode, setPeriodMode] = useState<PeriodMode>('month')
-  const [selectedMonth, setSelectedMonth] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })
+  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonthValue)
   const [customStart, setCustomStart] = useState(() => toDateKey(new Date()))
   const [customEnd, setCustomEnd] = useState(() => toDateKey(new Date()))
   const [draftSelectedBranchId, setDraftSelectedBranchId] = useState(selectedBranchId)
@@ -407,6 +408,24 @@ export function AdminSales() {
     setCustomEnd(draftCustomEnd)
   }
 
+  const hasActiveFilters =
+    selectedBranchId !== '' || periodMode !== 'month' || selectedMonth !== getCurrentMonthValue()
+
+  const handleResetFilters = () => {
+    const defaultMonth = getCurrentMonthValue()
+    const today = toDateKey(new Date())
+    setSelectedBranchId('')
+    setPeriodMode('month')
+    setSelectedMonth(defaultMonth)
+    setCustomStart(today)
+    setCustomEnd(today)
+    setDraftSelectedBranchId('')
+    setDraftPeriodMode('month')
+    setDraftSelectedMonth(defaultMonth)
+    setDraftCustomStart(today)
+    setDraftCustomEnd(today)
+  }
+
   if (permLoading) return <SkeletonTable rows={10} />
   if (!can('reportes:ver')) return null
 
@@ -427,92 +446,86 @@ export function AdminSales() {
         </div>
         <Button onClick={handleExport} className="gap-2" variant="outline">
           <Download className="h-4 w-4" />
-          Exportar Excel (CSV)
+          Exportar CSV
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            <span>Filtros del reporte</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Modo período</label>
-              <select
-                value={draftPeriodMode}
-                onChange={(e) => setDraftPeriodMode(e.target.value as PeriodMode)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-              >
-                <option value="month">Mensual</option>
-                <option value="custom">Rango personalizado</option>
-              </select>
-            </div>
+      {/* Filter toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={draftPeriodMode}
+          onChange={(e) => setDraftPeriodMode(e.target.value as PeriodMode)}
+          className={`h-9 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 transition-colors ${
+            draftPeriodMode !== 'month' ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+          }`}
+        >
+          <option value="month">Mensual</option>
+          <option value="custom">Rango personalizado</option>
+        </select>
 
-            {draftPeriodMode === 'month' ? (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Mes</label>
-                <Input
-                  type="month"
-                  value={draftSelectedMonth}
-                  onChange={(e) => setDraftSelectedMonth(e.target.value)}
-                />
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Fecha inicio</label>
-                  <Input
-                    type="date"
-                    value={draftCustomStart}
-                    onChange={(e) => setDraftCustomStart(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Fecha fin</label>
-                  <Input
-                    type="date"
-                    value={draftCustomEnd}
-                    onChange={(e) => setDraftCustomEnd(e.target.value)}
-                  />
-                </div>
-              </>
-            )}
+        {draftPeriodMode === 'month' ? (
+          <input
+            type="month"
+            value={draftSelectedMonth}
+            onChange={(e) => setDraftSelectedMonth(e.target.value)}
+            className="h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+          />
+        ) : (
+          <>
+            <input
+              type="date"
+              value={draftCustomStart}
+              onChange={(e) => setDraftCustomStart(e.target.value)}
+              className="h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+            />
+            <span className="text-gray-400 text-sm">—</span>
+            <input
+              type="date"
+              value={draftCustomEnd}
+              onChange={(e) => setDraftCustomEnd(e.target.value)}
+              className="h-9 border border-gray-200 rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500"
+            />
+          </>
+        )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Sucursal</label>
-              <select
-                value={draftSelectedBranchId}
-                onChange={(e) => setDraftSelectedBranchId(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-500"
-              >
-                <option value="">Todas las sucursales</option>
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+        <select
+          value={draftSelectedBranchId}
+          onChange={(e) => setDraftSelectedBranchId(e.target.value)}
+          className={`h-9 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500 transition-colors ${
+            draftSelectedBranchId ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+          }`}
+        >
+          <option value="">Todas las sucursales</option>
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>
+              {branch.name}
+            </option>
+          ))}
+        </select>
 
-          {invalidDraftCustomRange && (
-            <p className="mt-3 text-sm text-red-600">La fecha inicio no puede ser mayor que la fecha fin.</p>
-          )}
+        <Button
+          onClick={handleApplyFilters}
+          disabled={invalidDraftCustomRange || !hasPendingFilterChanges || loading}
+          size="sm"
+        >
+          Aplicar filtros
+        </Button>
 
-          <div className="mt-4 flex justify-end">
-            <Button
-              onClick={handleApplyFilters}
-              disabled={invalidDraftCustomRange || !hasPendingFilterChanges || loading}
-            >
-              Aplicar filtros
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="h-9 px-3 rounded-lg text-sm text-red-500 border border-red-200 hover:bg-red-50 flex items-center gap-1 shrink-0 transition-colors"
+          >
+            <X className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Limpiar</span>
+          </button>
+        )}
+      </div>
+
+      {invalidDraftCustomRange && (
+        <p className="text-sm text-red-600">La fecha inicio no puede ser mayor que la fecha fin.</p>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <Card>

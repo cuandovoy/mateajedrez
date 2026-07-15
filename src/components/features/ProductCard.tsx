@@ -138,8 +138,11 @@ export function ProductCard({
           <button
             onClick={handleAddToCart}
             disabled={isAdding}
-            className="absolute bottom-3 right-3 rounded-full p-2.5 md:p-3 text-white shadow-lg z-10 md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300 disabled:opacity-50"
-            style={{ backgroundColor: 'var(--org-primary-color, #6366f1)' }}
+            className="absolute bottom-3 right-3 rounded-full p-2.5 md:p-3 shadow-lg z-10 md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300 disabled:opacity-50"
+            style={{
+              backgroundColor: 'var(--org-primary-color, #6366f1)',
+              color: 'var(--org-primary-ink, white)',
+            }}
             aria-label="Agregar al carrito"
           >
             {isAdding ? (

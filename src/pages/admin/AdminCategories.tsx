@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { uploadCategoryImage, deleteImage } from '@/lib/storage'
 import { CategoryTable } from '@/components/admin/CategoryTable'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
+import { useToastStore } from '@/store/toastStore'
 import type { Category, CategoryInsert, CategoryUpdate } from '@/types'
 
 type ViewMode = 'grid' | 'list'
@@ -28,6 +29,7 @@ function AdminCategoriesContent() {
   const { organizationId } = useOrganization()
   const { can, loading: permLoading } = usePermission()
   const canManage = can('catalogo:gestionar')
+  const { show } = useToastStore()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -106,12 +108,12 @@ function AdminCategoriesContent() {
     if (!file) return
 
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      alert('Tipo de archivo no permitido. Use JPG, PNG o WEBP')
+      show('Tipo de archivo no permitido. Use JPG, PNG o WEBP', 'error')
       return
     }
 
     if (file.size > MAX_IMAGE_SIZE) {
-      alert('La imagen es demasiado grande. Máximo 5MB')
+      show('La imagen es demasiado grande. Máximo 5MB', 'error')
       return
     }
 
@@ -178,7 +180,7 @@ function AdminCategoriesContent() {
       fetchCategories()
     } catch (error) {
       console.error('Error saving category:', error)
-      alert('Error al guardar la categoría')
+      show('Error al guardar la categoría', 'error')
     } finally {
       setUploadingImage(false)
     }
@@ -211,7 +213,7 @@ function AdminCategoriesContent() {
       fetchCategories()
     } catch (error) {
       console.error('Error deleting category:', error)
-      alert('Error al eliminar la categoría')
+      show('Error al eliminar la categoría', 'error')
     }
   }
 

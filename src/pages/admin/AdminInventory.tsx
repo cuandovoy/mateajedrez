@@ -15,6 +15,7 @@ import { trackAuditAction } from '@/lib/audit'
 import { capitalizeFirst, formatDateShort } from '@/lib/utils'
 import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { queryKeys } from '@/lib/queryKeys'
+import { getStockLevelColor, getStockLevelFromDays, getStockLevelFromFlags } from '@/lib/statusColors'
 import { supabase } from '@/lib/supabase'
 import { useToastStore } from '@/store/toastStore'
 import { useSearchParams } from 'react-router-dom'
@@ -990,7 +991,7 @@ export function AdminInventory() {
             className="shrink-0"
           >
             <Download className="h-4 w-4 mr-2" />
-            {exportingAll ? 'Exportando...' : 'Exportar (Excel)'}
+            {exportingAll ? 'Exportando...' : 'Exportar CSV'}
           </Button>
           {missingProductsCount !== null && missingProductsCount > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-sm">
@@ -1109,7 +1110,7 @@ export function AdminInventory() {
                             <div key={b.id} className="flex items-center justify-between gap-2">
                               <span className="text-sm text-gray-600 truncate">{b.name}</span>
                               {cell ? (
-                                <span className={`inline-block min-w-[2.5rem] text-center rounded-md px-2 py-0.5 text-sm font-semibold shrink-0 ${isOut ? 'bg-red-100 text-red-700' : isLow ? 'bg-yellow-100 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
+                                <span className={`inline-block min-w-[2.5rem] text-center rounded-md px-2 py-0.5 text-sm font-semibold shrink-0 ${getStockLevelColor(getStockLevelFromFlags({ stock: cell.stock, isLowStock: !!isLow })).badge}`}>
                                   {cell.stock}
                                 </span>
                               ) : (
@@ -1179,10 +1180,9 @@ export function AdminInventory() {
                               <td key={b.id} className="px-4 py-3 text-center text-gray-300">—</td>
                             )
                             const isLow = cell.stock <= (cell.low_stock_threshold || 0) || cell.stock <= (cell.min_stock || 0)
-                            const isOut = cell.stock === 0
                             return (
                               <td key={b.id} className="px-4 py-3 text-center">
-                                <span className={`inline-block min-w-[2.5rem] rounded-md px-2 py-0.5 text-sm font-semibold ${isOut ? 'bg-red-100 text-red-700' : isLow ? 'bg-yellow-100 text-yellow-700' : 'bg-green-50 text-green-700'}`}>
+                                <span className={`inline-block min-w-[2.5rem] rounded-md px-2 py-0.5 text-sm font-semibold ${getStockLevelColor(getStockLevelFromFlags({ stock: cell.stock, isLowStock: isLow })).badge}`}>
                                   {cell.stock}
                                 </span>
                               </td>
@@ -1253,6 +1253,7 @@ export function AdminInventory() {
               <button
                 type="button"
                 onClick={() => setSearchInput('')}
+                aria-label="Limpiar búsqueda"
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
               >
                 <X className="h-3.5 w-3.5" />
@@ -1416,10 +1417,10 @@ export function AdminInventory() {
               {/* Mobile cards */}
               <div className="md:hidden divide-y">
                 {displayInventory.map((item) => {
-                  const isLow = item.is_low_stock
-                  const isOut = item.stock === 0
+                  const stockLevel = getStockLevelFromFlags({ stock: item.stock, isLowStock: item.is_low_stock })
+                  const levelColor = getStockLevelColor(stockLevel)
                   return (
-                    <div key={item.id} className={`p-4 space-y-2 ${isLow ? 'bg-yellow-50' : ''}`}>
+                    <div key={item.id} className={`p-4 space-y-2 ${stockLevel === 'ok' ? '' : levelColor.bg}`}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-3 min-w-0">
                           {item.thumbnail_url ? (
@@ -1474,9 +1475,7 @@ export function AdminInventory() {
                           const dias = calcDiasStock(item.stock, vendido)
                           if (dias === null) return null
                           return (
-                            <span className={`text-xs font-mono font-semibold ${
-                              dias < 7 ? 'text-red-600' : dias < 14 ? 'text-yellow-600' : 'text-gray-500'
-                            }`}>
+                            <span className={`text-xs font-mono font-semibold ${getStockLevelColor(getStockLevelFromDays(dias)).text}`}>
                               {dias}d de stock
                             </span>
                           )
@@ -1489,7 +1488,7 @@ export function AdminInventory() {
                               <Input type="number" min="0" value={editingItem.stock} onChange={(e) => setEditingItem({ ...editingItem, stock: parseInt(e.target.value) || 0 })} className="w-20 text-center h-8" autoFocus />
                             </div>
                           ) : (
-                            <span className={`text-lg font-bold ${isOut ? 'text-red-600' : isLow ? 'text-yellow-600' : 'text-green-700'}`}>
+                            <span className={`text-lg font-bold ${stockLevel === 'ok' ? 'text-green-700' : levelColor.text}`}>
                               {item.stock}
                             </span>
                           )}
@@ -1517,10 +1516,13 @@ export function AdminInventory() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {displayInventory.map((item) => (
+                  {displayInventory.map((item) => {
+                    const stockLevel = getStockLevelFromFlags({ stock: item.stock, isLowStock: item.is_low_stock })
+                    const levelColor = getStockLevelColor(stockLevel)
+                    return (
                     <tr
                       key={item.id}
-                      className={`hover:bg-gray-50 ${item.is_low_stock ? 'bg-yellow-50' : ''}`}
+                      className={`hover:bg-gray-50 ${stockLevel === 'ok' ? '' : levelColor.bg}`}
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center space-x-2">
@@ -1591,7 +1593,7 @@ export function AdminInventory() {
                         ) : (
                           <span
                             className={`text-sm font-semibold ${
-                              item.is_low_stock ? 'text-red-600' : 'text-gray-900'
+                              stockLevel === 'ok' ? 'text-gray-900' : levelColor.text
                             }`}
                           >
                             {item.stock}
@@ -1638,9 +1640,7 @@ export function AdminInventory() {
                           const dias = calcDiasStock(item.stock, vendido)
                           if (dias === null) return <span className="text-xs text-gray-400">Sin rotación</span>
                           return (
-                            <span className={`text-sm font-mono font-semibold ${
-                              dias < 7 ? 'text-red-600' : dias < 14 ? 'text-yellow-600' : 'text-gray-700'
-                            }`}>
+                            <span className={`text-sm font-mono font-semibold ${getStockLevelColor(getStockLevelFromDays(dias)).text}`}>
                               {dias}d
                             </span>
                           )
@@ -1734,7 +1734,8 @@ export function AdminInventory() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
               </div>

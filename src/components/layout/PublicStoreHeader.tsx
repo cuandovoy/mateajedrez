@@ -25,7 +25,7 @@ function CategoryNavItem({ cat, slug, onNavigate }: CategoryNavItemProps) {
       <Link
         to={`/${slug}/categories/${cat.value}`}
         onClick={onNavigate}
-        className="relative px-3 py-1.5 text-sm font-medium text-white/90 hover:text-white transition-colors duration-150 after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-white/70 after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-250 after:origin-center"
+        className="relative px-3 py-1.5 text-sm font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors duration-150 after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-[color-mix(in_srgb,var(--org-primary-ink,white)_70%,transparent)] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-250 after:origin-center"
       >
         {cat.label}
       </Link>
@@ -36,7 +36,7 @@ function CategoryNavItem({ cat, slug, onNavigate }: CategoryNavItemProps) {
     <div className="group relative">
       <button
         type="button"
-        className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white/90 hover:text-white transition-colors duration-150"
+        className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors duration-150"
       >
         {cat.label}
         <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-180" />
@@ -84,7 +84,7 @@ function MobileCategoryItem({ cat, slug, onNavigate }: MobileCategoryItemProps) 
         <Link
           to={`/${slug}/categories/${cat.value}`}
           onClick={onNavigate}
-          className="flex-1 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10 transition-colors rounded-lg"
+          className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors rounded-lg"
         >
           {cat.label}
         </Link>
@@ -92,7 +92,7 @@ function MobileCategoryItem({ cat, slug, onNavigate }: MobileCategoryItemProps) 
           <button
             type="button"
             onClick={() => setIsExpanded((p) => !p)}
-            className="p-2.5 text-white/70 hover:text-white transition-colors"
+            className="p-2.5 text-[color-mix(in_srgb,var(--org-primary-ink,white)_70%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors"
             aria-label={isExpanded ? 'Contraer' : 'Expandir'}
           >
             <ChevronDown
@@ -108,7 +108,7 @@ function MobileCategoryItem({ cat, slug, onNavigate }: MobileCategoryItemProps) 
               key={sub.value}
               to={`/${slug}/categories/${sub.value}`}
               onClick={onNavigate}
-              className="block px-3 py-2 text-sm text-white/75 hover:text-white hover:bg-white/10 transition-colors rounded-lg"
+              className="block px-3 py-2 text-sm text-[color-mix(in_srgb,var(--org-primary-ink,white)_75%,transparent)] hover:text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors rounded-lg"
             >
               {sub.label}
             </Link>
@@ -158,6 +158,8 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
   const desktopLogoUrl = organization.logo_url || null
   const mobileLogoUrl = minimalLogoUrl || desktopLogoUrl
   const primaryColor = organization.primary_color || '#6366f1'
+  const isValidHex = (v: string) => /^#[0-9a-fA-F]{6}$/.test(v)
+  const safePrimaryColor = isValidHex(primaryColor) ? primaryColor : '#6366f1'
 
   const showName = (settings.store_header_show_name as boolean) !== false
   const logoSizeKey = (settings.store_header_logo_size as string) ?? 'md'
@@ -170,10 +172,10 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
     <header
       className="sticky top-0 z-30 border-b"
       style={{
-        backgroundColor: `${primaryColor}ee`,
+        backgroundColor: `${safePrimaryColor}ee`,
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        borderColor: `${primaryColor}33`,
+        borderColor: `${safePrimaryColor}33`,
       }}
     >
       <div className="container-custom">
@@ -187,11 +189,11 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
               <img src={desktopLogoUrl} alt={organization.name} className={`${logoSizeClass} object-contain`} />
             ) : (
               <div className={`${logoSizeClass} flex items-center justify-center bg-white/20 rounded-lg`}>
-                <span className="text-white font-bold text-lg">{organization.name.charAt(0).toUpperCase()}</span>
+                <span className="text-[var(--org-primary-ink,white)] font-bold text-lg">{organization.name.charAt(0).toUpperCase()}</span>
               </div>
             )}
             {showName && (
-              <span className="text-white font-semibold text-lg leading-tight">{organization.name}</span>
+              <span className="text-[var(--org-primary-ink,white)] font-semibold text-lg leading-tight">{organization.name}</span>
             )}
           </Link>
 
@@ -217,7 +219,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
               <button
                 type="button"
                 onClick={() => setIsSearchOpen((p) => !p)}
-                className={`shrink-0 text-white/80 hover:text-white transition-colors ${isSearchOpen ? 'py-2' : 'w-full h-full flex items-center justify-center'}`}
+                className={`shrink-0 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors ${isSearchOpen ? 'py-2' : 'w-full h-full flex items-center justify-center'}`}
                 aria-label={isSearchOpen ? 'Cerrar búsqueda' : 'Abrir búsqueda'}
               >
                 {isSearchOpen ? <X className="h-4 w-4" /> : <Search className="h-4 w-4" />}
@@ -230,13 +232,13 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Buscar productos…"
-                    className="bg-transparent text-white placeholder-white/50 text-sm outline-none ml-2 w-full"
+                    className="bg-transparent text-[var(--org-primary-ink,white)] placeholder-[color-mix(in_srgb,var(--org-primary-ink,white)_50%,transparent)] text-sm outline-none ml-2 w-full"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery('')}
-                      className="text-white/50 hover:text-white shrink-0 transition-colors"
+                      className="text-[color-mix(in_srgb,var(--org-primary-ink,white)_50%,transparent)] hover:text-[var(--org-primary-ink,white)] shrink-0 transition-colors"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -249,7 +251,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
             <Link
               to={`/${slug}/cart`}
               onClick={closeAll}
-              className="relative p-2 text-white/80 hover:text-white transition-colors rounded-full hover:bg-white/15"
+              className="relative p-2 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-full hover:bg-white/15"
               aria-label="Ver carrito"
             >
               <ShoppingCart className="h-5 w-5" />
@@ -269,7 +271,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
           <button
             type="button"
             onClick={() => { setIsMobileMenuOpen((p) => !p); setIsSearchOpen(false) }}
-            className="p-2 -ml-1 text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+            className="p-2 -ml-1 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-lg hover:bg-white/10"
             aria-label="Menú"
           >
             {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -281,10 +283,10 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
               <img src={mobileLogoUrl} alt={organization.name} className={`${logoSizeClassMobile} object-contain`} />
             ) : (
               <div className={`${logoSizeClassMobile} flex items-center justify-center bg-white/20 rounded-lg`}>
-                <span className="text-white font-bold">{organization.name.charAt(0).toUpperCase()}</span>
+                <span className="text-[var(--org-primary-ink,white)] font-bold">{organization.name.charAt(0).toUpperCase()}</span>
               </div>
             )}
-            {showName && <span className="text-white font-semibold text-sm">{organization.name}</span>}
+            {showName && <span className="text-[var(--org-primary-ink,white)] font-semibold text-sm">{organization.name}</span>}
           </Link>
 
           {/* Right */}
@@ -292,7 +294,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
             <button
               type="button"
               onClick={() => { setIsSearchOpen((p) => !p); setIsMobileMenuOpen(false) }}
-              className="p-2 text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+              className="p-2 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-lg hover:bg-white/10"
               aria-label="Buscar"
             >
               <Search className="h-5 w-5" />
@@ -300,7 +302,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
             <Link
               to={`/${slug}/cart`}
               onClick={closeAll}
-              className="relative p-2 text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+              className="relative p-2 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-lg hover:bg-white/10"
               aria-label="Carrito"
             >
               <ShoppingCart className="h-5 w-5" />
@@ -315,28 +317,28 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
 
         {/* ─── Mobile search panel ─── */}
         {isSearchOpen && (
-          <div className="lg:hidden border-t px-3 py-3" style={{ borderColor: `${primaryColor}33` }}>
+          <div className="lg:hidden border-t px-3 py-3" style={{ borderColor: `${safePrimaryColor}33` }}>
             <form onSubmit={handleSearch} className="flex items-center gap-2">
               <div className="flex-1 flex items-center bg-white/15 focus-within:bg-white/25 rounded-full px-4 py-2 transition-colors">
-                <Search className="h-4 w-4 text-white/60 shrink-0" />
+                <Search className="h-4 w-4 text-[color-mix(in_srgb,var(--org-primary-ink,white)_60%,transparent)] shrink-0" />
                 <input
                   ref={mobileSearchRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Buscar productos…"
-                  className="bg-transparent text-white placeholder-white/50 text-sm outline-none ml-2 flex-1"
+                  className="bg-transparent text-[var(--org-primary-ink,white)] placeholder-[color-mix(in_srgb,var(--org-primary-ink,white)_50%,transparent)] text-sm outline-none ml-2 flex-1"
                   autoFocus
                 />
                 {searchQuery && (
-                  <button type="button" onClick={() => setSearchQuery('')} className="text-white/50 hover:text-white ml-1 transition-colors">
+                  <button type="button" onClick={() => setSearchQuery('')} className="text-[color-mix(in_srgb,var(--org-primary-ink,white)_50%,transparent)] hover:text-[var(--org-primary-ink,white)] ml-1 transition-colors">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 )}
               </div>
               <button
                 type="submit"
-                className="px-4 py-2 text-sm font-medium text-white bg-white/20 hover:bg-white/30 rounded-full transition-colors shrink-0"
+                className="px-4 py-2 text-sm font-medium text-[var(--org-primary-ink,white)] bg-white/20 hover:bg-white/30 rounded-full transition-colors shrink-0"
               >
                 Buscar
               </button>
@@ -346,10 +348,10 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
 
         {/* ─── Mobile menu panel ─── */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t" style={{ borderColor: `${primaryColor}33` }}>
+          <div className="lg:hidden border-t" style={{ borderColor: `${safePrimaryColor}33` }}>
             {categoriesWithSubs.length > 0 ? (
               <div className="py-2">
-                <p className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-widest text-white/50">
+                <p className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-widest text-[color-mix(in_srgb,var(--org-primary-ink,white)_50%,transparent)]">
                   Categorías
                 </p>
                 {categoriesWithSubs.map((cat) => (
@@ -357,7 +359,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
                 ))}
               </div>
             ) : (
-              <div className="py-4 px-4 text-sm text-white/50 text-center">
+              <div className="py-4 px-4 text-sm text-[color-mix(in_srgb,var(--org-primary-ink,white)_50%,transparent)] text-center">
                 No hay categorías disponibles
               </div>
             )}

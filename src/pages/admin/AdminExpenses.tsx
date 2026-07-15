@@ -9,7 +9,7 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { usePermission } from '@/hooks/usePermission'
 import { trackAuditAction } from '@/lib/audit'
 import { supabase } from '@/lib/supabase'
-import { formatDateShort, formatPrice } from '@/lib/utils'
+import { cn, formatDateShort, formatPrice } from '@/lib/utils'
 import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { useToastStore } from '@/store/toastStore'
 import { BookOpen, ChevronDown, ClipboardList, CreditCard, Plus, Receipt, X } from 'lucide-react'
@@ -1609,93 +1609,101 @@ export function AdminExpenses() {
       )}
 
       {activeView === 'expense_ledger' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle>Libro de egresos</CardTitle>
-              <span className="text-xs text-gray-600">Pagina {expenseLedgerPage} de {totalExpenseLedgerPages}</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase text-gray-500">Desde</label>
-                <Input
-                  type="date"
-                  value={ledgerDraftFilters.dateFrom}
-                  onChange={(event) => setLedgerDraftFilters((previous) => ({ ...previous, dateFrom: event.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase text-gray-500">Hasta</label>
-                <Input
-                  type="date"
-                  value={ledgerDraftFilters.dateTo}
-                  onChange={(event) => setLedgerDraftFilters((previous) => ({ ...previous, dateTo: event.target.value }))}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase text-gray-500">Proveedor</label>
-                <select
-                  className="min-h-[40px] w-full rounded-lg border border-gray-300 px-3"
-                  value={ledgerDraftFilters.supplierId}
-                  onChange={(event) => setLedgerDraftFilters((previous) => ({ ...previous, supplierId: event.target.value }))}
-                >
-                  <option value="">Todos</option>
-                  {suppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase text-gray-500">Tipo de registro</label>
-                <select
-                  className="min-h-[40px] w-full rounded-lg border border-gray-300 px-3"
-                  value={ledgerDraftFilters.entryKind}
-                  onChange={(event) =>
-                    setLedgerDraftFilters((previous) => ({
-                      ...previous,
-                      entryKind: event.target.value as ExpenseLedgerFilters['entryKind'],
-                    }))
-                  }
-                >
-                  <option value="">Todos</option>
-                  <option value="accrual">Devengado</option>
-                  <option value="cash">Caja</option>
-                </select>
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium uppercase text-gray-500">Evento</label>
-                <select
-                  className="min-h-[40px] w-full rounded-lg border border-gray-300 px-3"
-                  value={ledgerDraftFilters.eventType}
-                  onChange={(event) =>
-                    setLedgerDraftFilters((previous) => ({
-                      ...previous,
-                      eventType: event.target.value as ExpenseLedgerFilters['eventType'],
-                    }))
-                  }
-                >
-                  <option value="">Todos</option>
-                  <option value="invoice">Factura</option>
-                  <option value="payment">Pago</option>
-                  <option value="payment_reversal">Reversion de pago</option>
-                  <option value="manual_adjustment">Ajuste manual</option>
-                  <option value="direct_expense">Gasto directo</option>
-                </select>
-              </div>
-              <div className="flex items-end gap-2">
-                <Button variant="outline" className="w-full" onClick={clearLedgerFilters}>
-                  Limpiar
-                </Button>
-                <Button className="w-full" onClick={applyLedgerFilters}>
-                  Aplicar
-                </Button>
-              </div>
-            </div>
+        <>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <input
+              type="date"
+              value={ledgerDraftFilters.dateFrom}
+              onChange={(event) => setLedgerDraftFilters((previous) => ({ ...previous, dateFrom: event.target.value }))}
+              className={cn(
+                'h-9 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500',
+                ledgerDraftFilters.dateFrom ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+              )}
+            />
+            <input
+              type="date"
+              value={ledgerDraftFilters.dateTo}
+              onChange={(event) => setLedgerDraftFilters((previous) => ({ ...previous, dateTo: event.target.value }))}
+              className={cn(
+                'h-9 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500',
+                ledgerDraftFilters.dateTo ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+              )}
+            />
+            <select
+              value={ledgerDraftFilters.supplierId}
+              onChange={(event) => setLedgerDraftFilters((previous) => ({ ...previous, supplierId: event.target.value }))}
+              className={cn(
+                'h-9 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500',
+                ledgerDraftFilters.supplierId ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+              )}
+            >
+              <option value="">Todos los proveedores</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={ledgerDraftFilters.entryKind}
+              onChange={(event) =>
+                setLedgerDraftFilters((previous) => ({
+                  ...previous,
+                  entryKind: event.target.value as ExpenseLedgerFilters['entryKind'],
+                }))
+              }
+              className={cn(
+                'h-9 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500',
+                ledgerDraftFilters.entryKind ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+              )}
+            >
+              <option value="">Todos los registros</option>
+              <option value="accrual">Devengado</option>
+              <option value="cash">Caja</option>
+            </select>
+            <select
+              value={ledgerDraftFilters.eventType}
+              onChange={(event) =>
+                setLedgerDraftFilters((previous) => ({
+                  ...previous,
+                  eventType: event.target.value as ExpenseLedgerFilters['eventType'],
+                }))
+              }
+              className={cn(
+                'h-9 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500',
+                ledgerDraftFilters.eventType ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+              )}
+            >
+              <option value="">Todos los eventos</option>
+              <option value="invoice">Factura</option>
+              <option value="payment">Pago</option>
+              <option value="payment_reversal">Reversion de pago</option>
+              <option value="manual_adjustment">Ajuste manual</option>
+              <option value="direct_expense">Gasto directo</option>
+            </select>
+            <Button size="sm" onClick={applyLedgerFilters} className="h-9">
+              Aplicar
+            </Button>
+            {(ledgerDraftFilters.dateFrom || ledgerDraftFilters.dateTo || ledgerDraftFilters.supplierId || ledgerDraftFilters.entryKind || ledgerDraftFilters.eventType) && (
+              <button
+                type="button"
+                onClick={clearLedgerFilters}
+                className="h-9 px-3 rounded-lg text-sm text-red-500 border border-red-200 hover:bg-red-50 flex items-center gap-1 shrink-0"
+              >
+                <X className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Limpiar</span>
+              </button>
+            )}
+          </div>
 
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-3">
+                <CardTitle>Libro de egresos</CardTitle>
+                <span className="text-xs text-gray-600">Pagina {expenseLedgerPage} de {totalExpenseLedgerPages}</span>
+              </div>
+            </CardHeader>
+            <CardContent>
             {/* Mobile cards */}
             <div className="md:hidden space-y-3">
               {expenseLedgerEntries.length === 0 && (
@@ -1775,8 +1783,9 @@ export function AdminExpenses() {
                 Pagina siguiente
               </Button>
             </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {activeView === 'direct_expenses' && (

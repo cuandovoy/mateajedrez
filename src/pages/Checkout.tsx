@@ -725,7 +725,10 @@ function CheckoutInner() {
                               {formatPrice(item.product.price * item.quantity, settings)}
                             </p>
                           )}
-                          <p className="text-sm font-semibold text-primary-600">
+                          <p
+                            className="text-sm font-semibold"
+                            style={{ color: 'var(--org-primary-color, #6366f1)' }}
+                          >
                             {formatPrice(unitPrice * item.quantity, settings)}
                           </p>
                         </div>
@@ -823,10 +826,17 @@ function CheckoutInner() {
                           <label
                             key={m.id}
                             className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                              paymentMethod === m.key
-                                ? 'border-primary-400 bg-primary-50'
-                                : 'border-gray-200 hover:bg-gray-50'
+                              paymentMethod === m.key ? '' : 'border-gray-200 hover:bg-gray-50'
                             }`}
+                            style={
+                              paymentMethod === m.key
+                                ? {
+                                    borderColor: 'var(--org-primary-color, #6366f1)',
+                                    backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #6366f1) 15%, white)',
+                                    color: 'var(--org-primary-color, #6366f1)',
+                                  }
+                                : undefined
+                            }
                           >
                             <input
                               type="radio"
@@ -834,9 +844,10 @@ function CheckoutInner() {
                               value={m.key}
                               checked={paymentMethod === m.key}
                               onChange={(e) => setPaymentMethod(e.target.value)}
-                              className="w-4 h-4 text-primary-500 focus:ring-primary-400 shrink-0"
+                              className="w-4 h-4 focus:ring-[var(--org-primary-color,#6366f1)] shrink-0"
+                              style={{ accentColor: 'var(--org-primary-color, #6366f1)' }}
                             />
-                            <span className={`shrink-0 ${paymentMethod === m.key ? 'text-primary-600' : 'text-gray-400'}`}>
+                            <span className={`shrink-0 ${paymentMethod === m.key ? '' : 'text-gray-400'}`}>
                               {icon}
                             </span>
                             <div className="flex-1 min-w-0">

@@ -8,6 +8,7 @@ import type { Order, OrderPayment } from '@/types'
 import { DollarSign, ExternalLink, MinusCircle, Receipt, ShoppingCart, X } from 'lucide-react'
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { getOrderStatusColor } from '@/lib/statusColors'
 
 interface CashSessionPaymentsProps {
   sessionId: string
@@ -45,15 +46,6 @@ const STATUS_LABEL: Record<string, string> = {
   shipped: 'Enviado',
   delivered: 'Entregado',
   cancelled: 'Cancelado',
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  pending_allocation: 'bg-orange-100 text-orange-800',
-  processing: 'bg-blue-100 text-blue-800',
-  shipped: 'bg-purple-100 text-purple-800',
-  delivered: 'bg-green-100 text-green-800',
-  cancelled: 'bg-red-100 text-red-800',
 }
 
 export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsProps) {
@@ -322,7 +314,7 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                           </td>
                           <td className="px-3 py-2 whitespace-nowrap">
                             {payment.order && (
-                              <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLOR[payment.order.status ?? ''] ?? 'bg-gray-100 text-gray-700'}`}>
+                              <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getOrderStatusColor(payment.order.status)}`}>
                                 {STATUS_LABEL[payment.order.status ?? ''] ?? payment.order.status}
                               </span>
                             )}
@@ -389,7 +381,7 @@ export function CashSessionPayments({ sessionId, onClose }: CashSessionPaymentsP
                           </span>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${STATUS_COLOR[order.status ?? ''] ?? 'bg-gray-100 text-gray-700'}`}>
+                          <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getOrderStatusColor(order.status)}`}>
                             {STATUS_LABEL[order.status ?? ''] ?? order.status}
                           </span>
                         </td>

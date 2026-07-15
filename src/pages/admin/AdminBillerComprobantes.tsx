@@ -13,9 +13,8 @@ import { formatDateShort, formatPrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { SkeletonTable } from '@/components/ui/Skeleton'
-import { Receipt, Search, Calendar, ChevronLeft, ChevronRight, ExternalLink, Download, Settings } from 'lucide-react'
+import { Receipt, Search, Calendar, ChevronLeft, ChevronRight, ExternalLink, Download, Settings, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type Comprobante = {
@@ -187,88 +186,98 @@ export function AdminBillerComprobantes() {
         <div className="flex items-center space-x-3">
           <Receipt className="h-7 w-7 text-teal-600" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Comprobantes Fiscales</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Comprobantes Fiscales</h1>
             <p className="text-gray-600 mt-1">Historial de e-Tickets y e-Facturas emitidos con Biller</p>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="text"
-                  placeholder="Nro, serie, orden..."
-                  value={searchTerm}
-                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha inicio</label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1) }}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Fecha fin</label>
-              <div className="relative">
-                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1) }}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tipo</label>
-              <select
-                value={tipoFilter}
-                onChange={(e) => { setTipoFilter(e.target.value as typeof tipoFilter); setCurrentPage(1) }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
-              >
-                <option value="all">Todos</option>
-                <option value="101">e-Ticket</option>
-                <option value="111">e-Factura</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-              <select
-                value={estadoFilter}
-                onChange={(e) => { setEstadoFilter(e.target.value as typeof estadoFilter); setCurrentPage(1) }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-admin-200"
-              >
-                <option value="all">Todos</option>
-                <option value="emitido">Emitido</option>
-                <option value="anulado">Anulado</option>
-                <option value="error">Error</option>
-              </select>
-            </div>
-          </div>
-          {(startDate || estadoFilter !== 'all' || tipoFilter !== 'all' || searchTerm) && (
-            <div className="mt-3">
-              <Button variant="outline" size="sm" onClick={handleResetFilters}>
-                Limpiar filtros
-              </Button>
-            </div>
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Nro, serie, orden..."
+            value={searchTerm}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1) }}
+            className="w-full h-9 pl-9 pr-8 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-admin-500"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => { setSearchTerm(''); setCurrentPage(1) }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        <div className="relative">
+          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => { setStartDate(e.target.value); setCurrentPage(1) }}
+            className={cn(
+              'h-9 pl-9 pr-3 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500',
+              startDate ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+            )}
+          />
+        </div>
+
+        <div className="relative">
+          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => { setEndDate(e.target.value); setCurrentPage(1) }}
+            className={cn(
+              'h-9 pl-9 pr-3 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-admin-500',
+              endDate !== todayStr ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+            )}
+          />
+        </div>
+
+        <select
+          value={tipoFilter}
+          onChange={(e) => { setTipoFilter(e.target.value as typeof tipoFilter); setCurrentPage(1) }}
+          className={cn(
+            'h-9 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500',
+            tipoFilter !== 'all' ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+          )}
+        >
+          <option value="all">Todos los tipos</option>
+          <option value="101">e-Ticket</option>
+          <option value="111">e-Factura</option>
+        </select>
+
+        <select
+          value={estadoFilter}
+          onChange={(e) => { setEstadoFilter(e.target.value as typeof estadoFilter); setCurrentPage(1) }}
+          className={cn(
+            'h-9 border rounded-lg px-3 text-sm focus:outline-none focus:ring-2 focus:ring-admin-500',
+            estadoFilter !== 'all' ? 'border-admin-400 bg-admin-50 text-admin-800 font-medium' : 'border-gray-200 bg-white text-gray-700'
+          )}
+        >
+          <option value="all">Todos los estados</option>
+          <option value="emitido">Emitido</option>
+          <option value="anulado">Anulado</option>
+          <option value="error">Error</option>
+        </select>
+
+        {(startDate || estadoFilter !== 'all' || tipoFilter !== 'all' || searchTerm) && (
+          <button
+            type="button"
+            onClick={handleResetFilters}
+            className="h-9 px-3 rounded-lg text-sm text-red-500 border border-red-200 hover:bg-red-50 flex items-center gap-1 shrink-0"
+          >
+            <X className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Limpiar</span>
+          </button>
+        )}
+      </div>
 
       {/* Table */}
       <Card>

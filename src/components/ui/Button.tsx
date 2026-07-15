@@ -15,12 +15,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const isAdminContext = typeof document !== 'undefined' && document.body.classList.contains('admin-theme')
     
     const variants = {
-      primary: isAdminContext 
+      primary: isAdminContext
         ? 'bg-admin-500 text-white hover:bg-admin-600 focus-visible:ring-admin-500'
-        : 'text-white focus-visible:ring-[var(--org-primary-color,#6366f1)]',
+        : 'focus-visible:ring-[var(--org-primary-color,#6366f1)]',
       secondary: isAdminContext
         ? 'bg-gray-600 text-white hover:bg-gray-700 focus-visible:ring-gray-500'
-        : 'text-white focus-visible:ring-[var(--org-secondary-color,#8b5cf6)]',
+        : 'focus-visible:ring-[var(--org-secondary-color,#8b5cf6)]',
       outline: isAdminContext
         ? 'border-2 border-admin-500 text-admin-600 hover:bg-admin-50 focus-visible:ring-admin-500'
         : 'border-2 focus-visible:ring-[var(--org-primary-color,#6366f1)]',
@@ -31,9 +31,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     // Estilos inline para colores dinámicos cuando no es admin
     const dynamicStyles = !isAdminContext && variant === 'primary' ? {
       backgroundColor: 'var(--org-primary-color, #6366f1)',
+      color: 'var(--org-primary-ink, #ffffff)',
       '--hover-bg': 'var(--org-primary-color, #6366f1)',
     } : !isAdminContext && variant === 'secondary' ? {
       backgroundColor: 'var(--org-secondary-color, #8b5cf6)',
+      color: 'var(--org-secondary-ink, #ffffff)',
     } : !isAdminContext && variant === 'outline' ? {
       borderColor: 'var(--org-primary-color, #6366f1)',
       color: 'var(--org-primary-color, #6366f1)',

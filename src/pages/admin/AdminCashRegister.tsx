@@ -32,6 +32,7 @@ import { trackAuditAction } from '@/lib/audit'
 import { formatDateShort, formatPrice } from '@/lib/utils'
 import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { useAuthStore } from '@/store/authStore'
+import { useToastStore } from '@/store/toastStore'
 import type { CashSession, CashSessionInsert, CashSessionUpdate } from '@/types'
 
 
@@ -56,6 +57,7 @@ function AdminCashRegisterContent() {
   const settings = useOrgSettings()
   const queryClient = useQueryClient()
   const { can, loading: permLoading } = usePermission()
+  const { show } = useToastStore()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false)
   const [editingSession, setEditingSession] = useState<CashSession | null>(null)
@@ -177,7 +179,7 @@ function AdminCashRegisterContent() {
         .single()
 
       if (existingSession) {
-        alert('Ya existe una sesión abierta para esta sucursal. Por favor, ciérrala primero.')
+        show('Ya existe una sesión abierta para esta sucursal. Por favor, ciérrala primero.', 'error')
         return
       }
 
@@ -216,7 +218,7 @@ function AdminCashRegisterContent() {
       invalidateSessions()
     } catch (error) {
       console.error('Error opening cash session:', error)
-      alert('Error al abrir la sesión de caja')
+      show('Error al abrir la sesión de caja', 'error')
     }
   }
 
@@ -271,7 +273,7 @@ function AdminCashRegisterContent() {
       invalidateSessions()
     } catch (error) {
       console.error('Error closing cash session:', error)
-      alert('Error al cerrar la sesión de caja')
+      show('Error al cerrar la sesión de caja', 'error')
     }
   }
 
@@ -296,7 +298,7 @@ function AdminCashRegisterContent() {
       invalidateSessions()
     } catch (error) {
       console.error('Error deleting cash session:', error)
-      alert('Error al eliminar la sesión de caja')
+      show('Error al eliminar la sesión de caja', 'error')
     }
   }
 

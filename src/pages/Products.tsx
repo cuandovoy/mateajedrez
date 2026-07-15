@@ -94,6 +94,7 @@ export function Products() {
   if (isLoading && allProducts.length === 0) {
     return (
       <div className="container-custom py-8">
+        <Skeleton className="h-10 w-72 mb-6 rounded-xl" />
         <div className="flex gap-3 flex-wrap mb-8">
           <Skeleton className="h-10 flex-1 min-w-[200px] rounded-full" />
           <Skeleton className="h-10 w-20 rounded-full" />
@@ -111,6 +112,15 @@ export function Products() {
 
   return (
     <div className="container-custom py-8">
+      <div className="mb-8">
+        <h1
+          className="text-3xl font-bold text-gray-900 mb-1"
+          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
+        >
+          Todos los productos
+        </h1>
+      </div>
+
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-3 mb-8">
         {/* Search */}
@@ -141,10 +151,10 @@ export function Products() {
               onClick={() => setSelectedCategory('')}
               className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
                 !selectedCategory
-                  ? 'text-white border-transparent shadow-sm'
+                  ? 'border-transparent shadow-sm'
                   : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
-              style={!selectedCategory ? { backgroundColor: 'var(--org-primary-color, #6366f1)' } : undefined}
+              style={!selectedCategory ? { backgroundColor: 'var(--org-primary-color, #6366f1)', color: 'var(--org-primary-ink, white)' } : undefined}
             >
               Todos
             </button>
@@ -154,10 +164,10 @@ export function Products() {
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
                   selectedCategory === cat.id
-                    ? 'text-white border-transparent shadow-sm'
+                    ? 'border-transparent shadow-sm'
                     : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
-                style={selectedCategory === cat.id ? { backgroundColor: 'var(--org-primary-color, #6366f1)' } : undefined}
+                style={selectedCategory === cat.id ? { backgroundColor: 'var(--org-primary-color, #6366f1)', color: 'var(--org-primary-ink, white)' } : undefined}
               >
                 {cat.name}
               </button>

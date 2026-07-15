@@ -8,7 +8,7 @@ export function InstallBanner() {
 
   return (
     <div className="fixed bottom-20 lg:bottom-4 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm">
-      <div className="bg-[#12192C] text-white rounded-xl shadow-lg px-4 py-3 flex items-start gap-3">
+      <div className="bg-admin-900 text-white rounded-xl shadow-lg px-4 py-3 flex items-start gap-3">
         <div className="h-9 w-9 rounded-lg bg-white/10 flex items-center justify-center shrink-0 mt-0.5">
           <img src="/logo3.png" alt="Axios" className="h-6 w-6 object-contain" />
         </div>

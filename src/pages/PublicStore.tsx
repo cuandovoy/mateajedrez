@@ -152,7 +152,7 @@ export function PublicStore() {
         <Skeleton className="w-full h-64 md:h-96 rounded-none" />
         <div className="container-custom py-12">
           <Skeleton className="h-8 w-40 mx-auto mb-10 rounded-xl" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
             {Array.from({ length: 8 }).map((_, i) => (
               <SkeletonProductCard key={i} />
             ))}
@@ -223,7 +223,7 @@ export function PublicStore() {
                   className="px-8 py-4 md:px-10 md:py-4 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-full"
                   style={{
                     backgroundColor: `var(--org-primary-color, #6366f1)`,
-                    color: 'white',
+                    color: 'var(--org-primary-ink, white)',
                   }}
                 >
                   Ver productos

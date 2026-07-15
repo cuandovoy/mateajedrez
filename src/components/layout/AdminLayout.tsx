@@ -64,6 +64,8 @@ type NavItem = {
   minBranches?: number
   /** Mostrar solo si la organización tiene configuración de Biller */
   requiresBillerConfig?: boolean
+  /** Ocultar si el módulo de la organización está deshabilitado (organizations.settings) */
+  requiresOrgSetting?: 'branches_enabled' | 'transfers_enabled'
   /** Acción custom en lugar de navegación */
   onClick?: () => void
   /** Subitems expandibles dentro del ítem */
@@ -174,7 +176,7 @@ export function AdminLayout() {
             { path: '/pos', label: 'Modo operador' },
           ],
         },
-        { path: '/transfers', label: 'Transferencias', icon: ArrowRight, planFeature: 'transfers' as const, minBranches: 2, permission: 'inventario:ver' as const },
+        { path: '/transfers', label: 'Transferencias', icon: ArrowRight, planFeature: 'transfers' as const, minBranches: 2, permission: 'inventario:ver' as const, requiresOrgSetting: 'transfers_enabled' as const },
       ],
     },
     {
@@ -195,7 +197,7 @@ export function AdminLayout() {
         },
         { path: '/reposicion', label: 'Reposición', icon: RefreshCw, permission: 'inventario:ver' as const },
         { path: '/suppliers', label: 'Proveedores', icon: Truck, permission: 'compras:ver' as const },
-        { path: '/branches', label: 'Sucursales', icon: Building2, permission: 'configuracion:ver' as const },
+        { path: '/branches', label: 'Sucursales', icon: Building2, permission: 'configuracion:ver' as const, requiresOrgSetting: 'branches_enabled' as const },
       ],
     },
     {
@@ -279,7 +281,7 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Admin Header - compacto */}
-      <header className="bg-[#1c1d33] border-b border-white/10 sticky top-0 z-30">
+      <header className="bg-admin-900 border-b border-white/10 sticky top-0 z-30">
         <div className="px-4 md:px-6 py-2.5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -445,7 +447,7 @@ export function AdminLayout() {
 
         {/* Admin Sidebar - más compacto */}
         <aside className={cn(
-          'fixed left-0 top-[52px] h-[calc(100vh-52px)] bg-[#1c1d33] border-r border-white/10 overflow-y-auto z-20 transition-all duration-300 ease-in-out',
+          'fixed left-0 top-[52px] h-[calc(100vh-52px)] bg-admin-900 border-r border-white/10 overflow-y-auto z-20 transition-all duration-300 ease-in-out',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
           sidebarCollapsed ? 'lg:w-14' : 'w-64 lg:w-64'
         )}>
@@ -460,6 +462,8 @@ export function AdminLayout() {
                   if (item.requiresBillerConfig && (billerConfigLoading || !billerConfig)) return false
                   // Module permission gate: hide item if user lacks the required module permission
                   if (item.permission && !permLoading && !can(item.permission)) return false
+                  // Org module toggle: additive gate, only hides — never reveals an otherwise-gated item
+                  if (item.requiresOrgSetting && orgSettings[item.requiresOrgSetting] === false) return false
                   if (section.title === 'Reportes') return true
                   return !item.planFeature || canUseFeature(item.planFeature)
                 }) ?? []
@@ -668,7 +672,7 @@ export function AdminLayout() {
             type="button"
             onClick={toggleSidebarCollapsed}
             aria-label="Expandir barra lateral"
-            className="hidden lg:flex fixed left-14 top-24 z-30 h-10 w-10 items-center justify-center rounded-r-full border border-white/15 bg-[#1c1d33] text-slate-400 shadow-sm hover:bg-white/10 hover:text-slate-200 transition-colors"
+            className="hidden lg:flex fixed left-14 top-24 z-30 h-10 w-10 items-center justify-center rounded-r-full border border-white/15 bg-admin-900 text-slate-400 shadow-sm hover:bg-white/10 hover:text-slate-200 transition-colors"
           >
             <ChevronRight className="h-5 w-5" />
           </button>
@@ -700,7 +704,7 @@ export function AdminLayout() {
       </div>
 
       {/* Bottom Navigation - solo mobile */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#1c1d33] border-t border-white/10">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-admin-900 border-t border-white/10">
         <div className="flex items-stretch h-16">
           {[
             { path: '/', label: 'Inicio', icon: LayoutDashboard },
@@ -745,7 +749,7 @@ export function AdminLayout() {
         <EditOrganizationModal
           organization={currentOrganization}
           onClose={() => setOrgSettingsOpen(false)}
-          hiddenTabs={['formato', 'suscripcion', 'facturacion']}
+          hiddenTabs={['formato', 'suscripcion', 'facturacion', 'modulos']}
         />
       )}
 

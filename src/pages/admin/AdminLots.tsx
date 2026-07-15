@@ -110,7 +110,7 @@ function AdminLotsContent() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Lotes de inventario</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Lotes de inventario</h1>
           {!loading && (
             <div className="flex flex-wrap gap-3 mt-1 text-sm">
               {stats.critical > 0 && (

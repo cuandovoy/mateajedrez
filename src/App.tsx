@@ -43,6 +43,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { Landing } from './pages/Landing'
 import { LandingFacturacion } from './pages/LandingFacturacion'
 import { PoliticaPrivacidad } from './pages/PoliticaPrivacidad'
@@ -56,6 +57,22 @@ function ReportsRouteGuard({ children }: { children: JSX.Element }) {
 
   if (!canUseFeature('advanced_reports')) {
     return <Navigate to={`/planes?from=${encodeURIComponent(location.pathname)}`} replace />
+  }
+
+  return children
+}
+
+function OrgFeatureRouteGuard({
+  feature,
+  children,
+}: {
+  feature: 'branches_enabled' | 'transfers_enabled'
+  children: JSX.Element
+}) {
+  const settings = useOrgSettings()
+
+  if (settings[feature] === false) {
+    return <Navigate to="/" replace />
   }
 
   return children
@@ -120,11 +137,11 @@ function App() {
           <Route path="/reports/audit-logs" element={<ReportsRouteGuard><AdminAuditLogs /></ReportsRouteGuard>} />
           <Route path="/reports/customers" element={<ReportsRouteGuard><AdminCustomerReports /></ReportsRouteGuard>} />
           <Route path="/reports/inventory" element={<ReportsRouteGuard><AdminInventoryReports /></ReportsRouteGuard>} />
-          <Route path="/branches" element={<AdminBranches />} />
+          <Route path="/branches" element={<OrgFeatureRouteGuard feature="branches_enabled"><AdminBranches /></OrgFeatureRouteGuard>} />
           <Route path="/inventory" element={<AdminInventory />} />
           <Route path="/inventory/lots" element={<AdminLots />} />
           <Route path="/reposicion" element={<AdminReposicion />} />
-          <Route path="/transfers" element={<AdminTransfers />} />
+          <Route path="/transfers" element={<OrgFeatureRouteGuard feature="transfers_enabled"><AdminTransfers /></OrgFeatureRouteGuard>} />
           <Route path="/cash-register" element={<AdminCashRegister />} />
           <Route path="/organizations" element={<AdminOrganizations />} />
           <Route path="/planes" element={<AdminPlans />} />

@@ -17,6 +17,7 @@ import { PAGE_SIZE_ADMIN } from '@/lib/constants'
 import { Search, Calendar, ChevronLeft, ChevronRight, Eye, Plus, ShoppingCart, X } from 'lucide-react'
 import type { Order, CashSession } from '@/types'
 import { cn } from '@/lib/utils'
+import { getOrderStatusColor } from '@/lib/statusColors'
 
 const formatOrderDisplayNumber = (order: { id: string; order_number?: number | null }): string => {
   if (order.order_number && order.order_number > 0) return `#${String(order.order_number).padStart(6, '0')}`
@@ -33,18 +34,6 @@ const getStatusLabel = (status: string | null): string => {
     cancelled: 'Cancelado',
   }
   return (status && statusMap[status]) || status || 'Sin estado'
-}
-
-const getStatusColor = (status: string | null): string => {
-  const colorMap: Record<string, string> = {
-    pending_allocation: 'bg-orange-100 text-orange-800',
-    pending: 'bg-yellow-100 text-yellow-800',
-    processing: 'bg-blue-100 text-blue-800',
-    shipped: 'bg-purple-100 text-purple-800',
-    delivered: 'bg-green-100 text-green-800',
-    cancelled: 'bg-red-100 text-red-800',
-  }
-  return (status && colorMap[status]) || 'bg-gray-100 text-gray-800'
 }
 
 type OrderStatus = 'pending_allocation' | 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
@@ -296,7 +285,7 @@ export function AdminOrders() {
     <div>
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Órdenes</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Órdenes</h1>
           <p className="text-gray-600 mt-1">Gestiona todas las órdenes de la tienda</p>
         </div>
         {canManage && (
@@ -325,6 +314,7 @@ export function AdminOrders() {
             <button
               onClick={() => { setSearchTerm(''); setCurrentPage(1) }}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label="Limpiar búsqueda"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -436,7 +426,7 @@ export function AdminOrders() {
                         <p className="text-sm font-semibold text-gray-900 shrink-0">{formatPrice(order.total, settings)}</p>
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', getStatusColor(order.status))}>
+                        <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', getOrderStatusColor(order.status))}>
                           {getStatusLabel(order.status)}
                         </span>
                         <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', collectionStatus.color)}>
@@ -509,7 +499,7 @@ export function AdminOrders() {
                           </td>
                           <td className="py-3 px-4">
                             <div className="flex flex-wrap gap-1.5">
-                              <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', getStatusColor(order.status))}>
+                              <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', getOrderStatusColor(order.status))}>
                                 {getStatusLabel(order.status)}
                               </span>
                               <span className={cn('px-2 py-0.5 rounded-full text-xs font-medium', collectionStatus.color)}>

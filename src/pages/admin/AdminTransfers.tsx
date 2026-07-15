@@ -16,6 +16,7 @@ import { usePlanLimits } from '@/hooks/usePlanLimits'
 import { formatDateShort } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
 import type { InventoryTransfer } from '@/types'
+import { getTransferStatusColor } from '@/lib/statusColors'
 
 interface TransferWithDetails extends InventoryTransfer {
   from_branch_name: string
@@ -109,19 +110,6 @@ export function AdminTransfers() {
   const handleCancelTransfer = (transferId: string) => {
     if (!confirm('¿Cancelar esta transferencia? El stock será devuelto a la sucursal origen.')) return
     cancelTransfer.mutate(transferId)
-  }
-
-  const getStatusColor = (status: string | null) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 text-green-800'
-      case 'cancelled':
-        return 'bg-red-100 text-red-800'
-      case 'in_transit':
-        return 'bg-yellow-100 text-yellow-800'
-      default:
-        return 'bg-blue-100 text-blue-800'
-    }
   }
 
   const getStatusLabel = (status: string | null) => {
@@ -276,7 +264,7 @@ export function AdminTransfers() {
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span
-                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(
+                          className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTransferStatusColor(
                             transfer.status
                           )}`}
                         >

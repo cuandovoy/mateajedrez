@@ -48,7 +48,7 @@ export function WelcomeModal() {
         }`}
       >
         {/* Header navy */}
-        <div className="relative bg-[#1c1d33] px-7 py-7">
+        <div className="relative bg-admin-900 px-7 py-7">
           <button
             onClick={handleClose}
             className="absolute right-4 top-4 rounded-full p-1.5 text-white/40 hover:bg-white/10 hover:text-white/80 transition-colors"

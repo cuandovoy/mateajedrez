@@ -182,7 +182,7 @@ const { register, handleSubmit, reset, formState: { errors } } =
 ### Notificaciones
 ```typescript
 const { show } = useToastStore()
-show('Mensaje de éxito', 'success')   // 'success' | 'error' | 'warning' | 'info'
+show('Mensaje de éxito', 'success')   // 'success' | 'error' | 'info' (ToastType en src/components/ui/Toast.tsx — no existe 'warning', usar 'error' para bloqueos/validaciones)
 // Mensajes siempre en español
 ```
 

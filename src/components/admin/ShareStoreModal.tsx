@@ -14,10 +14,12 @@ export function ShareStoreModal({ storeUrl, storeName, onClose }: ShareStoreModa
 
   useEffect(() => {
     if (!canvasRef.current) return
+    // Color del QR fijo en el navy de marca (admin-900) — la librería QRCode
+    // no acepta clases Tailwind, solo valores hex directos.
     QRCode.toCanvas(canvasRef.current, storeUrl, {
       width: 220,
       margin: 2,
-      color: { dark: '#12192C', light: '#ffffff' },
+      color: { dark: '#1c1d33', light: '#ffffff' },
     })
   }, [storeUrl])
 
