@@ -14,18 +14,19 @@ import { useOrganization } from '@/hooks/useOrganization'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { usePermission } from '@/hooks/usePermission'
 import { usePlanLimits } from '@/hooks/usePlanLimits'
+import { generateDuplicateSku } from '@/lib/duplicateSku'
 import { getMaxProductImages } from '@/lib/planLimits'
 import { queryKeys } from '@/lib/queryKeys'
 import type { ProductForm } from '@/lib/schemas'
 import { productSchema } from '@/lib/schemas'
-import { deleteImage, uploadProductImage } from '@/lib/storage'
+import { deleteProductImageIfUnused, uploadProductImage } from '@/lib/storage'
 import { supabase } from '@/lib/supabase'
 import { capitalizeFirst, formatDateShort, formatPrice, getEffectivePrice } from '@/lib/utils'
 import { useToastStore } from '@/store/toastStore'
-import type { Category, Product, ProductImage, ProductInsert, ProductUpdate, ProductVariant, Supplier } from '@/types'
+import type { Category, Product, ProductImage, ProductInsert, ProductUpdate, ProductVariant, ProductVariantInsert, Supplier } from '@/types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Download, Edit, Grid3x3, List, Package, Percent, Plus, ScanLine, Search, Star, Trash2, Truck, Upload, X } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Copy, Download, Edit, Grid3x3, List, Package, Percent, Plus, ScanLine, Search, Star, Trash2, Truck, Upload, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
@@ -55,6 +56,24 @@ interface ProductWithImages extends Product {
 
 interface ProductVariantWithInventory extends ProductVariant {
   inventory_stock?: number
+}
+
+/**
+ * Definición de una variante copiada al duplicar un producto, pendiente de insertar
+ * hasta que el usuario guarde el formulario. No incluye `image_url`: se deja sin copiar
+ * a propósito para no compartir el mismo archivo de Storage entre variantes de dos
+ * productos distintos (la gestión de variantes no tiene la guarda de "otro producto
+ * todavía usa este archivo" que sí tiene product_images).
+ */
+interface DuplicateVariantDraft {
+  sku: string
+  name: string | null
+  attributes: ProductVariant['attributes']
+  price: number | null
+  unit: string | null
+  min_stock: number | null
+  low_stock_threshold: number | null
+  is_active: boolean | null
 }
 
 type ViewMode = 'grid' | 'list'
@@ -470,6 +489,8 @@ function AdminProductsContent() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductWithImages | null>(null)
   const [productImages, setProductImages] = useState<ProductImageItem[]>([])
+  const [duplicatedVariants, setDuplicatedVariants] = useState<DuplicateVariantDraft[]>([])
+  const [duplicatingProductId, setDuplicatingProductId] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [variantManagerProduct, setVariantManagerProduct] = useState<Product | null>(null)
   const [barcodeManagerProduct, setBarcodeManagerProduct] = useState<Product | null>(null)
@@ -1004,6 +1025,28 @@ function AdminProductsContent() {
         )
       }
 
+      // Duplicar producto: insertar las variantes copiadas (SKU nuevo por variante,
+      // sin image_url) apuntando al producto recién creado. El trigger de DB
+      // (auto_create_inventory_on_variant_insert) crea las filas de branch_inventory
+      // en stock 0 para cada sucursal automáticamente — no hace falta insertarlas a mano.
+      if (!editingProduct && duplicatingProductId && duplicatedVariants.length > 0) {
+        const variantRows: ProductVariantInsert[] = duplicatedVariants.map((draft) => ({
+          product_id: productId,
+          sku: draft.sku,
+          name: draft.name,
+          attributes: draft.attributes,
+          price: draft.price,
+          unit: draft.unit,
+          min_stock: draft.min_stock,
+          low_stock_threshold: draft.low_stock_threshold,
+          is_active: draft.is_active,
+        }))
+        const { error: variantsError } = await (supabase
+          .from('product_variants') as any)
+          .insert(variantRows)
+        if (variantsError) throw variantsError
+      }
+
       // Handle product images
       if (productImages.length > 0) {
         // Upload new files first
@@ -1060,7 +1103,7 @@ function AdminProductsContent() {
                   (img) => img.image_url === deletedImage.image_url
                 )
                 if (!stillExists) {
-                  await deleteImage(deletedImage.image_url, 'product-images')
+                  await deleteProductImageIfUnused(deletedImage.image_url)
                 }
               } catch (error) {
                 console.error('Error deleting image file:', error)
@@ -1107,7 +1150,7 @@ function AdminProductsContent() {
             )
             if (oldImage && oldImage.image_url !== imageToUpdate.image_url) {
               try {
-                await deleteImage(oldImage.image_url, 'product-images')
+                await deleteProductImageIfUnused(oldImage.image_url)
               } catch (error) {
                 console.error('Error deleting old image file:', error)
               }
@@ -1159,7 +1202,7 @@ function AdminProductsContent() {
         // Delete image files from storage
         for (const oldImage of editingProduct.product_images) {
           try {
-            await deleteImage(oldImage.image_url, 'product-images')
+            await deleteProductImageIfUnused(oldImage.image_url)
           } catch (error) {
             console.error('Error deleting image file:', error)
           }
@@ -1172,6 +1215,8 @@ function AdminProductsContent() {
       setProductImages([])
       setSelectedCategoryIds([])
       setInitialBranchId('')
+      setDuplicatingProductId(null)
+      setDuplicatedVariants([])
       invalidateProducts()
     } catch (error: any) {
       console.error('Error saving product:', error)
@@ -1244,6 +1289,8 @@ function AdminProductsContent() {
 
   const handleEdit = (product: ProductWithImages) => {
     setEditingProduct(product)
+    setDuplicatingProductId(null)
+    setDuplicatedVariants([])
 
     const existingImages: ProductImageItem[] = (product.product_images || [])
       .sort((a, b) => a.display_order - b.display_order)
@@ -1266,6 +1313,74 @@ function AdminProductsContent() {
       stock: product.inventory_stock ?? 0,
       category_id: product.category_id,
       sku: product.sku,
+      is_active: product.is_active ?? true,
+      discount_percentage: product.discount_percentage ?? null,
+      discount_expires_at: product.discount_expires_at
+        ? product.discount_expires_at.slice(0, 16)
+        : null,
+    })
+    setIsModalOpen(true)
+  }
+
+  const handleDuplicate = (product: ProductWithImages) => {
+    if (!canManage) return
+    if (isAtLimit('products')) {
+      show(`Límite alcanzado (${limits.products} productos). Actualizá tu plan.`, 'error')
+      return
+    }
+
+    // Modo "duplicar": editingProduct queda en null (el submit toma la rama de creación),
+    // pero recordamos el producto de origen para armar las variantes copiadas.
+    setEditingProduct(null)
+    setDuplicatingProductId(product.id)
+
+    // El SKU sugerido solo evita colisión contra los productos actualmente cargados en
+    // memoria (respetan los filtros activos). Si hay filtros aplicados, puede no cubrir
+    // el catálogo completo de la organización — el usuario puede ajustar el SKU antes de
+    // guardar, y el índice único de la DB (organization_id, sku) evita el duplicado real.
+    const existingSkus = products.map((p) => p.sku)
+    const newSku = generateDuplicateSku(product.sku, existingSkus)
+
+    const existingImages: ProductImageItem[] = (product.product_images || [])
+      .sort((a, b) => a.display_order - b.display_order)
+      .map((img) => ({
+        // Sin `id`: son imágenes nuevas para el producto copia. Se conserva la misma
+        // `image_url` del original para no volver a subir el archivo.
+        image_url: img.image_url,
+        display_order: img.display_order,
+        is_primary: img.is_primary ?? false,
+      }))
+    setProductImages(existingImages)
+
+    const existingCatIds = (product.product_categories || []).map((pc) => pc.category_id)
+    setSelectedCategoryIds(existingCatIds.length > 0 ? existingCatIds : product.category_id ? [product.category_id] : [])
+
+    const originalVariants = productVariantsByProduct[product.id] || []
+    const usedVariantSkus = new Set<string>()
+    const variantDrafts: DuplicateVariantDraft[] = originalVariants.map((variant) => {
+      const variantSku = generateDuplicateSku(variant.sku, Array.from(usedVariantSkus))
+      usedVariantSkus.add(variantSku)
+      return {
+        sku: variantSku,
+        name: variant.name,
+        attributes: variant.attributes,
+        price: variant.price,
+        unit: variant.unit,
+        min_stock: variant.min_stock ?? null,
+        low_stock_threshold: variant.low_stock_threshold ?? null,
+        is_active: variant.is_active,
+      }
+    })
+    setDuplicatedVariants(variantDrafts)
+
+    setInitialBranchId('')
+    reset({
+      name: `${product.name} (copia)`,
+      description: product.description || '',
+      price: product.price,
+      stock: 0,
+      category_id: product.category_id,
+      sku: newSku,
       is_active: product.is_active ?? true,
       discount_percentage: product.discount_percentage ?? null,
       discount_expires_at: product.discount_expires_at
@@ -1301,6 +1416,8 @@ function AdminProductsContent() {
     setProductImages([])
     setInitialBranchId('')
     setSelectedCategoryIds([])
+    setDuplicatingProductId(null)
+    setDuplicatedVariants([])
     reset()
     setIsModalOpen(true)
   }
@@ -1710,6 +1827,11 @@ function AdminProductsContent() {
                             onClick: () => handleEdit(product),
                           },
                           {
+                            label: 'Duplicar',
+                            icon: <Copy className="h-4 w-4" />,
+                            onClick: () => handleDuplicate(product),
+                          },
+                          {
                             label: 'Eliminar',
                             icon: <Trash2 className="h-4 w-4" />,
                             onClick: () => handleDelete(product.id),
@@ -1764,6 +1886,7 @@ function AdminProductsContent() {
               variantsByProduct={productVariantsByProduct}
               onEdit={handleEdit}
               onDelete={handleDelete}
+              onDuplicate={handleDuplicate}
               onManageVariants={setVariantManagerProduct}
               onManageBarcodes={setBarcodeManagerProduct}
               onManageSuppliers={setSupplierManagerProduct}
@@ -1913,6 +2036,8 @@ function AdminProductsContent() {
                     setProductImages([])
                     setInitialBranchId('')
                     setSelectedCategoryIds([])
+                    setDuplicatingProductId(null)
+                    setDuplicatedVariants([])
                     reset()
                   }}
                   className="p-1 hover:bg-gray-100 rounded-full transition-colors"
@@ -2246,6 +2371,8 @@ function AdminProductsContent() {
                       setProductImages([])
                       setInitialBranchId('')
                       setSelectedCategoryIds([])
+                      setDuplicatingProductId(null)
+                      setDuplicatedVariants([])
                       reset()
                     }}
                     className="flex-1"

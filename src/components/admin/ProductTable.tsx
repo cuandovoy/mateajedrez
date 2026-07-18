@@ -1,4 +1,4 @@
-import { Edit, Trash2, Package, Image as ImageIcon, ScanLine, Truck, ChevronDown, ChevronRight, Eye } from 'lucide-react'
+import { Edit, Trash2, Package, Image as ImageIcon, ScanLine, Truck, ChevronDown, ChevronRight, Eye, Copy } from 'lucide-react'
 import { ActionsMenu } from '@/components/ui/ActionsMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
@@ -22,6 +22,7 @@ interface ProductTableProps {
   variantsByProduct?: Record<string, ProductVariantWithInventory[]>
   onEdit: (product: Product) => void
   onDelete: (id: string) => void
+  onDuplicate: (product: Product) => void
   onManageVariants: (product: Product) => void
   onManageBarcodes?: (product: Product) => void
   onManageSuppliers?: (product: Product) => void
@@ -38,6 +39,7 @@ export function ProductTable({
   variantsByProduct = {},
   onEdit,
   onDelete,
+  onDuplicate,
   onManageVariants,
   onManageBarcodes,
   onManageSuppliers,
@@ -174,7 +176,10 @@ export function ProductTable({
                       ...(onManageBarcodes ? [{ label: 'Código de barras', icon: <ScanLine className="h-4 w-4" />, onClick: () => onManageBarcodes(product) }] : []),
                       ...(onManageSuppliers ? [{ label: 'Proveedores', icon: <Truck className="h-4 w-4" />, onClick: () => onManageSuppliers(product) }] : []),
                       ...(onAdjustInventory ? [{ label: 'Ajustar inventario', icon: <Package className="h-4 w-4" />, onClick: () => onAdjustInventory(product) }] : []),
-                      ...(canManage ? [{ label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(product.id), variant: 'danger' as const }] : []),
+                      ...(canManage ? [
+                        { label: 'Duplicar', icon: <Copy className="h-4 w-4" />, onClick: () => onDuplicate(product) },
+                        { label: 'Eliminar', icon: <Trash2 className="h-4 w-4" />, onClick: () => onDelete(product.id), variant: 'danger' as const },
+                      ] : []),
                     ]}
                   />
                 </div>
@@ -363,6 +368,11 @@ export function ProductTable({
                             label: 'Editar',
                             icon: <Edit className="h-4 w-4" />,
                             onClick: () => onEdit(product),
+                          },
+                          {
+                            label: 'Duplicar',
+                            icon: <Copy className="h-4 w-4" />,
+                            onClick: () => onDuplicate(product),
                           },
                           {
                             label: 'Eliminar',

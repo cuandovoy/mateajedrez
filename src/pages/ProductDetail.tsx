@@ -7,8 +7,9 @@ import { useProductVariants } from '@/hooks/useProductVariants'
 import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
+import { useToastStore } from '@/store/toastStore'
 import type { Product, ProductWithCategory, ProductImage } from '@/types'
-import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle } from 'lucide-react'
+import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle, Share2 } from 'lucide-react'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -31,6 +32,7 @@ export function ProductDetail() {
   const { slug, id } = useParams<{ slug?: string; id: string }>()
   const settings = useOrgSettings()
   const { addToCart } = useCartStore()
+  const { show } = useToastStore()
   const [product, setProduct] = useState<ProductWithCategory | null>(null)
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -145,6 +147,27 @@ export function ProductDetail() {
       console.error('Error adding to cart:', error)
     } finally {
       setIsAdding(false)
+    }
+  }
+
+  const handleShare = async () => {
+    if (!product) return
+    const shareUrl = window.location.href
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: product.name, url: shareUrl })
+      } catch {
+        // Usuario canceló el share nativo — no es un error a mostrar
+      }
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      show('Link copiado', 'success')
+    } catch {
+      show('No se pudo copiar el link', 'error')
     }
   }
 
@@ -420,12 +443,24 @@ export function ProductDetail() {
                 {product.category.name}
               </span>
             )}
-            <h1
-              className="text-3xl font-bold text-gray-900 mb-2"
-              style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
-            >
-              {capitalizeFirst(product.name)}
-            </h1>
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <h1
+                className="text-3xl font-bold text-gray-900"
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
+              >
+                {capitalizeFirst(product.name)}
+              </h1>
+              <button
+                type="button"
+                onClick={handleShare}
+                className="shrink-0 h-10 w-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+                style={{ color: 'var(--org-primary-color, #6366f1)' }}
+                aria-label="Compartir producto"
+                title="Compartir"
+              >
+                <Share2 className="h-4 w-4" />
+              </button>
+            </div>
             <div className="mb-4">
               {!selectedVariant && hasActiveDiscount(product) && (
                 <div className="flex items-center gap-2 mb-1">

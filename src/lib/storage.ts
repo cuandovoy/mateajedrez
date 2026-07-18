@@ -141,3 +141,30 @@ export async function deleteImage(
     throw error
   }
 }
+
+/**
+ * Delete a product image file from Storage only if no `product_images` row (of any
+ * product) still references the same `image_url`. Duplicar producto crea filas nuevas
+ * de `product_images` que apuntan a la misma URL del producto original (sin volver a
+ * subir el archivo), por lo que dos productos distintos pueden compartir el mismo
+ * archivo físico. Llamar a esta función DESPUÉS de borrar/actualizar la fila de
+ * `product_images` del producto actual en la base, para que el conteo refleje
+ * correctamente si el archivo sigue en uso por otro producto.
+ */
+export async function deleteProductImageIfUnused(imageUrl: string): Promise<void> {
+  const { count, error } = await supabase
+    .from('product_images')
+    .select('id', { count: 'exact', head: true })
+    .eq('image_url', imageUrl)
+
+  if (error) {
+    throw error
+  }
+
+  if (count && count > 0) {
+    // Otro producto todavía referencia este archivo — no tocar el Storage.
+    return
+  }
+
+  await deleteImage(imageUrl, 'product-images')
+}

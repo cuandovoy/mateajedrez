@@ -32,6 +32,12 @@ _(todos completados)_
 
 ---
 
+## Duplicar producto / Grilla de variantes (2026-07-16)
+
+### 🟡 Media
+
+- 🟡 `useProductVariantGrid.ts` — el batch save de variantes no es una transacción real: el `insert` de filas nuevas es atómico, pero los `update` de filas existentes van en paralelo con `Promise.all`, cada uno con su propio `.update().eq('id', ...)`. Si esto empieza a fallar parcialmente en producción (algunos updates OK, otros no), mover el batch a una Edge Function/RPC para que sea atómico.
+
 ## Bugs detectados
 
 ### 🟠 Alta
@@ -117,6 +123,9 @@ Todo lo marcado ✅ más abajo fue implementado, verificado (`tsc --noEmit` limp
 - 🟢 El gap del grid de skeleton en `PublicStore.tsx` (`gap-4 md:gap-6`) no coincide exactamente con el del grid real (`md:gap-5`) — detectado al arreglar el mismatch de breakpoint del mismo grid; diferencia mínima, no se tocó para no ampliar el diff de esa tarea puntual.
 
 ## Completado ✅
+
+- ✅ 2026-07-16 — **`VariantGrid.tsx` — imagen por variante restaurada**: columna "Imagen" agregada (thumbnail + input file + "Quitar"). El archivo se sube recién al presionar "Guardar cambios" (no en cada selección), y si reemplaza/quita una imagen existente, el archivo viejo se borra del Storage después de confirmar el guardado exitoso en la base — mismo comportamiento que tenía `VariantForm.tsx` antes de ser reemplazado por la grilla.
+
 
 - ✅ 2026-07-14 — **Rebrand de paleta admin**: `tailwind.config.js` — escala `admin-*` reemplazada de azul genérico (idéntico al `blue` de Tailwind) por una escala derivada en OKLCH del navy real de marca (`#1c1d33`, `docs/product_marketing.md`); `admin-900` es el hex exacto de marca. Contraste vs. blanco verificado matemáticamente: 600→5.53:1, 700→8.50:1, 800→12.76:1 (todos ≥ AA). Se agregó escala `accent` (derivada del rojo `#fd2525`) para uso puntual, explícitamente separada de la semántica de error/destructivo.
 - ✅ 2026-07-14 — **`focus:ring-primary-500` → `focus:ring-admin-500`** en `EditOrganizationModal.tsx` (7 selects de la pestaña "Formato"/checkout/consignación) — escala equivocada, no eran color pickers de storefront.
