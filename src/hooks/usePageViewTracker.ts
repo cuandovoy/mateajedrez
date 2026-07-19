@@ -39,7 +39,7 @@ export function usePageViewTracker(organizationId: string | undefined, slug: str
       .insert({
         organization_id: organizationId,
         slug,
-        page_path: location.pathname.replace(`/${slug}`, '') || '/',
+        page_path: location.pathname,
         session_id: sessionId,
         device_type: deviceType,
         referrer,

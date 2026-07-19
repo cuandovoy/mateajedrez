@@ -17,7 +17,7 @@ import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { BranchInventory, Customer } from '@/types/database.types'
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 // Icon map for known payment method keys
 const PAYMENT_METHOD_ICONS: Record<string, React.ReactNode> = {
@@ -41,7 +41,6 @@ interface FulfillmentBranchCandidate {
 
 function CheckoutInner() {
   const navigate = useNavigate()
-  const { slug } = useParams<{ slug?: string }>()
   const settings = useOrgSettings()
   const { items, getTotal, clearCart } = useCartStore()
   const { user } = useAuthStore()
@@ -648,11 +647,7 @@ function CheckoutInner() {
       show('¡Orden creada exitosamente!', 'success')
 
       // Navigate to order confirmation
-      navigate(
-        slug
-          ? `/${slug}/order-confirmation/${(order as { id: string }).id}`
-          : `/orders/${(order as { id: string }).id}`
-      )
+      navigate(`/order-confirmation/${(order as { id: string }).id}`)
     } catch (error) {
       console.error('Error creating order:', error)
       show('Error al crear la orden. Por favor, intenta nuevamente.', 'error')
@@ -674,7 +669,7 @@ function CheckoutInner() {
     <div className="container-custom py-8">
       <Button
         variant="ghost"
-        onClick={() => navigate(slug ? `/${slug}/cart` : '/cart')}
+        onClick={() => navigate('/cart')}
         className="mb-6"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
@@ -727,7 +722,7 @@ function CheckoutInner() {
                           )}
                           <p
                             className="text-sm font-semibold"
-                            style={{ color: 'var(--org-primary-color, #6366f1)' }}
+                            style={{ color: 'var(--org-primary-color, #46362B)' }}
                           >
                             {formatPrice(unitPrice * item.quantity, settings)}
                           </p>
@@ -831,9 +826,9 @@ function CheckoutInner() {
                             style={
                               paymentMethod === m.key
                                 ? {
-                                    borderColor: 'var(--org-primary-color, #6366f1)',
-                                    backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #6366f1) 15%, white)',
-                                    color: 'var(--org-primary-color, #6366f1)',
+                                    borderColor: 'var(--org-primary-color, #46362B)',
+                                    backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #46362B) 15%, white)',
+                                    color: 'var(--org-primary-color, #46362B)',
                                   }
                                 : undefined
                             }
@@ -844,8 +839,8 @@ function CheckoutInner() {
                               value={m.key}
                               checked={paymentMethod === m.key}
                               onChange={(e) => setPaymentMethod(e.target.value)}
-                              className="w-4 h-4 focus:ring-[var(--org-primary-color,#6366f1)] shrink-0"
-                              style={{ accentColor: 'var(--org-primary-color, #6366f1)' }}
+                              className="w-4 h-4 focus:ring-[var(--org-primary-color,#46362B)] shrink-0"
+                              style={{ accentColor: 'var(--org-primary-color, #46362B)' }}
                             />
                             <span className={`shrink-0 ${paymentMethod === m.key ? '' : 'text-gray-400'}`}>
                               {icon}

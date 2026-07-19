@@ -301,16 +301,10 @@ Principios:
 ## Rutas y contextos
 
 ### Tienda pública
-- Prefijo `/:slug/*`
+- Monta en la raíz (`/`) — sin prefijo `:slug`, este fork sirve una única organización
 - Sin autenticación requerida
-- Org obtenida por slug de la URL (RPC `get_org_by_slug`)
+- Org obtenida una sola vez desde `VITE_STORE_SLUG` (env var de build) vía RPC `get_org_by_slug`, resuelta en `PublicStoreWrapper`
 - Layout: `PublicStoreLayout`
-
-### Panel admin
-- Rutas en `/` (sin prefijo)
-- Requiere auth + permisos
-- Layout: `AdminLayout` con sidebar
-- Org obtenida de `useOrganization()` (store)
 
 ---
 

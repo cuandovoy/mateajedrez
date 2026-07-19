@@ -1,28 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  body {
-    background-color: #fef7f0;
-    color: #111827;
-    font-family: 'Poppins', sans-serif;
+  :root {
+    /* Marca Ruemia — tokens estáticos, hardcodeados a propósito (ver
+       CLAUDE.md: theming dinámico por organización fue removido, el fork
+       es single-tenant). Los nombres --org-* se mantienen por compatibilidad
+       con el resto de la tienda, que sigue consumiendo var(--org-*, #fallback). */
+    --org-primary-color: #46362B;
+    --org-secondary-color: #A78B6C;
+    --org-accent-color: #B29E88;
+    --org-primary-ink: #EAE2D6;
+    --org-secondary-ink: #46362B;
+    --org-accent-ink: #46362B;
+    --org-font-family: 'Cambria', Georgia, 'Times New Roman', serif;
+    --org-font-heading: 'Bodoni Moda', serif;
   }
-  
-  /* Variables CSS para colores admin - se aplican cuando el body tiene la clase 'admin-theme' */
-  body.admin-theme {
-    --admin-primary-50: #eff6ff;
-    --admin-primary-100: #dbeafe;
-    --admin-primary-200: #bfdbfe;
-    --admin-primary-300: #93c5fd;
-    --admin-primary-400: #60a5fa;
-    --admin-primary-500: #3b82f6;
-    --admin-primary-600: #2563eb;
-    --admin-primary-700: #1d4ed8;
-    --admin-primary-800: #1e40af;
-    --admin-primary-900: #1e3a8a;
+
+  body {
+    background-color: #EAE2D6;
+    color: #111827;
+    font-family: 'Cambria', Georgia, 'Times New Roman', serif;
   }
 }
 
@@ -41,9 +42,6 @@
 @layer utilities {
   .focus-ring {
     @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500;
-  }
-  .focus-ring-admin {
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-admin-500;
   }
 }
 

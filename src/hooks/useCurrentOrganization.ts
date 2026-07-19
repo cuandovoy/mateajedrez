@@ -1,34 +1,12 @@
-import { PublicStoreContext } from '@/contexts/PublicStoreContext'
-import { useOrganizationStore } from '@/store/organizationStore'
+import { usePublicStore } from '@/contexts/PublicStoreContext'
 import type { Organization } from '@/types/database.types'
-import { useContext } from 'react'
 
 /**
- * Hook que retorna la organización actual según el contexto:
- * - Si estamos en tienda pública (PublicStoreProvider), usa usePublicStore
- * - Si estamos en admin, usa useOrganizationStore
+ * Organización actual de la tienda pública (single-tenant por deploy).
+ * Fork de un único cliente: ya no hay contexto admin, todo el árbol de
+ * rutas está siempre dentro de PublicStoreProvider.
  */
-export function useCurrentOrganization(): {
-  organization: Organization | null
-  slug: string | null
-  isPublicStore: boolean
-} {
-  const publicStoreContext = useContext(PublicStoreContext)
-  
-  if (publicStoreContext) {
-    // Estamos en contexto de tienda pública
-    return {
-      organization: publicStoreContext.organization,
-      slug: publicStoreContext.slug,
-      isPublicStore: true,
-    }
-  }
-  
-  // Estamos en contexto admin
-  const currentOrg = useOrganizationStore((s) => s.currentOrganization)
-  return {
-    organization: currentOrg,
-    slug: currentOrg?.slug ?? null,
-    isPublicStore: false,
-  }
+export function useCurrentOrganization(): { organization: Organization | null } {
+  const { organization } = usePublicStore()
+  return { organization }
 }

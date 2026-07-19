@@ -5,6 +5,24 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 
 ---
 
+## Rebrand Ruemia (2026-07-19)
+
+### 🔴 Crítico
+
+- 🔴 `src/pages/PoliticaPrivacidad.tsx` sigue con contenido/mailto genérico del desarrollador (`ciceridev@gmail.com`), no el texto legal real de Ruemia. Es la única página `/legal/*` que sobrevivió al recorte de admin y está linkeada desde el checkout — pendiente del texto real del cliente antes de ir a producción.
+
+### 🟡 Media
+
+- 🟡 `organization.settings.store_whatsapp_number` sigue en `null` en la base — el número real (`092 391 232`, del brand board) no se cargó a propósito (falta autorización explícita para el `UPDATE`). Mientras tanto el botón "Consultar disponibilidad" de `ProductDetail.tsx` no aparece; cae al fallback de botón deshabilitado.
+- 🟡 `supabase/functions/send-notification/email-templates.ts` — el logo de los emails transaccionales ya apunta a `/og-image.png` en el código, pero requiere `supabase functions deploy` manual para tomar efecto en producción.
+
+### ✅ Completado
+
+- ✅ 2026-07-19 — `src/components/ui/ActionsMenu.tsx` (huérfano, cero import sites) borrado junto con `Tabs.tsx`/`Dropdown.tsx`/`ProductListItem.tsx`.
+- ✅ 2026-07-19 — `public/logo2.png`, `public/logo3.png`, `public/logo.svg` borrados — solo quedaban referenciados en `PWA_SETUP.md` (doc desactualizada), cero uso en código tras el rebrand.
+
+---
+
 ## Carrito — Tienda Pública
 
 ### 🟠 Alta

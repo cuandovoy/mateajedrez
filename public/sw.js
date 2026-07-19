@@ -1,7 +1,7 @@
-const CACHE_NAME = 'axios-v2';
+const CACHE_NAME = 'ruemia-v1';
 const STATIC_ASSETS = [
-  '/logo2.png',
-  '/logo3.png',
+  '/icon-192.png',
+  '/icon-512.png',
   '/manifest.webmanifest',
 ];
 

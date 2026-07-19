@@ -127,7 +127,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
       <div className="flex items-center justify-center py-4">
         <div
           className="animate-spin rounded-full h-6 w-6 border-b-2"
-          style={{ borderColor: 'var(--org-primary-color, #6366f1)' }}
+          style={{ borderColor: 'var(--org-primary-color, #46362B)' }}
         ></div>
       </div>
     )
@@ -181,9 +181,9 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
                       style={
                         isSelected
                           ? {
-                              borderColor: 'var(--org-primary-color, #6366f1)',
-                              backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #6366f1) 15%, white)',
-                              color: 'var(--org-primary-color, #6366f1)',
+                              borderColor: 'var(--org-primary-color, #46362B)',
+                              backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #46362B) 15%, white)',
+                              color: 'var(--org-primary-color, #46362B)',
                             }
                           : undefined
                       }
@@ -220,8 +220,8 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
                   style={
                     isSelected
                       ? {
-                          borderColor: 'var(--org-primary-color, #6366f1)',
-                          backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #6366f1) 15%, white)',
+                          borderColor: 'var(--org-primary-color, #46362B)',
+                          backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #46362B) 15%, white)',
                         }
                       : undefined
                   }
@@ -243,7 +243,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
         <div className="p-4 bg-gray-50 rounded-lg space-y-2">
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-700">Precio:</span>
-            <span className="text-lg font-bold" style={{ color: 'var(--org-primary-color, #6366f1)' }}>
+            <span className="text-lg font-bold" style={{ color: 'var(--org-primary-color, #46362B)' }}>
               {formatPrice(displayPrice, settings)}
             </span>
           </div>

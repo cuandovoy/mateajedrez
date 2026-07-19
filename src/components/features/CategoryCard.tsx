@@ -4,13 +4,12 @@ import { useEffect, useState } from 'react'
 
 interface CategoryCardProps {
   category: Category
-  basePath?: string
   fallbackImages?: string[]
 }
 
 const CATEGORY_FALLBACK_INTERVAL_MS = 4500
 
-export function CategoryCard({ category, basePath = '', fallbackImages = [] }: CategoryCardProps) {
+export function CategoryCard({ category, fallbackImages = [] }: CategoryCardProps) {
   const [fallbackIndex, setFallbackIndex] = useState(0)
   const shouldUseFallback = !category.image_url && fallbackImages.length > 0
 
@@ -27,7 +26,7 @@ export function CategoryCard({ category, basePath = '', fallbackImages = [] }: C
   }, [fallbackImages.length, shouldUseFallback])
 
   return (
-    <Link to={`${basePath}/categories/${category.slug}`} className="block">
+    <Link to={`/categories/${category.slug}`} className="block">
       <div className="group relative rounded-2xl overflow-hidden aspect-[4/3] cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300">
         {/* Image layer */}
         {category.image_url ? (
@@ -61,7 +60,7 @@ export function CategoryCard({ category, basePath = '', fallbackImages = [] }: C
         ) : (
           <div
             className="absolute inset-0"
-            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--org-primary-color, #6366f1) 20%, white), color-mix(in srgb, var(--org-secondary-color, #8b5cf6) 15%, white))' }}
+            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--org-primary-color, #46362B) 20%, white), color-mix(in srgb, var(--org-secondary-color, #A78B6C) 15%, white))' }}
           />
         )}
 
@@ -75,7 +74,7 @@ export function CategoryCard({ category, basePath = '', fallbackImages = [] }: C
         <div className="absolute bottom-0 left-0 right-0 p-5">
           <h3
             className="text-white text-xl font-semibold tracking-tight drop-shadow-sm"
-            style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
+            style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
           >
             {category.name}
           </h3>

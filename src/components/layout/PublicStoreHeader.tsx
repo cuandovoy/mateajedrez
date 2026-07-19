@@ -4,77 +4,101 @@ import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
 import type { CategoryWithSubcategories } from '@/hooks/usePublicCategories'
 import { ChevronDown, Menu, Search, ShoppingCart, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import logoWordmark from '@/brand/logo-principal-fondo1.png'
+import logoIsotipo from '@/brand/isotipo-fondo1.png'
 
 interface PublicStoreHeaderProps {
   organization: Organization
-  slug: string
 }
 
-interface CategoryNavItemProps {
-  cat: CategoryWithSubcategories
-  slug: string
+interface CategoryMenuProps {
+  categories: CategoryWithSubcategories[]
   onNavigate: () => void
 }
 
-function CategoryNavItem({ cat, slug, onNavigate }: CategoryNavItemProps) {
-  const hasSubcategories = cat.subcategories && cat.subcategories.length > 0
+function CategoryMenu({ categories, onNavigate }: CategoryMenuProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  if (!hasSubcategories) {
-    return (
-      <Link
-        to={`/${slug}/categories/${cat.value}`}
-        onClick={onNavigate}
-        className="relative px-3 py-1.5 text-sm font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors duration-150 after:absolute after:bottom-0 after:left-3 after:right-3 after:h-px after:bg-[color-mix(in_srgb,var(--org-primary-ink,white)_70%,transparent)] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-250 after:origin-center"
-      >
-        {cat.label}
-      </Link>
-    )
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen])
+
+  const handleLinkClick = () => {
+    setIsOpen(false)
+    onNavigate()
   }
 
   return (
-    <div className="group relative">
+    <div ref={containerRef} className="relative">
       <button
         type="button"
-        className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors duration-150"
+        onClick={() => setIsOpen((p) => !p)}
+        aria-expanded={isOpen}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors duration-150"
       >
-        {cat.label}
-        <ChevronDown className="h-3.5 w-3.5 transition-transform duration-200 group-hover:rotate-180" />
+        Categorías
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Flyout */}
-      <div className="absolute top-full left-1/2 -translate-x-1/2 pt-3 invisible group-hover:visible opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-200 z-50 pointer-events-none group-hover:pointer-events-auto">
-        <div className="bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden min-w-[180px] w-max">
-          <Link
-            to={`/${slug}/categories/${cat.value}`}
-            onClick={onNavigate}
-            className="flex items-center px-4 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50 border-b border-gray-100 transition-colors"
-          >
-            Ver todos
-          </Link>
-          {cat.subcategories!.map((sub) => (
-            <Link
-              key={sub.value}
-              to={`/${slug}/categories/${sub.value}`}
-              onClick={onNavigate}
-              className="flex items-center px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-            >
-              {sub.label}
-            </Link>
-          ))}
+      {isOpen && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 pt-3 z-40">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-100 p-3 grid grid-cols-2 gap-x-8 gap-y-0.5 w-max max-w-md">
+            {categories.map((cat) => (
+              <div key={cat.value} className="py-1.5">
+                <Link
+                  to={`/categories/${cat.value}`}
+                  onClick={handleLinkClick}
+                  className="block px-2 py-1 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 hover:text-gray-900 transition-colors whitespace-nowrap"
+                >
+                  {cat.label}
+                </Link>
+                {cat.subcategories && cat.subcategories.length > 0 && (
+                  <div className="mt-0.5">
+                    {cat.subcategories.map((sub) => (
+                      <Link
+                        key={sub.value}
+                        to={`/categories/${sub.value}`}
+                        onClick={handleLinkClick}
+                        className="block px-2 py-1 rounded-lg text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors whitespace-nowrap"
+                      >
+                        {sub.label}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
 interface MobileCategoryItemProps {
   cat: CategoryWithSubcategories
-  slug: string
   onNavigate: () => void
 }
 
-function MobileCategoryItem({ cat, slug, onNavigate }: MobileCategoryItemProps) {
+function MobileCategoryItem({ cat, onNavigate }: MobileCategoryItemProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const hasSubcategories = cat.subcategories && cat.subcategories.length > 0
 
@@ -82,7 +106,7 @@ function MobileCategoryItem({ cat, slug, onNavigate }: MobileCategoryItemProps) 
     <div>
       <div className="flex items-center">
         <Link
-          to={`/${slug}/categories/${cat.value}`}
+          to={`/categories/${cat.value}`}
           onClick={onNavigate}
           className="flex-1 px-4 py-2.5 text-sm font-medium text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors rounded-lg"
         >
@@ -106,7 +130,7 @@ function MobileCategoryItem({ cat, slug, onNavigate }: MobileCategoryItemProps) 
           {cat.subcategories!.map((sub) => (
             <Link
               key={sub.value}
-              to={`/${slug}/categories/${sub.value}`}
+              to={`/categories/${sub.value}`}
               onClick={onNavigate}
               className="block px-3 py-2 text-sm text-[color-mix(in_srgb,var(--org-primary-ink,white)_75%,transparent)] hover:text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors rounded-lg"
             >
@@ -119,9 +143,13 @@ function MobileCategoryItem({ cat, slug, onNavigate }: MobileCategoryItemProps) 
   )
 }
 
-export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps) {
+const NAV_LINK_CLASS =
+  'px-3 py-1.5 rounded-full text-sm font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors duration-150'
+
+export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
   const { getItemCount, fetchCart } = useCartStore()
   const navigate = useNavigate()
+  const location = useLocation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -139,10 +167,28 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
     setIsSearchOpen(false)
   }
 
+  // En la home, "Inicio"/"Nosotros" hacen scroll suave en vez de navegar
+  // (evita un remount innecesario de la página cuando ya estás ahí).
+  const handleInicioClick = (e: React.MouseEvent) => {
+    closeAll()
+    if (location.pathname === '/') {
+      e.preventDefault()
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const handleNosotrosClick = (e: React.MouseEvent) => {
+    closeAll()
+    if (location.pathname === '/') {
+      e.preventDefault()
+      document.getElementById('nosotros')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault()
     const q = searchQuery.trim()
-    navigate(q ? `/${slug}/products?search=${encodeURIComponent(q)}` : `/${slug}/products`)
+    navigate(q ? `/products?search=${encodeURIComponent(q)}` : '/products')
     closeAll()
   }
 
@@ -152,19 +198,9 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
     }
   }, [isSearchOpen])
 
-  const settings = (organization.settings as Record<string, unknown>) ?? {}
-  const minimalLogoUrl =
-    typeof settings.store_logo_minimal_url === 'string' ? settings.store_logo_minimal_url : null
-  const desktopLogoUrl = organization.logo_url || null
-  const mobileLogoUrl = minimalLogoUrl || desktopLogoUrl
-  const primaryColor = organization.primary_color || '#6366f1'
-  const isValidHex = (v: string) => /^#[0-9a-fA-F]{6}$/.test(v)
-  const safePrimaryColor = isValidHex(primaryColor) ? primaryColor : '#6366f1'
-
-  const showName = (settings.store_header_show_name as boolean) !== false
-  const logoSizeKey = (settings.store_header_logo_size as string) ?? 'md'
-  const logoSizeClass = { sm: 'h-10 w-10', md: 'h-16 w-16', lg: 'h-20 w-20' }[logoSizeKey] ?? 'h-16 w-16'
-  const logoSizeClassMobile = { sm: 'h-8 w-8', md: 'h-12 w-12', lg: 'h-14 w-14' }[logoSizeKey] ?? 'h-12 w-12'
+  // Marca hardcodeada: theming dinámico por organización fue removido
+  // (single-tenant fork, org.branding/settings quedan permanentemente NULL).
+  const primaryColor = '#46362B'
 
   const itemCount = getItemCount()
 
@@ -172,10 +208,10 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
     <header
       className="sticky top-0 z-30 border-b"
       style={{
-        backgroundColor: `${safePrimaryColor}ee`,
+        backgroundColor: `${primaryColor}ee`,
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        borderColor: `${safePrimaryColor}33`,
+        borderColor: `${primaryColor}33`,
       }}
     >
       <div className="container-custom">
@@ -183,29 +219,23 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
         {/* ─── Desktop ─── */}
         <div className="hidden lg:flex items-center gap-6 h-16 my-2">
 
-          {/* Logo */}
-          <Link to={`/${slug}`} className="flex items-center gap-3 shrink-0">
-            {desktopLogoUrl ? (
-              <img src={desktopLogoUrl} alt={organization.name} className={`${logoSizeClass} object-contain`} />
-            ) : (
-              <div className={`${logoSizeClass} flex items-center justify-center bg-white/20 rounded-lg`}>
-                <span className="text-[var(--org-primary-ink,white)] font-bold text-lg">{organization.name.charAt(0).toUpperCase()}</span>
-              </div>
-            )}
-            {showName && (
-              <span className="text-[var(--org-primary-ink,white)] font-semibold text-lg leading-tight">{organization.name}</span>
-            )}
+          {/* Logo — el wordmark ya incluye el nombre "RUEMIA", no se repite como texto aparte */}
+          <Link to="/" className="flex items-center gap-3 shrink-0">
+            <img src={logoWordmark} alt={organization.name} className="h-12 w-12 rounded-lg object-contain" />
           </Link>
 
-          {/* Category nav */}
-          {categoriesWithSubs.length > 0 && (
-            <nav className="flex-1 flex items-center justify-center gap-0.5">
-              {categoriesWithSubs.map((cat) => (
-                <CategoryNavItem key={cat.value} cat={cat} slug={slug} onNavigate={closeAll} />
-              ))}
-            </nav>
-          )}
-          {categoriesWithSubs.length === 0 && <div className="flex-1" />}
+          {/* Nav: Inicio / Categorías (trigger colapsable) / Nosotros */}
+          <nav className="flex-1 flex items-center justify-center gap-1">
+            <Link to="/" onClick={handleInicioClick} className={NAV_LINK_CLASS}>
+              Inicio
+            </Link>
+            {categoriesWithSubs.length > 0 && (
+              <CategoryMenu categories={categoriesWithSubs} onNavigate={closeAll} />
+            )}
+            <Link to="/#nosotros" onClick={handleNosotrosClick} className={NAV_LINK_CLASS}>
+              Nosotros
+            </Link>
+          </nav>
 
           {/* Right actions */}
           <div className="flex items-center gap-2 shrink-0">
@@ -249,7 +279,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
 
             {/* Cart */}
             <Link
-              to={`/${slug}/cart`}
+              to="/cart"
               onClick={closeAll}
               className="relative p-2 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-full hover:bg-white/15"
               aria-label="Ver carrito"
@@ -277,16 +307,10 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
             {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
 
-          {/* Center logo */}
-          <Link to={`/${slug}`} onClick={closeAll} className="flex-1 flex justify-center items-center gap-2">
-            {mobileLogoUrl ? (
-              <img src={mobileLogoUrl} alt={organization.name} className={`${logoSizeClassMobile} object-contain`} />
-            ) : (
-              <div className={`${logoSizeClassMobile} flex items-center justify-center bg-white/20 rounded-lg`}>
-                <span className="text-[var(--org-primary-ink,white)] font-bold">{organization.name.charAt(0).toUpperCase()}</span>
-              </div>
-            )}
-            {showName && <span className="text-[var(--org-primary-ink,white)] font-semibold text-sm">{organization.name}</span>}
+          {/* Center logo — isotipo compacto + nombre, ya que el monograma solo no identifica la marca */}
+          <Link to="/" onClick={closeAll} className="flex-1 flex justify-center items-center gap-2">
+            <img src={logoIsotipo} alt={organization.name} className="h-10 w-10 rounded-lg object-contain" />
+            <span className="text-[var(--org-primary-ink,white)] font-semibold text-sm">{organization.name}</span>
           </Link>
 
           {/* Right */}
@@ -300,7 +324,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
               <Search className="h-5 w-5" />
             </button>
             <Link
-              to={`/${slug}/cart`}
+              to="/cart"
               onClick={closeAll}
               className="relative p-2 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-lg hover:bg-white/10"
               aria-label="Carrito"
@@ -317,7 +341,7 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
 
         {/* ─── Mobile search panel ─── */}
         {isSearchOpen && (
-          <div className="lg:hidden border-t px-3 py-3" style={{ borderColor: `${safePrimaryColor}33` }}>
+          <div className="lg:hidden border-t px-3 py-3" style={{ borderColor: `${primaryColor}33` }}>
             <form onSubmit={handleSearch} className="flex items-center gap-2">
               <div className="flex-1 flex items-center bg-white/15 focus-within:bg-white/25 rounded-full px-4 py-2 transition-colors">
                 <Search className="h-4 w-4 text-[color-mix(in_srgb,var(--org-primary-ink,white)_60%,transparent)] shrink-0" />
@@ -348,14 +372,30 @@ export function PublicStoreHeader({ organization, slug }: PublicStoreHeaderProps
 
         {/* ─── Mobile menu panel ─── */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t" style={{ borderColor: `${safePrimaryColor}33` }}>
+          <div className="lg:hidden border-t" style={{ borderColor: `${primaryColor}33` }}>
+            <div className="py-2">
+              <Link
+                to="/"
+                onClick={handleInicioClick}
+                className="block px-4 py-2.5 text-sm font-medium text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors rounded-lg"
+              >
+                Inicio
+              </Link>
+              <Link
+                to="/#nosotros"
+                onClick={handleNosotrosClick}
+                className="block px-4 py-2.5 text-sm font-medium text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors rounded-lg"
+              >
+                Nosotros
+              </Link>
+            </div>
             {categoriesWithSubs.length > 0 ? (
               <div className="py-2">
                 <p className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-widest text-[color-mix(in_srgb,var(--org-primary-ink,white)_50%,transparent)]">
                   Categorías
                 </p>
                 {categoriesWithSubs.map((cat) => (
-                  <MobileCategoryItem key={cat.value} cat={cat} slug={slug} onNavigate={closeAll} />
+                  <MobileCategoryItem key={cat.value} cat={cat} onNavigate={closeAll} />
                 ))}
               </div>
             ) : (

@@ -7,56 +7,38 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Poppins', 'sans-serif'],
+        sans: ['Cambria', 'Georgia', 'Times New Roman', 'serif'],
+        heading: ['Bodoni Moda', 'serif'],
       },
       spacing: {
         '18': '4.5rem',
         '22': '5.5rem',
       },
       colors: {
+        // Paleta de marca (Ruemia) — derivada del ink de marca (#46362B, ver src/brand/).
+        // Escala generada en OKLCH manteniendo hue/chroma constante (H≈56°); 900 es el
+        // hex de marca real (#46362B). Contraste vs blanco verificado WCAG AA
+        // (600: 6.06:1, 700: 8.55:1); 700 sobre 100/50 (Dropdown-style chips): 7.14:1 / 7.84:1.
         primary: {
-           50: '#eff6ff',
-          100: '#dbeafe',
-          200: '#bfdbfe',
-          300: '#93c5fd',
-          400: '#60a5fa',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
-          DEFAULT: '#3b82f6',
+          50: '#faf4f0',
+          100: '#f2e9e3',
+          200: '#e1d5cc',
+          300: '#cabab0',
+          400: '#ac9b8f',
+          500: '#8f7c70',
+          600: '#715f53',
+          700: '#5a493e',
+          800: '#4f3f33',
+          900: '#46362b',
+          DEFAULT: '#46362b',
         },
-        // Paleta de colores para Admin Panel — derivada del navy de marca (#1c1d33, ver docs/product_marketing.md)
-        // Escala generada en OKLCH manteniendo hue/chroma constante; contraste vs blanco verificado WCAG AA (600: 5.53:1, 700: 8.50:1, 800: 12.76:1)
-        admin: {
-          50: '#f7f8ff',
-          100: '#eceef8',
-          200: '#dbddec',
-          300: '#c0c2d7',
-          400: '#a0a3bb',
-          500: '#81849f',
-          600: '#646781',
-          700: '#494b63',
-          800: '#2f3145',
-          900: '#1c1d33',
-          950: '#0b0c17',
-          DEFAULT: '#646781',
-        },
-        // Acento de marca — derivado del rojo (#fd2525). Uso puntual (badges, highlights), nunca en botones/focus-rings
-        // generales ni en estados con semántica propia (error/destructivo siguen usando la escala red/rose estándar).
-        accent: {
-          50: '#ffeae2',
-          100: '#ffd9cf',
-          200: '#ffbeb1',
-          300: '#ff9484',
-          400: '#ff6356',
-          500: '#fd2525',
-          600: '#d20000',
-          700: '#a90000',
-          800: '#7d0000',
-          900: '#570000',
-          DEFAULT: '#fd2525',
+        // Tokens de marca crudos (ver docs de marca / branboard) — usar cuando se necesita
+        // el hex exacto en vez de un paso de la escala `primary`.
+        brand: {
+          ink: '#46362B',
+          camel: '#A78B6C',
+          taupe: '#B29E88',
+          cream: '#EAE2D6',
         },
       },
     },

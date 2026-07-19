@@ -1,78 +1,28 @@
 {
   "id": "/",
-  "name": "Axios Stock",
-  "short_name": "Axios",
-  "description": "Control de Stock & Gestión Comercial para tu negocio",
+  "name": "Ruemia",
+  "short_name": "Ruemia",
+  "description": "Mates artesanales de cuero y detalles bordados, hechos en Uruguay.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#12192C",
-  "theme_color": "#12192C",
+  "background_color": "#46362B",
+  "theme_color": "#46362B",
   "prefer_related_applications": false,
-  "categories": ["business", "productivity"],
+  "categories": ["shopping", "business"],
   "icons": [
     {
-      "src": "/logo2.png",
+      "src": "/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/logo2.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
-    },
-    {
-      "src": "/logo3.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/logo3.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "Panel de Administración",
-      "short_name": "Admin",
-      "description": "Acceder al panel de control",
-      "url": "/admin",
-      "icons": [
-        {
-          "src": "/logo3.png",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
-    },
-    {
-      "name": "Tienda Online",
-      "short_name": "Tienda",
-      "description": "Ver tienda online",
-      "url": "/store",
-      "icons": [
-        {
-          "src": "/logo2.png",
-          "sizes": "192x192",
-          "type": "image/png"
-        }
-      ]
-    }
-  ],
-  "share_target": {
-    "action": "/share",
-    "method": "POST",
-    "enctype": "multipart/form-data",
-    "params": {
-      "title": "title",
-      "text": "text",
-      "url": "url"
-    }
-  }
+  ]
 }

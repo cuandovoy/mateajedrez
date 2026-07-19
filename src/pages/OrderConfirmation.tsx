@@ -45,11 +45,11 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 }
 
 export function OrderConfirmation() {
-  const { slug, orderId } = useParams<{ slug?: string; orderId: string }>()
+  const { orderId } = useParams<{ orderId: string }>()
   const [searchParams] = useSearchParams()
   const mpStatus = searchParams.get('mp_status') // 'failure' | 'pending' | null (success)
   const settings = useOrgSettings()
-  const primaryColor = 'var(--org-primary-color, #6366f1)'
+  const primaryColor = 'var(--org-primary-color, #46362B)'
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [transferInstructions, setTransferInstructions] = useState<string>('')
   const [transferContactPhone, setTransferContactPhone] = useState<string>('')
@@ -280,7 +280,7 @@ export function OrderConfirmation() {
     return (
       <div className="container-custom py-8 text-center">
         <p className="text-gray-600 text-lg mb-4">Orden no encontrada</p>
-        <Link to={slug ? `/${slug}` : '/'}>
+        <Link to="/">
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver al inicio
@@ -537,7 +537,7 @@ export function OrderConfirmation() {
             <Download className="h-4 w-4 mr-2" />
             Descargar comprobante
           </Button>
-          <Link to={slug ? `/${slug}` : '/'}>
+          <Link to="/">
             <Button
               className="text-white w-full sm:w-auto"
               style={{ backgroundColor: primaryColor, borderColor: primaryColor }}

@@ -3,7 +3,6 @@ import { Skeleton, SkeletonProductCard } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization'
-import { useOrganizationStore } from '@/store/organizationStore'
 import { usePublicCategories } from '@/hooks/usePublicCategories'
 import { useFilteredProducts } from '@/hooks/usePublicProducts'
 import type { Product } from '@/types'
@@ -11,34 +10,19 @@ import { Search, X, PackageSearch } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
-const DEFAULT_STORE_SLUG = 'default'
-
 export function Products() {
-  const { organization, isPublicStore, slug } = useCurrentOrganization()
-  const fetchOrgBySlug = useOrganizationStore((s) => s.fetchOrgBySlug)
+  const { organization } = useCurrentOrganization()
   const [searchParams] = useSearchParams()
   const [searchTerm, setSearchTerm] = useState(() => searchParams.get('search') ?? '')
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [priceRange, setPriceRange] = useState({ min: '', max: '' })
-  const [orgId, setOrgId] = useState<string | null>(null)
+  const orgId = organization?.id ?? null
   const [currentPage, setCurrentPage] = useState(1)
 
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [allStock, setAllStock] = useState<Record<string, number>>({})
   const [allVariants, setAllVariants] = useState<Record<string, boolean>>({})
-
-  useEffect(() => {
-    const loadOrg = async () => {
-      if (isPublicStore && organization) {
-        setOrgId(organization.id)
-      } else {
-        const id = organization?.id ?? (await fetchOrgBySlug(DEFAULT_STORE_SLUG))?.id
-        setOrgId(id ?? null)
-      }
-    }
-    loadOrg()
-  }, [organization, isPublicStore, fetchOrgBySlug])
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -115,7 +99,7 @@ export function Products() {
       <div className="mb-8">
         <h1
           className="text-3xl font-bold text-gray-900 mb-1"
-          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
+          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
         >
           Todos los productos
         </h1>
@@ -132,7 +116,7 @@ export function Products() {
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar productos..."
             className="w-full h-10 pl-9 pr-8 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:ring-2 transition-shadow"
-            style={{ '--tw-ring-color': 'var(--org-primary-color, #6366f1)' } as React.CSSProperties}
+            style={{ '--tw-ring-color': 'var(--org-primary-color, #46362B)' } as React.CSSProperties}
           />
           {searchTerm && (
             <button
@@ -154,7 +138,7 @@ export function Products() {
                   ? 'border-transparent shadow-sm'
                   : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
-              style={!selectedCategory ? { backgroundColor: 'var(--org-primary-color, #6366f1)', color: 'var(--org-primary-ink, white)' } : undefined}
+              style={!selectedCategory ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
             >
               Todos
             </button>
@@ -167,7 +151,7 @@ export function Products() {
                     ? 'border-transparent shadow-sm'
                     : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
-                style={selectedCategory === cat.id ? { backgroundColor: 'var(--org-primary-color, #6366f1)', color: 'var(--org-primary-ink, white)' } : undefined}
+                style={selectedCategory === cat.id ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
               >
                 {cat.name}
               </button>
@@ -228,7 +212,6 @@ export function Products() {
                   product={product}
                   stock={allStock[product.id]}
                   hasVariants={Boolean(allVariants[product.id])}
-                  basePath={isPublicStore && slug ? `/${slug}` : ''}
                 />
               </div>
             ))}

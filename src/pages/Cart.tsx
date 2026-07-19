@@ -11,11 +11,10 @@ import { Product, ProductImage } from '@/types'
 import { BranchInventory, ProductVariant } from '@/types/database.types'
 import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 function CartContent() {
   const navigate = useNavigate()
-  const { slug } = useParams<{ slug?: string }>()
   const { organization } = usePublicStore()
   const settings = useOrgSettings()
   const { items, loading, fetchCart, updateQuantity, removeFromCart, getTotal } = useCartStore()
@@ -177,7 +176,7 @@ function CartContent() {
   }
 
   const handleCheckout = () => {
-    navigate(slug ? `/${slug}/checkout` : '/checkout')
+    navigate('/checkout')
   }
 
   if (loading) {
@@ -185,7 +184,7 @@ function CartContent() {
       <div className="flex items-center justify-center min-h-screen">
         <div
           className="animate-spin rounded-full h-12 w-12 border-b-2"
-          style={{ borderColor: 'var(--org-primary-color, #6366f1)' }}
+          style={{ borderColor: 'var(--org-primary-color, #46362B)' }}
         ></div>
       </div>
     )
@@ -197,7 +196,7 @@ function CartContent() {
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-gray-600 text-lg mb-4">Tu carrito está vacío</p>
-            <Button onClick={() => navigate(slug ? `/${slug}` : '/')}>
+            <Button onClick={() => navigate('/')}>
               Continuar Comprando
             </Button>
           </CardContent>
@@ -293,7 +292,7 @@ function CartContent() {
                                 {formatPrice(item.product.price, settings)}
                               </p>
                             )}
-                            <p className="text-sm" style={{ color: 'var(--org-primary-color, #6366f1)' }}>
+                            <p className="text-sm" style={{ color: 'var(--org-primary-color, #46362B)' }}>
                               {formatPrice(item.variant?.price ?? getEffectivePrice(item.product), settings)} c/u
                             </p>
                           </div>

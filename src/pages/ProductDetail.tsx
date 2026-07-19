@@ -29,7 +29,7 @@ function isValidImageUrl(url: string | null | undefined): boolean {
 }
 
 export function ProductDetail() {
-  const { slug, id } = useParams<{ slug?: string; id: string }>()
+  const { id } = useParams<{ id: string }>()
   const settings = useOrgSettings()
   const { addToCart } = useCartStore()
   const { show } = useToastStore()
@@ -222,7 +222,7 @@ export function ProductDetail() {
     return (
       <div className="container-custom py-8 text-center">
         <p className="text-gray-600 text-lg mb-4">Producto no encontrado</p>
-        <Link to={slug ? `/${slug}/products` : '/products'}>
+        <Link to="/products">
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a productos
@@ -242,7 +242,7 @@ export function ProductDetail() {
 
   return (
     <div className="container-custom py-8">
-      <Link to={slug ? `/${slug}/products` : '/products'}>
+      <Link to="/products">
         <Button variant="ghost" className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver a productos
@@ -408,8 +408,8 @@ export function ProductDetail() {
                         style={
                           index === currentImageIndex
                             ? {
-                                borderColor: 'var(--org-primary-color, #6366f1)',
-                                boxShadow: '0 0 0 2px color-mix(in srgb, var(--org-primary-color, #6366f1) 30%, transparent)',
+                                borderColor: 'var(--org-primary-color, #46362B)',
+                                boxShadow: '0 0 0 2px color-mix(in srgb, var(--org-primary-color, #46362B) 30%, transparent)',
                               }
                             : undefined
                         }
@@ -436,8 +436,8 @@ export function ProductDetail() {
               <span
                 className="inline-block px-3 py-1 rounded-full text-sm font-medium mb-2"
                 style={{
-                  backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #6366f1) 15%, white)',
-                  color: 'var(--org-primary-color, #6366f1)',
+                  backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #46362B) 15%, white)',
+                  color: 'var(--org-primary-color, #46362B)',
                 }}
               >
                 {product.category.name}
@@ -446,7 +446,7 @@ export function ProductDetail() {
             <div className="flex items-start justify-between gap-3 mb-2">
               <h1
                 className="text-3xl font-bold text-gray-900"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
               >
                 {capitalizeFirst(product.name)}
               </h1>
@@ -454,7 +454,7 @@ export function ProductDetail() {
                 type="button"
                 onClick={handleShare}
                 className="shrink-0 h-10 w-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
-                style={{ color: 'var(--org-primary-color, #6366f1)' }}
+                style={{ color: 'var(--org-primary-color, #46362B)' }}
                 aria-label="Compartir producto"
                 title="Compartir"
               >
@@ -474,7 +474,7 @@ export function ProductDetail() {
               )}
               <p
                 className="text-2xl font-bold"
-                style={{ color: 'var(--org-primary-color, #6366f1)' }}
+                style={{ color: 'var(--org-primary-color, #46362B)' }}
               >
                 {formatPrice(
                   selectedVariant ? (selectedVariant.price ?? getEffectivePrice(product)) : getEffectivePrice(product),
@@ -554,7 +554,7 @@ export function ProductDetail() {
                 rel="noopener noreferrer"
                 className="w-full h-12 inline-flex items-center justify-center gap-2 text-base font-semibold rounded-xl transition-colors"
                 style={{
-                  backgroundColor: 'var(--org-primary-color, #6366f1)',
+                  backgroundColor: 'var(--org-primary-color, #46362B)',
                   color: 'var(--org-primary-ink, white)',
                 }}
               >
@@ -589,7 +589,7 @@ export function ProductDetail() {
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {relatedProducts.map((relatedProduct) => (
-              <ProductCard key={relatedProduct.id} product={relatedProduct} basePath={slug ? `/${slug}` : ''} />
+              <ProductCard key={relatedProduct.id} product={relatedProduct} />
             ))}
           </div>
         </div>

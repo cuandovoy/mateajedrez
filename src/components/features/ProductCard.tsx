@@ -13,7 +13,6 @@ interface ProductCardProps {
   stock?: number
   hasVariants?: boolean
   noAddToCart?: boolean
-  basePath?: string
 }
 
 function isValidImageUrl(url: string | null | undefined): boolean {
@@ -32,7 +31,6 @@ export function ProductCard({
   stock: stockProp,
   hasVariants = false,
   noAddToCart = false,
-  basePath = '',
 }: ProductCardProps) {
   const settings = useOrgSettings()
   const { addToCart } = useCartStore()
@@ -85,7 +83,7 @@ export function ProductCard({
   }, [product.id, product.organization_id, stockProp])
 
   const hasStock = stock !== null ? stock > 0 : false
-  const productUrl = `${basePath}/product/${product.id}`
+  const productUrl = `/product/${product.id}`
   const showAddButton = !noAddToCart && !hasVariants && stock !== null && hasStock
 
   return (
@@ -124,15 +122,6 @@ export function ProductCard({
           </span>
         )}
 
-        {/* Out of stock overlay */}
-        {stock !== null && !hasStock && (
-          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-            <span className="bg-gray-800/90 text-white text-xs font-medium px-3 py-1.5 rounded-full tracking-wide">
-              Sin stock
-            </span>
-          </div>
-        )}
-
         {/* Add to cart button — always visible on mobile, hover-only on desktop */}
         {showAddButton && (
           <button
@@ -140,7 +129,7 @@ export function ProductCard({
             disabled={isAdding}
             className="absolute bottom-3 right-3 rounded-full p-2.5 md:p-3 shadow-lg z-10 md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300 disabled:opacity-50"
             style={{
-              backgroundColor: 'var(--org-primary-color, #6366f1)',
+              backgroundColor: 'var(--org-primary-color, #46362B)',
               color: 'var(--org-primary-ink, white)',
             }}
             aria-label="Agregar al carrito"
@@ -174,7 +163,7 @@ export function ProductCard({
             )}
             <span
               className="text-base font-bold leading-none"
-              style={{ color: 'var(--org-primary-color, #6366f1)' }}
+              style={{ color: 'var(--org-primary-color, #46362B)' }}
             >
               {formatPrice(getEffectivePrice(product), settings)}
             </span>

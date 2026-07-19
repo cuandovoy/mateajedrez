@@ -14,7 +14,7 @@ import { getProductsStock } from '@/lib/stock'
 const PAGE_SIZE = 20
 
 export function CategoryProducts() {
-  const { slug, categorySlug } = useParams<{ slug?: string; categorySlug: string }>()
+  const { categorySlug } = useParams<{ categorySlug: string }>()
   const { organization } = usePublicStore()
   const orgId = organization.id
   const [products, setProducts] = useState<Product[]>([])
@@ -274,7 +274,7 @@ export function CategoryProducts() {
     return (
       <div className="container-custom py-8 text-center">
         <p className="text-gray-600 text-lg mb-4">Categoría no encontrada</p>
-        <Link to={slug ? `/${slug}/products` : '/products'}>
+        <Link to="/products">
           <Button variant="outline" className="rounded-full">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a productos
@@ -286,7 +286,7 @@ export function CategoryProducts() {
 
   return (
     <div className="container-custom py-8">
-      <Link to={slug ? `/${slug}/products` : '/products'}>
+      <Link to="/products">
         <Button variant="ghost" className="mb-6 -ml-2 text-sm rounded-full" size="sm">
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Todos los productos
@@ -296,7 +296,7 @@ export function CategoryProducts() {
       <div className="mb-8">
         <h1
           className="text-3xl font-bold text-gray-900 mb-1"
-          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
+          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
         >
           {currentCategory?.name || parentCategory?.name}
         </h1>
@@ -339,7 +339,7 @@ export function CategoryProducts() {
                   ? 'border-transparent shadow-sm'
                   : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
-              style={selectedSubcategories.length === 0 ? { backgroundColor: 'var(--org-primary-color, #6366f1)', color: 'var(--org-primary-ink, white)' } : undefined}
+              style={selectedSubcategories.length === 0 ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
             >
               Todas
             </button>
@@ -354,7 +354,7 @@ export function CategoryProducts() {
                       ? 'border-transparent shadow-sm'
                       : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
                   }`}
-                  style={isActive ? { backgroundColor: 'var(--org-primary-color, #6366f1)', color: 'var(--org-primary-ink, white)' } : undefined}
+                  style={isActive ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
                 >
                   {subcat.name}
                 </button>
@@ -415,7 +415,6 @@ export function CategoryProducts() {
                 <ProductCard
                   product={product}
                   stock={stockByProduct[product.id]}
-                  basePath={slug ? `/${slug}` : ''}
                 />
               </div>
             ))}

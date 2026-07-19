@@ -1,5 +1,4 @@
 import { CartItem, Category, Product, ProductVariant } from './database.types'
-import type { Permission } from '@/lib/permissions'
 
 export type {
   CartItem, Category, CategoryInsert,
@@ -18,16 +17,6 @@ export type {
   InventoryTransfer, InventoryTransferInsert, InventoryTransferUpdate,
   OrganizationMember,
 } from './database.types'
-
-/**
- * The resolved org-scoped role for the current user in the active organization.
- * Populated by organizationStore.fetchOrganizations() and stored as orgRole.
- */
-export interface OrgRoleResolved {
-  roleId: string | null
-  baseRoleKey: 'admin' | 'manager' | 'viewer' | 'user' | 'custom' | null
-  permissions: Permission[]
-}
 
 /**
  * Extended organization member with org-role fields that migration 089 added.

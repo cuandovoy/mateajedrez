@@ -7,10 +7,6 @@ interface AuthState {
   user: User | null
   profile: UserProfile | null
   loading: boolean
-  /** Platform admin or org admin - puede gestionar miembros y organizaciones */
-  isAdmin: boolean
-  /** Admin o manager en alguna org - puede acceder al panel admin */
-  canAccessAdminPanel: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, fullName?: string) => Promise<void>
   resetPasswordRequest: (email: string) => Promise<void>
@@ -24,8 +20,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   profile: null,
   loading: true,
-  isAdmin: false,
-  canAccessAdminPanel: false,
 
   setLoading: (loading: boolean) => {
     set({ loading })
@@ -55,8 +49,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ user: session?.user ?? null })
 
       if (session?.user) {
-        const { useOrganizationStore } = await import('./organizationStore')
-        await useOrganizationStore.getState().fetchOrganizations()
         await get().fetchProfile()
         // Sync local cart to database when user logs in
         const { useCartStore } = await import('./cartStore')
@@ -71,7 +63,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
         if (error.message === 'Auth initialization timeout') {
           console.warn('Auth initialization timed out, continuing without session')
-          set({ user: null, profile: null, isAdmin: false, canAccessAdminPanel: false })
+          set({ user: null, profile: null })
           return
         }
         console.error('Error initializing auth:', error)
@@ -97,22 +89,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (error) throw error
 
       if (data) {
-        const profile = data as UserProfile
-        const { useOrganizationStore } = await import('./organizationStore')
-        // Derive isAdmin and canAccessAdminPanel from the org-scoped role (ADR-2).
-        // profile.role === 'admin' check is intentional: it guards platform-level admin
-        // features (e.g. /organizations, canCreateOrganization) distinct from org-level admin.
-        const orgRole = useOrganizationStore.getState().orgRole
-        const baseRoleKey = orgRole?.baseRoleKey ?? null
-        const isOrgAdmin = baseRoleKey === 'admin'
-        const isOrgManager = baseRoleKey === 'manager'
-        // canAccessAdminPanel: org admin/manager OR at least one :ver permission granted
-        const hasAnyVerPermission = (orgRole?.permissions ?? []).some((p) => p.endsWith(':ver'))
-        set({
-          profile,
-          isAdmin: profile.role === 'admin' || isOrgAdmin,
-          canAccessAdminPanel: profile.role === 'admin' || isOrgAdmin || isOrgManager || hasAnyVerPermission,
-        })
+        set({ profile: data as UserProfile })
       }
     } catch (error) {
       console.error('Error fetching profile:', error)
@@ -131,9 +108,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (error) throw error
 
       set({ user: data.user })
-      
-      const { useOrganizationStore } = await import('./organizationStore')
-      await useOrganizationStore.getState().fetchOrganizations()
+
       await get().fetchProfile()
       try {
         const { useCartStore } = await import('./cartStore')
@@ -202,9 +177,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { error } = await supabase.auth.signOut()
       if (error) throw error
 
-      set({ user: null, profile: null, isAdmin: false, canAccessAdminPanel: false })
-      const { useOrganizationStore } = await import('./organizationStore')
-      useOrganizationStore.getState().clear()
+      set({ user: null, profile: null })
     } catch (error) {
       console.error('Error signing out:', error)
       throw error
@@ -254,7 +227,7 @@ supabase.auth.onAuthStateChange(async (_event, session) => {
           console.error('Error in auth state change operations:', err)
         })
       } else {
-        useAuthStore.setState({ profile: null, isAdmin: false, canAccessAdminPanel: false })
+        useAuthStore.setState({ profile: null })
       }
     }
   } catch (error) {

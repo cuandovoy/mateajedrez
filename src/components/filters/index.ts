@@ -1,6 +1,0 @@
-export { CategoryFilter } from './CategoryFilter'
-export { PriceRangeFilter } from './PriceRangeFilter'
-export { SearchFilter } from './SearchFilter'
-export { StatusFilter } from './StatusFilter'
-export { StockFilter } from './StockFilter'
-export { SupplierFilter } from './SupplierFilter'

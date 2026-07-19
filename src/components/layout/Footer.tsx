@@ -1,21 +1,16 @@
-// Legacy alias — only used by ShopLayout (currently unused layout)
-export function Footer() { return null }
-
 import { Link } from 'react-router-dom'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
 import { ShoppingCart, LayoutGrid } from 'lucide-react'
+import logoWordmark from '@/brand/logo-principal-fondo1.png'
 
 export function PublicStoreFooter() {
-  const { organization, slug } = usePublicStore()
+  const { organization } = usePublicStore()
   const { categoriesWithSubs } = usePublicCategoriesForMenu(organization.id)
 
-  const primaryColor = organization.primary_color || '#6366f1'
-  const isValidHex = (v: string) => /^#[0-9a-fA-F]{6}$/.test(v)
-  const safePrimaryColor = isValidHex(primaryColor) ? primaryColor : '#6366f1'
-  const settings = (organization.settings as Record<string, unknown>) ?? {}
-  const logoUrl = organization.logo_url || null
-  const showName = (settings.store_header_show_name as boolean) !== false
+  // Marca hardcodeada: theming dinámico por organización fue removido
+  // (single-tenant fork, org.branding/settings quedan permanentemente NULL).
+  const primaryColor = '#46362B'
 
   const parentCategories = categoriesWithSubs
 
@@ -23,8 +18,8 @@ export function PublicStoreFooter() {
     <footer
       className="mt-16 border-t"
       style={{
-        backgroundColor: `${safePrimaryColor}10`,
-        borderColor: `${safePrimaryColor}22`,
+        backgroundColor: `${primaryColor}10`,
+        borderColor: `${primaryColor}22`,
       }}
     >
       <div className="container-custom py-10 md:py-14">
@@ -32,40 +27,29 @@ export function PublicStoreFooter() {
 
           {/* Col 1: Brand */}
           <div>
-            <Link to={`/${slug}`} className="flex items-center gap-3 mb-4">
-              {logoUrl ? (
-                <img
-                  src={logoUrl}
-                  alt={organization.name}
-                  className="h-10 w-10 object-contain"
-                />
-              ) : (
-                <div
-                  className="h-10 w-10 rounded-lg flex items-center justify-center font-bold text-base shrink-0"
-                  style={{ backgroundColor: primaryColor, color: 'var(--org-primary-ink, white)' }}
-                >
-                  {organization.name.charAt(0).toUpperCase()}
-                </div>
-              )}
-              {showName && (
-                <span
-                  className="font-semibold text-base text-gray-900"
-                  style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
-                >
-                  {organization.name}
-                </span>
-              )}
+            <Link to="/" className="flex items-center gap-3 mb-4">
+              <img
+                src={logoWordmark}
+                alt={organization.name}
+                className="h-10 w-10 rounded-lg object-contain"
+              />
+              <span
+                className="font-semibold text-base text-gray-900"
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
+              >
+                {organization.name}
+              </span>
             </Link>
             <div className="flex flex-col gap-2 mt-4">
               <Link
-                to={`/${slug}/products`}
+                to="/products"
                 className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition-colors"
               >
                 <LayoutGrid className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
                 Ver todos los productos
               </Link>
               <Link
-                to={`/${slug}/cart`}
+                to="/cart"
                 className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition-colors"
               >
                 <ShoppingCart className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
@@ -79,7 +63,7 @@ export function PublicStoreFooter() {
             <div>
               <h4
                 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Poppins))' }}
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
               >
                 Categorías
               </h4>
@@ -87,17 +71,17 @@ export function PublicStoreFooter() {
                 {parentCategories.map((cat) => (
                   <li key={cat.value}>
                     <Link
-                      to={`/${slug}/categories/${cat.value}`}
+                      to={`/categories/${cat.value}`}
                       className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
                     >
                       {cat.label}
                     </Link>
                     {cat.subcategories && cat.subcategories.length > 0 && (
-                      <ul className="mt-1.5 ml-3 space-y-1.5 border-l-2 pl-3" style={{ borderColor: `${safePrimaryColor}30` }}>
+                      <ul className="mt-1.5 ml-3 space-y-1.5 border-l-2 pl-3" style={{ borderColor: `${primaryColor}30` }}>
                         {cat.subcategories.map((sub) => (
                           <li key={sub.value}>
                             <Link
-                              to={`/${slug}/categories/${sub.value}`}
+                              to={`/categories/${sub.value}`}
                               className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
                             >
                               {sub.label}
@@ -121,7 +105,7 @@ export function PublicStoreFooter() {
       {/* Bottom bar */}
       <div
         className="border-t"
-        style={{ borderColor: `${safePrimaryColor}18` }}
+        style={{ borderColor: `${primaryColor}18` }}
       >
         <div className="container-custom py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <p className="text-xs text-gray-400">
@@ -136,7 +120,7 @@ export function PublicStoreFooter() {
               className="hover:underline"
               style={{ color: primaryColor }}
             >
-              Axiostock
+              Ciceridev
             </a>
           </p>
         </div>

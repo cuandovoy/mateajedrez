@@ -5,7 +5,7 @@
 
 const APP_URL = Deno.env.get('APP_URL') ?? 'https://axiostock.com'
 const ADMIN_URL = Deno.env.get('ADMIN_URL') ?? APP_URL
-const LOGO_URL = `${APP_URL}/logo3.png`
+const LOGO_URL = `${APP_URL}/og-image.png`
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
