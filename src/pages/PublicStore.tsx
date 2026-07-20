@@ -210,6 +210,7 @@ export function PublicStore() {
                 style={{
                   color: hasCoverImages ? heroTextColor : `var(--org-primary-color, #46362B)`,
                   fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`,
+                  letterSpacing: '0.05em',
                   textShadow: hasCoverImages ? '0 1px 3px rgba(0,0,0,0.25)' : undefined,
                 }}
               >
@@ -271,7 +272,7 @@ export function PublicStore() {
             <div className="flex items-center justify-between mb-6">
               <h2
                 className="text-xl md:text-2xl font-bold text-gray-900"
-                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))` }}
+                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`, letterSpacing: '0.05em' }}
               >
                 Categorías
               </h2>
@@ -304,7 +305,7 @@ export function PublicStore() {
             <div className="flex items-center justify-between mb-6">
               <h2
                 className="text-xl md:text-2xl font-bold text-gray-900"
-                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))` }}
+                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`, letterSpacing: '0.05em' }}
               >
                 Productos destacados
               </h2>
@@ -347,6 +348,7 @@ export function PublicStore() {
               style={{
                 color: 'var(--org-primary-ink, #EAE2D6)',
                 fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`,
+                letterSpacing: '0.05em',
               }}
             >
               Nosotros
@@ -356,6 +358,7 @@ export function PublicStore() {
               style={{
                 color: 'var(--org-primary-ink, #EAE2D6)',
                 fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`,
+                letterSpacing: '0.05em',
               }}
             >
               &ldquo;Las piezas con historia merecen ser parte de nuevos momentos.&rdquo;

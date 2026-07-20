@@ -115,6 +115,15 @@ export function ProductCard({
           </div>
         </Link>
 
+        {/* Sin stock overlay — informativo, no bloquea la navegación al detalle */}
+        {stock !== null && !hasStock && (
+          <div className="absolute inset-0 z-[5] flex items-center justify-center bg-white/70 pointer-events-none">
+            <span className="bg-gray-800/90 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
+              Sin stock
+            </span>
+          </div>
+        )}
+
         {/* Discount badge */}
         {hasActiveDiscount(product) && (
           <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm z-10">

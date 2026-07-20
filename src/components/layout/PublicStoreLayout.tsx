@@ -1,6 +1,7 @@
 import { ReactNode } from 'react'
 import { PublicStoreHeader } from './PublicStoreHeader'
 import { PublicStoreFooter } from './Footer'
+import { ShippingNoticeBanner } from './ShippingNoticeBanner'
 import { ToastContainer } from './ToastContainer'
 import { PublicStoreProvider } from '@/contexts/PublicStoreContext'
 import type { Organization } from '@/types/database.types'
@@ -18,6 +19,7 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
   return (
     <PublicStoreProvider organization={organization} slug={slug}>
       <div className="min-h-screen bg-white" style={{ fontFamily: `var(--org-font-family, Cambria)` }}>
+        <ShippingNoticeBanner />
         <PublicStoreHeader organization={organization} />
         <main className="flex-1">
           {children}

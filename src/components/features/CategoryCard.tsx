@@ -74,7 +74,7 @@ export function CategoryCard({ category, fallbackImages = [] }: CategoryCardProp
         <div className="absolute bottom-0 left-0 right-0 p-5">
           <h3
             className="text-white text-xl font-semibold tracking-tight drop-shadow-sm"
-            style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
+            style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
           >
             {category.name}
           </h3>

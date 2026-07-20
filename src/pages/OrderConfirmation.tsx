@@ -57,6 +57,10 @@ export function OrderConfirmation() {
   const [refreshingMp, setRefreshingMp] = useState(false)
 
   useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [orderId])
+
+  useEffect(() => {
     if (orderId) {
       fetchOrder()
     }

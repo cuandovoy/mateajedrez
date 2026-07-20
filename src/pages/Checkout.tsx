@@ -15,7 +15,7 @@ import { useToastStore } from '@/store/toastStore'
 import type { CartItemWithProduct, Order, ProductImage } from '@/types'
 import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { BranchInventory, Customer } from '@/types/database.types'
-import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark } from 'lucide-react'
+import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, Truck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
@@ -676,7 +676,12 @@ function CheckoutInner() {
         Volver al carrito
       </Button>
 
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Finalizar Compra</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-4">Finalizar Compra</h1>
+
+      <div className="mb-8 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <Truck className="h-5 w-5 shrink-0 mt-0.5" />
+        <p>Los productos tienen una demora de entrega de 3 a 5 días hábiles.</p>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Order Summary */}

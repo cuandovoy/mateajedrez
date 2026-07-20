@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/Button'
 import { useCurrentOrganization } from '@/hooks/useCurrentOrganization'
 import { usePublicCategories } from '@/hooks/usePublicCategories'
 import { useFilteredProducts } from '@/hooks/usePublicProducts'
+import { sortByStockFirst } from '@/lib/stock'
 import type { Product } from '@/types'
 import { Search, X, PackageSearch } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
 export function Products() {
@@ -71,6 +72,11 @@ export function Products() {
     setSearchTerm('')
   }
 
+  const sortedProducts = useMemo(
+    () => sortByStockFirst(allProducts, allStock),
+    [allProducts, allStock]
+  )
+
   const hasActiveFilters = !!(selectedCategory || priceRange.min || priceRange.max || searchTerm)
   const isLoadingMore = isFetching && currentPage > 1
   const hasMore = pageData?.hasMore ?? false
@@ -99,7 +105,7 @@ export function Products() {
       <div className="mb-8">
         <h1
           className="text-3xl font-bold text-gray-900 mb-1"
-          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
+          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
         >
           Todos los productos
         </h1>
@@ -202,7 +208,7 @@ export function Products() {
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
-            {allProducts.map((product, index) => (
+            {sortedProducts.map((product, index) => (
               <div
                 key={product.id}
                 className="animate-fade-in-up"

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
-import { ShoppingCart, LayoutGrid } from 'lucide-react'
+import { ShoppingCart, LayoutGrid, Instagram, Facebook, MessageCircle } from 'lucide-react'
 import logoWordmark from '@/brand/logo-principal-fondo1.png'
 
 export function PublicStoreFooter() {
@@ -13,6 +13,13 @@ export function PublicStoreFooter() {
   const primaryColor = '#46362B'
 
   const parentCategories = categoriesWithSubs
+
+  // Redes sociales configuradas por variable de entorno (single-tenant fork).
+  const instagramUrl = (import.meta.env.VITE_SOCIAL_INSTAGRAM ?? '').trim()
+  const facebookUrl = (import.meta.env.VITE_SOCIAL_FACEBOOK ?? '').trim()
+  const whatsappNumber = (import.meta.env.VITE_SOCIAL_WHATSAPP ?? '').trim()
+  const whatsappUrl = whatsappNumber ? `https://wa.me/${whatsappNumber.replace(/\D/g, '')}` : ''
+  const hasSocialLinks = Boolean(instagramUrl || facebookUrl || whatsappUrl)
 
   return (
     <footer
@@ -35,7 +42,7 @@ export function PublicStoreFooter() {
               />
               <span
                 className="font-semibold text-base text-gray-900"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
               >
                 {organization.name}
               </span>
@@ -63,7 +70,7 @@ export function PublicStoreFooter() {
             <div>
               <h4
                 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
               >
                 Categorías
               </h4>
@@ -96,8 +103,57 @@ export function PublicStoreFooter() {
             </div>
           )}
 
-          {/* Col 3: placeholder for future contact/social */}
-          <div className="hidden lg:block" />
+          {/* Col 3: redes sociales */}
+          {hasSocialLinks ? (
+            <div>
+              <h4
+                className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4"
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
+              >
+                Seguinos
+              </h4>
+              <div className="flex items-center gap-3">
+                {instagramUrl && (
+                  <a
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Instagram"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border transition-opacity hover:opacity-70"
+                    style={{ borderColor: `${primaryColor}30`, color: primaryColor }}
+                  >
+                    <Instagram className="h-4 w-4" />
+                  </a>
+                )}
+                {facebookUrl && (
+                  <a
+                    href={facebookUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Facebook"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border transition-opacity hover:opacity-70"
+                    style={{ borderColor: `${primaryColor}30`, color: primaryColor }}
+                  >
+                    <Facebook className="h-4 w-4" />
+                  </a>
+                )}
+                {whatsappUrl && (
+                  <a
+                    href={whatsappUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="WhatsApp"
+                    className="flex h-9 w-9 items-center justify-center rounded-full border transition-opacity hover:opacity-70"
+                    style={{ borderColor: `${primaryColor}30`, color: primaryColor }}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                  </a>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="hidden lg:block" />
+          )}
 
         </div>
       </div>

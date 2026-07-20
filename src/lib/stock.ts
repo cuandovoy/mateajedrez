@@ -111,6 +111,25 @@ export async function getProductsStock(
   return {}
 }
 
+/**
+ * Reordena productos poniendo primero los que tienen stock disponible.
+ * Mantiene el orden relativo original dentro de cada grupo (con/sin stock).
+ */
+export function sortByStockFirst<T extends { id: string }>(
+  products: T[],
+  stockByProduct: Record<string, number>
+): T[] {
+  return products
+    .map((product, index) => ({ product, index }))
+    .sort((a, b) => {
+      const aHasStock = (stockByProduct[a.product.id] ?? 0) > 0
+      const bHasStock = (stockByProduct[b.product.id] ?? 0) > 0
+      if (aHasStock === bHasStock) return a.index - b.index
+      return aHasStock ? -1 : 1
+    })
+    .map(({ product }) => product)
+}
+
 const cachedMainBranchByOrg = new Map<string, string | null>()
 
 export async function getMainBranchId(organizationId?: string | null): Promise<string | null> {

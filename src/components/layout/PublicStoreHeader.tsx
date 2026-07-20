@@ -5,7 +5,6 @@ import type { CategoryWithSubcategories } from '@/hooks/usePublicCategories'
 import { ChevronDown, Menu, Search, ShoppingCart, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import logoWordmark from '@/brand/logo-principal-fondo1.png'
 import logoIsotipo from '@/brand/isotipo-fondo1.png'
 
 interface PublicStoreHeaderProps {
@@ -206,22 +205,17 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
 
   return (
     <header
-      className="sticky top-0 z-30 border-b"
-      style={{
-        backgroundColor: `${primaryColor}ee`,
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        borderColor: `${primaryColor}33`,
-      }}
+      className="sticky top-0 z-30"
+      style={{ backgroundColor: primaryColor }}
     >
       <div className="container-custom">
 
         {/* ─── Desktop ─── */}
-        <div className="hidden lg:flex items-center gap-6 h-16 my-2">
+        <div className="hidden lg:flex items-center gap-6 h-16 ">
 
-          {/* Logo — el wordmark ya incluye el nombre "RUEMIA", no se repite como texto aparte */}
+          {/* Logo — mismo isotipo que en mobile, agrandado para jerarquía en desktop */}
           <Link to="/" className="flex items-center gap-3 shrink-0">
-            <img src={logoWordmark} alt={organization.name} className="h-12 w-12 rounded-lg object-contain" />
+            <img src={logoIsotipo} alt={organization.name} className="h-14 w-14 rounded-lg object-contain" />
           </Link>
 
           {/* Nav: Inicio / Categorías (trigger colapsable) / Nosotros */}

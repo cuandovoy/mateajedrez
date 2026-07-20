@@ -1,8 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,500;6..96,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..600;1,400..600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@font-face {
+  font-family: 'Berlin';
+  src: url('/berlin.regular.ttf') format('truetype');
+  /* Rango completo: es la única variante que tenemos. Sin esto, el navegador
+     "fake-boldea" (font-bold/font-semibold de Tailwind) sintéticamente, lo que
+     engrosa y solapa los trazos del glifo — se ve como letras muy pegadas. */
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cambria';
+  src: url('/Cambria.ttf') format('truetype');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 
 @layer base {
   :root {
@@ -16,14 +35,15 @@
     --org-primary-ink: #EAE2D6;
     --org-secondary-ink: #46362B;
     --org-accent-ink: #46362B;
-    --org-font-family: 'Cambria', Georgia, 'Times New Roman', serif;
-    --org-font-heading: 'Bodoni Moda', serif;
+    --org-font-family: 'Lora', 'Cambria', Georgia, 'Times New Roman', serif;
+    --org-font-heading: 'Berlin', 'Cambria', Georgia, serif;
+    --org-font-technical: Arial, Helvetica, sans-serif;
   }
 
   body {
     background-color: #EAE2D6;
     color: #111827;
-    font-family: 'Cambria', Georgia, 'Times New Roman', serif;
+    font-family: 'Lora', 'Cambria', Georgia, 'Times New Roman', serif;
   }
 }
 

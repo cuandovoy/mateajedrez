@@ -446,7 +446,7 @@ export function ProductDetail() {
             <div className="flex items-start justify-between gap-3 mb-2">
               <h1
                 className="text-3xl font-bold text-gray-900"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
               >
                 {capitalizeFirst(product.name)}
               </h1>
@@ -492,8 +492,8 @@ export function ProductDetail() {
 
           <div className="mb-6 space-y-4">
             <div>
-              <span className="text-sm font-medium text-gray-700">SKU: </span>
-              <span className="text-sm text-gray-600">{product.sku}</span>
+              <span className="text-sm font-medium text-gray-700" style={{ fontFamily: 'var(--org-font-technical, Arial, sans-serif)' }}>SKU: </span>
+              <span className="text-sm text-gray-600" style={{ fontFamily: 'var(--org-font-technical, Arial, sans-serif)' }}>{product.sku}</span>
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { ArrowLeft, Search, X, PackageSearch } from 'lucide-react'
 import type { Product, Category } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
-import { getProductsStock } from '@/lib/stock'
+import { getProductsStock, sortByStockFirst } from '@/lib/stock'
 
 const PAGE_SIZE = 20
 
@@ -241,6 +241,11 @@ export function CategoryProducts() {
     return () => { cancelled = true }
   }, [products])
 
+  const sortedProducts = useMemo(
+    () => sortByStockFirst(products, stockByProduct),
+    [products, stockByProduct]
+  )
+
   const clearFilters = () => {
     setSelectedSubcategories([])
     setPriceRange({ min: '', max: '' })
@@ -296,7 +301,7 @@ export function CategoryProducts() {
       <div className="mb-8">
         <h1
           className="text-3xl font-bold text-gray-900 mb-1"
-          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))' }}
+          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
         >
           {currentCategory?.name || parentCategory?.name}
         </h1>
@@ -406,7 +411,7 @@ export function CategoryProducts() {
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
-            {products.map((product, index) => (
+            {sortedProducts.map((product, index) => (
               <div
                 key={product.id}
                 className="animate-fade-in-up"
