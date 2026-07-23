@@ -688,7 +688,7 @@ useEffect(() => {
 - Bordes y sombra: `rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-0.5`
 - Zoom de imagen en hover: `group-hover:scale-105 transition-transform duration-500`
 - Botón "Agregar al carrito": floating `rounded-full` absolutamente posicionado en la esquina inferior derecha de la imagen. En desktop: `md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300`. En mobile: siempre visible. **No** usar un botón `w-full` debajo de la imagen para productos sin variantes.
-- Sin stock: overlay `bg-white/70` con pill `bg-gray-800/90 text-white` centrada — no botón deshabilitado
+- Sin stock: **sin overlay sobre la imagen** — el producto se ve normal. El único indicador es el badge junto al precio (`bg-red-50 text-red-600`, "Sin stock", mismo lugar que el badge verde "En stock"). El overlay `bg-white/70` con pill centrada que se usaba antes se sacó a pedido del usuario (2026-07-23): "nublaba" la foto del producto. Misma regla aplica a la imagen principal de `ProductDetail.tsx` — ahí el indicador es el texto "Este producto no tiene stock disponible." debajo del precio, sin overlay en la imagen.
 - Badge de descuento: `absolute top-3 left-3 rounded-full` — no dentro del body de la card
 
 ### CategoryCard

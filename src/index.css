@@ -1,5 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..600;1,400..600&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -35,7 +34,7 @@
     --org-primary-ink: #EAE2D6;
     --org-secondary-ink: #46362B;
     --org-accent-ink: #46362B;
-    --org-font-family: 'Lora', 'Cambria', Georgia, 'Times New Roman', serif;
+    --org-font-family: 'Poppins', 'Cambria', Georgia, 'Times New Roman', serif;
     --org-font-heading: 'Berlin', 'Cambria', Georgia, serif;
     --org-font-technical: Arial, Helvetica, sans-serif;
   }
@@ -43,7 +42,7 @@
   body {
     background-color: #EAE2D6;
     color: #111827;
-    font-family: 'Lora', 'Cambria', Georgia, 'Times New Roman', serif;
+    font-family: 'Poppins', 'Cambria', Georgia, 'Times New Roman', serif;
   }
 }
 

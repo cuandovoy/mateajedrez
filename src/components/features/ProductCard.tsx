@@ -3,7 +3,7 @@ import { ShoppingCart, Package } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { Product, ProductImage } from '@/types'
 import { useState, useEffect } from 'react'
@@ -115,15 +115,6 @@ export function ProductCard({
           </div>
         </Link>
 
-        {/* Sin stock overlay — informativo, no bloquea la navegación al detalle */}
-        {stock !== null && !hasStock && (
-          <div className="absolute inset-0 z-[5] flex items-center justify-center bg-white/70 pointer-events-none">
-            <span className="bg-gray-800/90 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
-              Sin stock
-            </span>
-          </div>
-        )}
-
         {/* Discount badge */}
         {hasActiveDiscount(product) && (
           <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm z-10">
@@ -178,9 +169,14 @@ export function ProductCard({
             </span>
           </div>
 
-          {stock !== null && hasStock && (
-            <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-600">
-              En stock
+          {stock !== null && (
+            <span
+              className={cn(
+                'flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium',
+                hasStock ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+              )}
+            >
+              {hasStock ? 'En stock' : 'Sin stock'}
             </span>
           )}
         </div>

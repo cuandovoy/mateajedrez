@@ -9,7 +9,11 @@ import { sortByStockFirst } from '@/lib/stock'
 import type { Product } from '@/types'
 import { Search, X, PackageSearch } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { useSearchParams } from 'react-router-dom'
+
+const META_DESCRIPTION =
+  'Explorá todo el catálogo de mates y accesorios artesanales de Ruemia — piezas en cuero hechas a mano en Uruguay.'
 
 export function Products() {
   const { organization } = useCurrentOrganization()
@@ -32,11 +36,13 @@ export function Products() {
     return () => window.clearTimeout(timeoutId)
   }, [searchTerm])
 
+  // No limpiamos allProducts acá: TanStack Query mantiene los resultados
+  // anteriores visibles (placeholderData) mientras carga los nuevos — vaciar
+  // el estado local a mano generaba un flash de "Sin resultados" falso antes
+  // de que llegara la respuesta real. El efecto de sync de más abajo
+  // reemplaza allProducts en cuanto llegan los datos de la página 1.
   useEffect(() => {
     setCurrentPage(1)
-    setAllProducts([])
-    setAllStock({})
-    setAllVariants({})
   }, [orgId, selectedCategory, priceRange.min, priceRange.max, debouncedSearchTerm])
 
   const { data: categoriesData } = usePublicCategories(orgId ?? '')
@@ -72,6 +78,14 @@ export function Products() {
     setSearchTerm('')
   }
 
+  // Elegir una categoría arranca una búsqueda nueva enfocada en esa categoría —
+  // un término de búsqueda de texto libre que haya quedado tipeado ya no aplica.
+  const selectCategory = (categoryId: string) => {
+    setSelectedCategory(categoryId)
+    setSearchTerm('')
+    setDebouncedSearchTerm('')
+  }
+
   const sortedProducts = useMemo(
     () => sortByStockFirst(allProducts, allStock),
     [allProducts, allStock]
@@ -79,11 +93,23 @@ export function Products() {
 
   const hasActiveFilters = !!(selectedCategory || priceRange.min || priceRange.max || searchTerm)
   const isLoadingMore = isFetching && currentPage > 1
+  const isFiltering = isFetching && currentPage === 1
   const hasMore = pageData?.hasMore ?? false
+
+  const seo = (
+    <Helmet>
+      <title>Todos los productos | Ruemia</title>
+      <meta name="description" content={META_DESCRIPTION} />
+      <meta property="og:title" content="Todos los productos | Ruemia" />
+      <meta property="og:description" content={META_DESCRIPTION} />
+      <link rel="canonical" href="/products" />
+    </Helmet>
+  )
 
   if (isLoading && allProducts.length === 0) {
     return (
       <div className="container-custom py-8">
+        {seo}
         <Skeleton className="h-10 w-72 mb-6 rounded-xl" />
         <div className="flex gap-3 flex-wrap mb-8">
           <Skeleton className="h-10 flex-1 min-w-[200px] rounded-full" />
@@ -102,6 +128,7 @@ export function Products() {
 
   return (
     <div className="container-custom py-8">
+      {seo}
       <div className="mb-8">
         <h1
           className="text-3xl font-bold text-gray-900 mb-1"
@@ -115,7 +142,18 @@ export function Products() {
       <div className="flex flex-wrap items-center gap-3 mb-8">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          {isFiltering ? (
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : (
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          )}
           <input
             type="text"
             value={searchTerm}
@@ -138,7 +176,7 @@ export function Products() {
         {categories.length > 0 && (
           <div className="flex gap-2 flex-wrap">
             <button
-              onClick={() => setSelectedCategory('')}
+              onClick={() => selectCategory('')}
               className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
                 !selectedCategory
                   ? 'border-transparent shadow-sm'
@@ -151,7 +189,7 @@ export function Products() {
             {categories.map((cat) => (
               <button
                 key={cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
+                onClick={() => selectCategory(cat.id)}
                 className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
                   selectedCategory === cat.id
                     ? 'border-transparent shadow-sm'
@@ -194,7 +232,7 @@ export function Products() {
       </div>
 
       {/* Products grid */}
-      {allProducts.length === 0 ? (
+      {allProducts.length === 0 && !isFiltering ? (
         <EmptyState
           icon={PackageSearch}
           title={searchTerm || hasActiveFilters ? 'Sin resultados' : 'Sin productos'}
@@ -206,7 +244,7 @@ export function Products() {
           action={hasActiveFilters ? { label: 'Limpiar filtros', onClick: clearFilters } : undefined}
         />
       ) : (
-        <>
+        <div className={isFiltering ? 'opacity-50 transition-opacity duration-200' : 'transition-opacity duration-200'}>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
             {sortedProducts.map((product, index) => (
               <div
@@ -235,7 +273,7 @@ export function Products() {
               </Button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )

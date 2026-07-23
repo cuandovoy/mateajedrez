@@ -5,7 +5,7 @@ import type { CategoryWithSubcategories } from '@/hooks/usePublicCategories'
 import { ChevronDown, Menu, Search, ShoppingCart, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import logoIsotipo from '@/brand/isotipo-fondo1.png'
+import logoIsotipo from '@/brand/isotipo-cropped.png'
 
 interface PublicStoreHeaderProps {
   organization: Organization
@@ -51,10 +51,10 @@ function CategoryMenu({ categories, onNavigate }: CategoryMenuProps) {
         type="button"
         onClick={() => setIsOpen((p) => !p)}
         aria-expanded={isOpen}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors duration-150"
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-base font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors duration-150"
       >
         Categorías
-        <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
@@ -143,7 +143,7 @@ function MobileCategoryItem({ cat, onNavigate }: MobileCategoryItemProps) {
 }
 
 const NAV_LINK_CLASS =
-  'px-3 py-1.5 rounded-full text-sm font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors duration-150'
+  'px-3 py-1.5 rounded-full text-base font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors duration-150'
 
 export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
   const { getItemCount, fetchCart } = useCartStore()
@@ -211,11 +211,11 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
       <div className="container-custom">
 
         {/* ─── Desktop ─── */}
-        <div className="hidden lg:flex items-center gap-6 h-16 ">
+        <div className="hidden lg:flex items-center gap-6 h-20 ">
 
           {/* Logo — mismo isotipo que en mobile, agrandado para jerarquía en desktop */}
           <Link to="/" className="flex items-center gap-3 shrink-0">
-            <img src={logoIsotipo} alt={organization.name} className="h-14 w-14 rounded-lg object-contain" />
+            <img src={logoIsotipo} alt={organization.name} className="h-16 w-16 rounded-lg object-contain" />
           </Link>
 
           {/* Nav: Inicio / Categorías (trigger colapsable) / Nosotros */}
@@ -289,7 +289,7 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
         </div>
 
         {/* ─── Mobile ─── */}
-        <div className="lg:hidden flex items-center h-14">
+        <div className="lg:hidden flex items-center h-16">
 
           {/* Hamburger */}
           <button
@@ -303,8 +303,8 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
 
           {/* Center logo — isotipo compacto + nombre, ya que el monograma solo no identifica la marca */}
           <Link to="/" onClick={closeAll} className="flex-1 flex justify-center items-center gap-2">
-            <img src={logoIsotipo} alt={organization.name} className="h-10 w-10 rounded-lg object-contain" />
-            <span className="text-[var(--org-primary-ink,white)] font-semibold text-sm">{organization.name}</span>
+            <img src={logoIsotipo} alt={organization.name} className="h-12 w-12 rounded-lg object-contain" />
+            <span className="text-[var(--org-primary-ink,white)] font-semibold text-base">{organization.name}</span>
           </Link>
 
           {/* Right */}

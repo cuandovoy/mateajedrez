@@ -4,6 +4,74 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-07-23 — Sacado el overlay blanco de "Sin stock" sobre la foto de producto
+
+- **Archivos modificados:** `src/components/features/ProductCard.tsx`, `src/pages/ProductDetail.tsx`, `CLAUDE.md`
+- **Qué cambió:** a pedido del usuario, se sacó el overlay `bg-white/70` + pill centrada "Sin stock" que tapaba la foto del producto (documentado hasta ahora como regla en `CLAUDE.md`) — el usuario lo describió como que "nublaba" la foto. Ahora la imagen se ve normal tanto en la grilla como en la ficha de producto; el único indicador de falta de stock es el badge rojo junto al precio en la grilla (agregado en la entrada anterior) y el texto "Este producto no tiene stock disponible." ya existente debajo del precio en la ficha. `CLAUDE.md` actualizado para reflejar la nueva convención.
+- **Verificación:** `tsc --noEmit` limpio, 86/86 tests, y en navegador (Playwright) contra "Eleonora" (sin stock) en grilla y ficha — foto limpia en ambos casos.
+
+## 2026-07-23 — Header más grande, logo recortado y badge "Sin stock" en la grilla
+
+- **Archivos modificados:** `src/components/layout/PublicStoreHeader.tsx`, `src/components/features/ProductCard.tsx`
+- **Archivo nuevo:** `src/brand/isotipo-cropped.png` (recorte del isotipo original, ver nota)
+- **Qué cambió:**
+  1. Header: texto de nav (`Inicio`/`Categorías`/`Nosotros`) de `text-sm` a `text-base`; alto de header de `h-16`/`h-14` a `h-20`/`h-16` (desktop/mobile); logo de `h-14`/`h-10` a `h-16`/`h-12`.
+  2. **El logo seguía viéndose chico incluso agrandado** porque `isotipo-fondo1.png` (1083×1081px) tiene el glifo "R." ocupando solo ~23% del canvas — el resto es relleno de fondo. Se generó `isotipo-cropped.png` (recorte 400×400 centrado en el glifo, vía Pillow, bounding box calculado por diferencia de color contra el fondo) y se apuntaron ambos usos del logo (desktop/mobile) a ese archivo nuevo. El original queda intacto en `src/brand/` (no se borró — puede servir de master para futuros recortes).
+  3. `ProductCard.tsx`: el badge de stock junto al precio solo se renderizaba cuando había stock ("En stock", verde) — sin stock quedaba un espacio en blanco. Ahora siempre se muestra el badge, alternando "En stock" (verde) / "Sin stock" (rojo).
+- **Verificación:** `tsc --noEmit` limpio, 86/86 tests, y en navegador (Playwright): header en 1440px/390px, y card de un producto sin stock ("Eleonora") mostrando el badge rojo.
+
+## 2026-07-23 — Hero outline CTA + altura responsive + fix de UX en filtros/búsqueda de /products
+
+- **Archivos modificados:** `src/pages/PublicStore.tsx`, `src/pages/Products.tsx`
+- **Dato modificado (producción, a pedido del usuario):** `organizations.settings.store_hero_show_cta` de `false` a `true` para Ruemia, vía `UPDATE` puntual con service role — no hay toggle en el panel admin para este campo.
+- **Qué cambió:**
+  1. El CTA "Ver productos" del hero pasó de botón sólido a `variant="outline"` (blanco sobre la foto de portada, color de marca si no hay foto) — pedido explícito del usuario. De paso, ya no duplica el cálculo de estilo que `Button.tsx` hace internamente (solo se pasa `style` cuando el valor es distinto al default, no siempre).
+  2. Alturas del hero (`heroHeightClass`) retocadas: menos padding en mobile, bastante más en desktop — las fotos de portada son verticales y el hero ancho-y-bajo de desktop las recortaba de más que el angosto-y-alto de mobile.
+  3. `/products`: el `useEffect` que vaciaba `allProducts`/`allStock`/`allVariants` en cada cambio de filtro causaba un flash de "Sin resultados" falso mientras el buscador esperaba el debounce + la respuesta real (porque `placeholderData` hace que `isLoading` ya sea `false` en ese momento). Se sacó el vaciado eager y se agregó un estado `isFiltering` (spinner en el ícono de búsqueda + grilla atenuada) para comunicar la carga sin ocultar los resultados anteriores. Además, elegir una categoría ahora limpia el término de búsqueda de texto (antes quedaba aplicado un filtro "fantasma").
+- **Verificación:** `tsc --noEmit` limpio, 86/86 tests, y en navegador (Playwright): hero en 1440px/390px, y muestreo cada 60ms del estado de `/products` durante una búsqueda — sin flash de empty-state.
+
+## 2026-07-22 — Revisión adversarial de seguridad (fresh context) del fix de organization_id
+
+- **Archivos modificados:** `src/hooks/useProductVariants.ts`, `src/hooks/usePublicProducts.ts`, `src/lib/queryKeys.ts`, `src/pages/ProductDetail.tsx`, `src/components/features/VariantSelector.tsx`, `supabase/migrations/141_fix_product_categories_public_rls.sql` (nuevo)
+- **Qué cambió:** un agente `review-risk` en contexto fresco auditó los cambios de `organization_id` del día y encontró 3 problemas:
+  1. **Crítico, preexistente**: `useProductVariants` no filtraba `product_variants` por organización (esa tabla no tiene columna `organization_id` propia, y su RLS es pública para cualquier producto activo) — pidiendo la ficha de un producto de otra organización se filtraban sus variantes (precio, SKU, atributos) aunque la página mostrara "no encontrado". Corregido con `product:products!inner(organization_id)` + `.eq('product.organization_id', organizationId)`.
+  2. **Alta, introducido hoy**: el nuevo `fetchCategoryProducts` armaba el filtro de búsqueda por concatenación sin sanitizar (a diferencia de su función hermana preexistente) — una coma podía inyectar condiciones extra en el `.or()` de PostgREST. Corregido reusando el sanitizado ya existente.
+  3. **Media, funcional**: RLS de `product_categories` sin policy pública de SELECT — productos vinculados solo vía esa tabla de junction no aparecían para usuarios anónimos. Migración nueva creada, **pendiente de aplicación manual por el usuario**.
+- **Verificación:** `tsc --noEmit` limpio, 86/86 tests, regresión completa en navegador (Playwright) sobre las 4 páginas del storefront.
+
+## 2026-07-22 — Fixes de seguimiento: organization_id, SEO de Products.tsx, duplicado de Helmet
+
+- **Archivos modificados:** `src/hooks/usePublicProducts.ts`, `src/pages/Products.tsx`, `src/components/layout/PublicStoreLayout.tsx`, `index.html`
+- **Qué cambió:**
+  1. `fetchStoreProduct` (usada por `ProductDetail.tsx`, agregada en la entrada anterior) no filtraba por `organization_id` ni en el producto principal ni en los relacionados — se agregó `.eq('organization_id', organizationId)` a ambas queries.
+  2. SEO en `Products.tsx`: `<Helmet>` con title/description estáticos + canonical `/products` (esta página no depende de datos async para su meta, a diferencia de producto/categoría).
+  3. **Bug encontrado al verificar visualmente el SEO de las 2 entradas anteriores**: `react-helmet-async` solo puede agregar tags vía JS, no eliminar los que ya estaban hardcodeados en `index.html` — el resultado eran 2 `<meta name="description">` (y og:title/og:description/canonical/og:image) compitiendo en el DOM. Se agregó un `<Helmet>` base con los defaults del sitio en `PublicStoreLayout.tsx` (cubre Home y cualquier página sin `<Helmet>` propio) y se sacaron de `index.html` los tags que ahora son 100% dinámicos: `description`, `og:title`, `og:description`, `og:image`, `canonical`. `<title>` se dejó estático a propósito — Helmet lo pisa con `document.title =` (asignación directa, no duplica), así que sigue sirviendo de fallback real para el instante antes de que cargue el JS.
+- **Limitación conocida, documentada en `.claude/TODO.md`:** el SEO dinámico vía Helmet no mejora el preview de WhatsApp/Twitter/Facebook al compartir un link — esos crawlers no ejecutan JS y solo ven el HTML estático. Requeriría SSR/prerendering, fuera del alcance de este fix (decisión de arquitectura pendiente, confirmada con el usuario).
+- **Verificación:** `tsc --noEmit` limpio, 86/86 tests, y en navegador (Playwright): 1 sola instancia de cada meta tag en home/`/products`/categoría/PDP con el valor correcto en cada caso (`og:image` del PDP muestra la foto real del producto). También se simuló una falla de red real en "agregar al carrito" desde `ProductDetail.tsx` — el toast de error aparece y el botón se resetea en vez de quedar trabado.
+
+## 2026-07-22 — ProductDetail.tsx: TanStack Query, fix de carrito trabado y SEO por producto
+
+- **Archivos modificados:** `src/pages/ProductDetail.tsx`, `src/hooks/usePublicProducts.ts`
+- **Qué cambió:**
+  1. `fetchProduct` (fetch manual con `supabase.from(...)` + `useState`/`useEffect`) reemplazado por un hook `useStoreProduct(organizationId, productId)` en `usePublicProducts.ts` (patrón TanStack Query igual al resto del archivo, `queryKeys.store.product` que ya existía sin uso). Mismo query shape exacto (producto + `category` + `product_images`, más productos relacionados por `category_id`) — refactor mecánico, no cambia qué se trae ni cómo se renderiza.
+  2. `handleAddToCart` — el fallo intermitente `TypeError: Failed to fetch` dejaba el botón trabado en "Cargando..." sin toast. El `finally` ya reseteaba `isAdding`, pero el `catch` no mostraba error; se agregó `show('No se pudo agregar el producto al carrito', 'error')`.
+  3. Meta tags por producto vía `react-helmet-async` (`<Helmet>` no tenía ningún uso real en el proyecto pese a estar instalado): `title`, `description`, `og:title`, `og:description`, `og:image`, `canonical` una vez cargado el producto; `noindex` en el estado "Producto no encontrado". Descripción truncada a 155 caracteres con saltos de línea colapsados a espacio; fallback a la descripción/imagen default de `index.html` cuando el producto no tiene descripción o imagen.
+- **Nota:** la query de producto no filtraba por `organization_id` (comportamiento pre-existente) — corregido en la entrada siguiente, ya no es un pendiente.
+
+## 2026-07-22 — CategoryProducts.tsx: TanStack Query, fix de aislamiento multi-tenant y SEO por categoría
+
+- **Archivos modificados:** `src/pages/CategoryProducts.tsx`, `src/hooks/usePublicProducts.ts`
+- **Qué cambió:** las llamadas directas a `supabase.from(...)` dentro de `useState`/`useEffect` se reemplazaron por el nuevo hook `useCategoryProducts` (TanStack Query), siguiendo el mismo patrón de `useFilteredProducts`/`Products.tsx` (paginación "Cargar más" con acumulación en estado local + `placeholderData` para evitar parpadeo). La resolución de categoría/categoría padre/subcategorías a partir del slug de la URL se derivó de `usePublicCategories(orgId)` (que ya filtra por `organization_id` y ya está cacheado) en vez de 2 queries adicionales sin ese filtro — elimina el hallazgo de la auditoría por construcción en vez de parchearlo. La query restante a `product_categories` (junction table) ganó `.eq('organization_id', organizationId)` explícito, y el filtro de organización en la query de productos pasó de condicional a incondicional, garantizado por `enabled: !!organizationId` en el hook. Se agregó SEO dinámico por categoría con `react-helmet-async` (`title`, `description`, `og:title`, `og:description`, `canonical`) — junto con la entrada anterior, primer uso real de `<Helmet>` en el repo (ya estaba instalado y wireado en `main.tsx` pero sin consumir).
+- **Verificación:** `tsc --noEmit` limpio, `eslint` limpio, 86/86 tests (`npx vitest run`).
+
+## 2026-07-22 — Descripción de producto con `\n` literal y labels de variante en inglés
+
+- **Archivos modificados:** `src/lib/utils.ts`, `src/lib/utils.test.ts`, `src/pages/ProductDetail.tsx`, `src/components/features/VariantSelector.tsx`
+- **Qué cambió:** auditoría de la tienda pública (skill `ecommerce-analyzer`) detectó `\n\n` literal mostrándose en pantalla en la descripción de producto. Se confirmó por lectura directa de `products.description` (read-only vía REST) que es sistémico — 18 de 49 productos con descripción tienen el string `\n`/`\r\n` cargado como texto en vez de un salto de línea real, no un caso aislado. Se agregó `normalizeLineBreaks()` (nueva, 7 tests) + `whitespace-pre-line` en el párrafo de descripción, en vez de editar 18 filas a mano — cubre también cargas futuras con el mismo error. También se encontró que el selector de variante mostraba "Size" en vez de "Talle": la clave del atributo es dato cargado inconsistente en `product_variants.attributes` (`Size`/`Color`/`talle`/`color`, más claves rotas como `cristal`/`1 kilo` que no se tocan), no texto hardcodeado. Con aprobación del usuario, se agregó `translateAttributeLabel()` (nueva, 7 tests) — mapa de traducción solo-display para claves reconocidas, sin escribir en la DB.
+- **Verificación:** `tsc --noEmit` limpio, 30/30 tests, y en navegador (Playwright) contra productos reales ("Eleonora" para la descripción, "Zuecos" para el label de talle).
+
+---
+
 ## 2026-07-20 — Tipografías de marca según manual: Berlin, Cambria y Arial
 
 - **Archivos modificados:** `src/index.css`, `src/pages/ProductDetail.tsx`, `public/berlin.regular.ttf` (nuevo, provisto por el usuario), `public/Cambria.ttf` (nuevo, provisto por el usuario)

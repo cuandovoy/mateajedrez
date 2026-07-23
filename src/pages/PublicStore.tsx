@@ -131,7 +131,10 @@ export function PublicStore() {
   const heroTextPosition = (settings.store_hero_text_position as string) ?? 'center'
   const heroHeight       = (settings.store_hero_height as string) ?? 'md'
 
-  const heroHeightClass = { sm: 'py-10 md:py-14', md: 'py-16 md:py-24', lg: 'py-24 md:py-36', xl: 'py-36 md:py-56' }[heroHeight] ?? 'py-16 md:py-24'
+  // Menos padding en mobile, mucho más en desktop: las fotos de portada son
+  // verticales, así que un hero angosto-y-alto (mobile) recorta poco, pero uno
+  // ancho-y-bajo (desktop) las recortaba de más — ver .claude/TODO.md.
+  const heroHeightClass = { sm: 'py-6 md:py-16', md: 'py-8 md:py-24', lg: 'py-12 md:py-40', xl: 'py-14 md:py-64' }[heroHeight] ?? 'py-8 md:py-24'
   const heroAlignClass  = { center: 'text-center items-center', left: 'text-left items-start', 'bottom-left': 'text-left items-start justify-end pb-12' }[heroTextPosition] ?? 'text-center items-center'
 
   const aboutImageUrl = useMemo(() => {
@@ -233,15 +236,17 @@ export function PublicStore() {
             {heroShowCta && (
               <Link to="/products">
                 <Button
+                  variant="outline"
                   size="lg"
                   className="px-8 py-4 md:px-10 md:py-4 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-full"
-                  style={{
-                    backgroundColor: `var(--org-primary-color, #46362B)`,
-                    color: 'var(--org-primary-ink, white)',
-                  }}
+                  style={
+                    hasCoverImages
+                      ? { borderColor: heroTextColor, color: heroTextColor }
+                      : undefined
+                  }
                 >
                   Ver productos
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  
                 </Button>
               </Link>
             )}

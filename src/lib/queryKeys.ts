@@ -7,8 +7,8 @@ export const queryKeys = {
     categories: (orgId: string) => ['store', orgId, 'categories'] as const,
     product: (orgId: string, productId: string) =>
       ['store', orgId, 'products', productId] as const,
-    productVariants: (productId: string) =>
-      ['store', 'products', productId, 'variants'] as const,
+    productVariants: (orgId: string, productId: string) =>
+      ['store', orgId, 'products', productId, 'variants'] as const,
     categoryProducts: (orgId: string, slug: string, filters: object) =>
       ['store', orgId, 'categories', slug, 'products', filters] as const,
   },

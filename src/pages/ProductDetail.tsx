@@ -1,20 +1,28 @@
 import { ProductCard } from '@/components/features/ProductCard'
 import { VariantSelector } from '@/components/features/VariantSelector'
 import { Button } from '@/components/ui/Button'
-import { supabase } from '@/lib/supabase'
+import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useProductVariants } from '@/hooks/useProductVariants'
-import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
+import { useStoreProduct } from '@/hooks/usePublicProducts'
+import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice, normalizeLineBreaks } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
 import { useToastStore } from '@/store/toastStore'
-import type { Product, ProductWithCategory, ProductImage } from '@/types'
+import type { Product, ProductImage } from '@/types'
 import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle, Share2 } from 'lucide-react'
 import { useEffect, useState, useRef, useCallback } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { Link, useParams } from 'react-router-dom'
 
 const DEFAULT_PRODUCT_PLACEHOLDER =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800"><rect width="800" height="800" fill="%23f3f4f6"/><g fill="%239ca3af"><rect x="240" y="260" width="320" height="220" rx="24"/><circle cx="320" cy="330" r="28"/><path d="M270 450l95-95 62 62 48-48 55 81z"/></g><text x="50%25" y="560" text-anchor="middle" font-family="Arial,sans-serif" font-size="32" fill="%236b7280">Sin imagen</text></svg>'
+
+// Fallbacks del sitio — deben coincidir con los tags estáticos de index.html
+const DEFAULT_META_DESCRIPTION =
+  'Mates artesanales de cuero y detalles bordados, hechos en Uruguay. Las piezas con historia merecen ser parte de nuevos momentos.'
+const DEFAULT_OG_IMAGE = '/og-image.png'
+const META_DESCRIPTION_MAX_LENGTH = 155
 
 // Helper function to validate image URLs
 function isValidImageUrl(url: string | null | undefined): boolean {
@@ -28,21 +36,33 @@ function isValidImageUrl(url: string | null | undefined): boolean {
   }
 }
 
+// Imagen principal del producto para el meta tag og:image — misma prioridad
+// (is_primary > display_order) que la galería, sin depender del estado de UI
+function getPrimaryImageUrl(product: Product & { product_images?: ProductImage[] }): string | null {
+  const images = product.product_images ?? []
+  const validImages = images.filter((img) => isValidImageUrl(img.image_url))
+  const primary = validImages.find((img) => img.is_primary) ?? validImages[0]
+  if (primary?.image_url) return primary.image_url
+  if (isValidImageUrl(product.image_url)) return product.image_url as string
+  return null
+}
+
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>()
   const settings = useOrgSettings()
+  const { organization } = usePublicStore()
   const { addToCart } = useCartStore()
   const { show } = useToastStore()
-  const [product, setProduct] = useState<ProductWithCategory | null>(null)
-  const [relatedProducts, setRelatedProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
+  const { data: productData, isLoading: loading } = useStoreProduct(organization?.id, id)
+  const product = productData?.product ?? null
+  const relatedProducts = productData?.relatedProducts ?? []
   const [isAdding, setIsAdding] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedVariant, setSelectedVariant] = useState<{ image_url?: string | null; price?: number | null; stock?: number; unit?: string | null } | null>(null)
 
   // useProductVariants comparte caché con VariantSelector — un solo request de red
-  const { data: variants = [] } = useProductVariants(id)
+  const { data: variants = [] } = useProductVariants(organization?.id, id)
   const hasActiveVariants = variants.length > 0
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [imageLoading, setImageLoading] = useState(true)
@@ -63,79 +83,28 @@ export function ProductDetail() {
 
 
   useEffect(() => {
-    if (id) {
-      fetchProduct()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
-
-  useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [id])
 
-  const fetchProduct = async () => {
-    if (!id) return
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select(`
-          *,
-          category:categories(*),
-          product_images (
-            id,
-            image_url,
-            display_order,
-            is_primary
-          )
-        `)
-        .eq('id', id)
-        .eq('is_active', true)
-        .single()
+  // Resetea el estado de la galería cuando cambia el producto cargado
+  useEffect(() => {
+    setCurrentImageIndex(0)
+    setImageLoading(true)
+    setFadeIn(false)
+    setAllImagesFailed(false)
+  }, [product?.id])
 
-      if (error) throw error
-
-      setProduct(data as ProductWithCategory & { product_images?: ProductImage[] })
-      setCurrentImageIndex(0)
-      setImageLoading(true)
-      setFadeIn(false)
-      setAllImagesFailed(false)
-
-      if (data) {
-        const productData = data as ProductWithCategory & { product_images?: ProductImage[] }
-        getProductStock(productData.id as string, null, null, productData.organization_id || null)
-          .then((stock) => setProductStock(stock))
-          .catch(() => setProductStock(0))
-      }
-
-      // Fetch related products
-      if ((data as ProductWithCategory)?.category_id) {
-        const { data: related, error: relatedError } = await supabase
-          .from('products')
-          .select(`
-            *,
-            category:categories(*),
-            product_images (
-              id,
-              image_url,
-              display_order,
-              is_primary
-            )
-          `)
-          .eq('category_id', (data as ProductWithCategory).category_id)
-          .eq('is_active', true)
-          .neq('id', id)
-          .limit(4)
-
-        if (!relatedError && related) {
-          setRelatedProducts(related)
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching product:', error)
-    } finally {
-      setLoading(false)
+  useEffect(() => {
+    if (!product) {
+      setProductStock(null)
+      return
     }
-  }
+    let cancelled = false
+    getProductStock(product.id, null, null, product.organization_id || null)
+      .then((stock) => { if (!cancelled) setProductStock(stock) })
+      .catch(() => { if (!cancelled) setProductStock(0) })
+    return () => { cancelled = true }
+  }, [product?.id, product?.organization_id])
 
   const handleAddToCart = async () => {
     if (!product) return
@@ -145,6 +114,7 @@ export function ProductDetail() {
       await addToCart(product.id, quantity, selectedVariantId || undefined)
     } catch (error) {
       console.error('Error adding to cart:', error)
+      show('No se pudo agregar el producto al carrito', 'error')
     } finally {
       setIsAdding(false)
     }
@@ -221,6 +191,9 @@ export function ProductDetail() {
   if (!product) {
     return (
       <div className="container-custom py-8 text-center">
+        <Helmet>
+          <meta name="robots" content="noindex" />
+        </Helmet>
         <p className="text-gray-600 text-lg mb-4">Producto no encontrado</p>
         <Link to="/products">
           <Button variant="outline">
@@ -240,8 +213,25 @@ export function ProductDetail() {
       )}`
     : null
 
+  const singleLineDescription = normalizeLineBreaks(product.description).replace(/\s*\n+\s*/g, ' ').trim()
+  const metaDescription = singleLineDescription
+    ? singleLineDescription.length > META_DESCRIPTION_MAX_LENGTH
+      ? `${singleLineDescription.slice(0, META_DESCRIPTION_MAX_LENGTH).trimEnd()}...`
+      : singleLineDescription
+    : DEFAULT_META_DESCRIPTION
+  const metaTitle = `${capitalizeFirst(product.name)} | Ruemia`
+  const ogImageUrl = getPrimaryImageUrl(product as Product & { product_images?: ProductImage[] }) ?? DEFAULT_OG_IMAGE
+
   return (
     <div className="container-custom py-8">
+      <Helmet>
+        <title>{metaTitle}</title>
+        <meta name="description" content={metaDescription} />
+        <meta property="og:title" content={metaTitle} />
+        <meta property="og:description" content={metaDescription} />
+        <meta property="og:image" content={ogImageUrl} />
+        <link rel="canonical" href={`/product/${product.id}`} />
+      </Helmet>
       <Link to="/products">
         <Button variant="ghost" className="mb-6">
           <ArrowLeft className="h-4 w-4 mr-2" />
@@ -350,13 +340,6 @@ export function ProductDetail() {
                     {imageLoading && (
                       <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
                         <div className="text-gray-400">Cargando...</div>
-                      </div>
-                    )}
-                    {isOutOfStock && (
-                      <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                        <span className="bg-gray-800/90 text-white text-xs font-medium px-3 py-1.5 rounded-full tracking-wide">
-                          Sin stock
-                        </span>
                       </div>
                     )}
                   </div>
@@ -485,8 +468,8 @@ export function ProductDetail() {
           </div>
 
           <div className="mb-6">
-            <p className="text-gray-700 leading-relaxed">
-              {capitalizeFirst(product.description) || 'Sin descripción disponible'}
+            <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+              {capitalizeFirst(normalizeLineBreaks(product.description)) || 'Sin descripción disponible'}
             </p>
           </div>
 

@@ -1,0 +1,16 @@
+{
+  "name": "string",
+  "sku": "string | null",
+  "url": "string",
+  "currency": "string",
+  "price_original": "number | null",
+  "price_final": "number",
+  "discount_percentage": "number | null",
+  "in_stock": "boolean",
+  "stock_label": "string | null",
+  "variants": [
+    { "attribute": "string", "value": "string", "available": "boolean" }
+  ],
+  "source_platform": "string | null",
+  "extracted_at": "string (ISO 8601)"
+}

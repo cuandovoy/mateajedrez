@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useProductVariants } from '@/hooks/useProductVariants'
-import { capitalizeFirst, cn, formatPrice, getEffectivePrice } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, getEffectivePrice, translateAttributeLabel } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { ProductVariant, Product } from '@/types'
 
@@ -24,7 +24,7 @@ interface VariantSelectorProps {
 
 export function VariantSelector({ product, selectedVariantId, onVariantChange }: VariantSelectorProps) {
   const settings = useOrgSettings()
-  const { data: variants = [], isPending: loading } = useProductVariants(product.id)
+  const { data: variants = [], isPending: loading } = useProductVariants(product.organization_id, product.id)
   const [attributes, setAttributes] = useState<Record<string, string[]>>({})
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({})
   const [variantStocks, setVariantStocks] = useState<Record<string, number>>({})
@@ -151,8 +151,8 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
         <>
           {Object.entries(attributes).map(([key, values]) => (
             <div key={key}>
-              <label className="block text-sm font-medium text-gray-700 mb-2 capitalize">
-                {key}
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {translateAttributeLabel(key)}
               </label>
               <div className="flex flex-wrap gap-2">
                 {values.map((value) => {

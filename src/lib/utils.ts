@@ -25,6 +25,25 @@ export function capitalizeFirst(str: string | null | undefined): string {
   return str.charAt(0).toUpperCase() + str.slice(1)
 }
 
+/** Convierte saltos de línea cargados como texto literal (`\n`/`\r\n`) en saltos de línea reales. */
+export function normalizeLineBreaks(str: string | null | undefined): string {
+  if (str == null || str === '') return ''
+  return str.replace(/\\r\\n|\\n/g, '\n')
+}
+
+const ATTRIBUTE_LABEL_MAP: Record<string, string> = {
+  size: 'Talle',
+  talle: 'Talle',
+  color: 'Color',
+  colour: 'Color',
+}
+
+/** Traduce/normaliza el nombre visible de un atributo de variante (ej. "Size" → "Talle") sin tocar el dato original usado para matching. Claves no reconocidas se muestran capitalizadas tal cual vienen cargadas. */
+export function translateAttributeLabel(key: string): string {
+  const normalized = ATTRIBUTE_LABEL_MAP[key.trim().toLowerCase()]
+  return normalized ?? capitalizeFirst(key)
+}
+
 const DEFAULT_LOCALE = 'es-AR'
 const DEFAULT_CURRENCY = 'ARS'
 

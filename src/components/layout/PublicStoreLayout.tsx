@@ -1,4 +1,5 @@
 import { ReactNode } from 'react'
+import { Helmet } from 'react-helmet-async'
 import { PublicStoreHeader } from './PublicStoreHeader'
 import { PublicStoreFooter } from './Footer'
 import { ShippingNoticeBanner } from './ShippingNoticeBanner'
@@ -18,6 +19,23 @@ interface PublicStoreLayoutProps {
 export function PublicStoreLayout({ organization, slug, children }: PublicStoreLayoutProps) {
   return (
     <PublicStoreProvider organization={organization} slug={slug}>
+      {/* Defaults SEO — deben coincidir con los tags estáticos de index.html
+          (que siguen ahí como fallback para crawlers que no ejecutan JS).
+          Cualquier <Helmet> de una página hija pisa estos tags puntuales. */}
+      <Helmet>
+        <title>Ruemia — Mates artesanales</title>
+        <meta
+          name="description"
+          content="Mates artesanales de cuero y detalles bordados, hechos en Uruguay. Las piezas con historia merecen ser parte de nuevos momentos."
+        />
+        <meta property="og:title" content="Ruemia — Mates artesanales" />
+        <meta
+          property="og:description"
+          content="Mates artesanales de cuero y detalles bordados, hechos en Uruguay. Las piezas con historia merecen ser parte de nuevos momentos."
+        />
+        <meta property="og:image" content="/og-image.png" />
+        <link rel="canonical" href="/" />
+      </Helmet>
       <div className="min-h-screen bg-white" style={{ fontFamily: `var(--org-font-family, Cambria)` }}>
         <ShippingNoticeBanner />
         <PublicStoreHeader organization={organization} />

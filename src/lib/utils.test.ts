@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { capitalizeFirst, formatPrice, formatDateShort } from './utils'
+import { capitalizeFirst, formatPrice, formatDateShort, normalizeLineBreaks, translateAttributeLabel } from './utils'
 import type { OrganizationSettings } from '@/types/database.types'
 
 // ─── capitalizeFirst ─────────────────────────────────────────────────────────
@@ -27,6 +27,70 @@ describe('capitalizeFirst', () => {
 
   it('maneja un solo caracter', () => {
     expect(capitalizeFirst('a')).toBe('A')
+  })
+})
+
+// ─── normalizeLineBreaks ─────────────────────────────────────────────────────
+
+describe('normalizeLineBreaks', () => {
+  it('convierte \\n literal a salto de línea real', () => {
+    expect(normalizeLineBreaks('Línea 1\\n\\nLínea 2')).toBe('Línea 1\n\nLínea 2')
+  })
+
+  it('convierte \\r\\n literal a salto de línea real', () => {
+    expect(normalizeLineBreaks('Línea 1\\r\\nLínea 2')).toBe('Línea 1\nLínea 2')
+  })
+
+  it('no toca un salto de línea real ya existente', () => {
+    expect(normalizeLineBreaks('Línea 1\nLínea 2')).toBe('Línea 1\nLínea 2')
+  })
+
+  it('deja intacto un string sin saltos de línea', () => {
+    expect(normalizeLineBreaks('Sin saltos')).toBe('Sin saltos')
+  })
+
+  it('retorna vacío para string vacío', () => {
+    expect(normalizeLineBreaks('')).toBe('')
+  })
+
+  it('retorna vacío para null', () => {
+    expect(normalizeLineBreaks(null)).toBe('')
+  })
+
+  it('retorna vacío para undefined', () => {
+    expect(normalizeLineBreaks(undefined)).toBe('')
+  })
+})
+
+// ─── translateAttributeLabel ─────────────────────────────────────────────────
+
+describe('translateAttributeLabel', () => {
+  it('traduce "Size" a "Talle"', () => {
+    expect(translateAttributeLabel('Size')).toBe('Talle')
+  })
+
+  it('traduce "size" en minúscula a "Talle"', () => {
+    expect(translateAttributeLabel('size')).toBe('Talle')
+  })
+
+  it('normaliza "talle" a "Talle"', () => {
+    expect(translateAttributeLabel('talle')).toBe('Talle')
+  })
+
+  it('normaliza "color" a "Color"', () => {
+    expect(translateAttributeLabel('color')).toBe('Color')
+  })
+
+  it('traduce "Colour" a "Color"', () => {
+    expect(translateAttributeLabel('Colour')).toBe('Color')
+  })
+
+  it('capitaliza claves no reconocidas en vez de traducirlas', () => {
+    expect(translateAttributeLabel('material')).toBe('Material')
+  })
+
+  it('no inventa una traducción para claves rotas de datos', () => {
+    expect(translateAttributeLabel('cristal')).toBe('Cristal')
   })
 })
 
