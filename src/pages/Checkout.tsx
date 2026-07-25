@@ -8,8 +8,9 @@ import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
+import { checkoutSchema, URUGUAY_DEPARTMENTS, type CheckoutFormData } from '@/lib/schemas'
 import { supabase } from '@/lib/supabase'
-import { capitalizeFirst, formatPrice, getEffectivePrice, getProductImageUrl, hasActiveDiscount } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl, hasActiveDiscount } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
@@ -17,8 +18,10 @@ import { useToastStore } from '@/store/toastStore'
 import type { CartItemWithProduct, Order, ProductImage } from '@/types'
 import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { BranchInventory, Customer } from '@/types/database.types'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, Truck } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 
 // Icon map for known payment method keys
@@ -27,12 +30,6 @@ const PAYMENT_METHOD_ICONS: Record<string, React.ReactNode> = {
   transfer: <Landmark className="h-5 w-5" />,
   credit_card: <CreditCard className="h-5 w-5" />,
   paypal: <CreditCard className="h-5 w-5" />,
-}
-
-interface ContactForm {
-  fullName: string
-  email: string
-  phone: string
 }
 
 interface FulfillmentBranchCandidate {
@@ -62,13 +59,24 @@ function CheckoutInner() {
     tipoComprobante: 'ticket',
   })
   const [mainBranchId, setMainBranchId] = useState<string | null>(null)
-  const [formData, setFormData] = useState<ContactForm>({
-    fullName: '',
-    email: '',
-    phone: '',
-  })
-  const [errors, setErrors] = useState<Partial<ContactForm>>({})
   const [paymentMethodError, setPaymentMethodError] = useState<string | null>(null)
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    setValue,
+    getValues,
+    formState: { errors },
+  } = useForm<CheckoutFormData>({
+    resolver: zodResolver(checkoutSchema),
+    defaultValues: {
+      fullName: '',
+      email: '',
+      phone: '',
+      address: '',
+      city: '',
+    },
+  })
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -144,10 +152,10 @@ function CheckoutInner() {
 
   // Pre-fill email from user when logged in
   useEffect(() => {
-    if (user?.email && !formData.email) {
-      setFormData((prev) => ({ ...prev, email: user.email ?? '' }))
+    if (user?.email && !getValues('email')) {
+      setValue('email', user.email)
     }
-  }, [user?.email])
+  }, [user?.email, getValues, setValue])
 
   // Sync payment method when enabled methods change
   useEffect(() => {
@@ -159,23 +167,6 @@ function CheckoutInner() {
       setPaymentMethod(firstEnabled)
     }
   }, [paymentMethods, mainBranchId, paymentMethod])
-
-  const validateForm = (): boolean => {
-    const newErrors: Partial<ContactForm> = {}
-
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = 'El nombre completo es obligatorio'
-    }
-    if (formData.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      newErrors.email = 'Email inválido'
-    }
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'El teléfono es obligatorio'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
-  }
 
   const validateStockForBranch = async (branchId: string): Promise<string[]> => {
     const stockIssues: string[] = []
@@ -325,14 +316,7 @@ function CheckoutInner() {
     return { branchId: null, stockIssues: fallbackIssues }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!validateForm()) {
-      show('Por favor, completa todos los campos obligatorios', 'error')
-      return
-    }
-
+  const onSubmit = async (formValues: CheckoutFormData) => {
     if (items.length === 0) {
       show('Tu carrito está vacío', 'error')
       navigate('/cart')
@@ -397,11 +381,13 @@ function CheckoutInner() {
       }
 
       const total = getTotal()
-      const customerEmail = (formData.email.trim() || user?.email) ?? null
       const contactInfo = {
-        fullName: formData.fullName,
-        email: customerEmail || undefined,
-        phone: formData.phone,
+        fullName: formValues.fullName,
+        email: formValues.email,
+        phone: formValues.phone,
+        address: formValues.address,
+        city: formValues.city,
+        department: formValues.department,
       }
 
       if (!organizationId) {
@@ -423,34 +409,37 @@ function CheckoutInner() {
         branch_id: fulfillmentBranchId, // Auto-assigned to a branch that can fulfill this order
       } as any
 
-      // Create or get customer (scoped by org)
+      // Create or get customer (scoped by org) — matcheado por email, que es
+      // ahora obligatorio y única clave de identidad del cliente (antes era
+      // por teléfono, ver migración 142_customers_unique_email.sql: dos
+      // clientes distintos pueden compartir teléfono, no email).
       let customer: Customer | null = null
 
-      const lookupCustomerByPhone = async (): Promise<Customer | null> => {
+      const lookupCustomerByEmail = async (): Promise<Customer | null> => {
         const { data } = await supabase
           .from('customers')
           .select('*')
           .eq('organization_id', organizationId)
-          .eq('phone', formData.phone)
+          .eq('email', formValues.email)
           .maybeSingle()
         return data as Customer | null
       }
 
-      const existingCustomer = await lookupCustomerByPhone()
+      const existingCustomer = await lookupCustomerByEmail()
 
       if (existingCustomer) {
         customer = existingCustomer
         const needsUpdate =
           (user?.id && !existingCustomer.user_id) ||
-          customerEmail !== (existingCustomer.email ?? '') ||
-          formData.fullName !== existingCustomer.full_name
+          formValues.fullName !== existingCustomer.full_name ||
+          formValues.phone !== existingCustomer.phone
         if (needsUpdate) {
           const { data: updatedCustomer } = await supabase
             .from('customers')
             .update({
               ...(user?.id && !existingCustomer.user_id ? { user_id: user.id } : {}),
-              email: customerEmail ?? user?.email ?? existingCustomer.email,
-              full_name: formData.fullName,
+              full_name: formValues.fullName,
+              phone: formValues.phone,
               address: contactInfo,
             } as never)
             .eq('id', existingCustomer.id)
@@ -464,9 +453,9 @@ function CheckoutInner() {
           .insert({
             organization_id: organizationId,
             user_id: user?.id || null,
-            email: customerEmail,
-            full_name: formData.fullName,
-            phone: formData.phone,
+            email: formValues.email,
+            full_name: formValues.fullName,
+            phone: formValues.phone,
             address: contactInfo,
             is_active: true,
           } as never)
@@ -478,11 +467,11 @@ function CheckoutInner() {
           // (guest can't see customers with user_id IS NOT NULL, or migration not applied)
           // Re-query to get the existing customer ID and proceed
           if ((customerError as any).code === '23505') {
-            const retryCustomer = await lookupCustomerByPhone()
+            const retryCustomer = await lookupCustomerByEmail()
             if (retryCustomer) {
               customer = retryCustomer
             } else {
-              throw new Error('Ya existe un cliente con ese número de teléfono para esta organización.')
+              throw new Error('Ya existe un cliente con ese email para esta organización.')
             }
           } else {
             throw customerError
@@ -676,13 +665,6 @@ function CheckoutInner() {
     }
   }
 
-  const handleChange = (field: keyof ContactForm, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }))
-    }
-  }
-
   const subtotal = getTotal()
 
   return (
@@ -775,7 +757,7 @@ function CheckoutInner() {
               <CardTitle>Datos de Contacto</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -783,32 +765,29 @@ function CheckoutInner() {
                     </label>
                     <Input
                       type="text"
-                      value={formData.fullName}
-                      onChange={(e) => handleChange('fullName', e.target.value)}
-                      required
+                      {...register('fullName')}
                       className={errors.fullName ? 'border-red-500' : ''}
                     />
                     {errors.fullName && (
-                      <p className="text-xs text-red-500 mt-1">{errors.fullName}</p>
+                      <p className="text-xs text-red-500 mt-1">{errors.fullName.message}</p>
                     )}
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Email
+                      Email <span className="text-red-500">*</span>
                     </label>
                     <Input
                       type="email"
-                      value={formData.email}
-                      onChange={(e) => handleChange('email', e.target.value)}
+                      {...register('email')}
                       placeholder="tu@email.com"
                       className={errors.email ? 'border-red-500' : ''}
                     />
                     {errors.email && (
-                      <p className="text-xs text-red-500 mt-1">{errors.email}</p>
+                      <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>
                     )}
                     <p className="text-xs text-gray-500 mt-1">
-                      Para recibir actualizaciones del estado de tu orden
+                      Te identifica como cliente y te avisamos el estado de tu orden
                     </p>
                   </div>
                 </div>
@@ -819,14 +798,66 @@ function CheckoutInner() {
                   </label>
                   <Input
                     type="tel"
-                    value={formData.phone}
-                    onChange={(e) => handleChange('phone', e.target.value)}
-                    required
+                    {...register('phone')}
+                    placeholder="099 123 456"
                     className={errors.phone ? 'border-red-500' : ''}
                   />
                   {errors.phone && (
-                    <p className="text-xs text-red-500 mt-1">{errors.phone}</p>
+                    <p className="text-xs text-red-500 mt-1">{errors.phone.message}</p>
                   )}
+                </div>
+
+                {/* Shipping address */}
+                <div className="pt-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Dirección de Envío <span className="text-red-500">*</span>
+                  </label>
+                  <div className="space-y-4">
+                    <div>
+                      <Input
+                        type="text"
+                        placeholder="Calle y número, apto/casa"
+                        {...register('address')}
+                        className={errors.address ? 'border-red-500' : ''}
+                      />
+                      {errors.address && (
+                        <p className="text-xs text-red-500 mt-1">{errors.address.message}</p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Input
+                          type="text"
+                          placeholder="Ciudad"
+                          {...register('city')}
+                          className={errors.city ? 'border-red-500' : ''}
+                        />
+                        {errors.city && (
+                          <p className="text-xs text-red-500 mt-1">{errors.city.message}</p>
+                        )}
+                      </div>
+
+                      <div>
+                        <select
+                          defaultValue=""
+                          {...register('department')}
+                          className={cn(
+                            'w-full min-h-[44px] px-4 py-2 border rounded-lg bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent transition-colors',
+                            errors.department ? 'border-red-500 focus-visible:ring-red-500' : 'border-gray-300'
+                          )}
+                        >
+                          <option value="" disabled>Departamento</option>
+                          {URUGUAY_DEPARTMENTS.map((dept) => (
+                            <option key={dept} value={dept}>{dept}</option>
+                          ))}
+                        </select>
+                        {errors.department && (
+                          <p className="text-xs text-red-500 mt-1">{errors.department.message}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Payment Method Selection */}

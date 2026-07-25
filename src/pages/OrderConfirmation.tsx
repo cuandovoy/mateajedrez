@@ -200,7 +200,7 @@ export function OrderConfirmation() {
 
     const addressHtml = addr
       ? `<p style="margin:2px 0;">${addr.fullName ?? ''}</p>
-         <p style="margin:2px 0;">${addr.address ?? ''}, ${addr.city ?? ''}</p>
+         <p style="margin:2px 0;">${addr.address ?? ''}, ${addr.city ?? ''}${addr.department ? `, ${addr.department}` : ''}</p>
          ${addr.email ? `<p style="margin:2px 0;">${addr.email}</p>` : ''}
          ${addr.phone ? `<p style="margin:2px 0;">Tel: ${addr.phone}</p>` : ''}`
       : ''
@@ -403,24 +403,28 @@ export function OrderConfirmation() {
               </div>
             )}
 
-            {order.shipping_address && (
-              <div className="border-t pt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Dirección de Envío</p>
-                <div className="text-sm text-gray-600">
-                  <p>{(order.shipping_address as { fullName: string }).fullName}</p>
-                  {(order.shipping_address as { email?: string }).email && (
-                    <p>Email: {(order.shipping_address as { email: string }).email}</p>
-                  )}
-                  <p>{(order.shipping_address as { address: string }).address}</p>
-                  <p>
-                    {(order.shipping_address as { city: string }).city}, {(order.shipping_address as { state: string }).state}{' '}
-                    {(order.shipping_address as { zipCode: string }).zipCode}
-                  </p>
-                  <p>{(order.shipping_address as { country: string }).country}</p>
-                  <p className="mt-2">Tel: {(order.shipping_address as { phone: string | number }).phone}</p>
+            {order.shipping_address && (() => {
+              const shipping = order.shipping_address as {
+                fullName?: string
+                email?: string
+                phone?: string
+                address?: string
+                city?: string
+                department?: string
+              }
+              return (
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium text-gray-700 mb-2">Dirección de Envío</p>
+                  <div className="text-sm text-gray-600">
+                    <p>{shipping.fullName}</p>
+                    {shipping.email && <p>Email: {shipping.email}</p>}
+                    <p>{shipping.address}</p>
+                    <p>{shipping.city}{shipping.department ? `, ${shipping.department}` : ''}</p>
+                    <p className="mt-2">Tel: {shipping.phone}</p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
           </CardContent>
         </Card>
 

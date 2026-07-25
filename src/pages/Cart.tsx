@@ -1,8 +1,10 @@
 import { CheckoutSteps } from '@/components/features/CheckoutSteps'
+import { ProductCard } from '@/components/features/ProductCard'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { useStoreProducts } from '@/hooks/usePublicProducts'
 import { capitalizeFirst, cn, formatPrice, getProductImageUrl, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useAuthStore } from '@/store/authStore'
@@ -11,8 +13,10 @@ import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { Product, ProductImage } from '@/types'
 import { BranchInventory, ProductVariant } from '@/types/database.types'
 import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+
+const SUGGESTED_PRODUCTS_COUNT = 5
 
 interface CartQuantityInputProps {
   quantity: number
@@ -71,6 +75,38 @@ function CartContent() {
   const [stockWarnings, setStockWarnings] = useState<Record<string, { available: number; requested: number }>>({})
   const [mainBranchId, setMainBranchId] = useState<string | null>(null)
   const [itemStocks, setItemStocks] = useState<Record<string, number>>({}) // item.id -> stock
+
+  const { data: storeProductsData } = useStoreProducts(organizationId)
+
+  const suggestedProducts = useMemo(() => {
+    const products = storeProductsData?.products ?? []
+    const stockByProduct = storeProductsData?.stockByProduct ?? {}
+    const cartProductIds = new Set(items.map((item) => item.product_id))
+
+    // Máximo un producto por categoría — mismo criterio que "Productos
+    // destacados" del home (PublicStore.tsx) para no repetir la misma
+    // categoría varias veces seguidas.
+    const seenCategoryIds = new Set<string>()
+    const result: { product: (typeof products)[number]; stock: number }[] = []
+
+    for (const product of products) {
+      if (result.length >= SUGGESTED_PRODUCTS_COUNT) break
+      if ((stockByProduct[product.id] ?? 0) <= 0 || cartProductIds.has(product.id)) continue
+
+      if (product.category_id) {
+        if (seenCategoryIds.has(product.category_id)) continue
+        seenCategoryIds.add(product.category_id)
+      }
+
+      result.push({ product, stock: stockByProduct[product.id] })
+    }
+
+    return result
+  }, [storeProductsData, items])
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
 
   useEffect(() => {
     fetchCart(organizationId)
@@ -227,6 +263,25 @@ function CartContent() {
     navigate('/checkout')
   }
 
+  const suggestedSection = suggestedProducts.length > 0 && (
+    <div className="mt-12">
+      <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">
+        También te puede interesar
+      </h2>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
+        {suggestedProducts.map(({ product, stock }, index) => (
+          <div
+            key={product.id}
+            className="animate-fade-in-up"
+            style={{ animationDelay: `${Math.min(index * 35, 260)}ms` }}
+          >
+            <ProductCard product={product} stock={stock} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -249,6 +304,7 @@ function CartContent() {
             </Button>
           </CardContent>
         </Card>
+        {suggestedSection}
       </div>
     )
   }
@@ -438,6 +494,8 @@ function CartContent() {
           </Card>
         </div>
       </div>
+
+      {suggestedSection}
     </div>
   )
 }

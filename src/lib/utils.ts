@@ -164,3 +164,12 @@ export function getProductImageUrl(
 
   return null
 }
+
+// Acepta +598XXXXXXXX, 598XXXXXXXX, 0XXXXXXXX o XXXXXXXX — flexible a propósito
+// (fijo con/sin código de área, celular con o sin +598) para no bloquear el
+// checkout por variantes de formato reales que igual son válidas.
+export function validateUruguayanPhone(phone: string): boolean {
+  const digits = phone.trim().replace(/[^\d+]/g, '')
+  const normalized = digits.replace(/^\+?598/, '').replace(/^0/, '')
+  return /^\d{7,9}$/.test(normalized)
+}

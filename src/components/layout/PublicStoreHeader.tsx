@@ -1,8 +1,11 @@
 import { useCartStore } from '@/store/cartStore'
 import type { Organization } from '@/types/database.types'
+import type { Product, ProductImage } from '@/types'
 import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
 import type { CategoryWithSubcategories } from '@/hooks/usePublicCategories'
-import { ChevronDown, Menu, Search, ShoppingCart, X } from 'lucide-react'
+import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl } from '@/lib/utils'
+import { ChevronDown, Menu, Minus, Plus, Search, ShoppingCart, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import logoIsotipo from '@/brand/isotipo-cropped.png'
@@ -150,11 +153,188 @@ function MobileCategoryItem({ cat, onNavigate }: MobileCategoryItemProps) {
   )
 }
 
+interface CartMenuProps {
+  triggerClassName: string
+  badgeClassName: string
+  ariaLabel: string
+  enableHover?: boolean
+}
+
+// Dropdown de vista rápida del carrito — evita tener que entrar a /cart solo
+// para sacar un producto o cambiar la cantidad. Se usa una instancia por
+// breakpoint (desktop/mobile) porque los triggers viven en bloques de layout
+// distintos; cada una abre/cierra de forma independiente con el mismo patrón
+// de click-afuera que CategoryMenu.
+function CartMenu({ triggerClassName, badgeClassName, ariaLabel, enableHover = false }: CartMenuProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const settings = useOrgSettings()
+  const { items, updateQuantity, removeFromCart, getTotal, getItemCount } = useCartStore()
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false)
+      }
+    }
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    setIsOpen(false)
+  }, [location.pathname])
+
+  const itemCount = getItemCount()
+
+  const goTo = (path: string) => {
+    setIsOpen(false)
+    navigate(path)
+  }
+
+  return (
+    <div ref={containerRef} className={cn('relative', enableHover && 'group')}>
+      <button
+        type="button"
+        onClick={() => setIsOpen((p) => !p)}
+        aria-label={ariaLabel}
+        aria-expanded={isOpen}
+        className={triggerClassName}
+      >
+        <ShoppingCart className="h-5 w-5" />
+        {itemCount > 0 && (
+          <span className={badgeClassName}>{itemCount > 99 ? '99+' : itemCount}</span>
+        )}
+      </button>
+
+      <div
+        className={cn(
+          'absolute top-full right-0 pt-3 z-40 transition-opacity duration-150',
+          isOpen
+            ? 'opacity-100 visible pointer-events-auto'
+            : enableHover
+              ? 'opacity-0 invisible pointer-events-none group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto'
+              : 'opacity-0 invisible pointer-events-none'
+        )}
+      >
+        <div className="bg-white rounded-xl shadow-2xl border border-gray-100 w-[calc(100vw-2rem)] max-w-sm max-h-[70vh] flex flex-col">
+          {items.length === 0 ? (
+            <p className="p-6 text-sm text-gray-500 text-center">Tu carrito está vacío</p>
+          ) : (
+            <>
+              <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+                {items.map((item) => {
+                  const productWithImages = item.product as Product & { product_images?: ProductImage[] }
+                  const imageUrl = getProductImageUrl(productWithImages, item.variant?.image_url || null)
+                  const unitPrice = item.variant?.price ?? getEffectivePrice(item.product)
+
+                  return (
+                    <div key={item.id} className="flex gap-3 p-3">
+                      <div className="flex-shrink-0 w-14 h-14 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                        {imageUrl ? (
+                          <img src={imageUrl} alt={capitalizeFirst(item.product.name)} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] text-center">
+                            Sin imagen
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {capitalizeFirst(item.product.name)}
+                        </p>
+                        {item.variant?.name && (
+                          <p className="text-xs text-gray-500 truncate">{capitalizeFirst(item.variant.name)}</p>
+                        )}
+                        <div className="mt-1.5 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(item.id, item.quantity - 1).catch(() => {})}
+                              disabled={item.quantity <= 1}
+                              aria-label="Disminuir cantidad"
+                              className="h-6 w-6 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="text-xs font-medium text-gray-900 w-4 text-center tabular-nums">
+                              {item.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateQuantity(item.id, item.quantity + 1).catch(() => {})}
+                              aria-label="Aumentar cantidad"
+                              className="h-6 w-6 flex items-center justify-center rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <span className="text-sm font-semibold text-gray-900">
+                            {formatPrice(unitPrice * item.quantity, settings)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeFromCart(item.id).catch(() => {})}
+                        aria-label="Eliminar producto del carrito"
+                        className="self-start text-gray-300 hover:text-red-500 transition-colors p-1 -mr-1"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="border-t border-gray-100 p-4 space-y-3">
+                <div className="flex justify-between text-sm font-bold text-gray-900">
+                  <span>Subtotal</span>
+                  <span>{formatPrice(getTotal(), settings)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => goTo('/checkout')}
+                  className="w-full h-10 rounded-lg text-white text-sm font-semibold transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: 'var(--org-primary-color, #46362B)' }}
+                >
+                  Finalizar compra
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goTo('/cart')}
+                  className="w-full h-10 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Ver carrito
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const NAV_LINK_CLASS =
   'px-3 py-1.5 rounded-full text-base font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors duration-150'
 
 export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
-  const { getItemCount, fetchCart } = useCartStore()
+  const { fetchCart } = useCartStore()
   const navigate = useNavigate()
   const location = useLocation()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -227,8 +407,6 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
   // (single-tenant fork, org.branding/settings quedan permanentemente NULL).
   const primaryColor = '#46362B'
 
-  const itemCount = getItemCount()
-
   return (
     <header
       ref={headerRef}
@@ -299,19 +477,12 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
             </div>
 
             {/* Cart */}
-            <Link
-              to="/cart"
-              onClick={closeAll}
-              className="relative p-2 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-full hover:bg-white/15"
-              aria-label="Ver carrito"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {itemCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center leading-none px-1 tabular-nums">
-                  {itemCount > 99 ? '99+' : itemCount}
-                </span>
-              )}
-            </Link>
+            <CartMenu
+              enableHover
+              ariaLabel="Ver carrito"
+              triggerClassName="relative p-2 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-full hover:bg-white/15"
+              badgeClassName="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[17px] h-[17px] flex items-center justify-center leading-none px-1 tabular-nums"
+            />
           </div>
         </div>
 
@@ -345,19 +516,11 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
             >
               <Search className="h-5 w-5" />
             </button>
-            <Link
-              to="/cart"
-              onClick={closeAll}
-              className="relative p-2 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-lg hover:bg-white/10"
-              aria-label="Carrito"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {itemCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center leading-none px-1 tabular-nums">
-                  {itemCount > 99 ? '99+' : itemCount}
-                </span>
-              )}
-            </Link>
+            <CartMenu
+              ariaLabel="Carrito"
+              triggerClassName="relative p-2 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-lg hover:bg-white/10"
+              badgeClassName="absolute top-0.5 right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center leading-none px-1 tabular-nums"
+            />
           </div>
         </div>
 
