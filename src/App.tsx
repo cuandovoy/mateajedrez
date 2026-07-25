@@ -1,4 +1,5 @@
 import { PublicStoreWrapper } from '@/components/layout/PublicStoreWrapper'
+import { SkeletonFullPage } from '@/components/ui/Skeleton'
 import { PublicStore } from '@/pages/PublicStore'
 import { Products } from '@/pages/Products'
 import { CategoryProducts } from '@/pages/CategoryProducts'
@@ -7,6 +8,7 @@ import { Cart } from '@/pages/Cart'
 import { Checkout } from '@/pages/Checkout'
 import { OrderConfirmation } from '@/pages/OrderConfirmation'
 import { PoliticaPrivacidad } from './pages/PoliticaPrivacidad'
+import { TerminosCondiciones } from './pages/TerminosCondiciones'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
@@ -19,18 +21,15 @@ function App() {
   }, [initialize])
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-200"></div>
-      </div>
-    )
+    return <SkeletonFullPage />
   }
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Legal — página pública sin autenticación, linkeada desde el checkout */}
+        {/* Legal — páginas públicas sin autenticación, linkeadas desde el checkout y el footer */}
         <Route path="/legal/privacidad" element={<PoliticaPrivacidad />} />
+        <Route path="/legal/terminos" element={<TerminosCondiciones />} />
 
         {/* Tienda pública — organización única, resuelta desde VITE_STORE_SLUG */}
         <Route element={<PublicStoreWrapper />}>

@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { ArrowLeft, Search, X, PackageSearch } from 'lucide-react'
 import type { Product } from '@/types'
-import { getProductsStock, sortByStockFirst } from '@/lib/stock'
+import { sortByStockFirst } from '@/lib/stock'
 
 export function CategoryProducts() {
   const { categorySlug } = useParams<{ categorySlug: string }>()
@@ -27,6 +27,11 @@ export function CategoryProducts() {
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
+    // Acá sí limpiamos productos: es un cambio de categoría real (otro listado
+    // completo), a diferencia de tocar un filtro dentro de la misma categoría
+    // (ver el otro efecto de reset más abajo, que NO limpia para evitar el
+    // flash de "Sin resultados").
+    setProducts([])
   }, [categorySlug])
 
   // Al cambiar de categoría, descartamos la selección de subcategoría explícita
@@ -82,7 +87,10 @@ export function CategoryProducts() {
 
   useEffect(() => {
     setCurrentPage(1)
-    setProducts([])
+    // No limpiamos `products` acá: TanStack Query mantiene la página anterior
+    // visible (placeholderData) mientras carga la nueva — vaciar el estado a
+    // mano generaba un flash de "Sin resultados" falso antes de que llegara
+    // la respuesta real (mismo bug ya corregido en Products.tsx el 2026-07-23).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categorySlug, filterCategoryIds.join(','), priceRange.min, priceRange.max, debouncedSearchTerm])
 
@@ -101,11 +109,13 @@ export function CategoryProducts() {
     if (!pageData) return
     if (currentPage === 1) {
       setProducts(pageData.products)
+      setStockByProduct(pageData.stockByProduct)
     } else {
       setProducts((prev) => {
         const existingIds = new Set(prev.map((p) => p.id))
         return [...prev, ...pageData.products.filter((p) => !existingIds.has(p.id))]
       })
+      setStockByProduct((prev) => ({ ...prev, ...pageData.stockByProduct }))
     }
   }, [pageData, currentPage])
 
@@ -124,16 +134,6 @@ export function CategoryProducts() {
   const handleSelectAllSubcategories = () => {
     setSelectedSubcategories([])
   }
-
-  useEffect(() => {
-    if (products.length === 0) { setStockByProduct({}); return }
-    let cancelled = false
-    const oid = categoryResolution?.parentCategory.organization_id ?? orgId
-    getProductsStock(products.map((p) => p.id), null, oid)
-      .then((stocks) => { if (!cancelled) setStockByProduct(stocks) })
-      .catch(() => { if (!cancelled) setStockByProduct({}) })
-    return () => { cancelled = true }
-  }, [products, categoryResolution, orgId])
 
   const sortedProducts = useMemo(
     () => sortByStockFirst(products, stockByProduct),
@@ -190,6 +190,7 @@ export function CategoryProducts() {
   const { currentCategory, parentCategory, subcategories } = categoryResolution
   const displayCategory = currentCategory ?? parentCategory
   const isLoadingMore = productsFetching && currentPage > 1
+  const isFiltering = productsFetching && currentPage === 1
   const hasMore = pageData?.hasMore ?? false
   const metaDescription = `Descubrí nuestra colección de ${displayCategory.name} — artículos artesanales de Ruemia.`
   const canonicalPath = `/categories/${categorySlug}`
@@ -203,6 +204,12 @@ export function CategoryProducts() {
         <meta property="og:description" content={metaDescription} />
         <link rel="canonical" href={canonicalPath} />
       </Helmet>
+
+      <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-gray-500">
+        <Link to="/" className="hover:text-gray-700 transition-colors">Inicio</Link>
+        <span aria-hidden="true">/</span>
+        <span className="text-gray-700 font-medium">{displayCategory.name}</span>
+      </nav>
 
       <Link to="/products">
         <Button variant="ghost" className="mb-6 -ml-2 text-sm rounded-full" size="sm">
@@ -229,7 +236,18 @@ export function CategoryProducts() {
       <div className="flex flex-wrap items-center gap-3 mb-8">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          {isFiltering ? (
+            <svg
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          ) : (
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          )}
           <input
             type="text"
             value={searchTerm}
@@ -310,7 +328,7 @@ export function CategoryProducts() {
       </div>
 
       {/* Products grid */}
-      {products.length === 0 ? (
+      {products.length === 0 && !isFiltering ? (
         <EmptyState
           icon={PackageSearch}
           title={hasActiveFilters ? 'Sin resultados' : 'Sin productos'}
@@ -322,7 +340,7 @@ export function CategoryProducts() {
           action={hasActiveFilters ? { label: 'Limpiar filtros', onClick: clearFilters } : undefined}
         />
       ) : (
-        <>
+        <div className={isFiltering ? 'opacity-50 transition-opacity duration-200' : 'transition-opacity duration-200'}>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
             {sortedProducts.map((product, index) => (
               <div
@@ -350,7 +368,7 @@ export function CategoryProducts() {
               </Button>
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )

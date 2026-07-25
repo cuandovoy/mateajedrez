@@ -20,9 +20,11 @@ interface VariantSelectorProps {
   product: Product
   selectedVariantId: string | null
   onVariantChange: (variantId: string) => void
+  onAvailabilityChange?: (hasAvailableVariant: boolean) => void
+  onVariantStocksChange?: (variantStocks: Record<string, number>) => void
 }
 
-export function VariantSelector({ product, selectedVariantId, onVariantChange }: VariantSelectorProps) {
+export function VariantSelector({ product, selectedVariantId, onVariantChange, onAvailabilityChange, onVariantStocksChange }: VariantSelectorProps) {
   const settings = useOrgSettings()
   const { data: variants = [], isPending: loading } = useProductVariants(product.organization_id, product.id)
   const [attributes, setAttributes] = useState<Record<string, string[]>>({})
@@ -80,12 +82,18 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
       const stockMap: Record<string, number> = {}
       results.forEach(({ variantId, stock }) => { stockMap[variantId] = stock })
       setVariantStocks(stockMap)
+      const hasAvailableVariant = variants.some((v) => v.is_active && (stockMap[v.id] ?? 0) > 0)
+      onAvailabilityChange?.(hasAvailableVariant)
+      // ProductDetail usa este mismo mapa en vez de pedir por su cuenta el
+      // stock de la variante seleccionada — evita 2 llamadas independientes a
+      // getProductStock que podían mostrar números distintos por un instante.
+      onVariantStocksChange?.(stockMap)
     })
 
     getProductStock(product.id, null, null, product.organization_id || null)
       .then((stock) => setProductStock(stock))
       .catch(() => setProductStock(0))
-  }, [variants, product.id, product.organization_id])
+  }, [variants, product.id, product.organization_id, onAvailabilityChange, onVariantStocksChange])
 
   useEffect(() => {
     setImageLoadFailed(false)
@@ -138,9 +146,14 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
   const hasAttributeOptions = Object.keys(attributes).length > 0
 
   if (variants.length === 1) {
+    const onlyVariantStock = variantStocks[variants[0].id] ?? 0
+    const onlyVariantAvailable = variants[0].is_active && onlyVariantStock > 0
     return (
       <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
         Variante única: <span className="font-medium">{variants[0].name || variants[0].sku}</span>
+        {!onlyVariantAvailable && (
+          <span className="block mt-1 text-gray-500">Sin stock disponible</span>
+        )}
       </div>
     )
   }
@@ -157,13 +170,21 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
               <div className="flex flex-wrap gap-2">
                 {values.map((value) => {
                   const isSelected = selectedAttributes[key] === value
-                  const variantWithThisValue = variants.find((v) => {
+                  // Un swatch debe verse disponible si CUALQUIER variante compatible con
+                  // el valor y con el resto de los atributos ya elegidos tiene stock —
+                  // tomar solo la primera coincidencia (.find) escondía combinaciones
+                  // con stock real detrás de una que no lo tenía.
+                  const matchingVariants = variants.filter((v) => {
                     if (!v.attributes || typeof v.attributes !== 'object') return false
                     const attrs = v.attributes as Record<string, string>
-                    return attrs[key] === value
+                    if (attrs[key] !== value) return false
+                    return Object.entries(selectedAttributes).every(
+                      ([otherKey, otherValue]) => otherKey === key || attrs[otherKey] === otherValue
+                    )
                   })
-                  const variantStock = variantWithThisValue ? (variantStocks[variantWithThisValue.id] ?? 0) : 0
-                  const isAvailable = variantWithThisValue?.is_active && variantStock > 0
+                  const isAvailable = matchingVariants.some(
+                    (v) => v.is_active && (variantStocks[v.id] ?? 0) > 0
+                  )
 
                   return (
                     <button
@@ -171,8 +192,9 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
                       type="button"
                       onClick={() => handleAttributeChange(key, value)}
                       disabled={!isAvailable}
+                      title={!isAvailable ? 'Sin stock' : undefined}
                       className={cn(
-                        'px-4 py-2 rounded-lg border-2 transition-colors',
+                        'relative overflow-hidden px-4 py-2 rounded-lg border-2 transition-colors',
                         isSelected
                           ? 'font-medium'
                           : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400',
@@ -189,6 +211,11 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange }:
                       }
                     >
                       {value}
+                      {!isAvailable && (
+                        <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                          <span className="w-[140%] h-px bg-gray-400 rotate-[-20deg]" />
+                        </span>
+                      )}
                     </button>
                   )
                 })}

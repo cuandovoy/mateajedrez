@@ -17,6 +17,11 @@ function localCartKey(organizationId?: string | null) {
   return organizationId ? `local_cart_${organizationId}` : 'local_cart'
 }
 
+// Marca errores que ya mostraron su propio toast específico (stock insuficiente,
+// producto inactivo, etc.) para que el catch de addToCart no los tape con el
+// mensaje genérico "Error al agregar producto al carrito".
+class CartToastedError extends Error {}
+
 interface CartState {
   items: CartItemWithProduct[]
   loading: boolean
@@ -247,13 +252,13 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         if (!variant) {
           useToastStore.getState().show('Variante no encontrada', 'error')
-          throw new Error('Variant not found')
+          throw new CartToastedError('Variant not found')
         }
 
         const product = (variant as any).product as Product
         if (!product?.is_active || !variant.is_active) {
           useToastStore.getState().show('Este producto no está disponible', 'error')
-          throw new Error('Product or variant is not active')
+          throw new CartToastedError('Product or variant is not active')
         }
 
         productOrganizationId = product.organization_id || null
@@ -270,7 +275,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         if (!product?.is_active) {
           useToastStore.getState().show('Este producto no está disponible', 'error')
-          throw new Error('Product is not active')
+          throw new CartToastedError('Product is not active')
         }
 
         const { count: variantsCount } = await supabase
@@ -281,7 +286,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
         if ((variantsCount || 0) > 0) {
           useToastStore.getState().show('Este producto tiene variantes. Selecciona una variante para agregar al carrito.', 'error')
-          throw new Error('Variant selection required')
+          throw new CartToastedError('Variant selection required')
         }
 
         productOrganizationId = product.organization_id || null
@@ -302,13 +307,13 @@ export const useCartStore = create<CartState>((set, get) => ({
             `No hay stock disponible para "${productName}"`,
             'error'
           )
-          throw new Error('Insufficient stock')
+          throw new CartToastedError('Insufficient stock')
         } else {
           useToastStore.getState().show(
             `Solo hay ${available} unidades disponibles de "${productName}"`,
             'error'
           )
-          throw new Error('Insufficient stock')
+          throw new CartToastedError('Insufficient stock')
         }
       }
 
@@ -443,10 +448,12 @@ export const useCartStore = create<CartState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error adding to cart:', error)
-      useToastStore.getState().show(
-        'Error al agregar producto al carrito',
-        'error'
-      )
+      if (!(error instanceof CartToastedError)) {
+        useToastStore.getState().show(
+          'Error al agregar producto al carrito',
+          'error'
+        )
+      }
       throw error
     }
   },
@@ -489,6 +496,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       })
     } catch (error) {
       console.error('Error updating quantity:', error)
+      useToastStore.getState().show('No se pudo actualizar la cantidad', 'error')
       throw error
     }
   },
@@ -519,6 +527,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       })
     } catch (error) {
       console.error('Error removing from cart:', error)
+      useToastStore.getState().show('No se pudo eliminar el producto del carrito', 'error')
       throw error
     }
   },

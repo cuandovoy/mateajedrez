@@ -36,7 +36,7 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
         <meta property="og:image" content="/og-image.png" />
         <link rel="canonical" href="/" />
       </Helmet>
-      <div className="min-h-screen bg-white" style={{ fontFamily: `var(--org-font-family, Cambria)` }}>
+      <div className="min-h-screen flex flex-col bg-white" style={{ fontFamily: `var(--org-font-family, Cambria)` }}>
         <ShippingNoticeBanner />
         <PublicStoreHeader organization={organization} />
         <main className="flex-1">

@@ -47,6 +47,11 @@ export function Products() {
 
   const { data: categoriesData } = usePublicCategories(orgId ?? '')
   const categories = (categoriesData ?? []).filter((cat) => !cat.parent_id)
+  // Subcategorías (ej. LLAVEROS, BOMBILLAS APLIQUES) — antes solo alcanzables vía
+  // el dropdown del header o el footer. selectCategory(id) ya soporta cualquier
+  // category_id (padre o hijo): useFilteredProducts filtra por category_id
+  // directo + junction table, sin necesidad de lógica adicional acá.
+  const subcategories = (categoriesData ?? []).filter((cat) => !!cat.parent_id)
 
   const { data: pageData, isFetching, isLoading } = useFilteredProducts(orgId, {
     categoryId: selectedCategory,
@@ -198,6 +203,22 @@ export function Products() {
                 style={selectedCategory === cat.id ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
               >
                 {cat.name}
+              </button>
+            ))}
+            {/* Subcategorías — mismo pill, borde más sutil cuando no están
+                seleccionadas para diferenciarlas visualmente de las categorías padre */}
+            {subcategories.map((subcat) => (
+              <button
+                key={subcat.id}
+                onClick={() => selectCategory(subcat.id)}
+                className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
+                  selectedCategory === subcat.id
+                    ? 'border-transparent shadow-sm'
+                    : 'bg-white border-gray-100 text-gray-500 hover:border-gray-300'
+                }`}
+                style={selectedCategory === subcat.id ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
+              >
+                {subcat.name}
               </button>
             ))}
           </div>

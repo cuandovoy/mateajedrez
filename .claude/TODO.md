@@ -7,9 +7,9 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 
 ## Rebrand Ruemia (2026-07-19)
 
-### 🔴 Crítico
+### 🟠 Alta
 
-- 🔴 `src/pages/PoliticaPrivacidad.tsx` sigue con contenido/mailto genérico del desarrollador (`ciceridev@gmail.com`), no el texto legal real de Ruemia. Es la única página `/legal/*` que sobrevivió al recorte de admin y está linkeada desde el checkout — pendiente del texto real del cliente antes de ir a producción.
+- 🟠 **Contenido legal con placeholders pendientes de completar antes de producción.** `src/pages/PoliticaPrivacidad.tsx` y `src/pages/TerminosCondiciones.tsx` (nueva) fueron reescritas para Ruemia (ver Completado 2026-07-25), pero el usuario confirmó que la tienda **no está registrada ante DGI** (sin RUT/monotributo) — el responsable se identifica por nombre completo + domicilio, no por razón social. Faltan datos reales, marcados `[COMPLETAR ...]` en ambos archivos: nombre completo del titular, domicilio/localidad, email de contacto, plazo y condiciones de cambios/devoluciones, zonas/costo/plazo de envío, y si se emite algún comprobante de venta.
 
 ### 🟡 Media
 
@@ -18,6 +18,7 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 
 ### ✅ Completado
 
+- ✅ 2026-07-25 — **Política de Privacidad reescrita + Términos y Condiciones creados + links en footer.** `PoliticaPrivacidad.tsx` ya no describe a Axiostock como SaaS (Supabase/Biller/CFE del proveedor) — ahora es el contenido real de Ruemia como tienda. `TerminosCondiciones.tsx` es nuevo (no existía ninguna página de términos), con ruta `/legal/terminos` en `App.tsx`. El footer (`Footer.tsx`) no linkeaba a ninguna página legal — bug ya trackeado más abajo en "Auditoría storefront público" — corregido agregando ambos links en la barra inferior. `Checkout.tsx` ahora referencia ambos documentos en el texto de aceptación (antes solo privacidad). El número de WhatsApp (`+598 98 839 561`) se tomó real de `VITE_WHATSAPP_SALES_NUMBER` en `.env`, no es placeholder. Queda pendiente completar los datos reales del titular — ver 🟠 Alta arriba.
 - ✅ 2026-07-19 — `src/components/ui/ActionsMenu.tsx` (huérfano, cero import sites) borrado junto con `Tabs.tsx`/`Dropdown.tsx`/`ProductListItem.tsx`.
 - ✅ 2026-07-19 — `public/logo2.png`, `public/logo3.png`, `public/logo.svg` borrados — solo quedaban referenciados en `PWA_SETUP.md` (doc desactualizada), cero uso en código tras el rebrand.
 
@@ -131,14 +132,14 @@ Todo lo marcado ✅ más abajo fue implementado, verificado (`tsc --noEmit` limp
 ### 🟡 Media (queda abierto)
 
 - 🟡 `CategoryProducts.tsx:14` hardcodea `PAGE_SIZE = 20` (no 24, no importado de `constants.ts`); `src/hooks/usePublicProducts.ts:61` usa 24 pero como constante local duplicada. Es un cambio de comportamiento (cuántos items carga cada página), no estético — se dejó fuera a propósito, igual que se dejó `PAGE_SIZE_ADMIN` sin completar en el panel admin.
-- 🟡 Checkout no tiene indicador de progreso/stepper — Carrito → Checkout → Confirmación es un flujo lineal silencioso. Es una adición de feature/UX, no un ajuste visual — backlog.
-- 🟡 El submenú de categorías del header desktop depende solo de `:hover`/`group-hover` en CSS — poco confiable en dispositivos híbridos táctiles. Es un problema de interacción, no visual — backlog.
+- ✅ ~~Checkout sin indicador de progreso/stepper~~ → **resuelto 2026-07-25**, ver Completado (lote de 13 mejoras visuales tienda pública).
+- ✅ ~~submenú de categorías del header depende solo de `:hover`~~ → **resuelto 2026-07-25**, ver Completado.
 - ✅ ~~duplicación de estilo en el CTA del hero de `PublicStore.tsx`~~ → **resuelto 2026-07-23**: el CTA pasó a `variant="outline"` (pedido del usuario) y ya no pisa el `style` de `Button` salvo cuando de verdad necesita un valor distinto (texto/borde blanco sobre foto de portada) — ver Completado.
 
 ### 🟢 Baja (queda abierto)
 
 - 🟢 Estado de carrito vacío solo ofrece "Continuar Comprando" genérico a home — sin productos sugeridos ni link directo a `/products`. Es una mejora de contenido/feature, no visual.
-- 🟢 El gap del grid de skeleton en `PublicStore.tsx` (`gap-4 md:gap-6`) no coincide exactamente con el del grid real (`md:gap-5`) — detectado al arreglar el mismatch de breakpoint del mismo grid; diferencia mínima, no se tocó para no ampliar el diff de esa tarea puntual.
+- ✅ ~~gap del grid de skeleton en `PublicStore.tsx` no coincide con el grid real~~ → **resuelto 2026-07-25**, ver Completado.
 
 ## Auditoría storefront público — ecommerce-analyzer (2026-07-22)
 
@@ -155,8 +156,8 @@ _(todos resueltos 2026-07-22 — ver Completado)_
 ### 🟡 Media
 
 - 🟡 **El SEO dinámico por página (`<Helmet>`, agregado 2026-07-22) no resuelve el preview de WhatsApp/Twitter/Facebook al compartir un link** — esos crawlers no ejecutan JS, así que solo ven el HTML estático de `index.html` (siempre el mismo, genérico, para cualquier producto/categoría). Para que compartir un producto puntual muestre su foto/nombre real en el preview hace falta SSR o prerendering (ej. `vite-plugin-ssr`, prerender en build, o un proxy que sirva HTML pre-renderizado solo a bots) — es un cambio de arquitectura, no algo para resolver con Helmet solo. Decisión pendiente del usuario sobre si vale la pena para este catálogo.
-- 🟡 Subcategorías (LLAVEROS, BOMBILLAS APLIQUES) no aparecen como chip de filtro en `/products` ni en la grilla de categorías del home — solo alcanzables vía dropdown del header o footer.
-- 🟡 `ProductDetail.tsx:558` — grid de "Productos relacionados" usa `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4`, no coincide con el estándar del proyecto (`grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5`).
+- ✅ ~~Subcategorías no aparecen como chip de filtro en `/products`~~ → **resuelto 2026-07-25**, ver Completado (home se dejó sin tocar a propósito, solo categorías padre).
+- ✅ ~~Grid de "Productos relacionados" no coincide con el estándar~~ → **resuelto 2026-07-25**, ver Completado.
 - 🟡 Sin JSON-LD `schema.org/Product` por producto (precio, disponibilidad, imagen) — el `ld+json` de `index.html` es solo de organización/sitio.
 - 🟡 `loading="lazy"` solo presente en `ProductCard.tsx:100` — falta en `CategoryCard.tsx:33,41`, `PublicStore.tsx:403` (imagen "Nosotros"), `ProductDetail.tsx:317,418`, `Cart.tsx:248`, `Checkout.tsx`, `OrderConfirmation.tsx:423`.
 - 🟡 Sin ruta 404 real: `App.tsx:47` redirige cualquier ruta desconocida a `/`; un `/product/:id` inexistente cae en "Producto no encontrado" sin status semántico.
@@ -164,14 +165,91 @@ _(todos resueltos 2026-07-22 — ver Completado)_
 
 ### 🟢 Baja
 
-- 🟢 Variantes sin stock (ej. talle 36) solo se ven grises/disabled, sin texto/tooltip que lo explique.
-- 🟢 `PublicStoreWrapper.tsx:53-57` y `App.tsx:22-26` usan spinner genérico para el loading de organización en vez de un `<Skeleton>`.
-- 🟢 Sin breadcrumbs en `ProductDetail` ni `CategoryProducts` (solo botón "Volver a productos").
-- 🟢 Footer sin trust signals (envíos, devoluciones, medios de pago) ni link a Términos/Condiciones (`PoliticaPrivacidad.tsx` solo está linkeada desde el checkout).
+- ✅ ~~Variantes sin stock sin texto/tooltip que lo explique~~ → **resuelto 2026-07-25**, ver Completado.
+- ✅ ~~Spinner genérico en vez de `<Skeleton>` en `PublicStoreWrapper.tsx`/`App.tsx`~~ → **resuelto 2026-07-25**, ver Completado.
+- ✅ ~~Sin breadcrumbs en `ProductDetail`/`CategoryProducts`~~ → **resuelto 2026-07-25**, ver Completado.
+- ✅ ~~Footer sin trust signals (envíos, devoluciones, medios de pago)~~ → **resuelto 2026-07-25**, ver Completado — texto genérico, sin plazos/costos todavía no confirmados.
 - 🟢 `src/lib/storage.ts` mencionado en `CLAUDE.md` no existe en el repo actual — discrepancia doc/código, no afecta hoy al storefront público (no sube imágenes) pero relevante para cuando se implemente carga de imágenes en admin.
 - 🟢 Cumple bien su propio estándar visual: badge de descuento arriba-izquierda, `aspect-square`, botón flotante en hover, overlay "Sin stock", filtros chip pills siempre visibles, empty state de búsqueda vacía, accesibilidad de `alt`/`aria-label` en imágenes y botones — todo verificado en vivo y en código.
 
+## Auditoría UX general — Tienda Pública (2026-07-24, 4 agentes en paralelo: home/header/footer, listados/cards, PDP, carrito/checkout/confirmación)
+
+Solo se listan hallazgos **nuevos** no trackeados ya más arriba. Los marcados "verificado" fueron confirmados leyendo el código directamente (no solo el reporte del agente) antes de anotarlos acá.
+
+### 🔴 Crítico
+
+_(los 2 hallazgos críticos de esta auditoría fueron corregidos el mismo día — ver Completado)_
+
+### 🟠 Alta
+
+_(5 de los 6 hallazgos de alta prioridad de esta auditoría fueron corregidos el mismo día — ver Completado. Queda abierto el de Mercado Pago, ver abajo, pendiente de decisión del usuario.)_
+
+- 🟠 **Pendiente de decisión — no se tocó código.** La orden y sus `order_items` se insertan en la DB **antes** de pedir la preferencia de Mercado Pago (`Checkout.tsx`, flujo `paymentMethod === 'mercadopago'`). Si `create-mp-preference` falla, la orden queda creada (`status: pending`), el carrito no se limpia, y reintentar puede generar una segunda orden completa para el mismo intento de compra. Investigado: `order_items` sí tiene `ON DELETE CASCADE` desde `orders` (migración `001_initial_schema.sql:72`) y existe un trigger `restore_branch_inventory_on_order_item_delete` (`056_order_edit_rls.sql`, superseded en `094_checkout_manual_stock_allocation_mode.sql`) que restaura el stock al borrar un `order_item` — en teoría borrar la orden fallida sería seguro para el stock. Pero: (1) no se pudo confirmar si la policy RLS de `orders` permite `DELETE` a un usuario anónimo/guest de checkout (podría fallar en silencio y dejar el huérfano igual), y (2) no se pudo verificar en vivo cómo interactúa ese trigger con el costeo FIFO (`124_costing_method_fifo.sql`) para el caso específico de un rollback post-fallo-de-MP. Implementar el rollback automático sin verificar esto en un entorno real es más riesgoso que el bug actual (podría corromper stock/costeo en silencio). Alternativa más simple y sin tocar triggers: no borrar la orden, marcarla con un status tipo `payment_failed`/`cancelled` en vez de dejarla en `pending`, para que no ensucie el panel admin ni bloquee reintentos — requiere agregar ese status al enum/checks de `orders.status` si no existe. **Necesita que el usuario decida el enfoque antes de tocar este flujo.**
+
+### 🟡 Media
+
+_(los 14 hallazgos de media prioridad de esta auditoría fueron corregidos el mismo día — ver Completado. Una sub-parte de uno de ellos quedó abierta a propósito, ver el ítem de zoom más abajo.)_
+
+- ✅ ~~Zoom/lightbox en la galería de `ProductDetail.tsx`~~ → **resuelto 2026-07-25**: modal fullscreen tap-to-zoom, ver Completado.
+- 🟡 **Queda abierto (relacionado, no tocado).** `src/pages/Products.tsx:89-92` + `src/lib/stock.ts:sortByStockFirst` — el sort por stock se re-aplica sobre **todo** el array acumulado cada vez que se pide "Cargar más" en `/products`, así que productos sin stock de la página 1 pueden saltar de posición cuando llega la página 2. No estaba en el alcance de esta pasada (que se centró en los hallazgos nuevos de la auditoría UX del 2026-07-24); fix: ordenar solo la página nueva antes de anexarla, no todo el acumulado.
+
+### 🟢 Baja
+
+- ✅ ~~CTA principal del hero sin ícono `ArrowRight`~~ → **resuelto 2026-07-25**, ver Completado.
+- ✅ ~~Puntos indicadores del carrusel del hero y del fallback de `CategoryCard` no interactivos~~ → **resuelto 2026-07-25**, ver Completado.
+- 🟢 Sección "Productos destacados" del home en realidad es "primer producto con stock por categoría en orden de array", no una selección curada/best-sellers — el nombre puede generar expectativas equivocadas.
+- 🟢 Botones +/− de cantidad en `ProductDetail.tsx:497-517` sin `aria-label` (el botón de compartir sí lo tiene). Nota: distinto del ítem de `Cart.tsx` de abajo, ya resuelto — este es en la ficha de producto, no se tocó.
+- ✅ ~~Cantidad del carrito no editable~~ → **resuelto 2026-07-25**, ver Completado.
+- 🟢 Sin validación de `priceRange.min <= priceRange.max` en los filtros de precio — un rango invertido solo da "Sin resultados" sin explicar por qué.
+- 🟢 `src/pages/Products.tsx` (350ms) vs `src/pages/CategoryProducts.tsx` (400ms) — debounce de búsqueda con timing distinto entre dos páginas casi idénticas.
+
 ## Completado ✅
+
+- ✅ 2026-07-25 — **Lote de 13 mejoras visuales/UX en la tienda pública** (a pedido explícito del usuario de agrupar varios ítems del backlog visual en una sola pasada, delegado a un sub-agente y verificado después):
+  1. Nuevo `src/components/features/CheckoutSteps.tsx` — stepper "Carrito → Checkout → Confirmación" montado en `Cart.tsx`/`Checkout.tsx`/`OrderConfirmation.tsx`, paso activo con `var(--org-primary-color)`, no clickeable (solo indicador).
+  2. `PublicStoreHeader.tsx` — el dropdown de categorías desktop ya tenía click + cierre al click afuera; se le agregó `group-hover` CSS puro (no `onMouseEnter/onMouseLeave`, respeta la regla del proyecto) para que el hover siga funcionando en mouse además del click en táctil.
+  3. `ProductDetail.tsx` — grid de "Productos relacionados" ajustado a `grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5` (estándar del proyecto).
+  4. `Products.tsx` — subcategorías agregadas como chips adicionales (borde/texto más tenue que las categorías padre) después de los chips de categoría padre; reusa `selectCategory` existente, sin cambios de hook (el filtro ya resuelve categoría padre o hija vía junction table). Home sin tocar a propósito.
+  5. `ProductDetail.tsx` — lightbox fullscreen al tocar/clickear la imagen principal (patrón modal estándar del proyecto: `fixed inset-0 z-50 bg-black/50`, X para cerrar, click afuera cierra, Escape cierra), reusa los handlers de navegación ya existentes de la galería.
+  6. `PublicStore.tsx` — ícono `ArrowRight` agregado al CTA "Ver productos" del hero, igual que los demás CTAs de la home.
+  7. `PublicStore.tsx` — puntos del carrusel del hero convertidos a `<button aria-label="Ir a la imagen N">` reales (ya tenían slide-state detrás). `CategoryCard.tsx` — los puntos del fallback también tenían estado real (auto-rotación) detrás, así que se cablearon como botones reales con `stopPropagation`/`preventDefault` (la card entera es un `<Link>`) en vez de sacarles la interactividad.
+  8. `Cart.tsx` — nuevo `CartQuantityInput` (input numérico junto a los botones +/-, commitea con `updateQuantity` al perder foco o Enter, clamp a `[1, stock disponible]`).
+  9. `VariantSelector.tsx` — `title="Sin stock"` + línea diagonal (`pointer-events-none`, no afecta layout) en swatches de atributo deshabilitados.
+  10. Breadcrumb (`Inicio / Categoría / Producto`) agregado en `ProductDetail.tsx` y `CategoryProducts.tsx`, mismo estilo en ambos, sin sacar los botones "Volver" existentes.
+  11. `Footer.tsx` — 3 líneas de trust signals (`Truck`/`RotateCcw`/`CreditCard` de Lucide) con texto genérico ("Coordinamos tu envío", "Cambios dentro de los primeros días", "Múltiples medios de pago") — sin plazos/costos concretos todavía no confirmados por el usuario (ver placeholders de `TerminosCondiciones.tsx`).
+  12. Nuevo `SkeletonFullPage` en `src/components/ui/Skeleton.tsx` (header + hero + grid placeholder), reemplaza el spinner circular en `PublicStoreWrapper.tsx` y `App.tsx` para el loading de pantalla completa antes de resolver la organización.
+  13. `PublicStore.tsx` — gap del grid de skeleton corregido de `gap-4 md:gap-6` a `gap-4 md:gap-5` para igualar el grid real.
+  - **Verificado:** `tsc --noEmit` limpio, 86/86 tests (mismo conteo que antes de empezar). `eslint` con los mismos 31 errores/12 warnings preexistentes (ninguno en líneas nuevas de este lote). Revisión manual propia (no solo el reporte del sub-agente) de los 3 cambios con más margen de interpretación — stepper, lightbox, input de cantidad — leyendo el diff real antes de dar el lote por cerrado. **No verificado visualmente en navegador** — recomendado un smoke pass manual (lightbox en mobile real, hover+click del submenú de categorías en un dispositivo híbrido, stepper en las 3 páginas del flujo de compra) antes de confiar en esto para producción.
+  - **Hallazgo aparte, no resuelto:** al revisar el diff se notó que dos fixes que el registro de este mismo TODO/CHANGELOG daba como "completados el 2026-07-24" (botón "Volver a productos" → `navigate(-1)` en `ProductDetail.tsx`, y cierre del menú/buscador mobile al tocar afuera del `<header>` en `PublicStoreHeader.tsx`) **no estaban presentes en el código antes de esta pasada** — el sub-agente terminó reimplementándolos de cero como si nunca se hubieran hecho. La rama actual (`restore`) no tiene ningún commit desde 2026-07-23 (`git log -1`: `e6d3974`, "First estilos") — todo el trabajo de las sesiones del 24 y 25 de julio quedó siempre como cambios sin commitear en el working tree. No se pudo determinar la causa exacta (¿un `git checkout` puntual sobre esos archivos en algún momento? ¿el registro del changelog de esa fecha estaba adelantado a un trabajo que después no se guardó?), pero es una señal de que los registros de "Completado" de este archivo pueden no reflejar 100% el estado real del código si no hay commits de por medio. **Recomendado: hacer un commit de checkpoint pronto** (hay ~22 archivos modificados sin commitear acumulados de varias sesiones) para que este tipo de desfasaje no vuelva a pasar desapercibido.
+
+- ✅ 2026-07-24 — **2 bugs críticos de la auditoría UX general corregidos:**
+  1. `src/hooks/usePublicProducts.ts` — `fetchFilteredProducts` ahora consulta `product_categories` (junction table) antes de armar el filtro, igual que `fetchCategoryProducts`: si hay productos vinculados a la categoría elegida solo por junction, se agregan al filtro vía `.or('category_id.eq.X,id.in.(...)')` en vez de perderse con el `.eq('category_id', X)` simple de antes. `/products` y `/categories/:slug` ahora dan resultados consistentes para la misma categoría.
+  2. `src/pages/ProductDetail.tsx` + `src/components/features/VariantSelector.tsx` — se agregó el callback `onAvailabilityChange` en `VariantSelector`: una vez que termina de traer el stock de todas las variantes, informa al padre si existe al menos una variante activa con stock > 0. `ProductDetail` guarda eso en `allVariantsUnavailable` (reseteado al cambiar de producto) y lo usa para forzar `isOutOfStock = true` cuando el producto tiene variantes pero ninguna es comprable — antes ese caso quedaba trabado para siempre en el botón deshabilitado "Seleccioná una variante", sin mostrar el mensaje de "sin stock" ni el fallback de WhatsApp. De paso, el caso de variante única sin stock (antes solo texto plano sin ninguna indicación) ahora muestra "Sin stock disponible" dentro de su propio box. **Verificado:** `tsc --noEmit` limpio, 86/86 tests. No se pudo verificar visualmente en navegador (no había sesión de Chrome conectada ni datos reales con productos 100% sin stock a mano) — recomendado un smoke test manual con un producto real de variantes agotadas antes de dar por cerrado del todo.
+
+- ✅ 2026-07-24 — **5 de los 6 hallazgos de alta prioridad de la auditoría UX general corregidos** (el 6to, Mercado Pago/orden duplicada, quedó pendiente de decisión del usuario — ver 🟠 Alta más arriba):
+  1. `src/store/cartStore.ts` — nueva clase interna `CartToastedError` para marcar errores que ya mostraron su propio toast específico (stock insuficiente, producto inactivo, variante no encontrada). El `catch` de `addToCart` ya no dispara el toast genérico "Error al agregar producto al carrito" cuando el error ya fue mostrado — antes lo tapaba siempre.
+  2. `src/store/toastStore.ts` + `src/components/layout/ToastContainer.tsx` — se agregó un `id` incremental al store; `ToastContainer` ahora renderiza `<Toast key={id} .../>` para forzar un remount (y timer de auto-cierre fresco) en cada `show()`, incluso con dos toasts seguidos de texto idéntico.
+  3. `src/store/cartStore.ts` — `updateQuantity` y `removeFromCart` ahora muestran un toast de error antes de relanzar la excepción (antes solo `console.error`). `src/pages/Cart.tsx` agregó `.catch(() => {})` en los 3 `onClick` que las invocan (+/−/eliminar) para evitar el unhandled promise rejection ahora que el store ya maneja el feedback.
+  4. `src/components/layout/PublicStoreLayout.tsx` — el contenedor raíz pasó de `min-h-screen bg-white` a `min-h-screen flex flex-col bg-white`, para que el `flex-1` del `<main>` (que ya estaba) deje de ser inerte y el footer quede pegado abajo en páginas con poco contenido.
+  5. `src/pages/Checkout.tsx` — nuevo `useEffect` que redirige a `/cart` si `items.length === 0` una vez que el carrito terminó de cargar (`cartLoading` del store, para no disparar un falso positivo mientras `PublicStoreHeader` todavía está trayendo el carrito en paralelo).
+  - **Verificado:** `tsc --noEmit` limpio, 86/86 tests, `eslint` sin errores nuevos (mismos 15 `any` preexistentes de siempre, confirmado comparando contra el estado sin estos cambios). No verificado visualmente en navegador.
+
+- ✅ 2026-07-24 — **14 de los hallazgos de media prioridad de la auditoría UX general corregidos** (solo quedaron abiertos el zoom/lightbox de la galería y el reorder de `sortByStockFirst` en "Cargar más" de `/products` — ver 🟡 Media más arriba):
+  1. `src/hooks/usePublicProducts.ts` + `src/pages/CategoryProducts.tsx` — `fetchCategoryProducts` ahora trae `stockByProduct` en la misma respuesta paginada (igual que `fetchFilteredProducts`), eliminando la tormenta de fetches individuales por `ProductCard` y el reordenamiento visible cuando llegaba el batch tardío.
+  2. `src/pages/CategoryProducts.tsx` — agregado el mismo tratamiento `isFiltering` (spinner en el buscador + grilla atenuada al 50%) que ya tenía `Products.tsx`. De paso se encontró y corrigió un bug más severo en el camino: el `useEffect` de reset de filtros vaciaba `products` de forma eager en cada cambio de filtro (mismo bug ya resuelto en `Products.tsx` el 2026-07-23, pero nunca portado acá), causando un flash real de "Sin resultados" — se sacó el vaciado eager para cambios de filtro y se movió a un efecto separado que sí limpia al cambiar de `categorySlug` (cambio de listado real).
+  3. `src/components/features/VariantSelector.tsx` — la disponibilidad de un swatch de atributo ahora agrega stock de **todas** las variantes compatibles con ese valor (+ atributos ya seleccionados), no solo la primera que matchea con `.find()`.
+  4. `src/components/features/VariantSelector.tsx` + `src/pages/ProductDetail.tsx` — nuevo callback `onVariantStocksChange` que reporta el mapa de stock por variante ya calculado en `VariantSelector`; `ProductDetail` lo consume en vez de pedir por su cuenta el stock de la variante seleccionada, eliminando la segunda llamada descoordinada a `getProductStock` que podía mostrar números distintos por un instante.
+  5. `src/pages/ProductDetail.tsx` — el badge de categoría pasó de `<span>` estático a `<Link to="/categories/:slug">`.
+  6. `src/pages/ProductDetail.tsx` — swipe táctil agregado a la galería (`onTouchStart`/`onTouchEnd`, umbral 40px) reutilizando `handlePreviousImage`/`handleNextImage` existentes. Zoom/lightbox quedó fuera de esta pasada (ver 🟡 Media).
+  7. `src/pages/ProductDetail.tsx` — el botón "Volver a productos" (siempre apuntaba a `/products` sin filtros) pasó a `navigate(-1)` (vuelve al listado exacto de origen, con sus filtros); el estado "Producto no encontrado" mantiene el link fijo a `/products` a propósito (un `-1` no sirve si se llegó por un link roto/compartido).
+  8. `src/pages/OrderConfirmation.tsx` — el encabezado ahora reusa la misma `orderRef` (prefiere `order_number`) que ya usaban el link de WhatsApp y el PDF, en vez de `order.id.slice(0,8)`.
+  9. `src/pages/Checkout.tsx` — sección "Método de Pago": skeleton mientras `useOrgPaymentMethods` está cargando, mensaje explícito si la org no configuró ninguno.
+  10. `src/pages/Checkout.tsx` — nuevo estado `paymentMethodError`: borde/texto rojo bajo la sección de método de pago cuando falla la validación (antes solo un toast de 3s), se limpia al elegir un método.
+  11. `src/pages/OrderConfirmation.tsx` — `handleRefreshMpPayment` ahora muestra un toast de error si la edge function responde con error o falla la red (antes no pasaba nada visible).
+  12. `src/components/layout/PublicStoreWrapper.tsx` — la pantalla de organización no encontrada/error ya no muestra `err.message` crudo (siempre un mensaje genérico en español) y ahora distingue error de red (con botón "Reintentar" que re-dispara la carga) de "no existe"/"no configurada" (sin botón, no tendría sentido reintentar).
+  13. `src/components/layout/PublicStoreHeader.tsx` — `aria-expanded` agregado al botón de menú mobile (ya lo tenía el de categorías desktop).
+  14. `src/components/layout/PublicStoreHeader.tsx` — menú y buscador mobile ahora se cierran al tocar afuera del `<header>` (mismo patrón `mousedown` + ref que ya usaba `CategoryMenu` en desktop).
+  - **Verificado:** `tsc --noEmit` limpio, 86/86 tests, `eslint` sin errores nuevos en ninguno de los 14 archivos tocados (confirmado que los `any`/warnings restantes son preexistentes). No verificado visualmente en navegador — recomendado un smoke pass manual (swipe en mobile real, click-outside del menú, flujo de checkout con 0 métodos de pago) antes de dar el lote por cerrado del todo.
 
 - ✅ 2026-07-22 — **Revisión adversarial (fresh context, agente `review-risk`) del fix de `organization_id` — 3 hallazgos, los 3 corregidos el mismo día:**
   1. 🔴 **Crítico, preexistente (no introducido por los refactors de hoy)**: `src/hooks/useProductVariants.ts` filtraba `product_variants` solo por `product_id`, sin `organization_id` — y la RLS de esa tabla (`037_update_rls_multi_tenant.sql:553-561`) es pública para cualquier producto `is_active`. Pidiendo `/product/<uuid-de-otra-organización>` se filtraban precio/SKU/atributos de variantes ajenas, aunque la ficha mostrara "Producto no encontrado". Corregido con un `inner join` a `products` (`product:products!inner(organization_id)`) filtrando `.eq('product.organization_id', organizationId)` — `product_variants` no tiene esa columna propia. Actualizados los 2 call sites (`ProductDetail.tsx`, `VariantSelector.tsx`) y `queryKeys.store.productVariants` (ahora incluye `orgId`). Verificado con curl contra la API real: el join con `organization_id` de otra org devuelve `[]`.

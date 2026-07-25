@@ -49,8 +49,17 @@ export function CategoryCard({ category, fallbackImages = [] }: CategoryCardProp
             {fallbackImages.length > 1 && (
               <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-1.5 z-10">
                 {fallbackImages.map((_, index) => (
-                  <span
+                  <button
                     key={`dot-${index}`}
+                    type="button"
+                    // La card entera es un <Link> a la categoría — sin esto, tocar
+                    // un punto navegaría en vez de solo cambiar la foto de fondo.
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      setFallbackIndex(index)
+                    }}
+                    aria-label={`Ver imagen ${index + 1} de ${category.name}`}
                     className={`h-1 w-1 rounded-full transition-all ${index === fallbackIndex ? 'bg-white w-3' : 'bg-white/60'}`}
                   />
                 ))}

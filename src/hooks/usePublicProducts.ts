@@ -24,7 +24,12 @@ export interface ProductFilters {
 
 // ─── Hook para PublicStore (home): todos los productos activos, sin filtros ───
 
-async function fetchStoreProducts(organizationId: string): Promise<ProductWithImages[]> {
+export interface StoreProductsData {
+  products: ProductWithImages[]
+  stockByProduct: Record<string, number>
+}
+
+async function fetchStoreProducts(organizationId: string): Promise<StoreProductsData> {
   const { data, error } = await supabase
     .from('products')
     .select(`
@@ -44,7 +49,14 @@ async function fetchStoreProducts(organizationId: string): Promise<ProductWithIm
     .order('created_at', { ascending: false })
 
   if (error) throw error
-  return data ?? []
+
+  const products = data ?? []
+  const productIds = products.map((p) => p.id)
+  const stockByProduct = productIds.length > 0
+    ? await getProductsStock(productIds, null, organizationId)
+    : {}
+
+  return { products, stockByProduct }
 }
 
 export function useStoreProducts(organizationId: string) {
@@ -68,6 +80,21 @@ async function fetchFilteredProducts(
   const from = (page - 1) * pageSize
   const to = from + pageSize // fetch uno extra para saber si hay más
 
+  // Los productos pueden estar vinculados a una categoría solo a través de la
+  // tabla de junction (categoría secundaria), aunque su category_id apunte a
+  // otra — mismo patrón que fetchCategoryProducts, ver CLAUDE.md.
+  let junctionProductIds: string[] = []
+  if (categoryId) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sb = supabase as any
+    const { data: pcLinks } = await sb
+      .from('product_categories')
+      .select('product_id')
+      .eq('organization_id', organizationId)
+      .eq('category_id', categoryId)
+    junctionProductIds = ((pcLinks ?? []) as { product_id: string }[]).map((l) => l.product_id)
+  }
+
   let query = supabase
     .from('products')
     .select(`
@@ -84,7 +111,11 @@ async function fetchFilteredProducts(
     .order('created_at', { ascending: false })
     .range(from, to)
 
-  if (categoryId) query = query.eq('category_id', categoryId)
+  if (categoryId) {
+    query = junctionProductIds.length > 0
+      ? query.or(`category_id.eq.${categoryId},id.in.(${junctionProductIds.join(',')})`)
+      : query.eq('category_id', categoryId)
+  }
   if (minPrice) query = query.gte('price', parseFloat(minPrice))
   if (maxPrice) query = query.lte('price', parseFloat(maxPrice))
   if (search) {
@@ -217,6 +248,7 @@ export interface CategoryProductsFilters {
 
 export interface CategoryProductsPage {
   products: Product[]
+  stockByProduct: Record<string, number>
   hasMore: boolean
 }
 
@@ -282,7 +314,12 @@ async function fetchCategoryProducts(
   const hasMore = rows.length > CATEGORY_PAGE_SIZE
   const products = hasMore ? rows.slice(0, CATEGORY_PAGE_SIZE) : rows
 
-  return { products, hasMore }
+  const productIds = products.map((p) => p.id)
+  const stockByProduct = productIds.length > 0
+    ? await getProductsStock(productIds, null, organizationId)
+    : {}
+
+  return { products, stockByProduct, hasMore }
 }
 
 export function useCategoryProducts(

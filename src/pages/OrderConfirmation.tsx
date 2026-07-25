@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { CheckoutSteps } from '@/components/features/CheckoutSteps'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { useToastStore } from '@/store/toastStore'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
-import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone, Download, AlertCircle, Clock, RefreshCw } from 'lucide-react'
+import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone, Download, AlertCircle, Clock, RefreshCw, MessageCircle } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
 
 const getStatusLabel = (status: string | null): string => {
@@ -147,9 +149,12 @@ export function OrderConfirmation() {
       if (res.ok) {
         // Reload to show updated status
         window.location.reload()
+      } else {
+        useToastStore.getState().show('No se pudo verificar el estado del pago. Intentá de nuevo.', 'error')
       }
     } catch (err) {
       console.error('Error refreshing MP payment:', err)
+      useToastStore.getState().show('No se pudo verificar el estado del pago. Intentá de nuevo.', 'error')
     } finally {
       setRefreshingMp(false)
     }
@@ -157,6 +162,17 @@ export function OrderConfirmation() {
 
   const whatsappDigits = transferContactPhone.replace(/\D/g, '')
   const whatsappHref = whatsappDigits ? `https://wa.me/${whatsappDigits}` : ''
+
+  const orderRef = order
+    ? order.order_number
+      ? `#${order.order_number}`
+      : `#${order.id.slice(0, 8).toUpperCase()}`
+    : ''
+  const contactWhatsappHref = settings.store_whatsapp_number
+    ? `https://wa.me/${settings.store_whatsapp_number.replace(/\D/g, '')}?text=${encodeURIComponent(
+        `Hola! Quiero coordinar mi orden ${orderRef}`
+      )}`
+    : null
 
   const handleDownloadReceipt = () => {
     if (!order) return
@@ -297,6 +313,7 @@ export function OrderConfirmation() {
   return (
     <div className="container-custom py-8">
       <div className="max-w-3xl mx-auto">
+        <CheckoutSteps currentStep="confirmation" />
 
         {/* MP-specific status banners */}
         {order.payment_method === 'mercadopago' && mpStatus === 'failure' && (
@@ -352,7 +369,7 @@ export function OrderConfirmation() {
             ¡Orden Confirmada!
           </h1>
           <p className="text-gray-600">
-            Tu orden #{order.id.slice(0, 8)} ha sido creada exitosamente
+            Tu orden {orderRef} ha sido creada exitosamente
           </p>
         </div>
 
@@ -407,6 +424,34 @@ export function OrderConfirmation() {
           </CardContent>
         </Card>
 
+        {contactWhatsappHref && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <MessageCircle className="h-5 w-5" />
+                <span>¿Necesitás coordinar tu pedido?</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Escribinos por WhatsApp al{' '}
+                <span className="font-semibold text-gray-900">{settings.store_whatsapp_number}</span>{' '}
+                para coordinar la entrega o resolver cualquier duda sobre tu orden.
+              </p>
+              <a
+                href={contactWhatsappHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 h-11 px-6 rounded-lg text-sm font-semibold text-white transition-colors w-full sm:w-auto"
+                style={{ backgroundColor: primaryColor }}
+              >
+                <MessageCircle className="h-4 w-4" />
+                Coordinar por WhatsApp
+              </a>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
             <CardTitle>Productos</CardTitle>
@@ -419,13 +464,19 @@ export function OrderConfirmation() {
                 
                 return (
                   <div key={item.id} className="flex items-center space-x-4">
-                    {displayImage && (
-                      <img
-                        src={displayImage}
-                        alt={capitalizeFirst(item.product.name)}
-                        className="w-16 h-16 object-cover rounded"
-                      />
-                    )}
+                    <div className="w-16 h-16 rounded bg-gray-100 flex-shrink-0 overflow-hidden">
+                      {displayImage ? (
+                        <img
+                          src={displayImage}
+                          alt={capitalizeFirst(item.product.name)}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] text-center p-1">
+                          Sin imagen
+                        </div>
+                      )}
+                    </div>
                     <div className="flex-1">
                       <p className="font-medium">{capitalizeFirst(item.product.name)}</p>
                       {variant && (

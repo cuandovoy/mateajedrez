@@ -46,7 +46,11 @@ function CategoryMenu({ categories, onNavigate }: CategoryMenuProps) {
   }
 
   return (
-    <div ref={containerRef} className="relative">
+    // `group` habilita el hover CSS-only del dropdown de abajo — se mantiene
+    // como comportamiento adicional en desktop (mouse), mientras que el click
+    // (necesario en híbridos táctiles donde el hover no es confiable) sigue
+    // controlado por `isOpen`, con cierre al click afuera ya manejado arriba.
+    <div ref={containerRef} className="relative group">
       <button
         type="button"
         onClick={() => setIsOpen((p) => !p)}
@@ -54,40 +58,44 @@ function CategoryMenu({ categories, onNavigate }: CategoryMenuProps) {
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-base font-medium text-[color-mix(in_srgb,var(--org-primary-ink,white)_90%,transparent)] hover:text-[var(--org-primary-ink,white)] hover:bg-white/10 transition-colors duration-150"
       >
         Categorías
-        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : 'group-hover:rotate-180'}`} />
       </button>
 
-      {isOpen && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 pt-3 z-40">
-          <div className="bg-white rounded-xl shadow-2xl border border-gray-100 p-3 grid grid-cols-2 gap-x-8 gap-y-0.5 w-max max-w-md">
-            {categories.map((cat) => (
-              <div key={cat.value} className="py-1.5">
-                <Link
-                  to={`/categories/${cat.value}`}
-                  onClick={handleLinkClick}
-                  className="block px-2 py-1 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 hover:text-gray-900 transition-colors whitespace-nowrap"
-                >
-                  {cat.label}
-                </Link>
-                {cat.subcategories && cat.subcategories.length > 0 && (
-                  <div className="mt-0.5">
-                    {cat.subcategories.map((sub) => (
-                      <Link
-                        key={sub.value}
-                        to={`/categories/${sub.value}`}
-                        onClick={handleLinkClick}
-                        className="block px-2 py-1 rounded-lg text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors whitespace-nowrap"
-                      >
-                        {sub.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+      <div
+        className={`absolute top-full left-1/2 -translate-x-1/2 pt-3 z-40 transition-opacity duration-150 ${
+          isOpen
+            ? 'opacity-100 visible pointer-events-auto'
+            : 'opacity-0 invisible pointer-events-none group-hover:opacity-100 group-hover:visible group-hover:pointer-events-auto'
+        }`}
+      >
+        <div className="bg-white rounded-xl shadow-2xl border border-gray-100 p-3 grid grid-cols-2 gap-x-8 gap-y-0.5 w-max max-w-md">
+          {categories.map((cat) => (
+            <div key={cat.value} className="py-1.5">
+              <Link
+                to={`/categories/${cat.value}`}
+                onClick={handleLinkClick}
+                className="block px-2 py-1 rounded-lg text-sm font-medium text-gray-800 hover:bg-gray-50 hover:text-gray-900 transition-colors whitespace-nowrap"
+              >
+                {cat.label}
+              </Link>
+              {cat.subcategories && cat.subcategories.length > 0 && (
+                <div className="mt-0.5">
+                  {cat.subcategories.map((sub) => (
+                    <Link
+                      key={sub.value}
+                      to={`/categories/${sub.value}`}
+                      onClick={handleLinkClick}
+                      className="block px-2 py-1 rounded-lg text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-800 transition-colors whitespace-nowrap"
+                    >
+                      {sub.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -154,6 +162,7 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const desktopSearchRef = useRef<HTMLInputElement>(null)
   const mobileSearchRef = useRef<HTMLInputElement>(null)
+  const headerRef = useRef<HTMLElement>(null)
 
   const { categoriesWithSubs } = usePublicCategoriesForMenu(organization.id)
 
@@ -197,6 +206,23 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
     }
   }, [isSearchOpen])
 
+  // El menú y el buscador mobile (paneles inline debajo de la barra) no tenían
+  // forma de cerrarse al tocar afuera, a diferencia del dropdown de categorías
+  // desktop (ver CategoryMenu más arriba) — mismo patrón acá, sobre el <header>.
+  useEffect(() => {
+    if (!isMobileMenuOpen && !isSearchOpen) return
+
+    const handleOutside = (e: MouseEvent) => {
+      if (headerRef.current && !headerRef.current.contains(e.target as Node)) {
+        setIsMobileMenuOpen(false)
+        setIsSearchOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutside)
+    return () => document.removeEventListener('mousedown', handleOutside)
+  }, [isMobileMenuOpen, isSearchOpen])
+
   // Marca hardcodeada: theming dinámico por organización fue removido
   // (single-tenant fork, org.branding/settings quedan permanentemente NULL).
   const primaryColor = '#46362B'
@@ -205,6 +231,7 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
 
   return (
     <header
+      ref={headerRef}
       className="sticky top-0 z-30"
       style={{ backgroundColor: primaryColor }}
     >
@@ -297,6 +324,7 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
             onClick={() => { setIsMobileMenuOpen((p) => !p); setIsSearchOpen(false) }}
             className="p-2 -ml-1 text-[color-mix(in_srgb,var(--org-primary-ink,white)_80%,transparent)] hover:text-[var(--org-primary-ink,white)] transition-colors rounded-lg hover:bg-white/10"
             aria-label="Menú"
+            aria-expanded={isMobileMenuOpen}
           >
             {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>

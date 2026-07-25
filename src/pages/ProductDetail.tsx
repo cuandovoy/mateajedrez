@@ -10,10 +10,10 @@ import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Product, ProductImage } from '@/types'
-import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle, Share2 } from 'lucide-react'
+import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle, Share2, X, ZoomIn } from 'lucide-react'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Helmet } from 'react-helmet-async'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 const DEFAULT_PRODUCT_PLACEHOLDER =
   'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="800" viewBox="0 0 800 800"><rect width="800" height="800" fill="%23f3f4f6"/><g fill="%239ca3af"><rect x="240" y="260" width="320" height="220" rx="24"/><circle cx="320" cy="330" r="28"/><path d="M270 450l95-95 62 62 48-48 55 81z"/></g><text x="50%25" y="560" text-anchor="middle" font-family="Arial,sans-serif" font-size="32" fill="%236b7280">Sin imagen</text></svg>'
@@ -49,6 +49,7 @@ function getPrimaryImageUrl(product: Product & { product_images?: ProductImage[]
 
 export function ProductDetail() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const settings = useOrgSettings()
   const { organization } = usePublicStore()
   const { addToCart } = useCartStore()
@@ -77,9 +78,15 @@ export function ProductDetail() {
     }
   }, [])
   const [allImagesFailed, setAllImagesFailed] = useState(false)
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
   const [productStock, setProductStock] = useState<number | null>(null)
-  const [variantStock, setVariantStock] = useState<number | null>(null)
+  // Poblado por VariantSelector (onVariantStocksChange) — evita que ProductDetail
+  // pida por su cuenta el stock de la variante seleccionada con una segunda
+  // llamada a getProductStock descoordinada de la que ya hace VariantSelector.
+  const [variantStockMap, setVariantStockMap] = useState<Record<string, number>>({})
+  const [allVariantsUnavailable, setAllVariantsUnavailable] = useState(false)
   const productRef = useRef<HTMLDivElement>(null)
+  const touchStartXRef = useRef<number | null>(null)
 
 
   useEffect(() => {
@@ -92,7 +99,28 @@ export function ProductDetail() {
     setImageLoading(true)
     setFadeIn(false)
     setAllImagesFailed(false)
+    setAllVariantsUnavailable(false)
+    setIsLightboxOpen(false)
   }, [product?.id])
+
+  // Cerrar el lightbox con Escape — mismo patrón que el dropdown de categorías
+  // del header (ver CategoryMenu en PublicStoreHeader.tsx).
+  useEffect(() => {
+    if (!isLightboxOpen) return
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsLightboxOpen(false)
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [isLightboxOpen])
+
+  const handleVariantAvailabilityChange = useCallback((hasAvailableVariant: boolean) => {
+    setAllVariantsUnavailable(!hasAvailableVariant)
+  }, [])
+
+  const handleVariantStocksChange = useCallback((stocks: Record<string, number>) => {
+    setVariantStockMap(stocks)
+  }, [])
 
   useEffect(() => {
     if (!product) {
@@ -155,15 +183,11 @@ export function ProductDetail() {
       if (variant) {
         setSelectedVariant(variant)
         setQuantity(1)
-        getProductStock(product.id, variantId, null, product.organization_id || null)
-          .then((stock) => setVariantStock(stock))
-          .catch(() => setVariantStock(0))
       }
       return
     }
 
     setSelectedVariant(null)
-    setVariantStock(null)
     setQuantity(1)
   }, [product, variants])
 
@@ -205,8 +229,13 @@ export function ProductDetail() {
     )
   }
 
+  const variantStock = selectedVariantId
+    ? (selectedVariantId in variantStockMap ? variantStockMap[selectedVariantId] : null)
+    : null
   const currentStock = selectedVariantId ? variantStock : productStock
-  const isOutOfStock = !(hasActiveVariants && !selectedVariantId) && currentStock !== null && currentStock <= 0
+  const isOutOfStock = hasActiveVariants && !selectedVariantId
+    ? allVariantsUnavailable
+    : currentStock !== null && currentStock <= 0
   const whatsappHref = settings.store_whatsapp_number
     ? `https://wa.me/${settings.store_whatsapp_number.replace(/\D/g, '')}?text=${encodeURIComponent(
         `Hola! Quiero consultar sobre la disponibilidad de "${product.name}" (${window.location.href})`
@@ -232,12 +261,31 @@ export function ProductDetail() {
         <meta property="og:image" content={ogImageUrl} />
         <link rel="canonical" href={`/product/${product.id}`} />
       </Helmet>
-      <Link to="/products">
-        <Button variant="ghost" className="mb-6">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Volver a productos
-        </Button>
-      </Link>
+
+      <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-gray-500">
+        <Link to="/" className="hover:text-gray-700 transition-colors">Inicio</Link>
+        {product.category && (
+          <>
+            <span aria-hidden="true">/</span>
+            <Link to={`/categories/${product.category.slug}`} className="hover:text-gray-700 transition-colors">
+              {product.category.name}
+            </Link>
+          </>
+        )}
+        <span aria-hidden="true">/</span>
+        <span className="text-gray-700 font-medium truncate max-w-[200px] sm:max-w-none">
+          {capitalizeFirst(product.name)}
+        </span>
+      </nav>
+
+      <Button
+        variant="ghost"
+        className="mb-6"
+        onClick={() => navigate(-1)}
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Volver
+      </Button>
 
       <div ref={productRef} className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         {/* Imagen del producto */}
@@ -301,6 +349,19 @@ export function ProductDetail() {
               setImageLoading(false)
               setFadeIn(true)
             }
+
+            const SWIPE_THRESHOLD_PX = 40
+            const handleTouchStart = (e: React.TouchEvent) => {
+              touchStartXRef.current = e.touches[0].clientX
+            }
+            const handleTouchEnd = (e: React.TouchEvent) => {
+              const startX = touchStartXRef.current
+              touchStartXRef.current = null
+              if (startX === null || !hasMultipleImages) return
+              const deltaX = e.changedTouches[0].clientX - startX
+              if (deltaX > SWIPE_THRESHOLD_PX) handlePreviousImage()
+              else if (deltaX < -SWIPE_THRESHOLD_PX) handleNextImage()
+            }
             
             if (!currentImageUrl || allImagesFailed) {
               return (
@@ -314,14 +375,19 @@ export function ProductDetail() {
             
             return (
               <div className="relative">
-                <div className="relative w-full overflow-hidden rounded-lg shadow-lg">
+                <div
+                  className="relative w-full overflow-hidden rounded-lg shadow-lg"
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                >
                   <div className="relative w-full" style={{ aspectRatio: '1 / 1', minHeight: '400px' }}>
                     <img
                       key={`${selectedVariantId ?? 'base'}-${currentImageIndex}`}
                       ref={handleImgRef}
                       src={currentImageUrl}
                       alt={capitalizeFirst(product.name)}
-                      className={`w-full h-full object-cover transition-opacity duration-300 ${
+                      onClick={() => setIsLightboxOpen(true)}
+                      className={`w-full h-full object-cover cursor-zoom-in transition-opacity duration-300 ${
                         fadeIn ? 'opacity-100' : 'opacity-0'
                       }`}
                       onLoad={handleImageLoad}
@@ -340,6 +406,11 @@ export function ProductDetail() {
                     {imageLoading && (
                       <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
                         <div className="text-gray-400">Cargando...</div>
+                      </div>
+                    )}
+                    {!imageLoading && (
+                      <div className="absolute top-3 right-3 bg-black/50 text-white rounded-full p-1.5 pointer-events-none">
+                        <ZoomIn className="h-4 w-4" />
                       </div>
                     )}
                   </div>
@@ -407,6 +478,58 @@ export function ProductDetail() {
                     ))}
                   </div>
                 )}
+
+                {/* Lightbox — reusa handlePreviousImage/handleNextImage de la galería */}
+                {isLightboxOpen && (
+                  <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                    onClick={() => setIsLightboxOpen(false)}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setIsLightboxOpen(false)}
+                      className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"
+                      aria-label="Cerrar"
+                    >
+                      <X className="h-7 w-7" />
+                    </button>
+
+                    <div
+                      className="relative flex items-center justify-center max-w-4xl w-full"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <img
+                        src={currentImageUrl}
+                        alt={capitalizeFirst(product.name)}
+                        className="max-h-[85vh] w-auto max-w-full object-contain rounded-lg"
+                      />
+
+                      {hasMultipleImages && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handlePreviousImage}
+                            className="absolute left-2 sm:-left-14 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors"
+                            aria-label="Imagen anterior"
+                          >
+                            <ChevronLeft className="h-6 w-6 text-white" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleNextImage}
+                            className="absolute right-2 sm:-right-14 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 rounded-full p-2 transition-colors"
+                            aria-label="Siguiente imagen"
+                          >
+                            <ChevronRight className="h-6 w-6 text-white" />
+                          </button>
+                          <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-white/80 text-sm">
+                            {currentImageIndex + 1} / {imageUrls.length}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })()}
@@ -416,15 +539,16 @@ export function ProductDetail() {
         <div>
           <div className="mb-4">
             {product.category && (
-              <span
-                className="inline-block px-3 py-1 rounded-full text-sm font-medium mb-2"
+              <Link
+                to={`/categories/${product.category.slug}`}
+                className="inline-block px-3 py-1 rounded-full text-sm font-medium mb-2 hover:opacity-80 transition-opacity"
                 style={{
                   backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #46362B) 15%, white)',
                   color: 'var(--org-primary-color, #46362B)',
                 }}
               >
                 {product.category.name}
-              </span>
+              </Link>
             )}
             <div className="flex items-start justify-between gap-3 mb-2">
               <h1
@@ -486,6 +610,8 @@ export function ProductDetail() {
               product={product}
               selectedVariantId={selectedVariantId}
               onVariantChange={handleVariantChange}
+              onAvailabilityChange={handleVariantAvailabilityChange}
+              onVariantStocksChange={handleVariantStocksChange}
             />
           </div>
 
@@ -570,7 +696,7 @@ export function ProductDetail() {
           <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">
             Productos relacionados
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
             {relatedProducts.map((relatedProduct) => (
               <ProductCard key={relatedProduct.id} product={relatedProduct} />
             ))}

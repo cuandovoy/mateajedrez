@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
-import { ShoppingCart, LayoutGrid, Instagram, Facebook, MessageCircle } from 'lucide-react'
+import { ShoppingCart, LayoutGrid, Instagram, Facebook, MessageCircle, Truck, RotateCcw, CreditCard } from 'lucide-react'
 import logoWordmark from '@/brand/logo-principal-fondo1.png'
 
 export function PublicStoreFooter() {
@@ -62,6 +62,23 @@ export function PublicStoreFooter() {
                 <ShoppingCart className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
                 Mi carrito
               </Link>
+            </div>
+
+            {/* Trust signals — texto genérico, sin plazos/costos aún no
+                confirmados (ver placeholders en TerminosCondiciones.tsx) */}
+            <div className="flex flex-col gap-2.5 mt-6 pt-6 border-t" style={{ borderColor: `${primaryColor}15` }}>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <Truck className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+                Coordinamos tu envío
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <RotateCcw className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+                Cambios dentro de los primeros días
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <CreditCard className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+                Múltiples medios de pago
+              </div>
             </div>
           </div>
 
@@ -163,10 +180,18 @@ export function PublicStoreFooter() {
         className="border-t"
         style={{ borderColor: `${primaryColor}18` }}
       >
-        <div className="container-custom py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="container-custom py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-gray-400">
             © {new Date().getFullYear()} {organization.name}. Todos los derechos reservados.
           </p>
+          <div className="flex items-center gap-4">
+            <Link to="/legal/privacidad" className="text-xs text-gray-400 hover:text-gray-700 hover:underline transition-colors">
+              Política de Privacidad
+            </Link>
+            <Link to="/legal/terminos" className="text-xs text-gray-400 hover:text-gray-700 hover:underline transition-colors">
+              Términos y Condiciones
+            </Link>
+          </div>
           <p className="text-xs text-gray-400">
             Powered by{' '}
             <a

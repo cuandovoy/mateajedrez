@@ -4,6 +4,19 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-07-25 — Lote de 13 mejoras visuales/UX en la tienda pública
+
+- **Archivos modificados:** `src/components/features/CheckoutSteps.tsx` (nuevo), `src/components/layout/PublicStoreHeader.tsx`, `src/pages/ProductDetail.tsx`, `src/pages/Products.tsx`, `src/pages/PublicStore.tsx`, `src/components/features/CategoryCard.tsx`, `src/pages/Cart.tsx`, `src/components/features/VariantSelector.tsx`, `src/pages/CategoryProducts.tsx`, `src/components/layout/Footer.tsx`, `src/components/ui/Skeleton.tsx`, `src/components/layout/PublicStoreWrapper.tsx`, `src/App.tsx`, `src/pages/Checkout.tsx`, `src/pages/OrderConfirmation.tsx`, `.claude/TODO.md`
+- **Qué cambió:** a pedido del usuario ("tomemos varias cosas a la vez para no ir parando"), se agrupó todo el backlog puramente visual/UX de la tienda pública en un solo lote: stepper de progreso en Carrito/Checkout/Confirmación, submenú de categorías con hover + click, grid de "relacionados" alineado al estándar, subcategorías como chip de filtro en `/products`, lightbox en la galería de producto, ícono en el CTA del hero, puntos de carrusel convertidos en botones reales, cantidad del carrito editable por teclado, tooltip en variantes sin stock, breadcrumbs en `ProductDetail`/`CategoryProducts`, trust signals en el footer, skeleton de página completa (reemplaza el spinner) y gap de skeleton corregido. Detalle completo de cada ítem en `.claude/TODO.md` (Completado, 2026-07-25).
+- **Verificación:** `tsc --noEmit` limpio, 86/86 tests (mismo conteo). No verificado visualmente en navegador.
+- **Nota:** se detectó que dos fixes previamente registrados como "completados el 2026-07-24" no estaban presentes en el código antes de esta pasada (ver detalle en `.claude/TODO.md`) — la rama `restore` no tiene commits desde el 2026-07-23, todo sigue sin commitear. Recomendado un commit de checkpoint pronto.
+
+## 2026-07-25 — Política de Privacidad real + Términos y Condiciones + links en el footer
+
+- **Archivos modificados:** `src/pages/PoliticaPrivacidad.tsx`, `src/pages/TerminosCondiciones.tsx` (nuevo), `src/App.tsx`, `src/components/layout/Footer.tsx`, `src/pages/Checkout.tsx`, `.claude/TODO.md`
+- **Qué cambió:** `PoliticaPrivacidad.tsx` estaba redactada para Axiostock como SaaS (Supabase/Biller/CFE del proveedor) en vez de para Ruemia como tienda — se reescribió con el contenido real de una tienda online, ajustado a que Ruemia **no está registrada ante DGI** (identifica al responsable por nombre completo, no por razón social/RUT). Se creó `TerminosCondiciones.tsx` (no existía ninguna página de términos) con ruta `/legal/terminos`. El footer no linkeaba a ninguna página legal — se agregaron ambos links en la barra inferior, visibles en toda la tienda. El texto de aceptación del checkout ahora referencia ambos documentos.
+- **Pendiente:** ambos archivos tienen placeholders `[COMPLETAR ...]` para datos reales que el usuario todavía no confirmó (nombre del titular, domicilio, email de contacto, política de cambios/envíos) — ver `.claude/TODO.md`.
+
 ## 2026-07-23 — Sacado el overlay blanco de "Sin stock" sobre la foto de producto
 
 - **Archivos modificados:** `src/components/features/ProductCard.tsx`, `src/pages/ProductDetail.tsx`, `CLAUDE.md`

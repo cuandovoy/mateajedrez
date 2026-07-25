@@ -1,3 +1,4 @@
+import { CheckoutSteps } from '@/components/features/CheckoutSteps'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
@@ -12,6 +13,53 @@ import { BranchInventory, ProductVariant } from '@/types/database.types'
 import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+
+interface CartQuantityInputProps {
+  quantity: number
+  min: number
+  max: number
+  onCommit: (value: number) => void
+}
+
+// Input editable de cantidad — complementa los botones +/- existentes.
+// El valor se confirma (dispara onCommit → updateQuantity) al perder foco o
+// con Enter, nunca en cada tecla, para no disparar un update por cada dígito.
+function CartQuantityInput({ quantity, min, max, onCommit }: CartQuantityInputProps) {
+  const [value, setValue] = useState(String(quantity))
+
+  useEffect(() => {
+    setValue(String(quantity))
+  }, [quantity])
+
+  const commit = () => {
+    const parsed = parseInt(value, 10)
+    if (Number.isNaN(parsed)) {
+      setValue(String(quantity))
+      return
+    }
+    const clamped = Math.min(Math.max(parsed, min), max)
+    setValue(String(clamped))
+    if (clamped !== quantity) onCommit(clamped)
+  }
+
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={min}
+      max={max}
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+      }}
+      className="w-14 h-9 text-center font-semibold border border-gray-200 rounded-lg focus:outline-none focus:ring-2 transition-shadow"
+      style={{ '--tw-ring-color': 'var(--org-primary-color, #46362B)' } as React.CSSProperties}
+      aria-label="Cantidad"
+    />
+  )
+}
 
 function CartContent() {
   const navigate = useNavigate()
@@ -207,6 +255,7 @@ function CartContent() {
 
   return (
     <div className="container-custom py-8">
+      <CheckoutSteps currentStep="cart" />
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Carrito de Compras</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -311,19 +360,22 @@ function CartContent() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity - 1).catch(() => {})}
                           disabled={item.quantity <= 1}
                           aria-label="Disminuir cantidad"
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
-                        <span className="w-12 text-center font-semibold">
-                          {item.quantity}
-                        </span>
+                        <CartQuantityInput
+                          quantity={item.quantity}
+                          min={1}
+                          max={itemStocks[item.id] ?? item.quantity}
+                          onCommit={(newQuantity) => updateQuantity(item.id, newQuantity).catch(() => {})}
+                        />
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          onClick={() => updateQuantity(item.id, item.quantity + 1).catch(() => {})}
                           disabled={item.quantity >= (itemStocks[item.id] ?? 0)}
                           aria-label="Aumentar cantidad"
                         >
@@ -337,7 +389,7 @@ function CartContent() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeFromCart(item.id)}
+                          onClick={() => removeFromCart(item.id).catch(() => {})}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           aria-label="Eliminar producto del carrito"
                         >

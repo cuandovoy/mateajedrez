@@ -42,6 +42,39 @@ export function SkeletonProductCard() {
   )
 }
 
+// Placeholder de página completa — usado antes de que exista la organización
+// (bootstrap inicial de la tienda pública), cuando todavía no hay layout real
+// que envolver con Skeleton*/EmptyState comunes. Aproxima header + hero + grid.
+export function SkeletonFullPage() {
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="h-16 lg:h-20 border-b border-gray-100 flex items-center">
+        <div className="container-custom flex items-center justify-between">
+          <Skeleton className="h-10 w-10 rounded-lg" />
+          <div className="hidden lg:flex gap-4">
+            <Skeleton className="h-4 w-16" />
+            <Skeleton className="h-4 w-20" />
+            <Skeleton className="h-4 w-16" />
+          </div>
+          <div className="flex gap-3">
+            <Skeleton className="h-9 w-9 rounded-full" />
+            <Skeleton className="h-9 w-9 rounded-full" />
+          </div>
+        </div>
+      </div>
+      <Skeleton className="w-full h-64 md:h-96 rounded-none" />
+      <div className="container-custom py-12">
+        <Skeleton className="h-8 w-40 mx-auto mb-10 rounded-xl" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <SkeletonProductCard key={i} />
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function SkeletonTable({ rows = 5 }: { rows?: number }) {
   return (
     <div className="overflow-x-auto">

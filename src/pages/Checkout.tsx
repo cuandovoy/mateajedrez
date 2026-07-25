@@ -1,7 +1,9 @@
 import { BillerCheckoutPanel } from '@/components/features/BillerCheckoutPanel'
+import { CheckoutSteps } from '@/components/features/CheckoutSteps'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
+import { Skeleton } from '@/components/ui/Skeleton'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
@@ -42,12 +44,12 @@ interface FulfillmentBranchCandidate {
 function CheckoutInner() {
   const navigate = useNavigate()
   const settings = useOrgSettings()
-  const { items, getTotal, clearCart } = useCartStore()
+  const { items, loading: cartLoading, getTotal, clearCart } = useCartStore()
   const { user } = useAuthStore()
   // const { executeRecaptcha } = useGoogleReCaptcha()
   const { organization } = usePublicStore()
   const organizationId = organization.id
-  const { methods: paymentMethods } = useOrgPaymentMethods(organizationId)
+  const { methods: paymentMethods, loading: paymentMethodsLoading } = useOrgPaymentMethods(organizationId)
   const { show } = useToastStore()
   const checkoutFulfillmentMode = settings.checkout_fulfillment_mode === 'main' ? 'main' : 'auto'
   const checkoutExcludeIsolatedWarehouses = settings.checkout_exclude_isolated_warehouses !== false
@@ -66,6 +68,21 @@ function CheckoutInner() {
     phone: '',
   })
   const [errors, setErrors] = useState<Partial<ContactForm>>({})
+  const [paymentMethodError, setPaymentMethodError] = useState<string | null>(null)
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
+
+  // Si se llega a /checkout con el carrito vacío (refresh, back, sesión de
+  // invitado expirada), redirige a /cart en vez de mostrar el formulario
+  // completo con un resumen en $0. `cartLoading` evita el falso positivo
+  // mientras PublicStoreHeader todavía está trayendo el carrito.
+  useEffect(() => {
+    if (!cartLoading && items.length === 0) {
+      navigate('/cart')
+    }
+  }, [cartLoading, items.length, navigate])
 
   // Cargar configuración de Biller si la org la tiene activa
   useEffect(() => {
@@ -323,10 +340,13 @@ function CheckoutInner() {
     }
 
     const availableMethods = paymentMethods.filter((m) => !m.requires_cash_session || mainBranchId)
-    if (availableMethods.length === 0 || !paymentMethod || !availableMethods.some((m) => m.key === paymentMethod)) {
+    const isPaymentMethodValid = availableMethods.length > 0 && !!paymentMethod && availableMethods.some((m) => m.key === paymentMethod)
+    if (!isPaymentMethodValid) {
+      setPaymentMethodError('Seleccioná un método de pago')
       show('Selecciona un método de pago válido', 'error')
       return
     }
+    setPaymentMethodError(null)
 
     // reCAPTCHA v3 validation
     // if (executeRecaptcha) {
@@ -667,6 +687,7 @@ function CheckoutInner() {
 
   return (
     <div className="container-custom py-8">
+      <CheckoutSteps currentStep="checkout" />
       <Button
         variant="ghost"
         onClick={() => navigate('/cart')}
@@ -814,7 +835,16 @@ function CheckoutInner() {
                     Método de Pago <span className="text-red-500">*</span>
                   </label>
                   <div className="space-y-3">
-                    {paymentMethods
+                    {paymentMethodsLoading ? (
+                      <>
+                        <Skeleton className="h-[72px] w-full rounded-lg" />
+                        <Skeleton className="h-[72px] w-full rounded-lg" />
+                      </>
+                    ) : paymentMethods.filter((m) => !m.requires_cash_session || mainBranchId).length === 0 ? (
+                      <p className="text-sm text-gray-500 rounded-lg border border-gray-200 p-4">
+                        Esta tienda no configuró ningún método de pago disponible. Contactanos para coordinar tu compra.
+                      </p>
+                    ) : paymentMethods
                       .filter((m) => !m.requires_cash_session || mainBranchId)
                       .map((m) => {
                         const iconUrl = (m.config as any)?.icon_url as string | undefined
@@ -843,7 +873,7 @@ function CheckoutInner() {
                               name="paymentMethod"
                               value={m.key}
                               checked={paymentMethod === m.key}
-                              onChange={(e) => setPaymentMethod(e.target.value)}
+                              onChange={(e) => { setPaymentMethod(e.target.value); setPaymentMethodError(null) }}
                               className="w-4 h-4 focus:ring-[var(--org-primary-color,#46362B)] shrink-0"
                               style={{ accentColor: 'var(--org-primary-color, #46362B)' }}
                             />
@@ -862,6 +892,9 @@ function CheckoutInner() {
                         )
                       })}
                   </div>
+                  {paymentMethodError && (
+                    <p className="text-xs text-red-500 mt-2">{paymentMethodError}</p>
+                  )}
                 </div>
 
                 <div className="flex items-center space-x-2 pt-4">
@@ -888,7 +921,11 @@ function CheckoutInner() {
                   {loading ? 'Procesando...' : 'Confirmar Orden'}
                 </Button>
                 <p className="text-xs text-gray-500 text-center">
-                  Al realizar tu pedido aceptás nuestra{' '}
+                  Al realizar tu pedido aceptás nuestros{' '}
+                  <Link to="/legal/terminos" target="_blank" className="underline hover:text-gray-700">
+                    Términos y Condiciones
+                  </Link>{' '}
+                  y nuestra{' '}
                   <Link to="/legal/privacidad" target="_blank" className="underline hover:text-gray-700">
                     Política de Privacidad
                   </Link>

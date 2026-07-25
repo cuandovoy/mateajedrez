@@ -56,8 +56,29 @@ export function PublicStore() {
   const [currentCoverIndex, setCurrentCoverIndex] = useState(0)
 
   const { data: allCategories = [] } = usePublicCategories(organization.id)
-  const { data: products = [], isLoading: loading } = useStoreProducts(organization.id)
+  const { data: storeProductsData, isLoading: loading } = useStoreProducts(organization.id)
+  const products = storeProductsData?.products ?? []
+  const stockByProduct = storeProductsData?.stockByProduct ?? {}
   const categories = allCategories.filter((cat: Category) => !cat.parent_id)
+
+  const featuredProducts = useMemo(() => {
+    const seenCategoryIds = new Set<string>()
+    const result: ProductWithImages[] = []
+
+    for (const product of products) {
+      const hasStock = (stockByProduct[product.id] ?? 0) > 0
+      if (!hasStock) continue
+
+      if (product.category_id) {
+        if (seenCategoryIds.has(product.category_id)) continue
+        seenCategoryIds.add(product.category_id)
+      }
+
+      result.push(product)
+    }
+
+    return result
+  }, [products, stockByProduct])
 
   const categoryFallbackImages = useMemo(() => {
     if (products.length === 0 || allCategories.length === 0) {
@@ -168,7 +189,7 @@ export function PublicStore() {
         <Skeleton className="w-full h-64 md:h-96 rounded-none" />
         <div className="container-custom py-12">
           <Skeleton className="h-8 w-40 mx-auto mb-10 rounded-xl" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
             {Array.from({ length: 8 }).map((_, i) => (
               <SkeletonProductCard key={i} />
             ))}
@@ -246,7 +267,7 @@ export function PublicStore() {
                   }
                 >
                   Ver productos
-                  
+                  <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
             )}
@@ -254,8 +275,11 @@ export function PublicStore() {
             {coverImages.length > 1 && (
               <div className={`mt-6 flex items-center gap-2 ${heroTextPosition === 'center' ? 'justify-center' : 'justify-start'}`}>
                 {coverImages.map((_, index) => (
-                  <span
+                  <button
                     key={`indicator-${index}`}
+                    type="button"
+                    onClick={() => setCurrentCoverIndex(index)}
+                    aria-label={`Ir a la imagen ${index + 1}`}
                     className="h-1.5 rounded-full transition-all duration-300"
                     style={{
                       backgroundColor: heroTextColor,
@@ -304,7 +328,7 @@ export function PublicStore() {
       )}
 
       {/* Featured Products Section */}
-      {products.length > 0 && (
+      {featuredProducts.length > 0 && (
         <section className={`py-10 md:py-14 ${categories.length > 0 ? 'border-t border-gray-100' : ''}`}>
           <div className="container-custom">
             <div className="flex items-center justify-between mb-6">
@@ -326,13 +350,13 @@ export function PublicStore() {
               )}
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
-              {products.slice(0, 10).map((product, index) => (
+              {featuredProducts.slice(0, 10).map((product, index) => (
                 <div
                   key={product.id}
                   className="animate-fade-in-up"
                   style={{ animationDelay: `${Math.min(index * 40, 280)}ms` }}
                 >
-                  <ProductCard product={product} noAddToCart={false} />
+                  <ProductCard product={product} stock={stockByProduct[product.id]} noAddToCart={false} />
                 </div>
               ))}
             </div>
