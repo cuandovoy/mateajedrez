@@ -5,7 +5,7 @@ import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useProductVariants } from '@/hooks/useProductVariants'
 import { useStoreProduct } from '@/hooks/usePublicProducts'
-import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice, normalizeLineBreaks } from '@/lib/utils'
+import { capitalizeFirst, formatPrice, getTransformedImageUrl, hasActiveDiscount, getEffectivePrice, normalizeLineBreaks } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useCartStore } from '@/store/cartStore'
 import { useToastStore } from '@/store/toastStore'
@@ -384,7 +384,7 @@ export function ProductDetail() {
                     <img
                       key={`${selectedVariantId ?? 'base'}-${currentImageIndex}`}
                       ref={handleImgRef}
-                      src={currentImageUrl}
+                      src={getTransformedImageUrl(currentImageUrl, { width: 1000, height: 1000 }) ?? currentImageUrl}
                       alt={capitalizeFirst(product.name)}
                       onClick={() => setIsLightboxOpen(true)}
                       className={`w-full h-full object-cover cursor-zoom-in transition-opacity duration-300 ${
@@ -470,7 +470,7 @@ export function ProductDetail() {
                         aria-label={`Ver imagen ${index + 1}`}
                       >
                         <img
-                          src={url}
+                          src={getTransformedImageUrl(url, { width: 160, height: 160 }) ?? url}
                           alt={`${capitalizeFirst(product.name)} - Imagen ${index + 1}`}
                           className="w-full h-full object-cover"
                         />
@@ -499,7 +499,7 @@ export function ProductDetail() {
                       onClick={(e) => e.stopPropagation()}
                     >
                       <img
-                        src={currentImageUrl}
+                        src={getTransformedImageUrl(currentImageUrl, { width: 1600, height: 1600, resize: 'contain' }) ?? currentImageUrl}
                         alt={capitalizeFirst(product.name)}
                         className="max-h-[85vh] w-auto max-w-full object-contain rounded-lg"
                       />

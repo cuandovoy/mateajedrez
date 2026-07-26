@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import type { Category } from '@/types'
+import { getTransformedImageUrl } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 
 interface CategoryCardProps {
@@ -31,7 +32,7 @@ export function CategoryCard({ category, fallbackImages = [] }: CategoryCardProp
         {/* Image layer */}
         {category.image_url ? (
           <img
-            src={category.image_url}
+            src={getTransformedImageUrl(category.image_url, { width: 800, height: 600 }) ?? category.image_url}
             alt={category.name}
             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
@@ -40,7 +41,7 @@ export function CategoryCard({ category, fallbackImages = [] }: CategoryCardProp
             {fallbackImages.map((imageUrl, index) => (
               <img
                 key={`${imageUrl}-${index}`}
-                src={imageUrl}
+                src={getTransformedImageUrl(imageUrl, { width: 800, height: 600 }) ?? imageUrl}
                 alt={`${category.name} ${index + 1}`}
                 className="absolute inset-0 w-full h-full object-cover transition-all duration-1000 group-hover:scale-105"
                 style={{ opacity: index === fallbackIndex ? 1 : 0 }}

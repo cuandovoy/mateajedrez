@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useProductVariants } from '@/hooks/useProductVariants'
-import { capitalizeFirst, cn, formatPrice, getEffectivePrice, translateAttributeLabel } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getTransformedImageUrl, translateAttributeLabel } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { ProductVariant, Product } from '@/types'
 
@@ -297,7 +297,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
         <div className="mt-4">
           {showImage && (
             <img
-              src={variantImage as string}
+              src={getTransformedImageUrl(variantImage as string, { width: 1000, height: 512 }) ?? (variantImage as string)}
               alt={capitalizeFirst(selectedVariant?.name || product.name)}
               className="w-full h-64 object-cover rounded-lg"
               onError={() => setImageLoadFailed(true)}
