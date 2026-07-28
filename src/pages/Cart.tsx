@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useStoreProducts } from '@/hooks/usePublicProducts'
-import { capitalizeFirst, cn, formatPrice, getProductImageUrl, getTransformedImageUrl, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, getProductImageUrl, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
@@ -351,7 +351,7 @@ function CartContent() {
                           <div className="flex-shrink-0 w-20 h-20 md:w-24 md:h-24 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                             {imageUrl ? (
                               <img
-                                src={getTransformedImageUrl(imageUrl, { width: 200, height: 200 }) ?? imageUrl}
+                                src={imageUrl}
                                 alt={capitalizeFirst(item.product.name)}
                                 className="w-full h-full object-cover"
                                 onError={(e) => {

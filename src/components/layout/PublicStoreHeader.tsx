@@ -4,7 +4,7 @@ import type { Product, ProductImage } from '@/types'
 import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
 import type { CategoryWithSubcategories } from '@/hooks/usePublicCategories'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl, getTransformedImageUrl } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl } from '@/lib/utils'
 import { ChevronDown, Menu, Minus, Plus, Search, ShoppingCart, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
@@ -244,7 +244,7 @@ function CartMenu({ triggerClassName, badgeClassName, ariaLabel, enableHover = f
                     <div key={item.id} className="flex gap-3 p-3">
                       <div className="flex-shrink-0 w-14 h-14 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
                         {imageUrl ? (
-                          <img src={getTransformedImageUrl(imageUrl, { width: 112, height: 112 }) ?? imageUrl} alt={capitalizeFirst(item.product.name)} className="w-full h-full object-cover" />
+                          <img src={imageUrl} alt={capitalizeFirst(item.product.name)} className="w-full h-full object-cover" />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] text-center">
                             Sin imagen

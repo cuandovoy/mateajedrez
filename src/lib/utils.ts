@@ -165,36 +165,6 @@ export function getProductImageUrl(
   return null
 }
 
-interface ImageTransformOptions {
-  width?: number
-  height?: number
-  resize?: 'cover' | 'contain' | 'fill'
-  quality?: number
-}
-
-const STORAGE_OBJECT_PATH = '/storage/v1/object/public/'
-const STORAGE_RENDER_PATH = '/storage/v1/render/image/public/'
-
-// Reescribe una URL pública de Supabase Storage al endpoint de transformación
-// on-the-fly (resize + conversión automática a WebP según el navegador) —
-// requiere plan Pro o superior. URLs que no sean de Storage (data:, assets
-// locales importados por Vite, CDNs externos) se devuelven sin modificar.
-export function getTransformedImageUrl(
-  url: string | null | undefined,
-  { width, height, resize = 'cover', quality = 80 }: ImageTransformOptions = {}
-): string | null {
-  if (!url) return null
-  if (!url.includes(STORAGE_OBJECT_PATH)) return url
-
-  const params = new URLSearchParams()
-  if (width) params.set('width', String(width))
-  if (height) params.set('height', String(height))
-  params.set('resize', resize)
-  params.set('quality', String(quality))
-
-  return `${url.replace(STORAGE_OBJECT_PATH, STORAGE_RENDER_PATH)}?${params.toString()}`
-}
-
 // Acepta +598XXXXXXXX, 598XXXXXXXX, 0XXXXXXXX o XXXXXXXX — flexible a propósito
 // (fijo con/sin código de área, celular con o sin +598) para no bloquear el
 // checkout por variantes de formato reales que igual son válidas.

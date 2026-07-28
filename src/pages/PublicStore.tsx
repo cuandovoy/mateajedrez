@@ -8,7 +8,6 @@ import { usePublicCategories } from '@/hooks/usePublicCategories'
 import { useStoreProducts } from '@/hooks/usePublicProducts'
 import type { Product, Category, ProductImage } from '@/types'
 import { Button } from '@/components/ui/Button'
-import { getTransformedImageUrl } from '@/lib/utils'
 import { ArrowRight, Check } from 'lucide-react'
 
 const STORE_COVER_IMAGES_KEY = 'store_cover_image_urls'
@@ -431,7 +430,7 @@ export function PublicStore() {
           {aboutImageUrl && (
             <div className="order-1 md:order-2">
               <img
-                src={getTransformedImageUrl(aboutImageUrl, { width: 1000, height: 1000 }) ?? aboutImageUrl}
+                src={aboutImageUrl}
                 alt="Pieza artesanal Ruemia — bordado a mano y cuero genuino"
                 className="w-full aspect-[4/5] md:aspect-[4/3] object-cover rounded-2xl shadow-lg"
               />

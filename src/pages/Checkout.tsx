@@ -10,7 +10,7 @@ import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
 import { checkoutSchema, URUGUAY_DEPARTMENTS, type CheckoutFormData } from '@/lib/schemas'
 import { supabase } from '@/lib/supabase'
-import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl, getTransformedImageUrl, hasActiveDiscount } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl, hasActiveDiscount } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
@@ -705,7 +705,7 @@ function CheckoutInner() {
                     <div key={item.id} className="flex items-start gap-3">
                       {imgUrl ? (
                         <img
-                          src={getTransformedImageUrl(imgUrl, { width: 128, height: 128 }) ?? imgUrl}
+                          src={imgUrl}
                           alt={capitalizeFirst(item.product.name)}
                           className="w-16 h-16 object-cover rounded flex-shrink-0"
                         />

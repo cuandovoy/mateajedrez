@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useToastStore } from '@/store/toastStore'
-import { capitalizeFirst, formatPrice, getTransformedImageUrl } from '@/lib/utils'
+import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone, Download, AlertCircle, Clock, RefreshCw, MessageCircle } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
 
@@ -471,7 +471,7 @@ export function OrderConfirmation() {
                     <div className="w-16 h-16 rounded bg-gray-100 flex-shrink-0 overflow-hidden">
                       {displayImage ? (
                         <img
-                          src={getTransformedImageUrl(displayImage, { width: 128, height: 128 }) ?? displayImage}
+                          src={displayImage}
                           alt={capitalizeFirst(item.product.name)}
                           className="w-full h-full object-cover"
                         />

@@ -3,7 +3,7 @@ import { ShoppingCart, Package } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
 import { Button } from '@/components/ui/Button'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
-import { capitalizeFirst, cn, formatPrice, getTransformedImageUrl, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
+import { capitalizeFirst, cn, formatPrice, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import type { Product, ProductImage } from '@/types'
 import { useState, useEffect } from 'react'
@@ -95,7 +95,7 @@ export function ProductCard({
             {currentImageUrl ? (
               <img
                 key={currentImageIndex}
-                src={getTransformedImageUrl(currentImageUrl, { width: 500, height: 500 }) ?? currentImageUrl}
+                src={currentImageUrl}
                 alt={capitalizeFirst(product.name)}
                 loading="lazy"
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
