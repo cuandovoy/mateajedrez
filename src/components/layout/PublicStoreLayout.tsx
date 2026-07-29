@@ -23,12 +23,12 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
           (que siguen ahí como fallback para crawlers que no ejecutan JS).
           Cualquier <Helmet> de una página hija pisa estos tags puntuales. */}
       <Helmet>
-        <title>Ruemia — Mates artesanales</title>
+        <title>RUEMIA — Mates artesanales</title>
         <meta
           name="description"
           content="Mates artesanales de cuero y detalles bordados, hechos en Uruguay. Las piezas con historia merecen ser parte de nuevos momentos."
         />
-        <meta property="og:title" content="Ruemia — Mates artesanales" />
+        <meta property="og:title" content="RUEMIA — Mates artesanales" />
         <meta
           property="og:description"
           content="Mates artesanales de cuero y detalles bordados, hechos en Uruguay. Las piezas con historia merecen ser parte de nuevos momentos."

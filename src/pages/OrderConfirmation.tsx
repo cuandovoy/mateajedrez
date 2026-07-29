@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useToastStore } from '@/store/toastStore'
+import { isCouponDiscountMetadata } from '@/lib/coupons'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone, Download, AlertCircle, Clock, RefreshCw, MessageCircle } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
@@ -23,7 +24,7 @@ const getStatusLabel = (status: string | null): string => {
 }
 
 interface OrderWithItems extends Order {
-  payment_method: 'transfer' | 'mercadopago' | 'cash'
+  payment_method: 'transfer' | 'mercadopago' | 'cash' | null
   organization?: {
     settings?: Record<string, unknown> | null
   } | null
@@ -173,6 +174,18 @@ export function OrderConfirmation() {
         `Hola! Quiero coordinar mi orden ${orderRef}`
       )}`
     : null
+  const couponDiscountMetadata = order && isCouponDiscountMetadata(order.discount_metadata)
+    ? order.discount_metadata
+    : null
+  const hasCouponDiscount = !!order && order.discount_total > 0
+  const couponLabel = couponDiscountMetadata?.code ?? 'Cupón'
+  const paymentMethodLabel = order
+    ? (order.total === 0
+        ? order.payment_method === 'mercadopago'
+          ? 'Mercado Pago (sin pago requerido)'
+          : 'Sin pago requerido'
+        : PAYMENT_METHOD_LABELS[order.payment_method ?? ''] ?? capitalizeFirst(order.payment_method ?? ''))
+    : ''
 
   const handleDownloadReceipt = () => {
     if (!order) return
@@ -197,6 +210,22 @@ export function OrderConfirmation() {
           </tr>`
       })
       .join('')
+
+    const summaryRowsHtml = `
+        <tr>
+          <td colspan="3" style="padding-top:12px;">Subtotal</td>
+          <td style="padding-top:12px;text-align:right;">${formatPrice(order.subtotal_before_discount ?? order.total, settings)}</td>
+        </tr>
+        ${hasCouponDiscount ? `
+        <tr>
+          <td colspan="3" style="padding-top:8px;color:#166534;">${couponLabel}</td>
+          <td style="padding-top:8px;text-align:right;color:#166534;">-${formatPrice(order.discount_total, settings)}</td>
+        </tr>
+        ` : ''}
+        <tr class="total-row">
+          <td colspan="3">Total</td>
+          <td>${formatPrice(order.total, settings)}</td>
+        </tr>`
 
     const addressHtml = addr
       ? `<p style="margin:2px 0;">${addr.fullName ?? ''}</p>
@@ -259,17 +288,14 @@ export function OrderConfirmation() {
       </thead>
       <tbody>
         ${itemsHtml}
-        <tr class="total-row">
-          <td colspan="3">Total</td>
-          <td>${formatPrice(order.total, settings)}</td>
-        </tr>
+        ${summaryRowsHtml}
       </tbody>
     </table>
   </div>
 
   <div class="section">
     <h2>Pago</h2>
-    <p>${order.payment_method === 'transfer' ? 'Transferencia bancaria' : order.payment_method === 'mercadopago' ? 'Mercado Pago' : capitalizeFirst(order.payment_method ?? '')}</p>
+    <p>${paymentMethodLabel}</p>
     <p style="margin-top:4px;color:#6b7280;">Estado: ${getStatusLabel(order.status)}</p>
   </div>
 
@@ -328,7 +354,19 @@ export function OrderConfirmation() {
           </div>
         )}
 
-        {order.payment_method === 'mercadopago' && order.status === 'processing' && (
+        {hasCouponDiscount && order.total === 0 && (
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-semibold text-emerald-800">El cupón cubrió el total</p>
+              <p className="text-sm text-emerald-700 mt-0.5">
+                No necesitás realizar ningún pago. Tu orden fue creada correctamente sin pasar por Mercado Pago.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {order.payment_method === 'mercadopago' && order.total > 0 && order.status === 'processing' && (
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
             <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 mt-0.5" />
             <div className="flex-1">
@@ -340,7 +378,7 @@ export function OrderConfirmation() {
           </div>
         )}
 
-        {order.payment_method === 'mercadopago' && order.status === 'pending' && mpStatus !== 'failure' && (
+        {order.payment_method === 'mercadopago' && order.total > 0 && order.status === 'pending' && mpStatus !== 'failure' && (
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
             <Clock className="h-5 w-5 shrink-0 text-yellow-600 mt-0.5" />
             <div className="flex-1 min-w-0">
@@ -381,27 +419,44 @@ export function OrderConfirmation() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-600">Estado</p>
                 <p className="font-semibold">{getStatusLabel(order.status)}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Total</p>
-                <p className="font-semibold text-lg" style={{ color: primaryColor }}>
-                  {formatPrice(order.total, settings)}
-                </p>
+                <p className="text-sm text-gray-600">Subtotal</p>
+                <p className="font-semibold">{formatPrice(order.subtotal_before_discount ?? order.total, settings)}</p>
               </div>
             </div>
 
-            {order.payment_method && (
-              <div className="border-t pt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">Método de Pago</p>
-                <p className="text-sm text-gray-600">
-                  {PAYMENT_METHOD_LABELS[order.payment_method] ?? capitalizeFirst(order.payment_method)}
-                </p>
+            {hasCouponDiscount && (
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex items-center justify-between gap-4 text-sm">
+                  <p className="font-medium text-gray-700">{couponLabel}</p>
+                  <p className="font-semibold text-emerald-700">-{formatPrice(order.discount_total, settings)}</p>
+                </div>
+                {couponDiscountMetadata?.applied_at && (
+                  <p className="text-xs text-gray-500">
+                    Aplicado el {new Date(couponDiscountMetadata.applied_at).toLocaleString('es-UY')}
+                  </p>
+                )}
               </div>
             )}
+
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium text-gray-700 mb-2">Método de Pago</p>
+              <p className="text-sm text-gray-600">
+                {paymentMethodLabel}
+              </p>
+            </div>
+
+            <div className="border-t pt-4">
+              <p className="text-sm text-gray-600">Total</p>
+              <p className="font-semibold text-lg" style={{ color: primaryColor }}>
+                {formatPrice(order.total, settings)}
+              </p>
+            </div>
 
             {order.shipping_address && (() => {
               const shipping = order.shipping_address as {

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { buildCouponDiscountMetadata, calculateCouponDiscountAmount, normalizeCouponCode } from '@/lib/coupons'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
@@ -23,6 +24,7 @@ import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, Truck } from '
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
+import type { StoreCoupon } from '@/types'
 
 // Icon map for known payment method keys
 const PAYMENT_METHOD_ICONS: Record<string, React.ReactNode> = {
@@ -53,6 +55,11 @@ function CheckoutInner() {
   const checkoutStockAllocationMode = settings.checkout_stock_allocation_mode === 'manual' ? 'manual' : 'immediate'
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<string>('')
+  const [couponCode, setCouponCode] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<StoreCoupon | null>(null)
+  const [couponLoading, setCouponLoading] = useState(false)
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const [couponSuccess, setCouponSuccess] = useState<string | null>(null)
   const [billerConfig, setBillerConfig] = useState<BillerConfig | null>(null)
   const [billerState, setBillerState] = useState<CheckoutBillerState>({
     emitirCFE: false,
@@ -167,6 +174,79 @@ function CheckoutInner() {
       setPaymentMethod(firstEnabled)
     }
   }, [paymentMethods, mainBranchId, paymentMethod])
+
+  const subtotal = getTotal()
+  const discountTotal = appliedCoupon
+    ? calculateCouponDiscountAmount(appliedCoupon.kind, appliedCoupon.amount, subtotal)
+    : 0
+  const finalTotal = Math.max(0, subtotal - discountTotal)
+  const paymentMethodRequired = finalTotal > 0
+
+  const fetchValidatedCoupon = async (normalizedCode: string): Promise<StoreCoupon | null> => {
+    const rpcAttempts = [
+      { p_organization_id: organizationId, p_code: normalizedCode },
+      { organization_id: organizationId, code: normalizedCode },
+    ]
+
+    for (const [index, rpcArgs] of rpcAttempts.entries()) {
+      const { data, error } = await supabase.rpc('validate_store_coupon' as never, rpcArgs as never)
+
+      if (error) {
+        if (index < rpcAttempts.length - 1) {
+          continue
+        }
+        throw error
+      }
+
+      const coupon = Array.isArray(data) ? data[0] : data
+      return (coupon ?? null) as StoreCoupon | null
+    }
+
+    return null
+  }
+
+  const handleApplyCoupon = async () => {
+    const normalizedCode = normalizeCouponCode(couponCode)
+    if (!normalizedCode) {
+      setCouponError('Ingresá un código de cupón')
+      setCouponSuccess(null)
+      return
+    }
+
+    if (!organizationId) {
+      setCouponError('No se pudo determinar la organización')
+      setCouponSuccess(null)
+      return
+    }
+
+    setCouponLoading(true)
+    setCouponError(null)
+    setCouponSuccess(null)
+
+    try {
+      const coupon = await fetchValidatedCoupon(normalizedCode)
+      if (!coupon) {
+        setCouponError('El cupón no es válido o ya venció')
+        return
+      }
+
+      setAppliedCoupon(coupon)
+      setCouponCode(coupon.code)
+      setCouponSuccess(`Cupón ${coupon.code} aplicado`)
+    } catch (error) {
+      console.error('Error validating coupon:', error)
+      setCouponError('No se pudo validar el cupón. Intentá nuevamente.')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponCode('')
+    setCouponError(null)
+    setCouponSuccess(null)
+  }
 
   const validateStockForBranch = async (branchId: string): Promise<string[]> => {
     const stockIssues: string[] = []
@@ -324,7 +404,9 @@ function CheckoutInner() {
     }
 
     const availableMethods = paymentMethods.filter((m) => !m.requires_cash_session || mainBranchId)
-    const isPaymentMethodValid = availableMethods.length > 0 && !!paymentMethod && availableMethods.some((m) => m.key === paymentMethod)
+    const isPaymentMethodValid = !paymentMethodRequired || (
+      availableMethods.length > 0 && !!paymentMethod && availableMethods.some((m) => m.key === paymentMethod)
+    )
     if (!isPaymentMethodValid) {
       setPaymentMethodError('Seleccioná un método de pago')
       show('Selecciona un método de pago válido', 'error')
@@ -380,7 +462,12 @@ function CheckoutInner() {
         return
       }
 
-      const total = getTotal()
+      const pricingSubtotal = getTotal()
+      const pricingDiscountTotal = appliedCoupon
+        ? calculateCouponDiscountAmount(appliedCoupon.kind, appliedCoupon.amount, pricingSubtotal)
+        : 0
+      const pricingTotal = Math.max(0, pricingSubtotal - pricingDiscountTotal)
+      const orderPaymentMethod = paymentMethod || null
       const contactInfo = {
         fullName: formValues.fullName,
         email: formValues.email,
@@ -402,10 +489,15 @@ function CheckoutInner() {
         organization_id: organizationId,
         user_id: user?.id || null,
         customer_id: null, // Will be set after creating customer
-        total,
+        subtotal_before_discount: pricingSubtotal,
+        discount_total: pricingDiscountTotal,
+        discount_metadata: appliedCoupon
+          ? buildCouponDiscountMetadata(appliedCoupon, pricingDiscountTotal)
+          : null,
+        total: pricingTotal,
         status: (checkoutStockAllocationMode === 'manual' ? 'pending_allocation' : 'pending') as Order['status'],
         shipping_address: contactInfo,
-        payment_method: paymentMethod,
+        payment_method: orderPaymentMethod,
         branch_id: fulfillmentBranchId, // Auto-assigned to a branch that can fulfill this order
       } as any
 
@@ -526,7 +618,7 @@ function CheckoutInner() {
       // -----------------------------------------------------------------------
       // Mercado Pago: create preference and redirect — skip remaining steps
       // -----------------------------------------------------------------------
-      if (paymentMethod === 'mercadopago') {
+      if (paymentMethod === 'mercadopago' && pricingTotal > 0) {
         const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-mp-preference`
         const { data: { session } } = await supabase.auth.getSession()
         const mpRes = await fetch(fnUrl, {
@@ -572,46 +664,48 @@ function CheckoutInner() {
         }
       }
 
-      const { error: paymentError } = await supabase
-        .from('order_payments')
-        .insert({
-          order_id: (order as { id: string }).id,
-          payment_method: paymentMethod,
-          amount: total,
-          cash_session_id: cashSessionId,
-        } as any)
-
-      if (paymentError) {
-        console.error('Error creating order payment:', paymentError)
-        // Don't fail the order if payment record fails, but log it
-      } else if (cashSessionId) {
-        // Update expected_amount for the cash session
-        // Calculate: opening_amount + sum of cash payments
-        const { data: sessionData } = await supabase
-          .from('cash_sessions')
-          .select('opening_amount')
-          .eq('id', cashSessionId)
-          .maybeSingle()
-
-        const { data: paymentsData } = await supabase
+      if (orderPaymentMethod) {
+        const { error: paymentError } = await supabase
           .from('order_payments')
-          .select('amount')
-          .eq('cash_session_id', cashSessionId)
-          .eq('payment_method', paymentMethod)
+          .insert({
+            order_id: (order as { id: string }).id,
+            payment_method: orderPaymentMethod,
+            amount: pricingTotal,
+            cash_session_id: cashSessionId,
+          } as any)
 
-        if (sessionData) {
-          const session = sessionData as { opening_amount: number }
-          const payments = (paymentsData || []) as Array<{ amount: number }>
-          const cashPaymentsTotal = payments.reduce(
-            (sum, p) => sum + p.amount,
-            0
-          )
-          const newExpectedAmount = (session.opening_amount || 0) + cashPaymentsTotal
-
-          await supabase
+        if (paymentError) {
+          console.error('Error creating order payment:', paymentError)
+          // Don't fail the order if payment record fails, but log it
+        } else if (cashSessionId) {
+          // Update expected_amount for the cash session
+          // Calculate: opening_amount + sum of cash payments
+          const { data: sessionData } = await supabase
             .from('cash_sessions')
-            .update({ expected_amount: newExpectedAmount } as never)
+            .select('opening_amount')
             .eq('id', cashSessionId)
+            .maybeSingle()
+
+          const { data: paymentsData } = await supabase
+            .from('order_payments')
+            .select('amount')
+            .eq('cash_session_id', cashSessionId)
+            .eq('payment_method', orderPaymentMethod)
+
+          if (sessionData) {
+            const session = sessionData as { opening_amount: number }
+            const payments = (paymentsData || []) as Array<{ amount: number }>
+            const cashPaymentsTotal = payments.reduce(
+              (sum, p) => sum + p.amount,
+              0
+            )
+            const newExpectedAmount = (session.opening_amount || 0) + cashPaymentsTotal
+
+            await supabase
+              .from('cash_sessions')
+              .update({ expected_amount: newExpectedAmount } as never)
+              .eq('id', cashSessionId)
+          }
         }
       }
 
@@ -631,7 +725,7 @@ function CheckoutInner() {
             {
               id: (order as { id: string }).id,
               organization_id: organizationId!,
-              payment_method: paymentMethod,
+              payment_method: orderPaymentMethod,
               items: orderItemsForBiller,
             },
             billerState,
@@ -664,8 +758,6 @@ function CheckoutInner() {
       setLoading(false)
     }
   }
-
-  const subtotal = getTotal()
 
   return (
     <div className="container-custom py-8">
@@ -740,11 +832,78 @@ function CheckoutInner() {
                   )
                 })}
               </div>
-              <div className="border-t pt-4">
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
-                  <span>{formatPrice(subtotal, settings)}</span>
+              <div className="border-t pt-4 space-y-3">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Subtotal</span>
+                    <span>{formatPrice(subtotal, settings)}</span>
+                  </div>
+                  {appliedCoupon && discountTotal > 0 && (
+                    <div className="flex justify-between text-emerald-700">
+                      <span className="flex items-center gap-2">
+                        Cupón {appliedCoupon.code}
+                        <button
+                          type="button"
+                          onClick={handleRemoveCoupon}
+                          className="text-xs font-medium underline underline-offset-2 hover:text-emerald-900"
+                        >
+                          Quitar
+                        </button>
+                      </span>
+                      <span>-{formatPrice(discountTotal, settings)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-dashed border-gray-200">
+                    <span>Total</span>
+                    <span>{formatPrice(finalTotal, settings)}</span>
+                  </div>
                 </div>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault()
+                    void handleApplyCoupon()
+                  }}
+                  className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
+                >
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
+                      Cupón de descuento
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={couponCode}
+                        onChange={(event) => {
+                          setCouponCode(event.target.value)
+                          setCouponError(null)
+                          setCouponSuccess(null)
+                        }}
+                        placeholder="INGRESÁ TU CÓDIGO"
+                        autoComplete="off"
+                        spellCheck={false}
+                        className="uppercase"
+                      />
+                      <Button
+                        type="submit"
+                        variant="outline"
+                        disabled={couponLoading}
+                        className="shrink-0"
+                      >
+                        {couponLoading ? 'Validando...' : 'Aplicar'}
+                      </Button>
+                    </div>
+                  </div>
+                  {couponError && (
+                    <p className="text-xs text-red-500">{couponError}</p>
+                  )}
+                  {couponSuccess && (
+                    <p className="text-xs text-emerald-700">{couponSuccess}</p>
+                  )}
+                  {finalTotal === 0 && discountTotal > 0 && (
+                    <p className="text-xs text-emerald-700">
+                      El cupón cubre el total de la orden. No necesitás pagar con Mercado Pago.
+                    </p>
+                  )}
+                </form>
               </div>
             </CardContent>
           </Card>
@@ -863,8 +1022,13 @@ function CheckoutInner() {
                 {/* Payment Method Selection */}
                 <div className="pt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Método de Pago <span className="text-red-500">*</span>
+                    Método de Pago {paymentMethodRequired && <span className="text-red-500">*</span>}
                   </label>
+                  {!paymentMethodRequired && discountTotal > 0 && (
+                    <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                      El cupón cubre el total de la orden. Elegir un método de pago es opcional.
+                    </div>
+                  )}
                   <div className="space-y-3">
                     {paymentMethodsLoading ? (
                       <>

@@ -236,6 +236,7 @@ export function PublicStore() {
                   fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`,
                   letterSpacing: '0.05em',
                   textShadow: hasCoverImages ? '0 1px 3px rgba(0,0,0,0.25)' : undefined,
+                  textTransform: 'uppercase',
                 }}
               >
                 {organization.name}

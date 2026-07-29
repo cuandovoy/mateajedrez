@@ -15,7 +15,7 @@ export type {
   AuditLog, AuditLogInsert, AuditLogUpdate,
   InventoryMovement, InventoryMovementInsert, InventoryMovementUpdate,
   InventoryTransfer, InventoryTransferInsert, InventoryTransferUpdate,
-  OrganizationMember,
+  OrganizationMember, StoreCoupon, StoreCouponInsert, StoreCouponUpdate,
 } from './database.types'
 
 /**

@@ -9,6 +9,7 @@ import { ChevronDown, Menu, Minus, Plus, Search, ShoppingCart, X } from 'lucide-
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import logoIsotipo from '@/brand/isotipo-cropped.png'
+import logoIsoPrincipal from '@/brand/ruemia-logo-horizontal.png'
 
 interface PublicStoreHeaderProps {
   organization: Organization
@@ -502,8 +503,7 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
 
           {/* Center logo — isotipo compacto + nombre, ya que el monograma solo no identifica la marca */}
           <Link to="/" onClick={closeAll} className="flex-1 flex justify-center items-center gap-2">
-            <img src={logoIsotipo} alt={organization.name} className="h-12 w-12 rounded-lg object-contain" />
-            <span className="text-[var(--org-primary-ink,white)] font-semibold text-base">{organization.name}</span>
+            <img src={logoIsoPrincipal} alt={organization.name} className="h-24 w-24 rounded-lg object-contain" />
           </Link>
 
           {/* Right */}

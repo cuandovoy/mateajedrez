@@ -152,7 +152,7 @@ export type Database = {
           id: string
           is_isolated_warehouse: boolean
           is_active: boolean | null
-          kind: string
+          kind: 'store' | 'warehouse' | 'seller'
           name: string
           notes: string | null
           organization_id: string
@@ -173,7 +173,7 @@ export type Database = {
           id?: string
           is_isolated_warehouse?: boolean
           is_active?: boolean | null
-          kind?: string
+          kind?: 'store' | 'warehouse' | 'seller'
           name: string
           notes?: string | null
           organization_id: string
@@ -195,7 +195,7 @@ export type Database = {
           id?: string
           is_isolated_warehouse?: boolean
           is_active?: boolean | null
-          kind?: string
+          kind?: 'store' | 'warehouse' | 'seller'
           name?: string
           notes?: string | null
           organization_id?: string
@@ -1022,6 +1022,53 @@ export type Database = {
           },
         ]
       }
+      store_coupons: {
+        Row: {
+          amount: number
+          code: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          kind: 'fixed_amount' | 'percentage'
+          organization_id: string
+          updated_at: string
+          valid_until: string
+        }
+        Insert: {
+          amount: number
+          code: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: 'fixed_amount' | 'percentage'
+          organization_id: string
+          updated_at?: string
+          valid_until: string
+        }
+        Update: {
+          amount?: number
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: 'fixed_amount' | 'percentage'
+          organization_id?: string
+          updated_at?: string
+          valid_until?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_coupons_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           accent_color: string | null
@@ -1029,6 +1076,7 @@ export type Database = {
           button_style: string | null
           cover_image_url: string | null
           created_at: string | null
+          custom_domain: string | null
           deleted_at: string | null
           font_family: string | null
           font_heading: string | null
@@ -1051,6 +1099,7 @@ export type Database = {
           button_style?: string | null
           cover_image_url?: string | null
           created_at?: string | null
+          custom_domain?: string | null
           font_family?: string | null
           font_heading?: string | null
           id?: string
@@ -1072,6 +1121,7 @@ export type Database = {
           button_style?: string | null
           cover_image_url?: string | null
           created_at?: string | null
+          custom_domain?: string | null
           deleted_at?: string | null
           font_family?: string | null
           font_heading?: string | null
@@ -2109,6 +2159,9 @@ export type OrganizationMemberUpdate = TablesUpdate<'organization_members'>
 export type OrganizationPaymentMethod = Tables<'organization_payment_methods'>
 export type OrganizationPaymentMethodInsert = TablesInsert<'organization_payment_methods'>
 export type OrganizationPaymentMethodUpdate = TablesUpdate<'organization_payment_methods'>
+export type StoreCoupon = Tables<'store_coupons'>
+export type StoreCouponInsert = TablesInsert<'store_coupons'>
+export type StoreCouponUpdate = TablesUpdate<'store_coupons'>
 export type OrganizationSettings = {
   currency?: string | null
   locale?: string | null

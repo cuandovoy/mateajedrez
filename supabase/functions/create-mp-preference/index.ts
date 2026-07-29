@@ -104,6 +104,12 @@ Deno.serve(async (req) => {
     }
 
     const typedOrder = order as unknown as Order
+    if ((typedOrder.total ?? 0) <= 0) {
+      return new Response(JSON.stringify({ error: 'Esta orden no requiere pago con Mercado Pago' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
     // 3. Fetch org slug and currency (must come before mpItems to avoid TDZ on currencyId)
     const { data: orgRow } = await supabase
