@@ -23,6 +23,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, Truck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
+import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3'
 import { Link, useNavigate } from 'react-router-dom'
 import type { StoreCoupon } from '@/types'
 
@@ -45,7 +46,7 @@ function CheckoutInner() {
   const settings = useOrgSettings()
   const { items, loading: cartLoading, getTotal, clearCart } = useCartStore()
   const { user } = useAuthStore()
-  // const { executeRecaptcha } = useGoogleReCaptcha()
+  const { executeRecaptcha } = useGoogleReCaptcha()
   const { organization } = usePublicStore()
   const organizationId = organization.id
   const { methods: paymentMethods, loading: paymentMethodsLoading } = useOrgPaymentMethods(organizationId)
@@ -415,23 +416,23 @@ function CheckoutInner() {
     setPaymentMethodError(null)
 
     // reCAPTCHA v3 validation
-    // if (executeRecaptcha) {
-    //   try {
-    //     const token = await executeRecaptcha('checkout')
-    //     const { data: captchaResult, error: captchaError } = await supabase.functions.invoke('validate-recaptcha', {
-    //       body: { token },
-    //     })
-    //     if (captchaError || !captchaResult?.success || (captchaResult.score !== null && captchaResult.score < 0.5)) {
-    //       show('Verificación de seguridad fallida. Por favor intentá de nuevo.', 'error')
-    //       return
-    //     }
-    //   } catch (error) {
-    //     console.error('Error during reCAPTCHA validation:', error)
-    //     // Si falla la verificación por error de red/config, se bloquea la orden
-    //     show('No se pudo completar la verificación de seguridad. Revisá tu conexión.', 'error')
-    //     return
-    //   }
-    // }
+    if (executeRecaptcha) {
+      try {
+        const token = await executeRecaptcha('checkout')
+        const { data: captchaResult, error: captchaError } = await supabase.functions.invoke('validate-recaptcha', {
+          body: { token },
+        })
+        if (captchaError || !captchaResult?.success || (captchaResult.score !== null && captchaResult.score < 0.5)) {
+          show('Verificación de seguridad fallida. Por favor intentá de nuevo.', 'error')
+          return
+        }
+      } catch (error) {
+        console.error('Error during reCAPTCHA validation:', error)
+        // Si falla la verificación por error de red/config, se bloquea la orden
+        show('No se pudo completar la verificación de seguridad. Revisá tu conexión.', 'error')
+        return
+      }
+    }
 
     setLoading(true)
 
@@ -1136,10 +1137,10 @@ function CheckoutInner() {
 }
 
 export function Checkout() {
-  // const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY ?? ''
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY ?? ''
   return (
-    // <GoogleReCaptchaProvider reCaptchaKey={siteKey}>
-    // </GoogleReCaptchaProvider>
+    <GoogleReCaptchaProvider reCaptchaKey={siteKey}>
       <CheckoutInner />
+    </GoogleReCaptchaProvider>
   )
 }

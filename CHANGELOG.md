@@ -4,6 +4,12 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-08-03 — Reactivación de reCAPTCHA v3 en Checkout
+
+- **Archivos modificados:** `src/pages/Checkout.tsx`, `.env`, `package.json`, `yarn.lock`
+- **Qué cambió:** se restauró la integración de reCAPTCHA v3 invisible en el checkout, que había sido implementada el 2026-06-01 (`17f620c`) y deshabilitada 11 días después junto a un commit de fixes de estilos, sin justificación registrada — incluyendo la desinstalación del paquete `react-google-recaptcha-v3` y la remoción de `VITE_RECAPTCHA_SITE_KEY` del `.env` activo. Se reinstaló el paquete, se restauró la site key (reutilizando el par existente, ya que el dominio no cambió) y se descomentó el flujo: `GoogleReCaptchaProvider` envolviendo el checkout, `executeRecaptcha('checkout')` antes de crear la orden, validación server-side contra la Edge Function `validate-recaptcha` (ya deployada y con `RECAPTCHA_SECRET_KEY` configurado en Supabase — no requirió cambios). Un score menor a 0.5 bloquea la creación de la orden.
+- **Verificación:** `tsc --noEmit` limpio, 94/94 tests. No se pudo verificar visualmente en navegador (extensión de Chrome no conectada en esta sesión) — pendiente prueba manual del flujo de checkout end-to-end.
+
 ## 2026-07-25 — Lote de 13 mejoras visuales/UX en la tienda pública
 
 - **Archivos modificados:** `src/components/features/CheckoutSteps.tsx` (nuevo), `src/components/layout/PublicStoreHeader.tsx`, `src/pages/ProductDetail.tsx`, `src/pages/Products.tsx`, `src/pages/PublicStore.tsx`, `src/components/features/CategoryCard.tsx`, `src/pages/Cart.tsx`, `src/components/features/VariantSelector.tsx`, `src/pages/CategoryProducts.tsx`, `src/components/layout/Footer.tsx`, `src/components/ui/Skeleton.tsx`, `src/components/layout/PublicStoreWrapper.tsx`, `src/App.tsx`, `src/pages/Checkout.tsx`, `src/pages/OrderConfirmation.tsx`, `.claude/TODO.md`
