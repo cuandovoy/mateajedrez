@@ -2169,6 +2169,7 @@ export type OrganizationSettings = {
   decimal_places?: number | null
   default_low_stock_threshold?: number | null
   transfer_contact_phone?: string | null
+  transfer_contact_email?: string | null
   consignment_enabled?: boolean | null
   consignment_allow_seller_to_seller?: boolean | null
   consignment_default_warehouse_branch_id?: string | null
