@@ -343,6 +343,7 @@ export function OrderConfirmation() {
       </div>
     )
   }
+console.log(transferContactPhone);
 
   return (
     <div className="container-custom py-8">
