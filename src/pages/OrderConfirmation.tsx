@@ -116,8 +116,9 @@ export function OrderConfirmation() {
             ? transferConfig.transfer_instructions
             : ''
         setTransferInstructions(instructions)
-
+        
         const orgSettings = (orderData.organization?.settings || {}) as Record<string, unknown>
+        console.log("orgSettings: ", orgSettings);
         const contactPhone =
           typeof orgSettings.transfer_contact_phone === 'string'
             ? orgSettings.transfer_contact_phone.trim()
@@ -343,7 +344,7 @@ export function OrderConfirmation() {
       </div>
     )
   }
-console.log(transferContactPhone);
+console.log("Datos: ", transferContactPhone, transferContactEmail);
 
   return (
     <div className="container-custom py-8">
