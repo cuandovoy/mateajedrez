@@ -25,10 +25,7 @@ const getStatusLabel = (status: string | null): string => {
 
 interface OrderWithItems extends Order {
   payment_method: 'transfer' | 'mercadopago' | 'cash' | null
-  organization?: {
-    settings?: Record<string, unknown> | null
-  } | null
-  order_items: Array<OrderItem & { 
+  order_items: Array<OrderItem & {
     product: { name: string; image_url: string | null }
     variant?: { 
       id: string
@@ -47,6 +44,9 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   credit_card:  'Tarjeta de Crédito',
 }
 
+const TRANSFER_CONTACT_EMAIL = 'ruemia20@gmail.com'
+const TRANSFER_CONTACT_PHONE = '+59898839561'
+
 export function OrderConfirmation() {
   const { orderId } = useParams<{ orderId: string }>()
   const [searchParams] = useSearchParams()
@@ -55,8 +55,6 @@ export function OrderConfirmation() {
   const primaryColor = 'var(--org-primary-color, #46362B)'
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [transferInstructions, setTransferInstructions] = useState<string>('')
-  const [transferContactPhone, setTransferContactPhone] = useState<string>('')
-  const [transferContactEmail, setTransferContactEmail] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [refreshingMp, setRefreshingMp] = useState(false)
 
@@ -76,9 +74,6 @@ export function OrderConfirmation() {
         .from('orders')
         .select(`
           *,
-          organization:organizations (
-            settings
-          ),
           order_items (
             *,
             product:products (
@@ -116,24 +111,8 @@ export function OrderConfirmation() {
             ? transferConfig.transfer_instructions
             : ''
         setTransferInstructions(instructions)
-        
-        const orgSettings = (orderData.organization?.settings || {}) as Record<string, unknown>
-        console.log("orgSettings: ", orgSettings);
-        const contactPhone =
-          typeof orgSettings.transfer_contact_phone === 'string'
-            ? orgSettings.transfer_contact_phone.trim()
-            : ''
-        setTransferContactPhone(contactPhone)
-
-        const contactEmail =
-          typeof orgSettings.transfer_contact_email === 'string'
-            ? orgSettings.transfer_contact_email.trim()
-            : ''
-        setTransferContactEmail(contactEmail)
       } else {
         setTransferInstructions('')
-        setTransferContactPhone('')
-        setTransferContactEmail('')
       }
     } catch (error) {
       console.error('Error fetching order:', error)
@@ -170,8 +149,7 @@ export function OrderConfirmation() {
     }
   }
 
-  const whatsappDigits = transferContactPhone.replace(/\D/g, '')
-  const whatsappHref = whatsappDigits ? `https://wa.me/${whatsappDigits}` : ''
+  const whatsappHref = `https://wa.me/${TRANSFER_CONTACT_PHONE.replace(/\D/g, '')}`
 
   const orderRef = order
     ? order.order_number
@@ -273,7 +251,7 @@ export function OrderConfirmation() {
 <body>
   <div class="header">
     <div>
-      <div class="org-name">${order.organization ? '' : ''}Comprobante de compra</div>
+      <div class="org-name">Comprobante de compra</div>
       <div style="color:#6b7280;margin-top:4px;">Orden ${orderRef} · ${createdAt}</div>
     </div>
     <div class="badge">✓ Confirmada</div>
@@ -344,8 +322,6 @@ export function OrderConfirmation() {
       </div>
     )
   }
-console.log("Datos: ", transferContactPhone, transferContactEmail);
-
   return (
     <div className="container-custom py-8">
       <div className="max-w-3xl mx-auto">
@@ -617,39 +593,23 @@ console.log("Datos: ", transferContactPhone, transferContactEmail);
                     <p className="text-sm font-medium text-yellow-900 mb-1">
                       Envía el comprobante de transferencia
                     </p>
-                    {transferContactPhone || transferContactEmail ? (
-                      <>
-                        <p className="text-sm text-yellow-800">
-                          Por favor, envía una foto del comprobante de pago a este correo o WhatsApp:
-                        </p>
-                        <div className="mt-2 space-y-1">
-                          {transferContactEmail && (
-                            <p className="flex items-center gap-2 text-sm font-semibold" style={{ color: primaryColor }}>
-                              <Mail className="h-4 w-4 shrink-0" />
-                              <a href={`mailto:${transferContactEmail}`} className="hover:underline">
-                                {transferContactEmail}
-                              </a>
-                            </p>
-                          )}
-                          {transferContactPhone && (
-                            <p className="flex items-center gap-2 text-sm font-semibold" style={{ color: primaryColor }}>
-                              <Phone className="h-4 w-4 shrink-0" />
-                              {whatsappHref ? (
-                                <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                  {transferContactPhone}
-                                </a>
-                              ) : (
-                                transferContactPhone
-                              )}
-                            </p>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-sm text-yellow-800">
-                        Esta organización no configuró un contacto para comprobantes.
+                    <p className="text-sm text-yellow-800">
+                      Por favor, envía una foto del comprobante de pago a este correo o WhatsApp:
+                    </p>
+                    <div className="mt-2 space-y-1">
+                      <p className="flex items-center gap-2 text-sm font-semibold" style={{ color: primaryColor }}>
+                        <Mail className="h-4 w-4 shrink-0" />
+                        <a href={`mailto:${TRANSFER_CONTACT_EMAIL}`} className="hover:underline">
+                          {TRANSFER_CONTACT_EMAIL}
+                        </a>
                       </p>
-                    )}
+                      <p className="flex items-center gap-2 text-sm font-semibold" style={{ color: primaryColor }}>
+                        <Phone className="h-4 w-4 shrink-0" />
+                        <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                          {TRANSFER_CONTACT_PHONE}
+                        </a>
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
