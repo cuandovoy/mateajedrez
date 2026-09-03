@@ -45,7 +45,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 }
 
 const TRANSFER_CONTACT_EMAIL = 'ruemia20@gmail.com'
-const TRANSFER_CONTACT_PHONE = '+59898839561'
 
 export function OrderConfirmation() {
   const { orderId } = useParams<{ orderId: string }>()
@@ -149,7 +148,6 @@ export function OrderConfirmation() {
     }
   }
 
-  const whatsappHref = `https://wa.me/${TRANSFER_CONTACT_PHONE.replace(/\D/g, '')}`
 
   const orderRef = order
     ? order.order_number
@@ -601,12 +599,6 @@ export function OrderConfirmation() {
                         <Mail className="h-4 w-4 shrink-0" />
                         <a href={`mailto:${TRANSFER_CONTACT_EMAIL}`} className="hover:underline">
                           {TRANSFER_CONTACT_EMAIL}
-                        </a>
-                      </p>
-                      <p className="flex items-center gap-2 text-sm font-semibold" style={{ color: primaryColor }}>
-                        <Phone className="h-4 w-4 shrink-0" />
-                        <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                          {TRANSFER_CONTACT_PHONE}
                         </a>
                       </p>
                     </div>
