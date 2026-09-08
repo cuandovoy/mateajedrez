@@ -20,7 +20,7 @@ import type { CartItemWithProduct, Order, ProductImage } from '@/types'
 import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { BranchInventory, Customer } from '@/types/database.types'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, Truck } from 'lucide-react'
+import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, MapPin, Truck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3'
@@ -74,6 +74,7 @@ function CheckoutInner() {
     handleSubmit: handleFormSubmit,
     setValue,
     getValues,
+    watch,
     formState: { errors },
   } = useForm<CheckoutFormData>({
     resolver: zodResolver(checkoutSchema),
@@ -1017,6 +1018,16 @@ function CheckoutInner() {
                         )}
                       </div>
                     </div>
+
+                    {watch('department') === 'Paysandú' && (
+                      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                        <MapPin className="h-5 w-5 shrink-0 mt-0.5" />
+                        <p>
+                          Para Paysandú, el retiro se realiza en el local <strong>Mate Ajedrez</strong>.
+                          Te notificaremos cuando el pedido esté listo para retirar.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
