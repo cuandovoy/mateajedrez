@@ -54,24 +54,22 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
-    <!-- Structured Data (JSON-LD) -->
+    <!-- Structured Data (JSON-LD) — un único bloque Organization (antes había
+         dos duplicados con distinto `logo` y sin `url`/`sameAs`, señal
+         ambigua para Google). `logo` usa og-image.png (1200x1200, el logo/OG
+         real) en vez de apple-touch-icon.png (180x180, solo el ícono táctil). -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "Organization",
       "name": "Ruemia",
+      "url": "https://ruemia.uy",
       "description": "Mates artesanales de cuero y detalles bordados, hechos en Uruguay.",
-      "logo": "/og-image.png"
-    }
-    </script>
-
-    <!-- Organization Schema -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      "name": "Ruemia",
-      "logo": "/apple-touch-icon.png"
+      "logo": "https://ruemia.uy/og-image.png",
+      "sameAs": [
+        "https://www.instagram.com/ruemia.uy/",
+        "https://www.facebook.com/ruemia.uy/"
+      ]
     }
     </script>
   </head>

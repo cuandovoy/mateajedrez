@@ -29,4 +29,9 @@ dist-ssr
 .env.*
 !.env.example
 scripts/*
+!scripts/generate-sitemap.ts
 exports/
+
+# sitemap.xml se genera en build-time (scripts/generate-sitemap.ts, hook
+# "prebuild" en package.json) a partir de Supabase — no se versiona.
+public/sitemap.xml

@@ -5,6 +5,7 @@ import { PublicStoreFooter } from './Footer'
 import { ShippingNoticeBanner } from './ShippingNoticeBanner'
 import { ToastContainer } from './ToastContainer'
 import { PublicStoreProvider } from '@/contexts/PublicStoreContext'
+import { absoluteUrl } from '@/lib/siteUrl'
 import type { Organization } from '@/types/database.types'
 
 interface PublicStoreLayoutProps {
@@ -33,8 +34,9 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
           property="og:description"
           content="Mates artesanales de cuero y detalles bordados, hechos en Uruguay. Las piezas con historia merecen ser parte de nuevos momentos."
         />
-        <meta property="og:image" content="/og-image.png" />
-        <link rel="canonical" href="/" />
+        <meta property="og:image" content={absoluteUrl('/og-image.png')} />
+        <meta property="og:url" content={absoluteUrl('/')} />
+        <link rel="canonical" href={absoluteUrl('/')} />
       </Helmet>
       <div className="min-h-screen flex flex-col bg-white" style={{ fontFamily: `var(--org-font-family, Cambria)` }}>
         <ShippingNoticeBanner />

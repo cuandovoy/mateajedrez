@@ -158,9 +158,9 @@ _(todos resueltos 2026-07-22 — ver Completado)_
 - 🟡 **El SEO dinámico por página (`<Helmet>`, agregado 2026-07-22) no resuelve el preview de WhatsApp/Twitter/Facebook al compartir un link** — esos crawlers no ejecutan JS, así que solo ven el HTML estático de `index.html` (siempre el mismo, genérico, para cualquier producto/categoría). Para que compartir un producto puntual muestre su foto/nombre real en el preview hace falta SSR o prerendering (ej. `vite-plugin-ssr`, prerender en build, o un proxy que sirva HTML pre-renderizado solo a bots) — es un cambio de arquitectura, no algo para resolver con Helmet solo. Decisión pendiente del usuario sobre si vale la pena para este catálogo.
 - ✅ ~~Subcategorías no aparecen como chip de filtro en `/products`~~ → **resuelto 2026-07-25**, ver Completado (home se dejó sin tocar a propósito, solo categorías padre).
 - ✅ ~~Grid de "Productos relacionados" no coincide con el estándar~~ → **resuelto 2026-07-25**, ver Completado.
-- 🟡 Sin JSON-LD `schema.org/Product` por producto (precio, disponibilidad, imagen) — el `ld+json` de `index.html` es solo de organización/sitio.
+- ✅ ~~Sin JSON-LD `schema.org/Product` por producto (precio, disponibilidad, imagen) — el `ld+json` de `index.html` es solo de organización/sitio.~~ → **resuelto 2026-09-25**, ver Completado (auditoría SEO).
 - 🟡 `loading="lazy"` solo presente en `ProductCard.tsx:100` — falta en `CategoryCard.tsx:33,41`, `PublicStore.tsx:403` (imagen "Nosotros"), `ProductDetail.tsx:317,418`, `Cart.tsx:248`, `Checkout.tsx`, `OrderConfirmation.tsx:423`.
-- 🟡 Sin ruta 404 real: `App.tsx:47` redirige cualquier ruta desconocida a `/`; un `/product/:id` inexistente cae en "Producto no encontrado" sin status semántico.
+- ✅ ~~Sin ruta 404 real: `App.tsx:47` redirige cualquier ruta desconocida a `/`; un `/product/:id` inexistente cae en "Producto no encontrado" sin status semántico.~~ → **resuelto 2026-09-25**: `src/pages/NotFound.tsx` + `noindex`, ver Completado (auditoría SEO). Nota: el caso de `/product/:id` inexistente sigue devolviendo "Producto no encontrado" con `noindex` (ya correcto desde antes, sin status HTTP real posible en un SPA sin SSR).
 - 🟡 Link de WhatsApp del footer (`https://wa.me/` sin número) roto — mismo root cause ya trackeado arriba en "Rebrand Ruemia": `store_whatsapp_number` sigue en `null`. Este es un segundo síntoma (footer) además del botón de `ProductDetail.tsx` ya anotado.
 
 ### 🟢 Baja
@@ -203,7 +203,38 @@ _(los 14 hallazgos de media prioridad de esta auditoría fueron corregidos el mi
 - 🟢 Sin validación de `priceRange.min <= priceRange.max` en los filtros de precio — un rango invertido solo da "Sin resultados" sin explicar por qué.
 - 🟢 `src/pages/Products.tsx` (350ms) vs `src/pages/CategoryProducts.tsx` (400ms) — debounce de búsqueda con timing distinto entre dos páginas casi idénticas.
 
+## Auditoría SEO — ruemia.uy (2026-09-25)
+
+Implementación del plan de acción de `seo-audit-ruemia.md` (Tier 1 y Tier 2, ver Completado). Pendiente lo que queda fuera de alcance de esta pasada:
+
+### 🟠 Alta
+
+- 🟠 **Imágenes de producto sin optimizar** (hasta 2.5 MB en JPEG, sin `width`/`height`, `Cache-Control: no-cache`) — Issue #6 del audit. Fuera de alcance de esta pasada a pedido explícito del usuario (revertido antes por él a propósito). Recomendación pendiente: transformaciones de Supabase Storage (`?width=800&quality=75&format=webp`), `width`/`height` explícitos, y `cacheControl` al subir en `src/lib/storage.ts` (o donde viva `uploadProductImage` — no encontrado en este checkout, ver Issue #6 del audit para detalle).
+- 🟠 **SSR/prerender para previews sociales** — ya trackeado arriba (2026-07-22) y confirmado de nuevo en el audit (Issue #11): WhatsApp/Twitter/Facebook no ejecutan JS y siempre ven el `index.html` genérico. Decisión de arquitectura pendiente del usuario.
+
+### 🟡 Media
+
+- 🟡 **Paginación "Cargar más" sin URL propia** (`Products.tsx`, `CategoryProducts.tsx`) — Issue #3 del audit. Mitigado por el sitemap (lista cada producto/categoría directo), pero no se cambió el patrón de paginación en sí (fuera de alcance explícito de esta tarea).
+- 🟡 **Enviar el sitemap a Google Search Console** una vez deployado — acción manual del usuario, no de código.
+- 🟡 **Verificar Rich Results** (`Product`/`BreadcrumbList` recién agregados) con la [Rich Results Test](https://search.google.com/test/rich-results) de Google contra una URL real de producción.
+
+### 🟢 Baja
+
+- 🟢 Alt text de `ProductCard.tsx` sigue siendo `{categoría} {índice}` en vez de describir el producto puntual (Issue #13 del audit) — no tocado, fuera del alcance explícito de esta tarea.
+- 🟢 Meta descriptions de producto/categoría por debajo del largo ideal (Issue #12 del audit) — depende de contenido cargado en Supabase, no de código.
+
 ## Completado ✅
+
+- ✅ 2026-09-25 — **Auditoría SEO (Tier 1 + Tier 2 de `seo-audit-ruemia.md`)**:
+  1. `public/robots.txt` (nuevo) — `Allow: /`, `Disallow` de `/admin` (no existe en este fork, agregado igual por consistencia con otros forks), `/cart`, `/checkout`, `/order-confirmation`, y `Sitemap: https://ruemia.uy/sitemap.xml`.
+  2. `scripts/generate-sitemap.ts` (nuevo, corre en `prebuild` antes de `vite build`) — genera `public/sitemap.xml` con rutas estáticas + categorías + productos activos (`is_active = true`) de la organización resuelta por `VITE_STORE_SLUG` vía `get_org_by_slug`. Fail-soft: sin env o con Supabase caído, igual escribe un sitemap con las rutas estáticas. Lógica pura (XML builder, helper de URL absoluta) en `src/lib/sitemapBuilder.ts` + `src/lib/siteUrl.ts`, con tests.
+  3. `nginx.conf` — redirect 301 `www.ruemia.uy` → `https://ruemia.uy$request_uri` (por `Host`, nginx no termina TLS acá); `robots.txt`/`sitemap.xml` servidos como archivos reales con `Content-Type` explícito, antes del fallback SPA.
+  4. Canonical y `og:url` absolutos (`src/lib/siteUrl.ts::absoluteUrl`) en `PublicStoreLayout.tsx`, `ProductDetail.tsx`, `CategoryProducts.tsx`, `Products.tsx` — antes eran relativos (`href="/product/{id}"`), ambiguos entre `www` y apex.
+  5. `src/pages/NotFound.tsx` (nuevo) — reemplaza el redirect silencioso `<Navigate to="/" />` del catch-all de `App.tsx` (soft-404). `noindex` vía Helmet, mismo patrón que "producto no encontrado" de `ProductDetail.tsx`.
+  6. JSON-LD `Product` + `BreadcrumbList` en `ProductDetail.tsx`, `BreadcrumbList` en `CategoryProducts.tsx` (builders puros en `src/lib/jsonLd.ts`, con tests). `index.html` — los dos bloques `Organization` duplicados (con distinto `logo`) se consolidaron en uno solo, con `url` y `sameAs` (Instagram/Facebook).
+  7. `Dockerfile` — bug preexistente encontrado: `node:20-alpine` no cumple `engines.node ">=22"` de `package.json` (`yarn install` fallaba). Corregido a `node:22-alpine`. Se agregaron `ARG`/`ENV` para `VITE_STORE_SLUG` y `VITE_SITE_URL` (antes no estaban declarados, así que un `--build-arg` los ignoraba en silencio).
+  - **Tradeoff documentado:** el sitemap se genera en build-time (hook `prebuild`), no en request-time — un producto nuevo cargado en Supabase no aparece en el sitemap hasta el próximo build/deploy.
+  - Validado end-to-end con `docker build` + `docker run` real (robots.txt/sitemap.xml con Content-Type correcto, redirect www→apex, SPA fallback intacto) — ver CHANGELOG.md para detalle de tests/typecheck/build.
 
 - ✅ 2026-07-25 — **Lote de 13 mejoras visuales/UX en la tienda pública** (a pedido explícito del usuario de agrupar varios ítems del backlog visual en una sola pasada, delegado a un sub-agente y verificado después):
   1. Nuevo `src/components/features/CheckoutSteps.tsx` — stepper "Carrito → Checkout → Confirmación" montado en `Cart.tsx`/`Checkout.tsx`/`OrderConfirmation.tsx`, paso activo con `var(--org-primary-color)`, no clickeable (solo indicador).

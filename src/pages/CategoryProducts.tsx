@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/Button'
 import { ArrowLeft, Search, X, PackageSearch } from 'lucide-react'
 import type { Product } from '@/types'
 import { sortByStockFirst } from '@/lib/stock'
+import { absoluteUrl } from '@/lib/siteUrl'
+import { buildBreadcrumbJsonLd } from '@/lib/jsonLd'
 
 export function CategoryProducts() {
   const { categorySlug } = useParams<{ categorySlug: string }>()
@@ -193,7 +195,11 @@ export function CategoryProducts() {
   const isFiltering = productsFetching && currentPage === 1
   const hasMore = pageData?.hasMore ?? false
   const metaDescription = `Descubrí nuestra colección de ${displayCategory.name} — artículos artesanales de Ruemia.`
-  const canonicalPath = `/categories/${categorySlug}`
+  const canonicalUrl = absoluteUrl(`/categories/${categorySlug}`)
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: 'Inicio', url: absoluteUrl('/') },
+    { name: displayCategory.name, url: canonicalUrl },
+  ])
 
   return (
     <div className="container-custom py-8">
@@ -202,7 +208,9 @@ export function CategoryProducts() {
         <meta name="description" content={metaDescription} />
         <meta property="og:title" content={`${displayCategory.name} | Ruemia`} />
         <meta property="og:description" content={metaDescription} />
-        <link rel="canonical" href={canonicalPath} />
+        <meta property="og:url" content={canonicalUrl} />
+        <link rel="canonical" href={canonicalUrl} />
+        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
       </Helmet>
 
       <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-gray-500">

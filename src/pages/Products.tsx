@@ -6,6 +6,7 @@ import { useCurrentOrganization } from '@/hooks/useCurrentOrganization'
 import { usePublicCategories } from '@/hooks/usePublicCategories'
 import { useFilteredProducts } from '@/hooks/usePublicProducts'
 import { sortByStockFirst } from '@/lib/stock'
+import { absoluteUrl } from '@/lib/siteUrl'
 import type { Product } from '@/types'
 import { Search, X, PackageSearch } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -107,7 +108,8 @@ export function Products() {
       <meta name="description" content={META_DESCRIPTION} />
       <meta property="og:title" content="Todos los productos | Ruemia" />
       <meta property="og:description" content={META_DESCRIPTION} />
-      <link rel="canonical" href="/products" />
+      <meta property="og:url" content={absoluteUrl('/products')} />
+      <link rel="canonical" href={absoluteUrl('/products')} />
     </Helmet>
   )
 

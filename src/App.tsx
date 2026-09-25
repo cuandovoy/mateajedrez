@@ -7,11 +7,12 @@ import { ProductDetail } from '@/pages/ProductDetail'
 import { Cart } from '@/pages/Cart'
 import { Checkout } from '@/pages/Checkout'
 import { OrderConfirmation } from '@/pages/OrderConfirmation'
+import { NotFound } from '@/pages/NotFound'
 import { PoliticaPrivacidad } from './pages/PoliticaPrivacidad'
 import { TerminosCondiciones } from './pages/TerminosCondiciones'
 import { useAuthStore } from '@/store/authStore'
 import { useEffect } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 function App() {
   const { initialize, loading } = useAuthStore()
@@ -40,10 +41,12 @@ function App() {
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
-        </Route>
 
-        {/* Ruta por defecto */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+          {/* Catch-all de la tienda pública: página 404 real (noindex) en vez de
+              un redirect silencioso a "/" — ver comentario en NotFound.tsx. Vive
+              dentro de PublicStoreWrapper para conservar header/footer. */}
+          <Route path="*" element={<NotFound />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   )

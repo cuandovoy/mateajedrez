@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
+    "prebuild": "node scripts/generate-sitemap.ts",
     "build": "tsc && vite build",
     "dev:laboutique": "vite --mode laboutique",
     "build:laboutique": "tsc && vite build --mode laboutique",
@@ -19,6 +20,7 @@
     "type-check": "tsc --noEmit",
     "generate-types": "node scripts/generate-types.js",
     "seed": "node scripts/seed-organizations.js",
+    "optimize-images": "node scripts/optimize-existing-images.js",
     "load-products": "node scripts/load-products-from-csv.js",
     "update-stocks-xlsx": "node scripts/update-product-stock-from-xlsx.js"
   },
@@ -53,6 +55,7 @@
     "eslint-plugin-react-refresh": "^0.4.5",
     "jsdom": "^29.0.1",
     "postcss": "^8.4.32",
+    "sharp": "^0.35.4",
     "tailwindcss": "^3.4.0",
     "terser": "^5.46.1",
     "typescript": "^5.2.2",

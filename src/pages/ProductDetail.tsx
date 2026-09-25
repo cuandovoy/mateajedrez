@@ -7,6 +7,8 @@ import { useProductVariants } from '@/hooks/useProductVariants'
 import { useStoreProduct } from '@/hooks/usePublicProducts'
 import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice, normalizeLineBreaks } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
+import { absoluteUrl } from '@/lib/siteUrl'
+import { buildProductJsonLd, buildBreadcrumbJsonLd } from '@/lib/jsonLd'
 import { useCartStore } from '@/store/cartStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Product, ProductImage } from '@/types'
@@ -45,6 +47,25 @@ function getPrimaryImageUrl(product: Product & { product_images?: ProductImage[]
   if (primary?.image_url) return primary.image_url
   if (isValidImageUrl(product.image_url)) return product.image_url as string
   return null
+}
+
+// Todas las imágenes válidas del producto, mismo orden que la galería
+// (is_primary > display_order) — usado por el JSON-LD de Product, que acepta
+// un array completo de imágenes (no solo la principal).
+function getAllImageUrls(product: Product & { product_images?: ProductImage[] }): string[] {
+  const images = product.product_images ?? []
+  const sorted = [...images]
+    .filter((img) => isValidImageUrl(img.image_url))
+    .sort((a, b) => {
+      if (a.is_primary && !b.is_primary) return -1
+      if (!a.is_primary && b.is_primary) return 1
+      return a.display_order - b.display_order
+    })
+  const urls = sorted.map((img) => img.image_url as string)
+  if (isValidImageUrl(product.image_url) && !urls.includes(product.image_url as string)) {
+    urls.push(product.image_url as string)
+  }
+  return urls
 }
 
 export function ProductDetail() {
@@ -249,7 +270,35 @@ export function ProductDetail() {
       : singleLineDescription
     : DEFAULT_META_DESCRIPTION
   const metaTitle = `${capitalizeFirst(product.name)} | Ruemia`
-  const ogImageUrl = getPrimaryImageUrl(product as Product & { product_images?: ProductImage[] }) ?? DEFAULT_OG_IMAGE
+  // getPrimaryImageUrl ya valida http(s) (isValidImageUrl) y devuelve siempre
+  // una URL absoluta real de Supabase Storage — solo el fallback necesita
+  // pasar por absoluteUrl(), porque DEFAULT_OG_IMAGE es una ruta relativa.
+  const ogImageUrl = getPrimaryImageUrl(product as Product & { product_images?: ProductImage[] }) ?? absoluteUrl(DEFAULT_OG_IMAGE)
+  const productUrl = absoluteUrl(`/product/${product.id}`)
+  const displayPrice = selectedVariant ? (selectedVariant.price ?? getEffectivePrice(product)) : getEffectivePrice(product)
+
+  const productJsonLd = buildProductJsonLd({
+    name: capitalizeFirst(product.name),
+    description: singleLineDescription || null,
+    images: getAllImageUrls(product as Product & { product_images?: ProductImage[] }),
+    sku: product.sku,
+    url: productUrl,
+    price: displayPrice,
+    // useOrgSettings() ya resuelve un string real en runtime (ver
+    // DEFAULT_SETTINGS en useOrgSettings.ts) — el `?? 'ARS'` es solo para
+    // satisfacer el tipo `OrganizationSettings.currency` (string | null),
+    // más laxo que la garantía real del hook.
+    priceCurrency: settings.currency ?? 'ARS',
+    availability: isOutOfStock ? 'OutOfStock' : 'InStock',
+  })
+
+  const breadcrumbJsonLd = buildBreadcrumbJsonLd([
+    { name: 'Inicio', url: absoluteUrl('/') },
+    ...(product.category
+      ? [{ name: product.category.name, url: absoluteUrl(`/categories/${product.category.slug}`) }]
+      : []),
+    { name: capitalizeFirst(product.name), url: productUrl },
+  ])
 
   return (
     <div className="container-custom py-8">
@@ -259,7 +308,10 @@ export function ProductDetail() {
         <meta property="og:title" content={metaTitle} />
         <meta property="og:description" content={metaDescription} />
         <meta property="og:image" content={ogImageUrl} />
-        <link rel="canonical" href={`/product/${product.id}`} />
+        <meta property="og:url" content={productUrl} />
+        <link rel="canonical" href={productUrl} />
+        <script type="application/ld+json">{JSON.stringify(productJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
       </Helmet>
 
       <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-gray-500">
@@ -583,10 +635,7 @@ export function ProductDetail() {
                 className="text-2xl font-bold"
                 style={{ color: 'var(--org-primary-color, #46362B)' }}
               >
-                {formatPrice(
-                  selectedVariant ? (selectedVariant.price ?? getEffectivePrice(product)) : getEffectivePrice(product),
-                  settings
-                )}
+                {formatPrice(displayPrice, settings)}
               </p>
             </div>
           </div>
