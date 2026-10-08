@@ -149,10 +149,10 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
     const onlyVariantStock = variantStocks[variants[0].id] ?? 0
     const onlyVariantAvailable = variants[0].is_active && onlyVariantStock > 0
     return (
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+      <div className="rounded-lg border border-brand-line bg-brand-crema p-3 text-sm text-brand-muted">
         Variante única: <span className="font-medium">{variants[0].name || variants[0].sku}</span>
         {!onlyVariantAvailable && (
-          <span className="block mt-1 text-gray-500">Sin stock disponible</span>
+          <span className="block mt-1 text-brand-muted">Sin stock disponible</span>
         )}
       </div>
     )
@@ -164,7 +164,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
         <>
           {Object.entries(attributes).map(([key, values]) => (
             <div key={key}>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-brand-muted mb-2">
                 {translateAttributeLabel(key)}
               </label>
               <div className="flex flex-wrap gap-2">
@@ -197,7 +197,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
                         'relative overflow-hidden px-4 py-2 rounded-lg border-2 transition-colors',
                         isSelected
                           ? 'font-medium'
-                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400',
+                          : 'border-brand-line bg-white text-brand-muted hover:border-gray-400',
                         !isAvailable && 'opacity-50 cursor-not-allowed'
                       )}
                       style={
@@ -225,7 +225,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
         </>
       ) : (
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-brand-muted mb-2">
             Variantes
           </label>
           <div className="space-y-2">
@@ -241,7 +241,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
                   disabled={!isAvailable}
                   className={cn(
                     'w-full rounded-lg border px-3 py-2 text-left transition-colors',
-                    isSelected ? '' : 'border-gray-300 bg-white hover:border-gray-400',
+                    isSelected ? '' : 'border-brand-line bg-white hover:border-gray-400',
                     !isAvailable && 'opacity-50 cursor-not-allowed'
                   )}
                   style={
@@ -254,8 +254,8 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
                   }
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-800">{variant.name || variant.sku}</span>
-                    <span className={cn('text-xs', isAvailable ? 'text-green-600' : 'text-red-600')}>
+                    <span className="font-medium text-brand-tinta">{variant.name || variant.sku}</span>
+                    <span className={cn('text-xs', isAvailable ? 'text-[#46602B]' : 'text-red-600')}>
                       {isAvailable ? `${variantStock} en stock` : 'Sin stock'}
                     </span>
                   </div>
@@ -267,26 +267,26 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
       )}
 
       {selectedVariant && (
-        <div className="p-4 bg-gray-50 rounded-lg space-y-2">
+        <div className="p-4 bg-brand-crema rounded-lg space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-700">Precio:</span>
-            <span className="text-lg font-bold" style={{ color: 'var(--org-primary-color, #705931)' }}>
+            <span className="text-sm font-medium text-brand-muted">Precio:</span>
+            <span className="font-heading text-lg font-semibold" style={{ color: 'var(--org-primary-color, #705931)' }}>
               {formatPrice(displayPrice, settings)}
             </span>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm font-medium text-gray-700">Stock disponible:</span>
+            <span className="text-sm font-medium text-brand-muted">Stock disponible:</span>
             <span
               className={cn(
                 'text-sm font-semibold',
-                displayStock !== null && displayStock > 0 ? 'text-green-600' : 'text-red-600'
+                displayStock !== null && displayStock > 0 ? 'text-[#46602B]' : 'text-red-600'
               )}
             >
               {displayStock !== null ? displayStock : 'Cargando...'} {selectedVariant.unit || product.unit || 'unidad'}
             </span>
           </div>
           {selectedVariant.name && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-brand-muted">
               Variante: {selectedVariant.name}
             </div>
           )}

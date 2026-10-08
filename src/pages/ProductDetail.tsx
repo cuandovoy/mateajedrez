@@ -216,17 +216,17 @@ export function ProductDetail() {
     return (
       <div className="container-custom py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          <div className="aspect-square bg-gray-100 rounded-2xl animate-pulse" />
+          <div className="aspect-square bg-brand-crema rounded-lg animate-pulse" />
           <div className="space-y-4">
-            <div className="h-5 w-24 bg-gray-100 rounded-full animate-pulse" />
-            <div className="h-9 w-3/4 bg-gray-100 rounded-xl animate-pulse" />
-            <div className="h-7 w-32 bg-gray-100 rounded-xl animate-pulse" />
+            <div className="h-5 w-24 bg-brand-crema rounded-full animate-pulse" />
+            <div className="h-9 w-3/4 bg-brand-crema rounded-lg animate-pulse" />
+            <div className="h-7 w-32 bg-brand-crema rounded-lg animate-pulse" />
             <div className="space-y-2 pt-4">
-              <div className="h-4 w-full bg-gray-100 rounded animate-pulse" />
-              <div className="h-4 w-5/6 bg-gray-100 rounded animate-pulse" />
-              <div className="h-4 w-4/6 bg-gray-100 rounded animate-pulse" />
+              <div className="h-4 w-full bg-brand-crema rounded animate-pulse" />
+              <div className="h-4 w-5/6 bg-brand-crema rounded animate-pulse" />
+              <div className="h-4 w-4/6 bg-brand-crema rounded animate-pulse" />
             </div>
-            <div className="h-12 w-full bg-gray-100 rounded-xl animate-pulse mt-6" />
+            <div className="h-12 w-full bg-brand-crema rounded-lg animate-pulse mt-6" />
           </div>
         </div>
       </div>
@@ -239,7 +239,7 @@ export function ProductDetail() {
         <Helmet>
           <meta name="robots" content="noindex" />
         </Helmet>
-        <p className="text-gray-600 text-lg mb-4">Producto no encontrado</p>
+        <p className="text-brand-muted text-lg mb-4">Producto no encontrado</p>
         <Link to="/products">
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -314,18 +314,18 @@ export function ProductDetail() {
         <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
       </Helmet>
 
-      <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-gray-500">
-        <Link to="/" className="hover:text-gray-700 transition-colors">Inicio</Link>
+      <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-brand-muted">
+        <Link to="/" className="hover:text-brand-muted transition-colors">Inicio</Link>
         {product.category && (
           <>
             <span aria-hidden="true">/</span>
-            <Link to={`/categories/${product.category.slug}`} className="hover:text-gray-700 transition-colors">
+            <Link to={`/categories/${product.category.slug}`} className="hover:text-brand-muted transition-colors">
               {product.category.name}
             </Link>
           </>
         )}
         <span aria-hidden="true">/</span>
-        <span className="text-gray-700 font-medium truncate max-w-[200px] sm:max-w-none">
+        <span className="text-brand-muted font-medium truncate max-w-[200px] sm:max-w-none">
           {capitalizeFirst(product.name)}
         </span>
       </nav>
@@ -428,7 +428,7 @@ export function ProductDetail() {
             return (
               <div className="relative">
                 <div
-                  className="relative w-full overflow-hidden rounded-lg shadow-lg"
+                  className="relative w-full overflow-hidden rounded-md border border-brand-line"
                   onTouchStart={handleTouchStart}
                   onTouchEnd={handleTouchEnd}
                 >
@@ -456,12 +456,12 @@ export function ProductDetail() {
                       }}
                     />
                     {imageLoading && (
-                      <div className="absolute inset-0 bg-gray-200 animate-pulse flex items-center justify-center">
-                        <div className="text-gray-400">Cargando...</div>
+                      <div className="absolute inset-0 brand-shimmer flex items-center justify-center">
+                        <div className="text-brand-muted">Cargando...</div>
                       </div>
                     )}
                     {!imageLoading && (
-                      <div className="absolute top-3 right-3 bg-black/50 text-white rounded-full p-1.5 pointer-events-none">
+                      <div className="absolute top-3 right-3 bg-brand-tinta/60 text-white rounded-full p-1.5 pointer-events-none">
                         <ZoomIn className="h-4 w-4" />
                       </div>
                     )}
@@ -472,21 +472,21 @@ export function ProductDetail() {
                     <>
                       <button
                         onClick={handlePreviousImage}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 shadow-lg transition-all"
+                        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 transition-all"
                         aria-label="Imagen anterior"
                       >
-                        <ChevronLeft className="h-6 w-6 text-gray-800" />
+                        <ChevronLeft className="h-6 w-6 text-brand-tinta" />
                       </button>
                       <button
                         onClick={handleNextImage}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 shadow-lg transition-all"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white rounded-full p-2 transition-all"
                         aria-label="Siguiente imagen"
                       >
-                        <ChevronRight className="h-6 w-6 text-gray-800" />
+                        <ChevronRight className="h-6 w-6 text-brand-tinta" />
                       </button>
                       
                       {/* Image counter */}
-                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-3 py-1 rounded-full text-sm">
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-brand-tinta/60 text-white px-3 py-1 rounded-full text-sm">
                         {currentImageIndex + 1} / {imageUrls.length}
                       </div>
                     </>
@@ -508,17 +508,9 @@ export function ProductDetail() {
                             }, 150)
                           }
                         }}
-                        className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all duration-200 ${
-                          index === currentImageIndex ? 'ring-2 scale-105' : 'border-gray-300 hover:border-gray-400 hover:scale-105'
+                        className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border transition-colors duration-200 ${
+                          index === currentImageIndex ? 'border-brand-cuero ring-1 ring-brand-cuero' : 'border-brand-line hover:border-brand-algarrobo'
                         }`}
-                        style={
-                          index === currentImageIndex
-                            ? {
-                                borderColor: 'var(--org-primary-color, #705931)',
-                                boxShadow: '0 0 0 2px color-mix(in srgb, var(--org-primary-color, #705931) 30%, transparent)',
-                              }
-                            : undefined
-                        }
                         aria-label={`Ver imagen ${index + 1}`}
                       >
                         <img
@@ -534,7 +526,7 @@ export function ProductDetail() {
                 {/* Lightbox — reusa handlePreviousImage/handleNextImage de la galería */}
                 {isLightboxOpen && (
                   <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-brand-tinta/60 p-4"
                     onClick={() => setIsLightboxOpen(false)}
                   >
                     <button
@@ -593,27 +585,21 @@ export function ProductDetail() {
             {product.category && (
               <Link
                 to={`/categories/${product.category.slug}`}
-                className="inline-block px-3 py-1 rounded-full text-sm font-medium mb-2 hover:opacity-80 transition-opacity"
-                style={{
-                  backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #705931) 15%, white)',
-                  color: 'var(--org-primary-color, #705931)',
-                }}
+                className="brand-eyebrow inline-block mb-3 border-b border-transparent hover:border-brand-cuero transition-colors"
               >
                 {product.category.name}
               </Link>
             )}
             <div className="flex items-start justify-between gap-3 mb-2">
               <h1
-                className="text-3xl font-bold text-gray-900"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
+                className="brand-title text-2xl md:text-3xl"
               >
                 {capitalizeFirst(product.name)}
               </h1>
               <button
                 type="button"
                 onClick={handleShare}
-                className="shrink-0 h-10 w-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
-                style={{ color: 'var(--org-primary-color, #705931)' }}
+                className="shrink-0 h-10 w-10 rounded-full border border-brand-line text-brand-cuero flex items-center justify-center hover:border-brand-cuero transition-colors"
                 aria-label="Compartir producto"
                 title="Compartir"
               >
@@ -623,33 +609,30 @@ export function ProductDetail() {
             <div className="mb-4">
               {!selectedVariant && hasActiveDiscount(product) && (
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="bg-red-500 text-white text-sm font-bold px-2 py-0.5 rounded">
+                  <span className="inline-flex items-center rounded-full bg-brand-cuero px-3 py-1 font-heading text-xs font-semibold uppercase tracking-[0.14em] text-brand-crema">
                     -{product.discount_percentage}% OFF
                   </span>
-                  <span className="text-lg text-gray-400 line-through">
+                  <span className="text-lg text-brand-muted line-through">
                     {formatPrice(product.price, settings)}
                   </span>
                 </div>
               )}
-              <p
-                className="text-2xl font-bold"
-                style={{ color: 'var(--org-primary-color, #705931)' }}
-              >
+              <p className="font-heading text-3xl font-semibold tabular-nums text-brand-cuero">
                 {formatPrice(displayPrice, settings)}
               </p>
             </div>
           </div>
 
           <div className="mb-6">
-            <p className="text-gray-700 leading-relaxed whitespace-pre-line">
+            <p className="text-brand-muted leading-relaxed whitespace-pre-line">
               {capitalizeFirst(normalizeLineBreaks(product.description)) || 'Sin descripción disponible'}
             </p>
           </div>
 
           <div className="mb-6 space-y-4">
             <div>
-              <span className="text-sm font-medium text-gray-700" style={{ fontFamily: 'var(--org-font-technical, Arial, sans-serif)' }}>SKU: </span>
-              <span className="text-sm text-gray-600" style={{ fontFamily: 'var(--org-font-technical, Arial, sans-serif)' }}>{product.sku}</span>
+              <span className="brand-eyebrow !text-brand-muted">SKU </span>
+              <span className="text-sm text-brand-muted tabular-nums">{product.sku}</span>
             </div>
           </div>
 
@@ -664,15 +647,15 @@ export function ProductDetail() {
             />
           </div>
 
-          <div className="mb-6 pt-6 border-t border-gray-100">
+          <div className="mb-6 pt-6 border-t border-brand-line">
             {!isOutOfStock && (
               <div className="flex items-center gap-6 mb-4">
-                <span className="text-sm font-medium text-gray-700">Cantidad</span>
+                <span className="brand-eyebrow !text-brand-muted">Cantidad</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setQuantity(Math.max(1, quantity - 1))}
                     disabled={quantity <= 1 || (hasActiveVariants && !selectedVariantId)}
-                    className="h-9 w-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition-colors text-lg font-light"
+                    className="h-9 w-9 rounded-full border border-brand-line flex items-center justify-center text-brand-tinta hover:border-brand-cuero disabled:opacity-40 disabled:pointer-events-none transition-colors text-lg font-light"
                   >
                     −
                   </button>
@@ -686,12 +669,12 @@ export function ProductDetail() {
                       (hasActiveVariants && !selectedVariantId) ||
                       quantity >= (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0))
                     }
-                    className="h-9 w-9 rounded-full border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:pointer-events-none transition-colors text-lg font-light"
+                    className="h-9 w-9 rounded-full border border-brand-line flex items-center justify-center text-brand-tinta hover:border-brand-cuero disabled:opacity-40 disabled:pointer-events-none transition-colors text-lg font-light"
                   >
                     +
                   </button>
                 </div>
-                <span className="text-sm text-gray-400 ml-auto">
+                <span className="text-sm text-brand-muted ml-auto">
                   {hasActiveVariants && !selectedVariantId
                     ? 'Seleccioná una variante'
                     : `${selectedVariantId
@@ -703,25 +686,21 @@ export function ProductDetail() {
               </div>
             )}
             {isOutOfStock && (
-              <p className="text-sm text-gray-500 mb-4">Este producto no tiene stock disponible.</p>
+              <p className="text-sm text-brand-muted mb-4">Este producto no tiene stock disponible.</p>
             )}
             {isOutOfStock && whatsappHref ? (
               <a
                 href={whatsappHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full h-12 inline-flex items-center justify-center gap-2 text-base font-semibold rounded-xl transition-colors"
-                style={{
-                  backgroundColor: 'var(--org-primary-color, #705931)',
-                  color: 'var(--org-primary-ink, white)',
-                }}
+                className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-md bg-brand-cuero font-heading text-sm font-semibold uppercase tracking-[0.14em] text-brand-crema transition-colors hover:bg-brand-cuero-oscuro focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:ring-offset-2"
               >
                 <MessageCircle className="h-5 w-5" />
                 Consultar disponibilidad
               </a>
             ) : (
               <Button
-                className="w-full h-12 text-base font-semibold rounded-xl"
+                className="w-full h-12"
                 onClick={handleAddToCart}
                 disabled={
                   (hasActiveVariants && !selectedVariantId) ||
@@ -742,9 +721,10 @@ export function ProductDetail() {
       {/* Productos relacionados */}
       {relatedProducts.length > 0 && (
         <div>
-          <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">
-            Productos relacionados
-          </h2>
+          <div className="mb-8 pb-4 border-b border-brand-line">
+            <p className="brand-eyebrow mb-2">Seguí mirando</p>
+            <h2 className="brand-title text-xl md:text-2xl">Productos relacionados</h2>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
             {relatedProducts.map((relatedProduct) => (
               <ProductCard key={relatedProduct.id} product={relatedProduct} />

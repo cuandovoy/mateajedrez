@@ -39,7 +39,34 @@ export default {
           algarrobo: '#A9875A',
           yerba: '#5E7A3A',
           tinta: '#2B2418',
+          bg: '#FBF9F3',
+          line: '#E4DCC8',
+          muted: '#6E634F',
         },
+      },
+      keyframes: {
+        'brand-ring-draw': {
+          '0%': { strokeDashoffset: '302' },
+          '70%, 100%': { strokeDashoffset: '0' },
+        },
+        'brand-seal-breathe': {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(1.035)' },
+        },
+        'brand-fade-in': {
+          '0%': { opacity: '0', transform: 'translateY(6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'brand-shimmer': {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
+      },
+      animation: {
+        'brand-ring-draw': 'brand-ring-draw 2.4s cubic-bezier(0.25, 1, 0.5, 1) infinite',
+        'brand-seal-breathe': 'brand-seal-breathe 3.2s ease-in-out infinite',
+        'brand-fade-in': 'brand-fade-in 0.9s cubic-bezier(0.25, 1, 0.5, 1) 0.3s both',
+        'brand-shimmer': 'brand-shimmer 1.8s linear infinite',
       },
     },
   },

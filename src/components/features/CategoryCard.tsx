@@ -27,7 +27,7 @@ export function CategoryCard({ category, fallbackImages = [] }: CategoryCardProp
 
   return (
     <Link to={`/categories/${category.slug}`} className="block">
-      <div className="group relative rounded-2xl overflow-hidden aspect-[4/3] cursor-pointer shadow-sm hover:shadow-xl transition-all duration-300">
+      <div className="group relative rounded-md overflow-hidden aspect-[4/3] cursor-pointer border border-brand-line hover:border-brand-algarrobo transition-colors duration-300">
         {/* Image layer */}
         {category.image_url ? (
           <img
@@ -74,21 +74,21 @@ export function CategoryCard({ category, fallbackImages = [] }: CategoryCardProp
         )}
 
         {/* Gradient overlay — always present */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/15 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-tinta/80 via-brand-tinta/20 to-transparent" />
 
         {/* Hover brightening */}
-        <div className="absolute inset-0 bg-white/0 group-hover:bg-white/8 transition-all duration-300" />
+        <div className="absolute inset-0 bg-brand-crema/0 group-hover:bg-brand-crema/5 transition-all duration-300" />
 
         {/* Text */}
-        <div className="absolute bottom-0 left-0 right-0 p-5">
+        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-5">
           <h3
-            className="text-white text-xl font-semibold tracking-tight drop-shadow-sm"
-            style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
+            className="text-brand-crema text-lg font-light uppercase"
+            style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.22em' }}
           >
             {category.name}
           </h3>
           {category.description && (
-            <p className="text-white/75 text-sm mt-0.5 line-clamp-1">
+            <p className="text-brand-crema/80 text-sm mt-1 line-clamp-1">
               {category.description}
             </p>
           )}

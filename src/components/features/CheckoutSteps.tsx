@@ -29,8 +29,8 @@ export function CheckoutSteps({ currentStep }: CheckoutStepsProps) {
             <div className="flex flex-col items-center gap-1.5">
               <div
                 className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors',
-                  !isActive && !isCompleted && 'bg-gray-100 text-gray-400'
+                  'flex h-8 w-8 items-center justify-center rounded-full font-heading text-sm font-semibold transition-colors',
+                  !isActive && !isCompleted && 'border border-brand-line bg-white text-brand-muted'
                 )}
                 style={
                   isActive
@@ -46,15 +46,15 @@ export function CheckoutSteps({ currentStep }: CheckoutStepsProps) {
               >
                 {isCompleted ? <Check className="h-4 w-4" /> : index + 1}
               </div>
-              <span className={cn('text-xs font-medium whitespace-nowrap', isActive ? 'text-gray-900' : 'text-gray-400')}>
+              <span className={cn('font-heading text-[11px] font-semibold uppercase tracking-[0.14em] whitespace-nowrap', isActive ? 'text-brand-tinta' : 'text-brand-muted')}>
                 {step.label}
               </span>
             </div>
 
             {index < STEPS.length - 1 && (
               <div
-                className="h-0.5 w-10 sm:w-20 mx-2 sm:mx-3 mb-5 rounded-full transition-colors"
-                style={{ backgroundColor: index < currentIndex ? 'var(--org-primary-color, #705931)' : '#e5e7eb' }}
+                className="h-px w-10 sm:w-20 mx-2 sm:mx-3 mb-5 transition-colors"
+                style={{ backgroundColor: index < currentIndex ? 'var(--org-primary-color, #705931)' : '#E4DCC8' }}
               />
             )}
           </div>

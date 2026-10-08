@@ -4,6 +4,41 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-08 — Revisión de alineación, textos y navegación del inicio
+
+- **Archivos modificados:** `src/components/features/HomeEditorial.tsx`, `src/pages/PublicStore.tsx`, `src/components/layout/PublicStoreHeader.tsx`, `src/components/layout/Footer.tsx`, `src/components/layout/ShippingNoticeBanner.tsx`.
+- **Qué cambió:** portada más breve con acciones explícitas; mensaje de regalos y galería más concretos; Nosotros cierra con una visita al local. Logo centrado en móvil, menú con acceso permanente a Tienda, dirección enlazada a Visitanos, menos repeticiones en el pie y sin separación vacía en el inicio. WhatsApp no aparece sin un número válido.
+- **Verificación:** TypeScript y compilación Vite correctos; lint de los componentes editados correcto (PublicStore mantiene incidencias preexistentes documentadas). Playwright en 390, 768 y 1440 px sin desbordes; navegación móvil a Tienda, ancla de personalizados y acceso al local verificados. Catálogo sin productos en el entorno actual: no se verificaron visualmente las grillas con datos.
+
+## 2026-10-08 — Dirección de la tienda en el aviso superior
+
+- **Archivos modificados:** `src/components/layout/ShippingNoticeBanner.tsx`.
+- **Qué cambió:** se reemplazó el plazo de entrega por la dirección compartida de la tienda y un ícono de ubicación, manteniendo el estilo de la barra.
+
+## 2026-10-08 — Fotografías y contenido para la página principal
+
+- **Archivos modificados:** `src/pages/PublicStore.tsx`, `src/components/features/HomeEditorial.tsx` (nuevo), `public/images/home/` (nuevo).
+- **Qué cambió:** portada editorial con fotos reales cuando no hay un banner configurado, sección de personalización y regalos con galería de trabajos y foto propia para Nosotros. Las ocho imágenes se sirven en WebP con tamaños adaptados y carga diferida fuera de la portada; las consultas usan el WhatsApp configurado o la página Visitanos.
+- **Verificación:** TypeScript y compilación Vite correctos; lint del componente nuevo correcto (la página conserva incidencias previas). Playwright: escritorio de 1440 px y móvil de 390 px sin desbordes, ocho fotos cargadas y enlace a personalizados operativo.
+
+## 2026-10-08 — Logo de Mates Ajedrez en la tienda
+
+- **Archivos modificados:** `src/brand/mates-ajedrez-logo.jpeg` (nuevo), `src/brand/mates-ajedrez-logo-square.jpeg` (nuevo, 640x640), `src/components/layout/PublicStoreHeader.tsx`, `src/components/layout/Footer.tsx`, `src/components/ui/BrandLoader.tsx`, `public/favicon-32.png`, `public/apple-touch-icon.png`, `public/icon-192.png`, `public/icon-512.png`, `public/og-image.png` (1200x630), `public/sw.js` (cache v1 → v2), `index.html` (JSON-LD `logo` → icon-512.png), `.claude/TODO.md`
+- **Qué cambió:** el logo del cliente reemplaza los assets de Ruemia como sello circular en header (desktop 56px / mobile 44px), footer y BrandLoader (anillo animado alrededor, reduced-motion intacto). Íconos PWA/iOS full-bleed, favicon circular transparente, og-image con el logo a tamaño nativo sobre el fondo de marca. Assets Ruemia viejos quedan sin referencias (borrado pendiente en TODO).
+
+## 2026-10-08 — Página Visitanos (local físico)
+
+- **Archivos modificados:** src/pages/Visitanos.tsx, src/lib/storeLocation.ts, src/lib/storeLocation.test.ts, src/App.tsx, src/components/layout/PublicStoreHeader.tsx, src/components/layout/Footer.tsx, scripts/generate-sitemap.ts
+- **Qué cambió:** nueva ruta pública `/visitanos` con dirección, mapa de Google embebido (sin API key) y botón "Cómo llegar"; WhatsApp solo si hay número configurado. Dirección centralizada en `storeLocation.ts` (con tests). Link agregado al header (desktop + mobile), footer y sitemap. Sin CSP en nginx/index.html, no hizo falta tocar nada.
+
+## 2026-10-08 — Lavado de cara visual de la tienda (Mates Ajedrez)
+
+- **Archivos modificados:** CLAUDE.md (reglas visuales de la tienda actualizadas a la nueva identidad), tailwind.config.js, src/index.css, src/App.tsx, src/components/ui/{BrandLoader (nuevo),Button,Card,Input,Skeleton,EmptyState,ConfirmDialog,Toast}.tsx, src/components/layout/{PublicStoreHeader,PublicStoreLayout,PublicStoreWrapper,ShippingNoticeBanner,Footer}.tsx, src/components/features/{ProductCard,CategoryCard,CheckoutSteps,VariantSelector,BillerCheckoutPanel}.tsx, src/pages/{PublicStore,Products,CategoryProducts,ProductDetail,Cart,Checkout,OrderConfirmation,NotFound,PoliticaPrivacidad,TerminosCondiciones}.tsx
+- **Qué cambió:** look "ficha técnica artesanal": fondo crema, bordes finos en vez de sombras, radios chicos, header crema con línea, footer oscuro con wordmark espaciado, sellos circulares para descuentos, botones cuero/crema y chips restilizados. Tokens `brand.bg/line/muted`, clases `.brand-eyebrow/.brand-title/.brand-shimmer`. Nuevo loader de marca (anillo SVG + wordmark) y shimmer crema en skeletons; todo respeta `prefers-reduced-motion`. Sin cambios de lógica.
+
+---
+
+
 ## 2026-10-08 — Rebrand Ruemia → Mates Ajedrez
 
 - **Archivos modificados:** index.html, tailwind.config.js, src/index.css, src/vite-env.d.ts, nginx.conf, public/manifest.webmanifest, public/sw.js, public/robots.txt, src/lib/siteUrl.ts, src/lib/*.test.ts (jsonLd, siteUrl, siteUrl.env, sitemapBuilder), src/components/layout/{PublicStoreLayout,PublicStoreHeader,Footer,ShippingNoticeBanner}.tsx, src/components/features/{ProductCard,CategoryCard,VariantSelector,CheckoutSteps}.tsx, src/components/ui/Button.tsx, src/pages/{Products,ProductDetail,PublicStore,CategoryProducts,Checkout,Cart,OrderConfirmation,NotFound,TerminosCondiciones,PoliticaPrivacidad}.tsx, .claude/TODO.md

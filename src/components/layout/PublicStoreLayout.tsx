@@ -38,10 +38,10 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
         <meta property="og:url" content={absoluteUrl('/')} />
         <link rel="canonical" href={absoluteUrl('/')} />
       </Helmet>
-      <div className="min-h-screen flex flex-col bg-white" style={{ fontFamily: `var(--org-font-family, 'Source Sans 3')` }}>
+      <div className="min-h-screen flex flex-col bg-brand-bg text-brand-tinta" style={{ fontFamily: `var(--org-font-family, 'Source Sans 3')` }}>
         <ShippingNoticeBanner />
         <PublicStoreHeader organization={organization} />
-        <main className="flex-1">
+        <main className="flex-1 animate-fade-in-up">
           {children}
         </main>
         <PublicStoreFooter />

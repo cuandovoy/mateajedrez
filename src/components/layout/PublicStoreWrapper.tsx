@@ -3,7 +3,7 @@ import { Outlet } from 'react-router-dom'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { PublicStoreLayout } from './PublicStoreLayout'
 import { usePageViewTracker } from '@/hooks/usePageViewTracker'
-import { SkeletonFullPage } from '@/components/ui/Skeleton'
+import { BrandLoader } from '@/components/ui/BrandLoader'
 import type { Organization } from '@/types/database.types'
 
 // Fork de un único cliente: la organización ya no viene de la URL (:slug),
@@ -57,22 +57,22 @@ export function PublicStoreWrapper() {
   }, [fetchOrgBySlug, setCurrentOrganization, retryCount])
 
   if (loading) {
-    return <SkeletonFullPage />
+    return <BrandLoader />
   }
 
   if (error || !organization) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen bg-brand-bg">
         <div className="text-center max-w-sm px-4">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 className="brand-title text-xl mb-3">
             {isNetworkError ? 'No se pudo cargar la tienda' : 'Organización no encontrada'}
           </h1>
-          <p className="text-gray-600 mb-4">{error || 'La organización solicitada no existe o no está activa.'}</p>
+          <p className="text-brand-muted mb-5">{error || 'La organización solicitada no existe o no está activa.'}</p>
           {isNetworkError && (
             <button
               type="button"
               onClick={() => setRetryCount((n) => n + 1)}
-              className="px-5 py-2.5 rounded-full text-sm font-semibold text-white bg-gray-900 hover:bg-gray-800 transition-colors"
+              className="px-6 py-2.5 rounded-md font-heading text-xs font-semibold uppercase tracking-[0.14em] text-brand-crema bg-brand-cuero hover:bg-brand-cuero-oscuro transition-colors"
             >
               Reintentar
             </button>

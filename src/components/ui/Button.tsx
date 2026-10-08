@@ -9,40 +9,26 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = 'primary', size = 'md', isLoading, disabled, children, ...props }, ref) => {
-    const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none'
+    const baseStyles = 'inline-flex items-center justify-center rounded-md font-heading font-semibold uppercase tracking-[0.14em] transition-colors duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-brand-bg disabled:opacity-50 disabled:pointer-events-none'
 
     const variants = {
-      primary: 'focus-visible:ring-[var(--org-primary-color,#705931)]',
-      secondary: 'focus-visible:ring-[var(--org-secondary-color,#A9875A)]',
-      outline: 'border-2 focus-visible:ring-[var(--org-primary-color,#705931)]',
-      ghost: 'text-gray-700 hover:bg-gray-100 focus-visible:ring-gray-500',
-      danger: 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500',
+      primary: 'bg-brand-cuero text-brand-crema hover:bg-brand-cuero-oscuro focus-visible:ring-brand-cuero',
+      secondary: 'bg-brand-algarrobo text-brand-tinta hover:bg-[#9a7a50] focus-visible:ring-brand-algarrobo',
+      outline: 'border border-brand-cuero text-brand-cuero bg-transparent hover:bg-brand-cuero hover:text-brand-crema focus-visible:ring-brand-cuero',
+      ghost: 'text-brand-muted hover:bg-brand-crema hover:text-brand-tinta focus-visible:ring-brand-cuero',
+      danger: 'bg-red-700 text-white hover:bg-red-800 focus-visible:ring-red-600',
     }
 
-    // Estilos inline para colores dinámicos de marca
-    const dynamicStyles = variant === 'primary' ? {
-      backgroundColor: 'var(--org-primary-color, #705931)',
-      color: 'var(--org-primary-ink, #ffffff)',
-      '--hover-bg': 'var(--org-primary-color, #705931)',
-    } : variant === 'secondary' ? {
-      backgroundColor: 'var(--org-secondary-color, #A9875A)',
-      color: 'var(--org-secondary-ink, #ffffff)',
-    } : variant === 'outline' ? {
-      borderColor: 'var(--org-primary-color, #705931)',
-      color: 'var(--org-primary-color, #705931)',
-    } : {}
-
     const sizes = {
-      sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2 text-base',
-      lg: 'px-6 py-3 text-lg',
+      sm: 'px-3 py-1.5 text-xs',
+      md: 'px-5 py-2.5 text-sm',
+      lg: 'px-7 py-3.5 text-sm',
     }
 
     return (
       <button
         ref={ref}
         className={cn(baseStyles, variants[variant], sizes[size], className)}
-        style={dynamicStyles}
         disabled={disabled || isLoading}
         {...props}
       >

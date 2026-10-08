@@ -159,8 +159,8 @@ export function CategoryProducts() {
   if (loading) {
     return (
       <div className="container-custom py-8">
-        <Skeleton className="h-8 w-48 mb-6 rounded-xl" />
-        <Skeleton className="h-10 w-72 mb-3 rounded-xl" />
+        <Skeleton className="h-8 w-48 mb-6 rounded-lg" />
+        <Skeleton className="h-10 w-72 mb-3 rounded-lg" />
         <div className="flex gap-3 flex-wrap mb-8 mt-6">
           <Skeleton className="h-10 flex-1 min-w-[200px] rounded-full" />
           <Skeleton className="h-10 w-20 rounded-full" />
@@ -178,7 +178,7 @@ export function CategoryProducts() {
   if (notFound || !categoryResolution) {
     return (
       <div className="container-custom py-8 text-center">
-        <p className="text-gray-600 text-lg mb-4">Categoría no encontrada</p>
+        <p className="text-brand-muted text-lg mb-4">Categoría no encontrada</p>
         <Link to="/products">
           <Button variant="outline" className="rounded-full">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -213,10 +213,10 @@ export function CategoryProducts() {
         <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
       </Helmet>
 
-      <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-gray-500">
-        <Link to="/" className="hover:text-gray-700 transition-colors">Inicio</Link>
+      <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap items-center gap-1.5 text-sm text-brand-muted">
+        <Link to="/" className="hover:text-brand-muted transition-colors">Inicio</Link>
         <span aria-hidden="true">/</span>
-        <span className="text-gray-700 font-medium">{displayCategory.name}</span>
+        <span className="text-brand-muted font-medium">{displayCategory.name}</span>
       </nav>
 
       <Link to="/products">
@@ -226,15 +226,15 @@ export function CategoryProducts() {
         </Button>
       </Link>
 
-      <div className="mb-8">
+      <div className="mb-8 pb-6 border-b border-brand-line">
+        <p className="brand-eyebrow mb-2">Colección</p>
         <h1
-          className="text-3xl font-bold text-gray-900 mb-1"
-          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
+          className="brand-title text-2xl md:text-3xl mb-1"
         >
           {displayCategory.name}
         </h1>
         {(currentCategory?.description || parentCategory?.description) && (
-          <p className="text-gray-500 text-sm mt-1">
+          <p className="text-brand-muted text-sm mt-1">
             {currentCategory?.description || parentCategory?.description}
           </p>
         )}
@@ -246,7 +246,7 @@ export function CategoryProducts() {
         <div className="relative flex-1 min-w-[200px]">
           {isFiltering ? (
             <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-gray-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-brand-muted"
               viewBox="0 0 24 24"
               fill="none"
             >
@@ -254,19 +254,19 @@ export function CategoryProducts() {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
             </svg>
           ) : (
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-brand-muted pointer-events-none" />
           )}
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar en esta categoría..."
-            className="w-full h-10 pl-9 pr-8 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:ring-2 transition-shadow"
+            className="w-full h-10 pl-9 pr-8 border border-brand-line rounded-full text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-cuero focus:border-brand-cuero transition-colors"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-brand-muted hover:text-brand-muted"
             >
               <X className="h-4 w-4" />
             </button>
@@ -278,12 +278,11 @@ export function CategoryProducts() {
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={handleSelectAllSubcategories}
-              className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
+              className={`h-10 px-4 rounded-full font-heading text-xs font-semibold uppercase tracking-[0.14em] transition-colors border ${
                 effectiveSelectedSubcategories.length === 0
-                  ? 'border-transparent shadow-sm'
-                  : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                  ? 'bg-brand-cuero border-brand-cuero text-brand-crema'
+                  : 'bg-transparent border-brand-line text-brand-tinta hover:border-brand-cuero'
               }`}
-              style={effectiveSelectedSubcategories.length === 0 ? { backgroundColor: 'var(--org-primary-color, #705931)', color: 'var(--org-primary-ink, white)' } : undefined}
             >
               Todas
             </button>
@@ -293,12 +292,11 @@ export function CategoryProducts() {
                 <button
                   key={subcat.id as string}
                   onClick={() => handleSubcategoryToggle(subcat.id as string)}
-                  className={`h-10 px-4 rounded-full text-sm font-medium transition-all border ${
+                  className={`h-10 px-4 rounded-full font-heading text-xs font-semibold uppercase tracking-[0.14em] transition-colors border ${
                     isActive
-                      ? 'border-transparent shadow-sm'
-                      : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                      ? 'bg-brand-cuero border-brand-cuero text-brand-crema'
+                      : 'bg-transparent border-brand-line text-brand-tinta hover:border-brand-cuero'
                   }`}
-                  style={isActive ? { backgroundColor: 'var(--org-primary-color, #705931)', color: 'var(--org-primary-ink, white)' } : undefined}
                 >
                   {subcat.name}
                 </button>
@@ -314,15 +312,15 @@ export function CategoryProducts() {
             placeholder="Mín."
             value={priceRange.min}
             onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
-            className="w-28 h-10 px-3 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 bg-white"
+            className="w-28 h-10 px-3 border border-brand-line rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-cuero focus:border-brand-cuero bg-white"
           />
-          <span className="text-gray-400 text-sm">—</span>
+          <span className="text-brand-muted text-sm">—</span>
           <input
             type="number"
             placeholder="Máx."
             value={priceRange.max}
             onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
-            className="w-28 h-10 px-3 border border-gray-200 rounded-full text-sm focus:outline-none focus:ring-2 bg-white"
+            className="w-28 h-10 px-3 border border-brand-line rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-cuero focus:border-brand-cuero bg-white"
           />
           {hasActiveFilters && (
             <button
@@ -370,7 +368,7 @@ export function CategoryProducts() {
                 variant="outline"
                 onClick={handleLoadMore}
                 disabled={isLoadingMore}
-                className="rounded-full px-8"
+                className="px-8"
               >
                 {isLoadingMore ? 'Cargando...' : 'Cargar más'}
               </Button>

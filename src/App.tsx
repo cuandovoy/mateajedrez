@@ -1,5 +1,5 @@
 import { PublicStoreWrapper } from '@/components/layout/PublicStoreWrapper'
-import { SkeletonFullPage } from '@/components/ui/Skeleton'
+import { BrandLoader } from '@/components/ui/BrandLoader'
 import { PublicStore } from '@/pages/PublicStore'
 import { Products } from '@/pages/Products'
 import { CategoryProducts } from '@/pages/CategoryProducts'
@@ -8,6 +8,7 @@ import { Cart } from '@/pages/Cart'
 import { Checkout } from '@/pages/Checkout'
 import { OrderConfirmation } from '@/pages/OrderConfirmation'
 import { NotFound } from '@/pages/NotFound'
+import { Visitanos } from '@/pages/Visitanos'
 import { PoliticaPrivacidad } from './pages/PoliticaPrivacidad'
 import { TerminosCondiciones } from './pages/TerminosCondiciones'
 import { useAuthStore } from '@/store/authStore'
@@ -22,7 +23,7 @@ function App() {
   }, [initialize])
 
   if (loading) {
-    return <SkeletonFullPage />
+    return <BrandLoader />
   }
 
   return (
@@ -38,6 +39,7 @@ function App() {
           <Route path="/products" element={<Products />} />
           <Route path="/categories/:categorySlug" element={<CategoryProducts />} />
           <Route path="/product/:id" element={<ProductDetail />} />
+          <Route path="/visitanos" element={<Visitanos />} />
           <Route path="/cart" element={<Cart />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />

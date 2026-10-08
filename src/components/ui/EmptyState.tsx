@@ -16,13 +16,13 @@ export function EmptyState({ icon: Icon, title, description, action, className =
   return (
     <div className={`text-center py-12 px-4 ${className}`}>
       {Icon && (
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gray-100">
-          <Icon className="h-8 w-8 text-gray-400" />
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-brand-line bg-brand-crema">
+          <Icon className="h-7 w-7 text-brand-cuero" strokeWidth={1.25} />
         </div>
       )}
-      <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+      <h3 className="font-heading text-base font-semibold uppercase tracking-[0.14em] text-brand-tinta">{title}</h3>
       {description && (
-        <p className="mt-2 text-sm text-gray-600 max-w-sm mx-auto">{description}</p>
+        <p className="mt-2 text-sm text-brand-muted max-w-sm mx-auto">{description}</p>
       )}
       {action && (
         <div className="mt-6">

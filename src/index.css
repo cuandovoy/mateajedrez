@@ -19,10 +19,15 @@
     --org-font-family: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
     --org-font-heading: 'Josefin Sans', 'Source Sans 3', system-ui, sans-serif;
     --org-font-technical: Arial, Helvetica, sans-serif;
+    /* Store surface tokens (artisan spec sheet look) */
+    --brand-bg: #FBF9F3;
+    --brand-line: #E4DCC8;
+    --brand-muted: #6E634F;
+    --brand-ink: #2B2418;
   }
 
   body {
-    background-color: #F7F4E9;
+    background-color: #FBF9F3;
     color: #2B2418;
     font-family: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
   }
@@ -36,6 +41,24 @@
   /* Spacing consistente: usar p-4, p-6, gap-4, gap-6 */
   .spacing-section {
     @apply p-4 md:p-6;
+  }
+
+  /* Small uppercase tracked label used above section titles and on card meta */
+  .brand-eyebrow {
+    @apply font-heading text-[11px] font-semibold uppercase tracking-[0.28em] text-brand-cuero;
+  }
+
+  /* Thin-line display title: Josefin Light, spaced */
+  .brand-title {
+    @apply font-heading font-light uppercase tracking-[0.14em] text-brand-tinta;
+  }
+
+  /* Brand skeleton: soft crema to line sweep */
+  .brand-shimmer {
+    background-color: #EFE9D8;
+    background-image: linear-gradient(90deg, #F7F4E9 0%, #E4DCC8 50%, #F7F4E9 100%);
+    background-size: 200% 100%;
+    @apply animate-brand-shimmer;
   }
 }
 
@@ -60,4 +83,24 @@
 .animate-fade-in-up {
   animation: fadeInUp 0.4s ease forwards;
   opacity: 0;
+}
+
+/* Reduced motion: stop brand loader, shimmer and entrance animations */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+    opacity: 1;
+  }
+  .brand-shimmer {
+    animation: none;
+    background-image: none;
+  }
+  .brand-loader-ring,
+  .brand-loader-seal,
+  .brand-loader-word {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }

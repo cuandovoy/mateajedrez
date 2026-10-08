@@ -5,10 +5,22 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 
 ---
 
+## Portada con fotografías (2026-10-08)
+
+- 🟢 Resolver lint preexistente en `src/pages/PublicStore.tsx`: `no-constant-condition` en el recorrido de categorías y dependencias de hooks inestables. El nuevo `HomeEditorial.tsx` pasa lint.
+
+## Visitanos (2026-10-08)
+
+- 🟡 Pedir al cliente el logo en mayor resolución o vectorial (SVG/PDF): el original es 531x601 JPEG, el og-image (1200x630) y los íconos salen con el logo a tamaño nativo — más nitidez para og-image y futura impresión
+- 🟢 Borrar assets Ruemia sin uso (cero referencias en código): src/brand/isotipo-cropped.png, isotipo-fondo1.png, logo-principal-fondo1.png, ruemia-logo-horizontal.png, branboard.pdf; public/berlin.regular.ttf, public/Cambria.ttf
+- 🟡 Agregar horarios de atención a la página Visitanos (dato aún no confirmado) — src/pages/Visitanos.tsx
+- 🟡 Agregar fotos del local a la página Visitanos — src/pages/Visitanos.tsx
+- 🟢 Usar el link de la ficha de Google Maps del local para un embed más rico (reseñas, fotos) — src/lib/storeLocation.ts
+- 🟢 Agregar JSON-LD LocalBusiness una vez confirmados los horarios — src/pages/Visitanos.tsx
+
 ## Rebrand Mates Ajedrez (2026-10-08)
 
 ### 🔴 Crítico
-- 🔴 Reemplazar assets de imagen con los de Mates Ajedrez (el cliente aún no entregó logos; siguen los de Ruemia): src/brand/isotipo-cropped.png, isotipo-fondo1.png, logo-principal-fondo1.png, ruemia-logo-horizontal.png (renombrar el archivo y el import en PublicStoreHeader.tsx), src/brand/branboard.pdf; public/favicon-32.png, apple-touch-icon.png, icon-192.png, icon-512.png, og-image.png (1200x1200) — afecta og:image, JSON-LD logo y PWA
 - 🔴 Completar placeholders legales: [NOMBRE COMPLETO DEL TITULAR] y [EMAIL DE CONTACTO] en TerminosCondiciones.tsx y PoliticaPrivacidad.tsx; TRANSFER_CONTACT_EMAIL en OrderConfirmation.tsx (era un email de Ruemia, ahora placeholder)
 
 ### 🟠 Alta
@@ -18,6 +30,12 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 ### 🟡 Media
 - 🟡 Archivos de fuentes obsoletos removibles: public/berlin.regular.ttf y public/Cambria.ttf (ya no se referencian)
 - 🟡 Footer solo soporta Instagram/Facebook/WhatsApp; el manual incluye Threads (https://www.threads.net/@matesajedrez) — agregar si el cliente lo pide (requiere cambio de código, fuera del alcance del rebrand)
+
+## Facelift Mates Ajedrez (2026-10-08)
+- 🟡 Verificar visualmente ProductCard/ProductDetail/Checkout con datos reales (la DB actual no tiene productos, no se pudo capturar)
+- 🟡 Spinners `animate-spin` restantes en Cart, OrderConfirmation, VariantSelector y botones: migrar a skeleton/BrandLoader
+- 🟢 `SkeletonFullPage` quedó sin uso tras BrandLoader — eliminar si no se necesita
+- 🟢 Contraste de `text-brand-muted` (#6E634F) sobre #FBF9F3 ≈ 5.6:1, OK; revisar sobre `bg-brand-crema` en tablas del checkout
 
 ## Rebrand Ruemia (2026-07-19)
 
@@ -239,6 +257,7 @@ Implementación del plan de acción de `seo-audit-ruemia.md` (Tier 1 y Tier 2, v
 
 ## Completado ✅
 
+- ✅ 2026-10-08 — Logo y assets de Mates Ajedrez integrados (header, footer, BrandLoader, favicon, apple-touch-icon, icon-192/512, og-image 1200x630, JSON-LD logo, sw cache v2). Reemplaza los pendientes de assets Ruemia.
 - ✅ 2026-09-25 — **Auditoría SEO (Tier 1 + Tier 2 de `seo-audit-ruemia.md`)**:
   1. `public/robots.txt` (nuevo) — `Allow: /`, `Disallow` de `/admin` (no existe en este fork, agregado igual por consistencia con otros forks), `/cart`, `/checkout`, `/order-confirmation`, y `Sitemap: https://ruemia.uy/sitemap.xml`.
   2. `scripts/generate-sitemap.ts` (nuevo, corre en `prebuild` antes de `vite build`) — genera `public/sitemap.xml` con rutas estáticas + categorías + productos activos (`is_active = true`) de la organización resuelta por `VITE_STORE_SLUG` vía `get_org_by_slug`. Fail-soft: sin env o con Supabase caído, igual escribe un sitemap con las rutas estáticas. Lógica pura (XML builder, helper de URL absoluta) en `src/lib/sitemapBuilder.ts` + `src/lib/siteUrl.ts`, con tests.

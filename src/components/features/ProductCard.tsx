@@ -87,11 +87,11 @@ export function ProductCard({
   const showAddButton = !noAddToCart && !hasVariants && stock !== null && hasStock
 
   return (
-    <div className="group bg-white rounded-2xl border border-gray-100 overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 flex flex-col h-full">
+    <div className="group bg-white rounded-md border border-brand-line overflow-hidden transition-colors duration-300 hover:border-brand-algarrobo flex flex-col h-full">
       {/* Image area */}
       <div className="relative overflow-hidden">
         <Link to={productUrl}>
-          <div className="aspect-square bg-gray-50">
+          <div className="aspect-square bg-brand-crema border-b border-brand-line">
             {currentImageUrl ? (
               <img
                 key={currentImageIndex}
@@ -108,7 +108,7 @@ export function ProductCard({
                 }}
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-200">
+              <div className="w-full h-full flex items-center justify-center text-brand-line">
                 <Package className="h-14 w-14" />
               </div>
             )}
@@ -117,7 +117,7 @@ export function ProductCard({
 
         {/* Discount badge */}
         {hasActiveDiscount(product) && (
-          <span className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow-sm z-10">
+          <span className="absolute top-3 left-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-brand-cuero text-brand-crema font-heading text-[11px] font-semibold ring-1 ring-brand-crema/60">
             -{product.discount_percentage}%
           </span>
         )}
@@ -127,7 +127,7 @@ export function ProductCard({
           <button
             onClick={handleAddToCart}
             disabled={isAdding}
-            className="absolute bottom-3 right-3 rounded-full p-2.5 md:p-3 shadow-lg z-10 md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300 disabled:opacity-50"
+            className="absolute bottom-3 right-3 rounded-full p-2.5 md:p-3 border border-brand-crema/40 z-10 md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300 disabled:opacity-50"
             style={{
               backgroundColor: 'var(--org-primary-color, #705931)',
               color: 'var(--org-primary-ink, white)',
@@ -149,7 +149,7 @@ export function ProductCard({
       {/* Info */}
       <div className="p-4 flex flex-col flex-grow">
         <Link to={productUrl}>
-          <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 leading-snug mb-3 hover:opacity-70 transition-opacity">
+          <h3 className="text-[15px] font-semibold text-brand-tinta line-clamp-2 leading-snug mb-3 hover:text-brand-cuero transition-colors">
             {capitalizeFirst(product.name)}
           </h3>
         </Link>
@@ -157,12 +157,12 @@ export function ProductCard({
         <div className="mt-auto flex items-end justify-between gap-2">
           <div className="min-w-0">
             {hasActiveDiscount(product) && (
-              <span className="text-xs text-gray-400 line-through block">
+              <span className="text-xs text-brand-muted line-through block tabular-nums">
                 {formatPrice(product.price, settings)}
               </span>
             )}
             <span
-              className="text-base font-bold leading-none"
+              className="font-heading text-lg font-semibold leading-none tabular-nums"
               style={{ color: 'var(--org-primary-color, #705931)' }}
             >
               {formatPrice(getEffectivePrice(product), settings)}
@@ -172,8 +172,8 @@ export function ProductCard({
           {stock !== null && (
             <span
               className={cn(
-                'flex-shrink-0 text-xs px-2 py-0.5 rounded-full font-medium',
-                hasStock ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'
+                'flex-shrink-0 font-heading text-[10px] px-2 py-1 rounded-full font-semibold uppercase tracking-[0.1em]',
+                hasStock ? 'bg-[#EEF3E6] text-[#46602B]' : 'bg-red-50 text-red-700'
               )}
             >
               {hasStock ? 'En stock' : 'Sin stock'}
@@ -183,7 +183,7 @@ export function ProductCard({
 
         {!noAddToCart && hasVariants && (
           <Link to={productUrl} className="mt-3">
-            <Button variant="outline" size="sm" className="w-full text-xs rounded-xl" disabled={!hasStock}>
+            <Button variant="outline" size="sm" className="w-full" disabled={!hasStock}>
               {hasStock ? 'Ver opciones' : 'Sin stock'}
             </Button>
           </Link>

@@ -311,7 +311,7 @@ export function OrderConfirmation() {
   if (!order) {
     return (
       <div className="container-custom py-8 text-center">
-        <p className="text-gray-600 text-lg mb-4">Orden no encontrada</p>
+        <p className="text-brand-muted text-lg mb-4">Orden no encontrada</p>
         <Link to="/">
           <Button variant="outline">
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -352,11 +352,11 @@ export function OrderConfirmation() {
         )}
 
         {order.payment_method === 'mercadopago' && order.total > 0 && order.status === 'processing' && (
-          <div className="mb-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
-            <CheckCircle2 className="h-5 w-5 shrink-0 text-green-600 mt-0.5" />
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-[#C9D7B5] bg-[#EEF3E6] p-4">
+            <CheckCircle2 className="h-5 w-5 shrink-0 text-[#46602B] mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold text-green-800">Pago confirmado por Mercado Pago</p>
-              <p className="text-sm text-green-700 mt-0.5">
+              <p className="font-semibold text-[#46602B]">Pago confirmado por Mercado Pago</p>
+              <p className="text-sm text-[#46602B] mt-0.5">
                 Tu pago fue acreditado correctamente. Ya estamos preparando tu orden.
               </p>
             </div>
@@ -364,18 +364,18 @@ export function OrderConfirmation() {
         )}
 
         {order.payment_method === 'mercadopago' && order.total > 0 && order.status === 'pending' && mpStatus !== 'failure' && (
-          <div className="mb-6 flex items-start gap-3 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
-            <Clock className="h-5 w-5 shrink-0 text-yellow-600 mt-0.5" />
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-brand-algarrobo/40 bg-brand-crema p-4">
+            <Clock className="h-5 w-5 shrink-0 text-brand-tinta mt-0.5" />
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-yellow-800">Pago en proceso</p>
-              <p className="text-sm text-yellow-700 mt-0.5">
+              <p className="font-semibold text-brand-tinta">Pago en proceso</p>
+              <p className="text-sm text-brand-tinta mt-0.5">
                 Mercado Pago está procesando tu pago. El estado de la orden se actualizará automáticamente cuando se confirme.
               </p>
               <button
                 type="button"
                 onClick={handleRefreshMpPayment}
                 disabled={refreshingMp}
-                className="mt-3 flex items-center gap-1.5 text-sm font-medium text-yellow-800 underline underline-offset-2 hover:text-yellow-900 disabled:opacity-50"
+                className="mt-3 flex items-center gap-1.5 text-sm font-medium text-brand-tinta underline underline-offset-2 hover:text-brand-tinta disabled:opacity-50"
               >
                 <RefreshCw className={`h-3.5 w-3.5 ${refreshingMp ? 'animate-spin' : ''}`} />
                 {refreshingMp ? 'Verificando...' : 'Verificar estado ahora'}
@@ -385,13 +385,13 @@ export function OrderConfirmation() {
         )}
 
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-4">
-            <CheckCircle2 className="h-8 w-8 text-green-600" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#EEF3E6] rounded-full mb-4">
+            <CheckCircle2 className="h-8 w-8 text-[#46602B]" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="brand-title text-2xl md:text-3xl mb-2">
             ¡Orden Confirmada!
           </h1>
-          <p className="text-gray-600">
+          <p className="text-brand-muted">
             Tu orden {orderRef} ha sido creada exitosamente
           </p>
         </div>
@@ -406,11 +406,11 @@ export function OrderConfirmation() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-600">Estado</p>
+                <p className="text-sm text-brand-muted">Estado</p>
                 <p className="font-semibold">{getStatusLabel(order.status)}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Subtotal</p>
+                <p className="text-sm text-brand-muted">Subtotal</p>
                 <p className="font-semibold">{formatPrice(order.subtotal_before_discount ?? order.total, settings)}</p>
               </div>
             </div>
@@ -418,11 +418,11 @@ export function OrderConfirmation() {
             {hasCouponDiscount && (
               <div className="border-t pt-4 space-y-2">
                 <div className="flex items-center justify-between gap-4 text-sm">
-                  <p className="font-medium text-gray-700">{couponLabel}</p>
+                  <p className="font-medium text-brand-muted">{couponLabel}</p>
                   <p className="font-semibold text-emerald-700">-{formatPrice(order.discount_total, settings)}</p>
                 </div>
                 {couponDiscountMetadata?.applied_at && (
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-brand-muted">
                     Aplicado el {new Date(couponDiscountMetadata.applied_at).toLocaleString('es-UY')}
                   </p>
                 )}
@@ -430,14 +430,14 @@ export function OrderConfirmation() {
             )}
 
             <div className="border-t pt-4">
-              <p className="text-sm font-medium text-gray-700 mb-2">Método de Pago</p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm font-medium text-brand-muted mb-2">Método de Pago</p>
+              <p className="text-sm text-brand-muted">
                 {paymentMethodLabel}
               </p>
             </div>
 
             <div className="border-t pt-4">
-              <p className="text-sm text-gray-600">Total</p>
+              <p className="text-sm text-brand-muted">Total</p>
               <p className="font-semibold text-lg" style={{ color: primaryColor }}>
                 {formatPrice(order.total, settings)}
               </p>
@@ -454,8 +454,8 @@ export function OrderConfirmation() {
               }
               return (
                 <div className="border-t pt-4">
-                  <p className="text-sm font-medium text-gray-700 mb-2">Dirección de Envío</p>
-                  <div className="text-sm text-gray-600">
+                  <p className="text-sm font-medium text-brand-muted mb-2">Dirección de Envío</p>
+                  <div className="text-sm text-brand-muted">
                     <p>{shipping.fullName}</p>
                     {shipping.email && <p>Email: {shipping.email}</p>}
                     <p>{shipping.address}</p>
@@ -477,9 +477,9 @@ export function OrderConfirmation() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-brand-muted">
                 Escribinos por WhatsApp al{' '}
-                <span className="font-semibold text-gray-900">{settings.store_whatsapp_number}</span>{' '}
+                <span className="font-semibold text-brand-tinta">{settings.store_whatsapp_number}</span>{' '}
                 para coordinar la entrega o resolver cualquier duda sobre tu orden.
               </p>
               <a
@@ -508,7 +508,7 @@ export function OrderConfirmation() {
                 
                 return (
                   <div key={item.id} className="flex items-center space-x-4">
-                    <div className="w-16 h-16 rounded bg-gray-100 flex-shrink-0 overflow-hidden">
+                    <div className="w-16 h-16 rounded bg-brand-crema flex-shrink-0 overflow-hidden">
                       {displayImage ? (
                         <img
                           src={displayImage}
@@ -516,7 +516,7 @@ export function OrderConfirmation() {
                           className="w-full h-full object-cover"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px] text-center p-1">
+                        <div className="w-full h-full flex items-center justify-center text-brand-muted text-[10px] text-center p-1">
                           Sin imagen
                         </div>
                       )}
@@ -526,14 +526,14 @@ export function OrderConfirmation() {
                       {variant && (
                         <div className="mt-1 space-y-1">
                           {variant.name && (
-                            <p className="text-sm font-medium text-gray-700">
+                            <p className="text-sm font-medium text-brand-muted">
                               Variante: {capitalizeFirst(variant.name)}
                             </p>
                           )}
                           {variant.attributes && typeof variant.attributes === 'object' && (
                             <div className="flex flex-wrap gap-1">
                               {Object.entries(variant.attributes as Record<string, string>).map(([key, value]) => (
-                                <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">
+                                <span key={key} className="text-xs bg-brand-crema text-brand-muted px-2 py-0.5 rounded">
                                   {key}: {value}
                                 </span>
                               ))}
@@ -541,7 +541,7 @@ export function OrderConfirmation() {
                           )}
                         </div>
                       )}
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-brand-muted">
                         Cantidad: {item.quantity} × {formatPrice(item.price, settings)}
                       </p>
                     </div>
@@ -553,7 +553,7 @@ export function OrderConfirmation() {
               })}
             </div>
             <div className="border-t mt-4 pt-4">
-              <div className="flex justify-between text-lg font-bold">
+              <div className="flex justify-between font-heading text-lg font-semibold">
                 <span>Total</span>
                 <span>{formatPrice(order.total, settings)}</span>
               </div>
@@ -572,27 +572,27 @@ export function OrderConfirmation() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="p-4 rounded-lg" style={{ backgroundColor: `color-mix(in srgb, ${primaryColor} 10%, white)` }}>
-                <p className="text-sm font-medium text-gray-700 mb-3">
+                <p className="text-sm font-medium text-brand-muted mb-3">
                   Realiza la transferencia por el monto total de la orden:
                 </p>
                 {transferInstructions.trim() ? (
-                  <pre className="text-sm text-gray-700 font-sans leading-6 text-bold">
+                  <pre className="text-sm text-brand-muted font-sans leading-6 text-bold">
                     {transferInstructions}
                   </pre>
                 ) : (
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-brand-muted">
                     Esta organización no configuró aún los datos bancarios de transferencia.
                   </p>
                 )}
               </div>
-              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+              <div className="bg-brand-crema border border-brand-algarrobo/40 p-4 rounded-lg">
                 <div className="flex items-start space-x-3">
-                  <Phone className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <Phone className="h-5 w-5 text-brand-tinta mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-yellow-900 mb-1">
+                    <p className="text-sm font-medium text-brand-tinta mb-1">
                       Envía el comprobante de transferencia
                     </p>
-                    <p className="text-sm text-yellow-800">
+                    <p className="text-sm text-brand-tinta">
                       Por favor, envía una foto del comprobante de pago a este correo o WhatsApp:
                     </p>
                     <div className="mt-2 space-y-1">
@@ -606,7 +606,7 @@ export function OrderConfirmation() {
                   </div>
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-brand-muted mt-2">
                 Una vez recibido el comprobante, procesaremos tu orden y te notificaremos.
               </p>
             </CardContent>

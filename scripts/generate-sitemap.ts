@@ -57,6 +57,7 @@ function loadDotEnvFallback(): void {
 const STATIC_ROUTES: Array<{ path: string; changefreq: NonNullable<SitemapEntry['changefreq']>; priority: number }> = [
   { path: '/', changefreq: 'daily', priority: 1.0 },
   { path: '/products', changefreq: 'daily', priority: 0.9 },
+  { path: '/visitanos', changefreq: 'monthly', priority: 0.5 },
   { path: '/legal/privacidad', changefreq: 'yearly', priority: 0.2 },
   { path: '/legal/terminos', changefreq: 'yearly', priority: 0.2 },
 ]

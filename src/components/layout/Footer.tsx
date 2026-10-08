@@ -1,82 +1,77 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
-import { ShoppingCart, LayoutGrid, Instagram, Facebook, MessageCircle, Truck, RotateCcw, CreditCard } from 'lucide-react'
-import logoWordmark from '@/brand/logo-principal-fondo1.png'
+import { ShoppingCart, LayoutGrid, Instagram, Facebook, MessageCircle, MapPin, Truck, RotateCcw, CreditCard } from 'lucide-react'
+import { buildWhatsappUrl } from '@/lib/storeLocation'
+import logoSquare from '@/brand/mates-ajedrez-logo-square.jpeg'
 
 export function PublicStoreFooter() {
   const { organization } = usePublicStore()
+  const { pathname } = useLocation()
   const { categoriesWithSubs } = usePublicCategoriesForMenu(organization.id)
-
-  // Marca hardcodeada: theming dinámico por organización fue removido
-  // (single-tenant fork, org.branding/settings quedan permanentemente NULL).
-  const primaryColor = '#705931'
 
   const parentCategories = categoriesWithSubs
 
   // Redes sociales configuradas por variable de entorno (single-tenant fork).
   const instagramUrl = (import.meta.env.VITE_SOCIAL_INSTAGRAM ?? '').trim()
   const facebookUrl = (import.meta.env.VITE_SOCIAL_FACEBOOK ?? '').trim()
-  const whatsappNumber = (import.meta.env.VITE_SOCIAL_WHATSAPP ?? '').trim()
-  const whatsappUrl = whatsappNumber ? `https://wa.me/${whatsappNumber.replace(/\D/g, '')}` : ''
+  const whatsappUrl = buildWhatsappUrl(import.meta.env.VITE_SOCIAL_WHATSAPP)
   const hasSocialLinks = Boolean(instagramUrl || facebookUrl || whatsappUrl)
 
+  const columnHeading = 'font-heading text-[11px] font-semibold uppercase tracking-[0.28em] text-brand-algarrobo mb-4 pb-3 border-b border-brand-crema/20'
+  const linkClass = 'text-sm text-brand-crema/75 hover:text-brand-crema transition-colors'
+  const socialClass = 'flex h-11 w-11 items-center justify-center rounded-full border border-brand-crema/30 text-brand-crema transition-colors hover:bg-brand-crema hover:text-brand-tinta'
+
   return (
-    <footer
-      className="mt-16 border-t"
-      style={{
-        backgroundColor: `${primaryColor}10`,
-        borderColor: `${primaryColor}22`,
-      }}
-    >
-      <div className="container-custom py-10 md:py-14">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-10">
+    <footer className={`${pathname === '/' ? '' : 'mt-16'} bg-brand-tinta text-brand-crema`}>
+      <div className="container-custom py-12 md:py-16">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${parentCategories.length > 0 ? 'lg:grid-cols-3' : ''} gap-10 lg:gap-14`}>
 
           {/* Col 1: Brand */}
           <div>
-            <Link to="/" className="flex items-center gap-3 mb-4">
+            <Link to="/" className="flex items-center gap-4 mb-5">
               <img
-                src={logoWordmark}
+                src={logoSquare}
                 alt="Mates Ajedrez"
-                className="h-10 w-10 rounded-lg object-contain"
+                width={48}
+                height={48}
+                className="h-12 w-12 rounded-full object-cover ring-1 ring-brand-crema/30"
               />
-              <span
-                className="font-semibold text-base text-gray-900"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
-              >
-                {organization.name}
+              <span className="font-heading font-light uppercase text-lg tracking-[0.2em] text-brand-crema">
+                Mates Ajedrez
               </span>
             </Link>
-            <div className="flex flex-col gap-2 mt-4">
-              <Link
-                to="/products"
-                className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-              >
-                <LayoutGrid className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+            <p className="font-heading font-light text-sm tracking-[0.08em] text-brand-crema/80 mb-5">
+              MATE, luego existo
+            </p>
+            <div className="flex flex-col gap-2.5">
+              <Link to="/products" className={`flex items-center gap-2 ${linkClass}`}>
+                <LayoutGrid className="h-4 w-4 shrink-0 text-brand-algarrobo" strokeWidth={1.5} />
                 Ver todos los productos
               </Link>
-              <Link
-                to="/cart"
-                className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 transition-colors"
-              >
-                <ShoppingCart className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+              <Link to="/cart" className={`flex items-center gap-2 ${linkClass}`}>
+                <ShoppingCart className="h-4 w-4 shrink-0 text-brand-algarrobo" strokeWidth={1.5} />
                 Mi carrito
+              </Link>
+              <Link to="/visitanos" className={`flex items-center gap-2 ${linkClass}`}>
+                <MapPin className="h-4 w-4 shrink-0 text-brand-algarrobo" strokeWidth={1.5} />
+                Visitanos
               </Link>
             </div>
 
             {/* Trust signals — texto genérico, sin plazos/costos aún no
                 confirmados (ver placeholders en TerminosCondiciones.tsx) */}
-            <div className="flex flex-col gap-2.5 mt-6 pt-6 border-t" style={{ borderColor: `${primaryColor}15` }}>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <Truck className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+            <div className="flex flex-col gap-2.5 mt-6 pt-6 border-t border-brand-crema/20">
+              <div className="flex items-center gap-2 text-xs text-brand-crema/70">
+                <Truck className="h-4 w-4 shrink-0 text-brand-algarrobo" strokeWidth={1.5} />
                 Coordinamos tu envío
               </div>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <RotateCcw className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+              <div className="flex items-center gap-2 text-xs text-brand-crema/70">
+                <RotateCcw className="h-4 w-4 shrink-0 text-brand-algarrobo" strokeWidth={1.5} />
                 Cambios dentro de los primeros días
               </div>
-              <div className="flex items-center gap-2 text-xs text-gray-500">
-                <CreditCard className="h-4 w-4 shrink-0" style={{ color: primaryColor }} />
+              <div className="flex items-center gap-2 text-xs text-brand-crema/70">
+                <CreditCard className="h-4 w-4 shrink-0 text-brand-algarrobo" strokeWidth={1.5} />
                 Múltiples medios de pago
               </div>
             </div>
@@ -85,28 +80,20 @@ export function PublicStoreFooter() {
           {/* Col 2: Categories */}
           {parentCategories.length > 0 && (
             <div>
-              <h4
-                className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
-              >
-                Categorías
-              </h4>
+              <h2 className={columnHeading}>Categorías</h2>
               <ul className="space-y-2.5">
                 {parentCategories.map((cat) => (
                   <li key={cat.value}>
-                    <Link
-                      to={`/categories/${cat.value}`}
-                      className="text-sm text-gray-500 hover:text-gray-900 transition-colors"
-                    >
+                    <Link to={`/categories/${cat.value}`} className={linkClass}>
                       {cat.label}
                     </Link>
                     {cat.subcategories && cat.subcategories.length > 0 && (
-                      <ul className="mt-1.5 ml-3 space-y-1.5 border-l-2 pl-3" style={{ borderColor: `${primaryColor}30` }}>
+                      <ul className="mt-1.5 ml-3 space-y-1.5 border-l border-brand-crema/20 pl-3">
                         {cat.subcategories.map((sub) => (
                           <li key={sub.value}>
                             <Link
                               to={`/categories/${sub.value}`}
-                              className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+                              className="text-xs text-brand-crema/60 hover:text-brand-crema transition-colors"
                             >
                               {sub.label}
                             </Link>
@@ -123,47 +110,21 @@ export function PublicStoreFooter() {
           {/* Col 3: redes sociales */}
           {hasSocialLinks ? (
             <div>
-              <h4
-                className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
-              >
-                Seguinos
-              </h4>
+              <h2 className={columnHeading}>Seguinos</h2>
               <div className="flex items-center gap-3">
                 {instagramUrl && (
-                  <a
-                    href={instagramUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Instagram"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border transition-opacity hover:opacity-70"
-                    style={{ borderColor: `${primaryColor}30`, color: primaryColor }}
-                  >
-                    <Instagram className="h-4 w-4" />
+                  <a href={instagramUrl} target="_blank" rel="noopener noreferrer" aria-label="Instagram" className={socialClass}>
+                    <Instagram className="h-4 w-4" strokeWidth={1.5} />
                   </a>
                 )}
                 {facebookUrl && (
-                  <a
-                    href={facebookUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Facebook"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border transition-opacity hover:opacity-70"
-                    style={{ borderColor: `${primaryColor}30`, color: primaryColor }}
-                  >
-                    <Facebook className="h-4 w-4" />
+                  <a href={facebookUrl} target="_blank" rel="noopener noreferrer" aria-label="Facebook" className={socialClass}>
+                    <Facebook className="h-4 w-4" strokeWidth={1.5} />
                   </a>
                 )}
                 {whatsappUrl && (
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="WhatsApp"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border transition-opacity hover:opacity-70"
-                    style={{ borderColor: `${primaryColor}30`, color: primaryColor }}
-                  >
-                    <MessageCircle className="h-4 w-4" />
+                  <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" className={socialClass}>
+                    <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
                   </a>
                 )}
               </div>
@@ -176,30 +137,26 @@ export function PublicStoreFooter() {
       </div>
 
       {/* Bottom bar */}
-      <div
-        className="border-t"
-        style={{ borderColor: `${primaryColor}18` }}
-      >
-        <div className="container-custom py-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-gray-400">
+      <div className="border-t border-brand-crema/20">
+        <div className="container-custom py-4 flex flex-col lg:flex-row items-center justify-between gap-3">
+          <p className="text-xs text-brand-crema/60">
             © {new Date().getFullYear()} {organization.name}. Todos los derechos reservados.
           </p>
           <div className="flex items-center gap-4">
-            <Link to="/legal/privacidad" className="text-xs text-gray-400 hover:text-gray-700 hover:underline transition-colors">
+            <Link to="/legal/privacidad" className="text-xs text-brand-crema/60 hover:text-brand-crema hover:underline transition-colors">
               Política de Privacidad
             </Link>
-            <Link to="/legal/terminos" className="text-xs text-gray-400 hover:text-gray-700 hover:underline transition-colors">
+            <Link to="/legal/terminos" className="text-xs text-brand-crema/60 hover:text-brand-crema hover:underline transition-colors">
               Términos y Condiciones
             </Link>
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-brand-crema/60">
             Powered by{' '}
             <a
               href="https://ciceridev.vercel.app/home"
               target="_blank"
               rel="noopener noreferrer"
-              className="hover:underline"
-              style={{ color: primaryColor }}
+              className="text-brand-algarrobo hover:underline"
             >
               Ciceridev
             </a>

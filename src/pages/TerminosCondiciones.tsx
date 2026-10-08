@@ -5,26 +5,26 @@ export function TerminosCondiciones() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-white py-12 px-4 sm:px-6">
+    <div className="min-h-screen bg-brand-bg py-12 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-8 transition-colors"
+          className="flex items-center gap-2 text-sm text-brand-muted hover:text-brand-tinta mb-8 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver
         </button>
 
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Términos y Condiciones</h1>
-        <p className="text-sm text-gray-500 mb-10">Última actualización: [COMPLETAR FECHA DE PUBLICACIÓN]</p>
+        <h1 className="brand-title text-2xl md:text-3xl mb-2">Términos y Condiciones</h1>
+        <p className="text-sm text-brand-muted mb-10">Última actualización: [COMPLETAR FECHA DE PUBLICACIÓN]</p>
 
-        <div className="space-y-8 text-gray-700 leading-relaxed">
+        <div className="space-y-8 text-brand-muted leading-relaxed">
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Aceptación de estos términos</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">1. Aceptación de estos términos</h2>
             <p>
               Al navegar y realizar una compra en Mates Ajedrez (
-              <a href="https://www.instagram.com/matesajedrez/" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+              <a href="https://www.instagram.com/matesajedrez/" target="_blank" rel="noopener noreferrer" className="text-brand-cuero hover:underline">
                 @matesajedrez
               </a>
               ) aceptás los presentes Términos y Condiciones. Si no estás de acuerdo con alguno de sus
@@ -33,15 +33,15 @@ export function TerminosCondiciones() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">2. Identificación del vendedor</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">2. Identificación del vendedor</h2>
             <p>
               Esta tienda es operada por <strong>[NOMBRE COMPLETO DEL TITULAR]</strong>, con domicilio en{' '}
               <strong>Avenida España 1471, Paysandú, Uruguay</strong>. Podés contactarnos por correo electrónico a{' '}
-              <a href="mailto:[EMAIL DE CONTACTO]" className="text-primary-600 hover:underline">
+              <a href="mailto:[EMAIL DE CONTACTO]" className="text-brand-cuero hover:underline">
                 [EMAIL DE CONTACTO]
               </a>{' '}
               o por WhatsApp{' '}
-              <a href="https://wa.link/bdxmao" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+              <a href="https://wa.link/bdxmao" target="_blank" rel="noopener noreferrer" className="text-brand-cuero hover:underline">
                 escribinos acá
               </a>
               .
@@ -49,7 +49,7 @@ export function TerminosCondiciones() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">3. Productos, precios y disponibilidad</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">3. Productos, precios y disponibilidad</h2>
             <ul className="list-disc pl-6 space-y-2">
               <li>Los precios publicados están expresados en pesos uruguayos ($UY) e incluyen los impuestos aplicables.</li>
               <li>
@@ -63,7 +63,7 @@ export function TerminosCondiciones() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">4. Medios de pago</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">4. Medios de pago</h2>
             <p>
               Los medios de pago habilitados se muestran al finalizar la compra, en el paso de checkout.
               Al elegir un medio de pago electrónico, la transacción es procesada directamente por el
@@ -72,7 +72,7 @@ export function TerminosCondiciones() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">5. Envío y entrega</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">5. Envío y entrega</h2>
             <ul className="list-disc pl-6 space-y-2">
               <li>[COMPLETAR: zonas de envío disponibles.]</li>
               <li>[COMPLETAR: costo de envío y condiciones para envío gratis, si aplica.]</li>
@@ -82,7 +82,7 @@ export function TerminosCondiciones() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">6. Cambios y devoluciones</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">6. Cambios y devoluciones</h2>
             <ul className="list-disc pl-6 space-y-2">
               <li>[COMPLETAR: plazo para solicitar un cambio o devolución, ej. 5 días corridos desde recibido el producto.]</li>
               <li>[COMPLETAR: condiciones del producto para aceptar el cambio/devolución, ej. sin uso, con etiquetas.]</li>
@@ -95,7 +95,7 @@ export function TerminosCondiciones() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">7. Garantías del comprador</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">7. Garantías del comprador</h2>
             <p>
               Conforme a la <strong>Ley N.º 17.250 de Relaciones de Consumo</strong> de la República
               Oriental del Uruguay, tenés derecho a recibir un producto que coincida con lo publicado y en
@@ -106,7 +106,7 @@ export function TerminosCondiciones() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">8. Propiedad intelectual</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">8. Propiedad intelectual</h2>
             <p>
               Las imágenes, textos, logo y demás contenido de este sitio son propiedad de Mates Ajedrez o de sus
               proveedores y no pueden reproducirse ni utilizarse sin autorización previa.
@@ -114,7 +114,7 @@ export function TerminosCondiciones() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">9. Modificaciones de estos términos</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">9. Modificaciones de estos términos</h2>
             <p>
               Podemos actualizar estos Términos y Condiciones cuando sea necesario. Los cambios entran en
               vigencia desde su publicación en esta página, junto con la fecha de última actualización.
@@ -122,17 +122,17 @@ export function TerminosCondiciones() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">10. Ley aplicable</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">10. Ley aplicable</h2>
             <p>
               Estos Términos y Condiciones se rigen por las leyes de la República Oriental del Uruguay.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">11. Contacto</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">11. Contacto</h2>
             <p>
               Para cualquier consulta sobre estos Términos y Condiciones, escribinos a{' '}
-              <a href="mailto:[EMAIL DE CONTACTO]" className="text-primary-600 hover:underline">
+              <a href="mailto:[EMAIL DE CONTACTO]" className="text-brand-cuero hover:underline">
                 [EMAIL DE CONTACTO]
               </a>
               .
@@ -140,9 +140,9 @@ export function TerminosCondiciones() {
           </section>
 
           <section>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-brand-muted">
               Ver también nuestra{' '}
-              <Link to="/legal/privacidad" className="text-primary-600 hover:underline">
+              <Link to="/legal/privacidad" className="text-brand-cuero hover:underline">
                 Política de Privacidad
               </Link>
               .

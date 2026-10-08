@@ -32,7 +32,7 @@ export function BillerCheckoutPanel({ config, onChange }: Props) {
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+    <div className="border border-brand-line rounded-lg p-4 space-y-3">
       {/* Toggle principal */}
       <label className="flex items-center gap-3 cursor-pointer select-none">
         <input
@@ -44,18 +44,18 @@ export function BillerCheckoutPanel({ config, onChange }: Props) {
           }}
           className="h-4 w-4 rounded"
         />
-        <span className="font-medium text-sm text-gray-800">
+        <span className="font-medium text-sm text-brand-tinta">
           Emitir comprobante fiscal electrónico
         </span>
         {config.ambiente === 'test' && (
-          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded font-medium">
+          <span className="text-xs bg-brand-crema text-brand-cuero-oscuro px-2 py-0.5 rounded font-medium">
             MODO TEST
           </span>
         )}
       </label>
 
       {emitirCFE && (
-        <div className="space-y-3 pt-2 border-t border-gray-100">
+        <div className="space-y-3 pt-2 border-t border-brand-line">
           {/* e-Ticket vs e-Factura */}
           <div className="flex gap-2">
             {(['ticket', 'factura'] as const).map((t) => (
@@ -66,7 +66,7 @@ export function BillerCheckoutPanel({ config, onChange }: Props) {
                 className={`flex-1 py-2 px-3 rounded border text-sm font-medium transition-colors ${
                   tipo === t
                     ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'border-gray-300 text-gray-600 hover:border-indigo-400'
+                    : 'border-brand-line text-brand-muted hover:border-indigo-400'
                 }`}
               >
                 {t === 'ticket' ? 'e-Ticket' : 'e-Factura'}
@@ -88,7 +88,7 @@ export function BillerCheckoutPanel({ config, onChange }: Props) {
                     setTipoDoc(v)
                     notify({ clienteTipoDocumento: v })
                   }}
-                  className="border border-gray-300 rounded-md px-2 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="border border-brand-line rounded-md px-2 py-1.5 text-sm w-28 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value={TIPO_DOCUMENTO_CLIENTE.RUT}>RUT</option>
                   <option value={TIPO_DOCUMENTO_CLIENTE.CI}>CI</option>
@@ -107,7 +107,7 @@ export function BillerCheckoutPanel({ config, onChange }: Props) {
                     setDocumento(e.target.value)
                     notify({ clienteDocumento: e.target.value })
                   }}
-                  className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="flex-1 border border-brand-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
               <input
@@ -118,7 +118,7 @@ export function BillerCheckoutPanel({ config, onChange }: Props) {
                   setNombre(e.target.value)
                   notify({ clienteNombre: e.target.value })
                 }}
-                className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-brand-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
               <input
                 type="email"
@@ -128,7 +128,7 @@ export function BillerCheckoutPanel({ config, onChange }: Props) {
                   setEmail(e.target.value)
                   notify({ clienteEmail: e.target.value })
                 }}
-                className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-brand-line rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           )}

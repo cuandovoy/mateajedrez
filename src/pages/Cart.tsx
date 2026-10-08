@@ -58,7 +58,7 @@ function CartQuantityInput({ quantity, min, max, onCommit }: CartQuantityInputPr
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur()
       }}
-      className="w-14 h-9 text-center font-semibold border border-gray-200 rounded-lg focus:outline-none focus:ring-2 transition-shadow"
+      className="w-14 h-9 text-center font-semibold border border-brand-line rounded-lg focus:outline-none focus:ring-2 transition-shadow"
       style={{ '--tw-ring-color': 'var(--org-primary-color, #705931)' } as React.CSSProperties}
       aria-label="Cantidad"
     />
@@ -265,7 +265,7 @@ function CartContent() {
 
   const suggestedSection = suggestedProducts.length > 0 && (
     <div className="mt-12">
-      <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-6">
+      <h2 className="brand-title text-xl md:text-2xl mb-6">
         También te puede interesar
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
@@ -298,7 +298,7 @@ function CartContent() {
       <div className="container-custom py-8">
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-gray-600 text-lg mb-4">Tu carrito está vacío</p>
+            <p className="text-brand-muted text-lg mb-4">Tu carrito está vacío</p>
             <Button onClick={() => navigate('/')}>
               Continuar Comprando
             </Button>
@@ -312,7 +312,7 @@ function CartContent() {
   return (
     <div className="container-custom py-8">
       <CheckoutSteps currentStep="cart" />
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Carrito de Compras</h1>
+      <h1 className="brand-title text-2xl md:text-3xl mb-8">Carrito de Compras</h1>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">
@@ -324,13 +324,13 @@ function CartContent() {
               <Card key={item.id} className={cn(hasStockIssue && 'border-yellow-300 border-2')}>
                 <CardContent className="p-6">
                   {hasStockIssue && (
-                    <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start space-x-2">
-                      <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                    <div className="mb-4 p-3 bg-brand-crema border border-brand-algarrobo/40 rounded-lg flex items-start space-x-2">
+                      <AlertTriangle className="h-5 w-5 text-brand-tinta flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-yellow-800">
+                        <p className="text-sm font-medium text-brand-tinta">
                           Stock insuficiente
                         </p>
-                        <p className="text-xs text-yellow-700 mt-1">
+                        <p className="text-xs text-brand-tinta mt-1">
                           Disponible: {stockWarning.available}, Solicitado: {stockWarning.requested}
                         </p>
                       </div>
@@ -348,7 +348,7 @@ function CartContent() {
                         )
                         
                         return (
-                          <div className="flex-shrink-0 w-20 h-20 md:w-24 md:h-24 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+                          <div className="flex-shrink-0 w-20 h-20 md:w-24 md:h-24 bg-brand-crema rounded-lg overflow-hidden border border-brand-line">
                             {imageUrl ? (
                               <img
                                 src={imageUrl}
@@ -361,7 +361,7 @@ function CartContent() {
                                 }}
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400 text-xs text-center p-2">
+                              <div className="w-full h-full flex items-center justify-center bg-brand-crema text-brand-muted text-xs text-center p-2">
                                 Sin imagen
                               </div>
                             )}
@@ -369,20 +369,20 @@ function CartContent() {
                         )
                       })()}
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                        <h3 className="text-base sm:text-lg font-semibold text-brand-tinta">
                           {capitalizeFirst(item.product.name)}
                         </h3>
                         {item.variant && (
                           <div className="mt-1 space-y-1">
                             {item.variant.name && (
-                              <p className="text-sm text-gray-600 font-medium">
+                              <p className="text-sm text-brand-muted font-medium">
                                 {capitalizeFirst(item.variant.name)}
                               </p>
                             )}
                             {item.variant.attributes && typeof item.variant.attributes === 'object' && (
                               <div className="flex flex-wrap gap-2">
                                 {Object.entries(item.variant.attributes as Record<string, string>).map(([key, value]) => (
-                                  <span key={key} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                  <span key={key} className="text-xs bg-brand-crema text-brand-muted px-2 py-1 rounded">
                                     {key}: {value}
                                   </span>
                                 ))}
@@ -393,7 +393,7 @@ function CartContent() {
                         {item.quantity > 1 && (
                           <div className="mt-2">
                             {!item.variant && hasActiveDiscount(item.product) && (
-                              <p className="text-xs text-gray-400 line-through leading-none">
+                              <p className="text-xs text-brand-muted line-through leading-none">
                                 {formatPrice(item.product.price, settings)}
                               </p>
                             )}
@@ -403,7 +403,7 @@ function CartContent() {
                           </div>
                         )}
                         {itemStocks[item.id] !== undefined && itemStocks[item.id] > 0 && (
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-brand-muted mt-1">
                             Stock disponible: {itemStocks[item.id]} {item.variant?.unit || item.product.unit || 'unidad'}
                           </p>
                         )}
@@ -439,7 +439,7 @@ function CartContent() {
                         </Button>
                       </div>
                       <div className="flex flex-col items-end sm:items-end gap-2">
-                        <p className="text-base sm:text-lg font-bold text-gray-900">
+                        <p className="text-base sm:font-heading text-lg font-semibold text-brand-tinta">
                           {formatPrice((item.variant?.price ?? getEffectivePrice(item.product)) * item.quantity, settings)}
                         </p>
                         <Button
@@ -467,18 +467,18 @@ function CartContent() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between">
-                <span className="text-gray-600">Subtotal</span>
+                <span className="text-brand-muted">Subtotal</span>
                 <span className="font-semibold">{formatPrice(getTotal(), settings)}</span>
               </div>
               <div className="border-t pt-4">
-                <div className="flex justify-between text-lg font-bold">
+                <div className="flex justify-between font-heading text-lg font-semibold">
                   <span>Total</span>
                   <span>{formatPrice(getTotal(), settings)}</span>
                 </div>
               </div>
               {Object.keys(stockWarnings).length > 0 && (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800">
+                <div className="p-3 bg-brand-crema border border-brand-algarrobo/40 rounded-lg">
+                  <p className="text-sm text-brand-tinta">
                     ⚠️ Algunos productos tienen problemas de stock. Por favor, actualiza las cantidades.
                   </p>
                 </div>

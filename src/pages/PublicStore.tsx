@@ -8,7 +8,8 @@ import { usePublicCategories } from '@/hooks/usePublicCategories'
 import { useStoreProducts } from '@/hooks/usePublicProducts'
 import type { Product, Category, ProductImage } from '@/types'
 import { Button } from '@/components/ui/Button'
-import { ArrowRight, Check } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
+import { HomePhoto, HomePhotoHero, HomePersonalization } from '@/components/features/HomeEditorial'
 
 const STORE_COVER_IMAGES_KEY = 'store_cover_image_urls'
 const HERO_SLIDE_INTERVAL_MS = 7000
@@ -144,7 +145,7 @@ export function PublicStore() {
   const heroShowTitle    = (settings.store_hero_show_title as boolean) !== false
   const heroShowSubtitle = (settings.store_hero_show_subtitle as boolean) !== false
   const heroShowCta      = (settings.store_hero_show_cta as boolean) !== false
-  const heroSubtitleText = (settings.store_hero_subtitle_text as string) || 'Bienvenido a nuestra tienda'
+  const heroSubtitleText = (settings.store_hero_subtitle_text as string) || 'MATE, luego existo'
   const heroOverlayOpacity = typeof settings.store_hero_overlay_opacity === 'number'
     ? settings.store_hero_overlay_opacity
     : 25
@@ -157,13 +158,6 @@ export function PublicStore() {
   // ancho-y-bajo (desktop) las recortaba de más — ver .claude/TODO.md.
   const heroHeightClass = { sm: 'py-6 md:py-16', md: 'py-8 md:py-24', lg: 'py-12 md:py-40', xl: 'py-14 md:py-64' }[heroHeight] ?? 'py-8 md:py-24'
   const heroAlignClass  = { center: 'text-center items-center', left: 'text-left items-start', 'bottom-left': 'text-left items-start justify-end pb-12' }[heroTextPosition] ?? 'text-center items-center'
-
-  const aboutImageUrl = useMemo(() => {
-    const withImage = products.find(
-      (product) => getOrderedProductImageUrls(product as ProductWithImages).length > 0
-    ) as ProductWithImages | undefined
-    return withImage ? getOrderedProductImageUrls(withImage)[0] : null
-  }, [products])
 
   useEffect(() => {
     if (!loading && window.location.hash === '#nosotros') {
@@ -185,10 +179,10 @@ export function PublicStore() {
 
   if (loading) {
     return (
-      <div className="bg-white">
+      <div className="bg-brand-bg">
         <Skeleton className="w-full h-64 md:h-96 rounded-none" />
         <div className="container-custom py-12">
-          <Skeleton className="h-8 w-40 mx-auto mb-10 rounded-xl" />
+          <Skeleton className="h-6 w-40 mx-auto mb-10" />
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-5">
             {Array.from({ length: 8 }).map((_, i) => (
               <SkeletonProductCard key={i} />
@@ -200,9 +194,9 @@ export function PublicStore() {
   }
 
   return (
-    <div className="bg-white">
+    <div className="bg-brand-bg">
       {/* Hero Banner Section */}
-      <section className="relative w-full mb-0">
+      {hasCoverImages ? <section className="relative w-full mb-0">
         <div className={`relative w-full ${heroHeightClass} overflow-hidden flex flex-col`}>
           {hasCoverImages ? (
             <div className="absolute inset-0">
@@ -219,24 +213,21 @@ export function PublicStore() {
               {heroOverlayOpacity > 0 && (
                 <div
                   className="absolute inset-0"
-                  style={{ backgroundColor: `rgba(0,0,0,${heroOverlayOpacity / 100})` }}
+                  style={{ backgroundColor: `rgba(43,36,24,${heroOverlayOpacity / 100})` }}
                 />
               )}
             </div>
           ) : (
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-100 to-gray-200" />
+            <div className="absolute inset-0 bg-brand-crema border-b border-brand-line" />
           )}
 
           <div className={`container-custom relative z-10 flex flex-col flex-1 ${heroAlignClass}`}>
             {heroShowTitle && (
               <h1
-                className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4"
+                className="font-heading font-light uppercase text-3xl sm:text-5xl lg:text-6xl tracking-[0.25em] sm:tracking-[0.35em] mb-4 break-words max-w-full"
                 style={{
-                  color: hasCoverImages ? heroTextColor : `var(--org-primary-color, #705931)`,
-                  fontFamily: `var(--org-font-heading, var(--org-font-family, sans-serif))`,
-                  letterSpacing: '0.12em',
-                  textShadow: hasCoverImages ? '0 1px 3px rgba(0,0,0,0.25)' : undefined,
-                  textTransform: 'uppercase',
+                  color: hasCoverImages ? heroTextColor : 'var(--org-primary-color, #705931)',
+                  textShadow: hasCoverImages ? '0 1px 3px rgba(43,36,24,0.35)' : undefined,
                 }}
               >
                 {organization.name}
@@ -245,10 +236,10 @@ export function PublicStore() {
 
             {heroShowSubtitle && (
               <p
-                className="text-lg md:text-xl mb-8 max-w-xl"
+                className="font-heading font-light uppercase text-sm md:text-base tracking-[0.3em] mb-8 max-w-xl"
                 style={{
-                  color: hasCoverImages ? heroTextColor : 'rgb(75 85 99)',
-                  textShadow: hasCoverImages ? '0 1px 2px rgba(0,0,0,0.2)' : undefined,
+                  color: hasCoverImages ? heroTextColor : '#6E634F',
+                  textShadow: hasCoverImages ? '0 1px 2px rgba(43,36,24,0.35)' : undefined,
                 }}
               >
                 {heroSubtitleText}
@@ -257,16 +248,7 @@ export function PublicStore() {
 
             {heroShowCta && (
               <Link to="/products">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="px-8 py-4 md:px-10 md:py-4 text-base font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 rounded-full"
-                  style={
-                    hasCoverImages
-                      ? { borderColor: heroTextColor, color: heroTextColor }
-                      : undefined
-                  }
-                >
+                <Button size="lg" className="px-8 md:px-10">
                   Ver productos
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
@@ -281,7 +263,7 @@ export function PublicStore() {
                     type="button"
                     onClick={() => setCurrentCoverIndex(index)}
                     aria-label={`Ir a la imagen ${index + 1}`}
-                    className="h-1.5 rounded-full transition-all duration-300"
+                    className="h-1 rounded-full transition-all duration-300"
                     style={{
                       backgroundColor: heroTextColor,
                       opacity: index === currentCoverIndex ? 1 : 0.4,
@@ -293,23 +275,19 @@ export function PublicStore() {
             )}
           </div>
         </div>
-      </section>
+      </section> : <HomePhotoHero />}
 
       {/* Categories Section */}
       {categories.length > 0 && (
         <section className="py-10 md:py-14">
           <div className="container-custom">
-            <div className="flex items-center justify-between mb-6">
-              <h2
-                className="text-xl md:text-2xl font-bold text-gray-900"
-                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, sans-serif))`, letterSpacing: '0.12em' }}
-              >
-                Categorías
-              </h2>
+            <div className="flex flex-wrap items-end justify-between gap-4 mb-8 pb-4 border-b border-brand-line">
+              <div>
+                <h2 className="brand-title text-2xl md:text-3xl">Categorías</h2>
+              </div>
               <Link
                 to="/products"
-                className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
-                style={{ color: 'var(--org-primary-color, #705931)' }}
+                className="flex shrink-0 items-center gap-1.5 font-heading text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-cuero border-b border-transparent hover:border-brand-cuero transition-colors"
               >
                 Ver todo
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -330,20 +308,16 @@ export function PublicStore() {
 
       {/* Featured Products Section */}
       {featuredProducts.length > 0 && (
-        <section className={`py-10 md:py-14 ${categories.length > 0 ? 'border-t border-gray-100' : ''}`}>
+        <section className="py-10 md:py-14">
           <div className="container-custom">
-            <div className="flex items-center justify-between mb-6">
-              <h2
-                className="text-xl md:text-2xl font-bold text-gray-900"
-                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, sans-serif))`, letterSpacing: '0.12em' }}
-              >
-                Productos destacados
-              </h2>
+            <div className="flex flex-wrap items-end justify-between gap-4 mb-8 pb-4 border-b border-brand-line">
+              <div>
+                <h2 className="brand-title text-2xl md:text-3xl">Productos destacados</h2>
+              </div>
               {products.length > 10 && (
                 <Link
                   to="/products"
-                  className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
-                  style={{ color: 'var(--org-primary-color, #705931)' }}
+                  className="flex shrink-0 items-center gap-1.5 font-heading text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-cuero border-b border-transparent hover:border-brand-cuero transition-colors"
                 >
                   Ver todos
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -365,77 +339,39 @@ export function PublicStore() {
         </section>
       )}
 
+      <HomePersonalization />
+
       {/* About Section */}
       <section
         id="nosotros"
-        className="py-16 md:py-24 scroll-mt-20"
-        style={{ backgroundColor: 'var(--org-primary-color, #705931)' }}
+        className="py-12 md:py-20 scroll-mt-20 bg-brand-cuero-oscuro"
       >
-        <div className="container-custom grid md:grid-cols-2 gap-10 md:gap-16 items-center">
-          <div className={aboutImageUrl ? 'order-2 md:order-1' : 'md:col-span-2 max-w-2xl mx-auto text-center'}>
-            <h2
-              className="text-3xl md:text-4xl font-bold mb-4"
-              style={{
-                color: 'var(--org-primary-ink, #F7F4E9)',
-                fontFamily: `var(--org-font-heading, var(--org-font-family, sans-serif))`,
-                letterSpacing: '0.12em',
-              }}
-            >
-              Nosotros
+        <div className="container-custom grid md:grid-cols-2 gap-8 lg:gap-16 items-center">
+          <div>
+            <h2 className="font-heading font-light uppercase tracking-[0.14em] text-3xl md:text-4xl text-brand-crema mb-4">
+              Conocé Mates Ajedrez
             </h2>
             <p
-              className="text-xl md:text-2xl italic mb-6 leading-snug"
-              style={{
-                color: 'var(--org-primary-ink, #F7F4E9)',
-                fontFamily: `var(--org-font-heading, var(--org-font-family, sans-serif))`,
-                letterSpacing: '0.12em',
-              }}
-            >
-              &ldquo;Tu mate, pero con tu esencia.&rdquo;
-            </p>
-            <p
-              className="leading-relaxed mb-6"
-              style={{ color: 'color-mix(in srgb, var(--org-primary-ink, #F7F4E9) 85%, transparent)' }}
+              className="leading-relaxed mb-6 text-brand-crema/85"
             >
               En Mates Ajedrez trabajamos cada mate a mano: cuero crudo, algarrobo y grabado
-              láser. El algarrobo le da alma, vos le das identidad. Nada de producción en
-              serie — cada pieza se personaliza y se prepara antes de llegar a tu casa.
+              láser. Cada pieza se personaliza y se prepara antes de llegar a tu casa.
             </p>
-            <ul
-              className={`flex flex-wrap gap-x-6 gap-y-2 mb-8 text-sm ${aboutImageUrl ? '' : 'justify-center'}`}
-              style={{ color: 'color-mix(in srgb, var(--org-primary-ink, #F7F4E9) 90%, transparent)' }}
-            >
-              {['Cuero crudo', 'Algarrobo', 'Grabado láser'].map((feature) => (
-                <li key={feature} className="flex items-center gap-2">
-                  <Check className="w-4 h-4 shrink-0" />
-                  {feature}
-                </li>
-              ))}
-            </ul>
-            <Link to="/products">
-              <Button
-                variant="outline"
-                className="px-6 py-3 rounded-full font-semibold"
-                style={{
-                  borderColor: 'var(--org-primary-ink, #F7F4E9)',
-                  color: 'var(--org-primary-ink, #F7F4E9)',
-                }}
-              >
-                Ver la colección
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
+            <p className="leading-relaxed mb-7 text-brand-crema/85">
+              Estamos en Paysandú. Acercate al local para ver los mates de cerca y elegir los detalles del tuyo.
+            </p>
+            <Link to="/visitanos" className="inline-flex items-center gap-3 min-h-12 px-6 border border-brand-crema text-brand-crema font-heading text-sm uppercase tracking-widest hover:bg-brand-crema hover:text-brand-cuero-oscuro transition-colors focus-ring">
+              Cómo llegar al local
+              <ArrowRight className="w-4 h-4" aria-hidden="true" />
             </Link>
           </div>
 
-          {aboutImageUrl && (
-            <div className="order-1 md:order-2">
-              <img
-                src={aboutImageUrl}
-                alt="Mate artesanal de Mates Ajedrez — cuero crudo y algarrobo"
-                className="w-full aspect-[4/5] md:aspect-[4/3] object-cover rounded-2xl shadow-lg"
-              />
-            </div>
-          )}
+          <div className="aspect-square overflow-hidden border border-brand-crema/20">
+            <HomePhoto
+              name="mate-con-identidad"
+              alt="Mate personalizado sobre una base de madera, entre plantas y materiales naturales"
+            />
+          </div>
         </div>
       </section>
     </div>

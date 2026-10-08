@@ -773,9 +773,9 @@ function CheckoutInner() {
         Volver al carrito
       </Button>
 
-      <h1 className="text-3xl font-bold text-gray-900 mb-4">Finalizar Compra</h1>
+      <h1 className="brand-title text-2xl md:text-3xl mb-4">Finalizar Compra</h1>
 
-      <div className="mb-8 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <div className="mb-8 flex items-start gap-3 rounded-lg border border-brand-algarrobo/40 bg-brand-crema px-4 py-3 text-sm text-brand-tinta">
         <Truck className="h-5 w-5 shrink-0 mt-0.5" />
         <p>Los productos tienen una demora de entrega de 3 a 5 días hábiles.</p>
       </div>
@@ -804,21 +804,21 @@ function CheckoutInner() {
                           className="w-16 h-16 object-cover rounded flex-shrink-0"
                         />
                       ) : (
-                        <div className="w-16 h-16 rounded bg-gray-100 flex-shrink-0" />
+                        <div className="w-16 h-16 rounded bg-brand-crema flex-shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 line-clamp-2">
+                        <p className="text-sm font-medium text-brand-tinta line-clamp-2">
                           {capitalizeFirst(item.product.name)}
                         </p>
                         {item.variant && (
-                          <p className="text-xs text-gray-500">{item.variant.name}</p>
+                          <p className="text-xs text-brand-muted">{item.variant.name}</p>
                         )}
-                        <p className="text-xs text-gray-600">
+                        <p className="text-xs text-brand-muted">
                           Cantidad: {item.quantity}
                         </p>
                         <div className="mt-0.5">
                           {!item.variant && hasActiveDiscount(item.product) && (
-                            <p className="text-xs text-gray-400 line-through leading-none">
+                            <p className="text-xs text-brand-muted line-through leading-none">
                               {formatPrice(item.product.price * item.quantity, settings)}
                             </p>
                           )}
@@ -836,7 +836,7 @@ function CheckoutInner() {
               </div>
               <div className="border-t pt-4 space-y-3">
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between text-gray-600">
+                  <div className="flex justify-between text-brand-muted">
                     <span>Subtotal</span>
                     <span>{formatPrice(subtotal, settings)}</span>
                   </div>
@@ -855,7 +855,7 @@ function CheckoutInner() {
                       <span>-{formatPrice(discountTotal, settings)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-lg font-bold pt-2 border-t border-dashed border-gray-200">
+                  <div className="flex justify-between font-heading text-lg font-semibold pt-2 border-t border-dashed border-brand-line">
                     <span>Total</span>
                     <span>{formatPrice(finalTotal, settings)}</span>
                   </div>
@@ -865,10 +865,10 @@ function CheckoutInner() {
                     event.preventDefault()
                     void handleApplyCoupon()
                   }}
-                  className="space-y-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
+                  className="space-y-2 rounded-lg border border-brand-line bg-brand-crema p-3"
                 >
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-gray-600 mb-1">
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-brand-muted mb-1">
                       Cupón de descuento
                     </label>
                     <div className="flex gap-2">
@@ -921,7 +921,7 @@ function CheckoutInner() {
               <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-brand-muted mb-1">
                       Nombre Completo <span className="text-red-500">*</span>
                     </label>
                     <Input
@@ -935,7 +935,7 @@ function CheckoutInner() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-brand-muted mb-1">
                       Email <span className="text-red-500">*</span>
                     </label>
                     <Input
@@ -947,14 +947,14 @@ function CheckoutInner() {
                     {errors.email && (
                       <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>
                     )}
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-brand-muted mt-1">
                       Te identifica como cliente y te avisamos el estado de tu orden
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-brand-muted mb-1">
                     Teléfono <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -970,7 +970,7 @@ function CheckoutInner() {
 
                 {/* Shipping address */}
                 <div className="pt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-brand-muted mb-3">
                     Dirección de Envío <span className="text-red-500">*</span>
                   </label>
                   <div className="space-y-4">
@@ -1004,8 +1004,8 @@ function CheckoutInner() {
                           defaultValue=""
                           {...register('department')}
                           className={cn(
-                            'w-full min-h-[44px] px-4 py-2 border rounded-lg bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent transition-colors',
-                            errors.department ? 'border-red-500 focus-visible:ring-red-500' : 'border-gray-300'
+                            'w-full min-h-[44px] px-4 py-2 border rounded-lg bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:border-transparent transition-colors',
+                            errors.department ? 'border-red-500 focus-visible:ring-red-500' : 'border-brand-line'
                           )}
                         >
                           <option value="" disabled>Departamento</option>
@@ -1020,7 +1020,7 @@ function CheckoutInner() {
                     </div>
 
                     {watch('department') === 'Paysandú' && (
-                      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                      <div className="flex items-start gap-3 rounded-lg border border-brand-algarrobo/40 bg-brand-crema px-4 py-3 text-sm text-brand-tinta">
                         <MapPin className="h-5 w-5 shrink-0 mt-0.5" />
                         <p>
                           Para Paysandú, el retiro se realiza en el local <strong>Mate Ajedrez</strong>.
@@ -1033,7 +1033,7 @@ function CheckoutInner() {
 
                 {/* Payment Method Selection */}
                 <div className="pt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-brand-muted mb-3">
                     Método de Pago {paymentMethodRequired && <span className="text-red-500">*</span>}
                   </label>
                   {!paymentMethodRequired && discountTotal > 0 && (
@@ -1048,7 +1048,7 @@ function CheckoutInner() {
                         <Skeleton className="h-[72px] w-full rounded-lg" />
                       </>
                     ) : paymentMethods.filter((m) => !m.requires_cash_session || mainBranchId).length === 0 ? (
-                      <p className="text-sm text-gray-500 rounded-lg border border-gray-200 p-4">
+                      <p className="text-sm text-brand-muted rounded-lg border border-brand-line p-4">
                         Esta tienda no configuró ningún método de pago disponible. Contactanos para coordinar tu compra.
                       </p>
                     ) : paymentMethods
@@ -1063,7 +1063,7 @@ function CheckoutInner() {
                           <label
                             key={m.id}
                             className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                              paymentMethod === m.key ? '' : 'border-gray-200 hover:bg-gray-50'
+                              paymentMethod === m.key ? '' : 'border-brand-line hover:bg-brand-crema'
                             }`}
                             style={
                               paymentMethod === m.key
@@ -1084,12 +1084,12 @@ function CheckoutInner() {
                               className="w-4 h-4 focus:ring-[var(--org-primary-color,#705931)] shrink-0"
                               style={{ accentColor: 'var(--org-primary-color, #705931)' }}
                             />
-                            <span className={`shrink-0 ${paymentMethod === m.key ? '' : 'text-gray-400'}`}>
+                            <span className={`shrink-0 ${paymentMethod === m.key ? '' : 'text-brand-muted'}`}>
                               {icon}
                             </span>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900">{m.name}</p>
-                              <p className="text-sm text-gray-500">
+                              <p className="font-medium text-brand-tinta">{m.name}</p>
+                              <p className="text-sm text-brand-muted">
                                 {m.requires_cash_session && mainBranchId
                                   ? 'Disponible solo en tienda física'
                                   : 'Realizá el pago según las instrucciones'}
@@ -1105,8 +1105,8 @@ function CheckoutInner() {
                 </div>
 
                 <div className="flex items-center space-x-2 pt-4">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <p className="text-sm text-gray-600">
+                  <CheckCircle2 className="h-5 w-5 text-[#46602B]" />
+                  <p className="text-sm text-brand-muted">
                     Tus datos serán guardados para futuras compras
                   </p>
                 </div>
@@ -1127,13 +1127,13 @@ function CheckoutInner() {
                 >
                   {loading ? 'Procesando...' : 'Confirmar Orden'}
                 </Button>
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-xs text-brand-muted text-center">
                   Al realizar tu pedido aceptás nuestros{' '}
-                  <Link to="/legal/terminos" target="_blank" className="underline hover:text-gray-700">
+                  <Link to="/legal/terminos" target="_blank" className="underline hover:text-brand-muted">
                     Términos y Condiciones
                   </Link>{' '}
                   y nuestra{' '}
-                  <Link to="/legal/privacidad" target="_blank" className="underline hover:text-gray-700">
+                  <Link to="/legal/privacidad" target="_blank" className="underline hover:text-brand-muted">
                     Política de Privacidad
                   </Link>
                   .

@@ -263,26 +263,45 @@ Principios:
 Principios:
 - Los controles son siempre visibles — no colapsados, no detrás de un botón "Filtros"
 - Contenedor: `flex flex-wrap items-center gap-3`
-- Search: input `rounded-full h-10 pl-9` con ícono `Search` y botón `×` inline
-- Categorías: `<button className="h-10 px-4 rounded-full text-sm font-medium border">` con `style={{ backgroundColor: 'var(--org-primary-color)' }}` cuando está activo
-- Precio: dos inputs `rounded-full h-10 w-28` inline con `—` entre ellos
+- Search: input `rounded-full h-10 pl-9 border border-brand-line bg-white focus:ring-2 focus:ring-brand-cuero` con ícono `Search` y botón `×` inline
+- Categorías: chips en tipografía de títulos, mayúscula espaciada (ver ejemplo abajo)
+- Precio: dos inputs `rounded-full h-10 w-28 border border-brand-line` inline con `—` entre ellos
 - Botón "Limpiar": `text-red-500 border border-red-200 rounded-full hover:bg-red-50`, solo cuando `hasActiveFilters`
 - No usar `<Card>`, `<select>` nativo ni sidebar lateral para filtros de tienda
 
 ```tsx
 // Chip de categoría activo
-<button
-  style={{ backgroundColor: 'var(--org-primary-color, #6366f1)' }}
-  className="h-10 px-4 rounded-full text-sm font-medium text-white border-transparent shadow-sm"
->
+<button className="h-10 px-4 rounded-full font-heading text-xs font-semibold uppercase tracking-[0.14em] transition-colors border bg-brand-cuero border-brand-cuero text-brand-crema">
   Nombre categoría
 </button>
 
 // Chip inactivo
-<button className="h-10 px-4 rounded-full text-sm font-medium bg-white border border-gray-200 text-gray-600 hover:border-gray-300">
+<button className="h-10 px-4 rounded-full font-heading text-xs font-semibold uppercase tracking-[0.14em] transition-colors border bg-transparent border-brand-line text-brand-tinta hover:border-brand-cuero">
   Nombre categoría
 </button>
 ```
+
+### Identidad visual de la tienda (Mates Ajedrez)
+
+Concepto: "ficha técnica artesanal" — basado en el manual de marca (círculo cuero con trazo fino crema, mayúsculas espaciadas, tonos tierra, nada saturado).
+
+- **Tokens** (`tailwind.config.js` → `brand.*`): `cuero` #705931 (primario), `cuero-oscuro` #5A4626 (hover), `crema` #F7F4E9, `algarrobo` #A9875A (acento), `yerba` #5E7A3A (apoyo verde), `tinta` #2B2418 (texto), `bg` #FBF9F3 (fondo de página), `line` #E4DCC8 (bordes), `muted` #6E634F (texto secundario)
+- En la tienda usar `brand-*` en vez de `gray-*`; nunca clases `admin-*`
+- Fondo de página: `bg-brand-bg` (no blanco puro). Superficies: `bg-white` o `bg-brand-crema` con `border border-brand-line`
+- **Sin sombras decorativas ni hover-lift**: el hover se expresa con cambio de borde (`hover:border-brand-algarrobo`) y zoom de imagen
+- Radios sobrios: `rounded-md` en cards e imágenes; `rounded-full` solo en chips, inputs de filtro, botones flotantes y sellos
+- Tipografía: `font-heading` (Josefin Sans) para títulos, marca, navegación y chips; Source Sans 3 para texto
+- Encabezados de sección: `.brand-eyebrow` (etiqueta chica en mayúscula espaciada, color cuero) + `.brand-title` (Josefin Light). Usar el eyebrow con moderación, no en cada bloque
+- El nombre de marca como wordmark se escribe espaciado: `A J E D R E Z`
+- Sello circular (`rounded-full bg-brand-cuero text-brand-crema`) es el recurso gráfico de la marca para badges
+- Badge "En stock": `bg-[#EEF3E6] text-[#46602B]` (tono yerba). "Sin stock": rojo atenuado, sin overlay
+- Footer: fondo `brand-tinta`, texto crema, separadores `border-brand-crema/20`
+
+### Loading y animaciones
+- Carga inicial de la app/tienda (resolución de org y auth): `<BrandLoader />` de `@/components/ui/BrandLoader` — sello cuero con anillo que se dibuja + wordmark. Es la única excepción permitida a "skeleton en vez de spinner", y solo para pantalla completa
+- Listados, grids y secciones siguen usando `Skeleton*`; el `Skeleton` usa `.brand-shimmer` (barrido crema → line), no el pulso gris
+- Keyframes en `tailwind.config.js`: `brand-ring-draw`, `brand-seal-breathe`, `brand-fade-in`, `brand-shimmer`
+- **Toda animación nueva debe desactivarse bajo `@media (prefers-reduced-motion: reduce)`** (bloque existente en `src/index.css`)
 
 ### Responsive
 - Mobile-first siempre: base → `md:` → `lg:`
@@ -685,14 +704,15 @@ useEffect(() => {
 
 ### ProductCard
 - Imagen: siempre `aspect-square` (1:1) — nunca `16/9` ni altura fija
-- Bordes y sombra: `rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-0.5`
+- Bordes: `bg-white rounded-md border border-brand-line hover:border-brand-algarrobo transition-colors` — sin sombras ni hover-lift
 - Zoom de imagen en hover: `group-hover:scale-105 transition-transform duration-500`
 - Botón "Agregar al carrito": floating `rounded-full` absolutamente posicionado en la esquina inferior derecha de la imagen. En desktop: `md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300`. En mobile: siempre visible. **No** usar un botón `w-full` debajo de la imagen para productos sin variantes.
 - Sin stock: **sin overlay sobre la imagen** — el producto se ve normal. El único indicador es el badge junto al precio (`bg-red-50 text-red-600`, "Sin stock", mismo lugar que el badge verde "En stock"). El overlay `bg-white/70` con pill centrada que se usaba antes se sacó a pedido del usuario (2026-07-23): "nublaba" la foto del producto. Misma regla aplica a la imagen principal de `ProductDetail.tsx` — ahí el indicador es el texto "Este producto no tiene stock disponible." debajo del precio, sin overlay en la imagen.
-- Badge de descuento: `absolute top-3 left-3 rounded-full` — no dentro del body de la card
+- Badge de descuento: sello circular `absolute top-3 left-3 h-11 w-11 rounded-full bg-brand-cuero text-brand-crema font-heading` — no dentro del body de la card
 
 ### CategoryCard
-- Diseño editorial con overlay: imagen a `aspect-[4/3]`, `rounded-2xl`, gradiente `bg-gradient-to-t from-black/65 via-black/15 to-transparent` sobre la imagen
+- Diseño editorial con overlay: imagen a `aspect-[4/3]`, `rounded-md border border-brand-line`, gradiente `bg-gradient-to-t from-brand-tinta/80 via-brand-tinta/20 to-transparent` sobre la imagen (tinta, no negro)
+- Nombre en `font-heading` Light, mayúscula espaciada
 - Texto (nombre + descripción) sobre el gradiente en la parte inferior — **nunca** en caja blanca debajo de la imagen
 - Hover: `group-hover:scale-105` solo en la imagen, no en la card entera
 
@@ -702,7 +722,9 @@ useEffect(() => {
 - Animación de entrada escalonada con `animate-fade-in-up` y `animationDelay: Math.min(index * 35, 260)ms`
 
 ### Header de tienda pública
-- Fondo: `backgroundColor: \`${primaryColor}ee\`` (93% opacidad) + `backdropFilter: 'blur(16px)'` — efecto frosted glass
+- Fondo sólido: `sticky top-0 z-30 bg-brand-bg border-b border-brand-line` — sin blur ni transparencia (el frosted glass era de la marca anterior)
+- Links de navegación: `font-heading text-xs font-semibold uppercase tracking-[0.2em] text-brand-cuero border-b border-transparent hover:border-brand-cuero`
+- Barra de aviso superior (`ShippingNoticeBanner`): fondo cuero, texto crema en mayúscula espaciada
 
 ---
 
@@ -726,5 +748,7 @@ useEffect(() => {
 - No usar sidebar ni drawer colapsable para filtros en la tienda pública — usar chip pills horizontales
 - No usar aspecto `16/9` ni altura fija en imágenes de ProductCard — usar `aspect-square`
 - No mostrar texto de categoría en caja blanca debajo de la imagen en CategoryCard — usar overlay editorial
-- No usar spinner giratorio en grids de productos de la tienda — usar `<SkeletonProductCard />`
+- No usar spinner giratorio en grids de productos de la tienda — usar `<SkeletonProductCard />` (`<BrandLoader />` solo para la carga inicial a pantalla completa)
+- No usar `gray-*`, sombras decorativas ni `rounded-2xl` en la tienda — usar tokens `brand-*`, bordes `brand-line` y `rounded-md`
+- No agregar animaciones sin su alternativa bajo `prefers-reduced-motion: reduce`
 - No usar `onMouseEnter/onMouseLeave` para efectos hover que pueden hacerse con CSS (`group-hover:`)

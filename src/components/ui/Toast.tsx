@@ -27,9 +27,9 @@ export function Toast({ message, type = 'success', onClose, duration = 3000 }: T
   }
 
   const iconStyles = {
-    success: 'text-emerald-600 bg-emerald-50',
-    error: 'text-red-600 bg-red-50',
-    info: 'text-blue-600 bg-blue-50',
+    success: 'text-[#46602B] bg-[#EEF3E6]',
+    error: 'text-red-700 bg-red-50',
+    info: 'text-brand-cuero bg-brand-crema',
   }
 
   const Icon = icons[type]
@@ -37,7 +37,7 @@ export function Toast({ message, type = 'success', onClose, duration = 3000 }: T
   return (
     <div
       role="alert"
-      className="animate-fade-in-up fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-sm z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border border-gray-100 bg-white text-gray-900"
+      className="animate-fade-in-up fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-sm z-50 flex items-center gap-3 px-4 py-3 rounded-md border border-brand-line bg-white text-brand-tinta shadow-[0_8px_24px_-12px_rgba(43,36,24,0.35)]"
     >
       <span className={cn('flex items-center justify-center h-8 w-8 rounded-full flex-shrink-0', iconStyles[type])}>
         <Icon className="h-4 w-4" />
@@ -46,7 +46,7 @@ export function Toast({ message, type = 'success', onClose, duration = 3000 }: T
       <button
         type="button"
         onClick={onClose}
-        className="min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2 text-gray-400 hover:text-gray-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400 rounded"
+        className="min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2 text-brand-muted hover:text-brand-muted transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-gray-400 rounded"
         aria-label="Cerrar notificación"
       >
         <X className="h-5 w-5" />

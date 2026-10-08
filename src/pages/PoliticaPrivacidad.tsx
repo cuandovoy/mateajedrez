@@ -5,33 +5,33 @@ export function PoliticaPrivacidad() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-white py-12 px-4 sm:px-6">
+    <div className="min-h-screen bg-brand-bg py-12 px-4 sm:px-6">
       <div className="max-w-3xl mx-auto">
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-800 mb-8 transition-colors"
+          className="flex items-center gap-2 text-sm text-brand-muted hover:text-brand-tinta mb-8 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Volver
         </button>
 
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Política de Privacidad</h1>
-        <p className="text-sm text-gray-500 mb-10">Última actualización: [COMPLETAR FECHA DE PUBLICACIÓN]</p>
+        <h1 className="brand-title text-2xl md:text-3xl mb-2">Política de Privacidad</h1>
+        <p className="text-sm text-brand-muted mb-10">Última actualización: [COMPLETAR FECHA DE PUBLICACIÓN]</p>
 
-        <div className="space-y-8 text-gray-700 leading-relaxed">
+        <div className="space-y-8 text-brand-muted leading-relaxed">
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Responsable del tratamiento</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">1. Responsable del tratamiento</h2>
             <p>
-              Mates Ajedrez (<a href="https://www.instagram.com/matesajedrez/" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">@matesajedrez</a>) es una
+              Mates Ajedrez (<a href="https://www.instagram.com/matesajedrez/" target="_blank" rel="noopener noreferrer" className="text-brand-cuero hover:underline">@matesajedrez</a>) es una
               tienda online operada por <strong>[NOMBRE COMPLETO DEL TITULAR]</strong>, con domicilio en{' '}
               <strong>Avenida España 1471, Paysandú, Uruguay</strong>, responsable del tratamiento de los datos personales
               recolectados a través de este sitio. Podés contactarnos por correo electrónico a{' '}
-              <a href="mailto:[EMAIL DE CONTACTO]" className="text-primary-600 hover:underline">
+              <a href="mailto:[EMAIL DE CONTACTO]" className="text-brand-cuero hover:underline">
                 [EMAIL DE CONTACTO]
               </a>{' '}
               o por WhatsApp{' '}
-              <a href="https://wa.link/bdxmao" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+              <a href="https://wa.link/bdxmao" target="_blank" rel="noopener noreferrer" className="text-brand-cuero hover:underline">
                 escribinos acá
               </a>
               .
@@ -39,7 +39,7 @@ export function PoliticaPrivacidad() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">2. Datos que recolectamos</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">2. Datos que recolectamos</h2>
             <p className="mb-3">Cuando comprás o navegás en nuestra tienda recolectamos:</p>
             <ul className="list-disc pl-6 space-y-2">
               <li>
@@ -65,7 +65,7 @@ export function PoliticaPrivacidad() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">3. Base legal</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">3. Base legal</h2>
             <p>
               El tratamiento de tus datos personales se rige por la{' '}
               <strong>Ley N.º 18.331 de Protección de Datos Personales</strong> de la República Oriental
@@ -79,7 +79,7 @@ export function PoliticaPrivacidad() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">4. Finalidad del tratamiento</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">4. Finalidad del tratamiento</h2>
             <p>Usamos tus datos para:</p>
             <ul className="list-disc pl-6 mt-3 space-y-2">
               <li>Procesar tu pedido, coordinar el envío o retiro y mantenerte informado sobre su estado.</li>
@@ -90,7 +90,7 @@ export function PoliticaPrivacidad() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">5. Compartición de datos con terceros</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">5. Compartición de datos con terceros</h2>
             <p className="mb-3">
               No vendemos ni cedemos tus datos personales a terceros con fines comerciales. Tus datos pueden
               ser compartidos únicamente con los proveedores estrictamente necesarios para operar la tienda:
@@ -114,7 +114,7 @@ export function PoliticaPrivacidad() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">6. Retención de datos</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">6. Retención de datos</h2>
             <p>
               Conservamos tus datos personales durante el tiempo necesario para procesar tu pedido y atender
               eventuales reclamos o consultas posteriores, y por un plazo adicional de{' '}
@@ -125,7 +125,7 @@ export function PoliticaPrivacidad() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">7. Tus derechos</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">7. Tus derechos</h2>
             <p className="mb-3">
               De conformidad con la Ley N.º 18.331, tenés derecho a:
             </p>
@@ -143,7 +143,7 @@ export function PoliticaPrivacidad() {
             </ul>
             <p className="mt-3">
               Para ejercer cualquiera de estos derechos (derechos ARCO), podés escribirnos a{' '}
-              <a href="mailto:[EMAIL DE CONTACTO]" className="text-primary-600 hover:underline">
+              <a href="mailto:[EMAIL DE CONTACTO]" className="text-brand-cuero hover:underline">
                 [EMAIL DE CONTACTO]
               </a>
               . Vamos a responder tu solicitud dentro de los plazos establecidos por la legislación vigente.
@@ -151,7 +151,7 @@ export function PoliticaPrivacidad() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">8. Cookies</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">8. Cookies</h2>
             <p>
               Este sitio utiliza únicamente <strong>cookies técnicas</strong> necesarias para el
               funcionamiento del carrito de compras y, si iniciás sesión, de tu autenticación. No utilizamos
@@ -160,7 +160,7 @@ export function PoliticaPrivacidad() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">9. Cambios a esta política</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">9. Cambios a esta política</h2>
             <p>
               Podemos actualizar esta Política de Privacidad cuando sea necesario. Si hacemos cambios
               significativos, lo vamos a indicar en esta misma página junto con la fecha de última
@@ -169,10 +169,10 @@ export function PoliticaPrivacidad() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">10. Contacto</h2>
+            <h2 className="text-xl font-semibold text-brand-tinta mb-3">10. Contacto</h2>
             <p>
               Para cualquier consulta sobre el tratamiento de tus datos personales, escribinos a{' '}
-              <a href="mailto:[EMAIL DE CONTACTO]" className="text-primary-600 hover:underline">
+              <a href="mailto:[EMAIL DE CONTACTO]" className="text-brand-cuero hover:underline">
                 [EMAIL DE CONTACTO]
               </a>
               .
@@ -180,9 +180,9 @@ export function PoliticaPrivacidad() {
           </section>
 
           <section>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-brand-muted">
               Ver también nuestros{' '}
-              <Link to="/legal/terminos" className="text-primary-600 hover:underline">
+              <Link to="/legal/terminos" className="text-brand-cuero hover:underline">
                 Términos y Condiciones
               </Link>
               .

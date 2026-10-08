@@ -16,7 +16,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-700 mb-1"
+            className="block text-sm font-medium text-brand-tinta mb-1"
           >
             {label}
           </label>
@@ -26,7 +26,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           aria-label={label || props['aria-label'] || (typeof props.placeholder === 'string' ? props.placeholder : undefined)}
           className={cn(
-            'w-full min-h-[44px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:border-transparent transition-colors',
+            'w-full min-h-[44px] px-4 py-2 bg-white text-brand-tinta placeholder:text-brand-muted border border-brand-line rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:border-brand-cuero transition-colors',
             error && 'border-red-500 focus-visible:ring-red-500',
             className
           )}
