@@ -35,3 +35,5 @@ exports/
 # sitemap.xml se genera en build-time (scripts/generate-sitemap.ts, hook
 # "prebuild" en package.json) a partir de Supabase — no se versiona.
 public/sitemap.xml
+# Local MCP config (contains tokens)
+.mcp.json
