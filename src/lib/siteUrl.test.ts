@@ -11,19 +11,19 @@ import { buildAbsoluteUrl, DEFAULT_SITE_URL } from './siteUrl'
 
 describe('buildAbsoluteUrl', () => {
   it('concatena base y path con un solo slash', () => {
-    expect(buildAbsoluteUrl('/product/123', 'https://ruemia.uy')).toBe('https://ruemia.uy/product/123')
+    expect(buildAbsoluteUrl('/product/123', 'https://mateajedrez.uy')).toBe('https://mateajedrez.uy/product/123')
   })
 
   it('agrega el slash inicial al path si falta', () => {
-    expect(buildAbsoluteUrl('product/123', 'https://ruemia.uy')).toBe('https://ruemia.uy/product/123')
+    expect(buildAbsoluteUrl('product/123', 'https://mateajedrez.uy')).toBe('https://mateajedrez.uy/product/123')
   })
 
   it('quita el slash final de la base para evitar doble slash', () => {
-    expect(buildAbsoluteUrl('/products', 'https://ruemia.uy/')).toBe('https://ruemia.uy/products')
+    expect(buildAbsoluteUrl('/products', 'https://mateajedrez.uy/')).toBe('https://mateajedrez.uy/products')
   })
 
   it('usa "/" cuando el path está vacío', () => {
-    expect(buildAbsoluteUrl('', 'https://ruemia.uy')).toBe('https://ruemia.uy/')
+    expect(buildAbsoluteUrl('', 'https://mateajedrez.uy')).toBe('https://mateajedrez.uy/')
   })
 
   it('usa DEFAULT_SITE_URL cuando no se pasa baseUrl', () => {
@@ -35,8 +35,8 @@ describe('buildAbsoluteUrl', () => {
   })
 
   it('preserva query params y hash del path', () => {
-    expect(buildAbsoluteUrl('/products?search=mate#top', 'https://ruemia.uy')).toBe(
-      'https://ruemia.uy/products?search=mate#top'
+    expect(buildAbsoluteUrl('/products?search=mate#top', 'https://mateajedrez.uy')).toBe(
+      'https://mateajedrez.uy/products?search=mate#top'
     )
   })
 })

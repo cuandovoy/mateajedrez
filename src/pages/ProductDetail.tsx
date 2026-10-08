@@ -22,7 +22,7 @@ const DEFAULT_PRODUCT_PLACEHOLDER =
 
 // Fallbacks del sitio — deben coincidir con los tags estáticos de index.html
 const DEFAULT_META_DESCRIPTION =
-  'Mates artesanales de cuero y detalles bordados, hechos en Uruguay. Las piezas con historia merecen ser parte de nuevos momentos.'
+  'Mates artesanales en cuero crudo y algarrobo, grabados y personalizados en Paysandú, Uruguay. Tu mate, pero con tu esencia.'
 const DEFAULT_OG_IMAGE = '/og-image.png'
 const META_DESCRIPTION_MAX_LENGTH = 155
 
@@ -269,7 +269,7 @@ export function ProductDetail() {
       ? `${singleLineDescription.slice(0, META_DESCRIPTION_MAX_LENGTH).trimEnd()}...`
       : singleLineDescription
     : DEFAULT_META_DESCRIPTION
-  const metaTitle = `${capitalizeFirst(product.name)} | Ruemia`
+  const metaTitle = `${capitalizeFirst(product.name)} | Mates Ajedrez`
   // getPrimaryImageUrl ya valida http(s) (isValidImageUrl) y devuelve siempre
   // una URL absoluta real de Supabase Storage — solo el fallback necesita
   // pasar por absoluteUrl(), porque DEFAULT_OG_IMAGE es una ruta relativa.
@@ -514,8 +514,8 @@ export function ProductDetail() {
                         style={
                           index === currentImageIndex
                             ? {
-                                borderColor: 'var(--org-primary-color, #46362B)',
-                                boxShadow: '0 0 0 2px color-mix(in srgb, var(--org-primary-color, #46362B) 30%, transparent)',
+                                borderColor: 'var(--org-primary-color, #705931)',
+                                boxShadow: '0 0 0 2px color-mix(in srgb, var(--org-primary-color, #705931) 30%, transparent)',
                               }
                             : undefined
                         }
@@ -595,8 +595,8 @@ export function ProductDetail() {
                 to={`/categories/${product.category.slug}`}
                 className="inline-block px-3 py-1 rounded-full text-sm font-medium mb-2 hover:opacity-80 transition-opacity"
                 style={{
-                  backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #46362B) 15%, white)',
-                  color: 'var(--org-primary-color, #46362B)',
+                  backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #705931) 15%, white)',
+                  color: 'var(--org-primary-color, #705931)',
                 }}
               >
                 {product.category.name}
@@ -605,7 +605,7 @@ export function ProductDetail() {
             <div className="flex items-start justify-between gap-3 mb-2">
               <h1
                 className="text-3xl font-bold text-gray-900"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
               >
                 {capitalizeFirst(product.name)}
               </h1>
@@ -613,7 +613,7 @@ export function ProductDetail() {
                 type="button"
                 onClick={handleShare}
                 className="shrink-0 h-10 w-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
-                style={{ color: 'var(--org-primary-color, #46362B)' }}
+                style={{ color: 'var(--org-primary-color, #705931)' }}
                 aria-label="Compartir producto"
                 title="Compartir"
               >
@@ -633,7 +633,7 @@ export function ProductDetail() {
               )}
               <p
                 className="text-2xl font-bold"
-                style={{ color: 'var(--org-primary-color, #46362B)' }}
+                style={{ color: 'var(--org-primary-color, #705931)' }}
               >
                 {formatPrice(displayPrice, settings)}
               </p>
@@ -712,7 +712,7 @@ export function ProductDetail() {
                 rel="noopener noreferrer"
                 className="w-full h-12 inline-flex items-center justify-center gap-2 text-base font-semibold rounded-xl transition-colors"
                 style={{
-                  backgroundColor: 'var(--org-primary-color, #46362B)',
+                  backgroundColor: 'var(--org-primary-color, #705931)',
                   color: 'var(--org-primary-ink, white)',
                 }}
               >

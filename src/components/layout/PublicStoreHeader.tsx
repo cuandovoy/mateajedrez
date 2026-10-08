@@ -311,7 +311,7 @@ function CartMenu({ triggerClassName, badgeClassName, ariaLabel, enableHover = f
                   type="button"
                   onClick={() => goTo('/checkout')}
                   className="w-full h-10 rounded-lg text-white text-sm font-semibold transition-opacity hover:opacity-90"
-                  style={{ backgroundColor: 'var(--org-primary-color, #46362B)' }}
+                  style={{ backgroundColor: 'var(--org-primary-color, #705931)' }}
                 >
                   Finalizar compra
                 </button>
@@ -406,7 +406,7 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
 
   // Marca hardcodeada: theming dinámico por organización fue removido
   // (single-tenant fork, org.branding/settings quedan permanentemente NULL).
-  const primaryColor = '#46362B'
+  const primaryColor = '#705931'
 
   return (
     <header
@@ -421,7 +421,7 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
 
           {/* Logo — mismo isotipo que en mobile, agrandado para jerarquía en desktop */}
           <Link to="/" className="flex items-center gap-3 shrink-0">
-            <img src={logoIsotipo} alt={organization.name} className="h-16 w-16 rounded-lg object-contain" />
+            <img src={logoIsotipo} alt="Mates Ajedrez" className="h-16 w-16 rounded-lg object-contain" />
           </Link>
 
           {/* Nav: Inicio / Categorías (trigger colapsable) / Nosotros */}
@@ -503,7 +503,7 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
 
           {/* Center logo — isotipo compacto + nombre, ya que el monograma solo no identifica la marca */}
           <Link to="/" onClick={closeAll} className="flex-1 flex justify-center items-center gap-2">
-            <img src={logoIsoPrincipal} alt={organization.name} className="h-24 w-24 rounded-lg object-contain" />
+            <img src={logoIsoPrincipal} alt="Mates Ajedrez" className="h-24 w-24 rounded-lg object-contain" />
           </Link>
 
           {/* Right */}

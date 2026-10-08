@@ -16,7 +16,7 @@ export function NotFound() {
   return (
     <div className="container-custom py-8">
       <Helmet>
-        <title>Página no encontrada | Ruemia</title>
+        <title>Página no encontrada | Mates Ajedrez</title>
         <meta name="robots" content="noindex" />
       </Helmet>
 

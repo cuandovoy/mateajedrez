@@ -44,14 +44,15 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   credit_card:  'Tarjeta de Crédito',
 }
 
-const TRANSFER_CONTACT_EMAIL = 'ruemia20@gmail.com'
+// PENDING: replace with the real Mates Ajedrez contact email (not in the brand manual).
+const TRANSFER_CONTACT_EMAIL = '[EMAIL DE CONTACTO]'
 
 export function OrderConfirmation() {
   const { orderId } = useParams<{ orderId: string }>()
   const [searchParams] = useSearchParams()
   const mpStatus = searchParams.get('mp_status') // 'failure' | 'pending' | null (success)
   const settings = useOrgSettings()
-  const primaryColor = 'var(--org-primary-color, #46362B)'
+  const primaryColor = 'var(--org-primary-color, #705931)'
   const [order, setOrder] = useState<OrderWithItems | null>(null)
   const [transferInstructions, setTransferInstructions] = useState<string>('')
   const [loading, setLoading] = useState(true)

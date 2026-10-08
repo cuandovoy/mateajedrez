@@ -5,6 +5,20 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 
 ---
 
+## Rebrand Mates Ajedrez (2026-10-08)
+
+### 🔴 Crítico
+- 🔴 Reemplazar assets de imagen con los de Mates Ajedrez (el cliente aún no entregó logos; siguen los de Ruemia): src/brand/isotipo-cropped.png, isotipo-fondo1.png, logo-principal-fondo1.png, ruemia-logo-horizontal.png (renombrar el archivo y el import en PublicStoreHeader.tsx), src/brand/branboard.pdf; public/favicon-32.png, apple-touch-icon.png, icon-192.png, icon-512.png, og-image.png (1200x1200) — afecta og:image, JSON-LD logo y PWA
+- 🔴 Completar placeholders legales: [NOMBRE COMPLETO DEL TITULAR] y [EMAIL DE CONTACTO] en TerminosCondiciones.tsx y PoliticaPrivacidad.tsx; TRANSFER_CONTACT_EMAIL en OrderConfirmation.tsx (era un email de Ruemia, ahora placeholder)
+
+### 🟠 Alta
+- 🟠 Configurar env vars de build: VITE_SITE_URL=https://mateajedrez.uy, VITE_SOCIAL_INSTAGRAM=https://www.instagram.com/matesajedrez/, VITE_SOCIAL_WHATSAPP=<número real>, VITE_STORE_SLUG; revisar organization.settings.store_whatsapp_number en DB
+- 🟠 Regenerar public/sitemap.xml en el próximo build con el dominio nuevo (si se commitea) y revisar el banner de envío (ShippingNoticeBanner.tsx, plazo 3 a 5 días) con el cliente
+
+### 🟡 Media
+- 🟡 Archivos de fuentes obsoletos removibles: public/berlin.regular.ttf y public/Cambria.ttf (ya no se referencian)
+- 🟡 Footer solo soporta Instagram/Facebook/WhatsApp; el manual incluye Threads (https://www.threads.net/@matesajedrez) — agregar si el cliente lo pide (requiere cambio de código, fuera del alcance del rebrand)
+
 ## Rebrand Ruemia (2026-07-19)
 
 ### 🟠 Alta

@@ -4,7 +4,7 @@ export function ShippingNoticeBanner() {
   return (
     <div
       className="w-full py-2 px-4 text-center text-white"
-      style={{ backgroundColor: '#6b5544' }}
+      style={{ backgroundColor: '#5A4626' }}
     >
       <div className="container-custom flex items-center justify-center gap-2">
         <Truck className="h-4 w-4 shrink-0" />

@@ -232,9 +232,9 @@ export function PublicStore() {
               <h1
                 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-4"
                 style={{
-                  color: hasCoverImages ? heroTextColor : `var(--org-primary-color, #46362B)`,
-                  fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`,
-                  letterSpacing: '0.05em',
+                  color: hasCoverImages ? heroTextColor : `var(--org-primary-color, #705931)`,
+                  fontFamily: `var(--org-font-heading, var(--org-font-family, sans-serif))`,
+                  letterSpacing: '0.12em',
                   textShadow: hasCoverImages ? '0 1px 3px rgba(0,0,0,0.25)' : undefined,
                   textTransform: 'uppercase',
                 }}
@@ -302,14 +302,14 @@ export function PublicStore() {
             <div className="flex items-center justify-between mb-6">
               <h2
                 className="text-xl md:text-2xl font-bold text-gray-900"
-                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`, letterSpacing: '0.05em' }}
+                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, sans-serif))`, letterSpacing: '0.12em' }}
               >
                 Categorías
               </h2>
               <Link
                 to="/products"
                 className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
-                style={{ color: 'var(--org-primary-color, #46362B)' }}
+                style={{ color: 'var(--org-primary-color, #705931)' }}
               >
                 Ver todo
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -335,7 +335,7 @@ export function PublicStore() {
             <div className="flex items-center justify-between mb-6">
               <h2
                 className="text-xl md:text-2xl font-bold text-gray-900"
-                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`, letterSpacing: '0.05em' }}
+                style={{ fontFamily: `var(--org-font-heading, var(--org-font-family, sans-serif))`, letterSpacing: '0.12em' }}
               >
                 Productos destacados
               </h2>
@@ -343,7 +343,7 @@ export function PublicStore() {
                 <Link
                   to="/products"
                   className="flex items-center gap-1 text-xs font-medium transition-opacity hover:opacity-70"
-                  style={{ color: 'var(--org-primary-color, #46362B)' }}
+                  style={{ color: 'var(--org-primary-color, #705931)' }}
                 >
                   Ver todos
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -369,16 +369,16 @@ export function PublicStore() {
       <section
         id="nosotros"
         className="py-16 md:py-24 scroll-mt-20"
-        style={{ backgroundColor: 'var(--org-primary-color, #46362B)' }}
+        style={{ backgroundColor: 'var(--org-primary-color, #705931)' }}
       >
         <div className="container-custom grid md:grid-cols-2 gap-10 md:gap-16 items-center">
           <div className={aboutImageUrl ? 'order-2 md:order-1' : 'md:col-span-2 max-w-2xl mx-auto text-center'}>
             <h2
               className="text-3xl md:text-4xl font-bold mb-4"
               style={{
-                color: 'var(--org-primary-ink, #EAE2D6)',
-                fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`,
-                letterSpacing: '0.05em',
+                color: 'var(--org-primary-ink, #F7F4E9)',
+                fontFamily: `var(--org-font-heading, var(--org-font-family, sans-serif))`,
+                letterSpacing: '0.12em',
               }}
             >
               Nosotros
@@ -386,27 +386,26 @@ export function PublicStore() {
             <p
               className="text-xl md:text-2xl italic mb-6 leading-snug"
               style={{
-                color: 'var(--org-primary-ink, #EAE2D6)',
-                fontFamily: `var(--org-font-heading, var(--org-font-family, Cambria))`,
-                letterSpacing: '0.05em',
+                color: 'var(--org-primary-ink, #F7F4E9)',
+                fontFamily: `var(--org-font-heading, var(--org-font-family, sans-serif))`,
+                letterSpacing: '0.12em',
               }}
             >
-              &ldquo;Las piezas con historia merecen ser parte de nuevos momentos.&rdquo;
+              &ldquo;Tu mate, pero con tu esencia.&rdquo;
             </p>
             <p
               className="leading-relaxed mb-6"
-              style={{ color: 'color-mix(in srgb, var(--org-primary-ink, #EAE2D6) 85%, transparent)' }}
+              style={{ color: 'color-mix(in srgb, var(--org-primary-ink, #F7F4E9) 85%, transparent)' }}
             >
-              En Ruemia armamos cada pieza a mano: bordado artesanal, cuero genuino y una
-              terminación pensada para acompañarte mucho tiempo. Nada de producción en serie —
-              cada mate, materas o accesorio pasa por su propio proceso, hasta el curado final
-              antes de llegar a tu casa.
+              En Mates Ajedrez trabajamos cada mate a mano: cuero crudo, algarrobo y grabado
+              láser. El algarrobo le da alma, vos le das identidad. Nada de producción en
+              serie — cada pieza se personaliza y se prepara antes de llegar a tu casa.
             </p>
             <ul
               className={`flex flex-wrap gap-x-6 gap-y-2 mb-8 text-sm ${aboutImageUrl ? '' : 'justify-center'}`}
-              style={{ color: 'color-mix(in srgb, var(--org-primary-ink, #EAE2D6) 90%, transparent)' }}
+              style={{ color: 'color-mix(in srgb, var(--org-primary-ink, #F7F4E9) 90%, transparent)' }}
             >
-              {['Bordado artesanal', 'Cuero genuino', 'Con curado incluido'].map((feature) => (
+              {['Cuero crudo', 'Algarrobo', 'Grabado láser'].map((feature) => (
                 <li key={feature} className="flex items-center gap-2">
                   <Check className="w-4 h-4 shrink-0" />
                   {feature}
@@ -418,8 +417,8 @@ export function PublicStore() {
                 variant="outline"
                 className="px-6 py-3 rounded-full font-semibold"
                 style={{
-                  borderColor: 'var(--org-primary-ink, #EAE2D6)',
-                  color: 'var(--org-primary-ink, #EAE2D6)',
+                  borderColor: 'var(--org-primary-ink, #F7F4E9)',
+                  color: 'var(--org-primary-ink, #F7F4E9)',
                 }}
               >
                 Ver la colección
@@ -432,7 +431,7 @@ export function PublicStore() {
             <div className="order-1 md:order-2">
               <img
                 src={aboutImageUrl}
-                alt="Pieza artesanal Ruemia — bordado a mano y cuero genuino"
+                alt="Mate artesanal de Mates Ajedrez — cuero crudo y algarrobo"
                 className="w-full aspect-[4/5] md:aspect-[4/3] object-cover rounded-2xl shadow-lg"
               />
             </div>

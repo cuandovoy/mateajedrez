@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-08 — Rebrand Ruemia → Mates Ajedrez
+
+- **Archivos modificados:** index.html, tailwind.config.js, src/index.css, src/vite-env.d.ts, nginx.conf, public/manifest.webmanifest, public/sw.js, public/robots.txt, src/lib/siteUrl.ts, src/lib/*.test.ts (jsonLd, siteUrl, siteUrl.env, sitemapBuilder), src/components/layout/{PublicStoreLayout,PublicStoreHeader,Footer,ShippingNoticeBanner}.tsx, src/components/features/{ProductCard,CategoryCard,VariantSelector,CheckoutSteps}.tsx, src/components/ui/Button.tsx, src/pages/{Products,ProductDetail,PublicStore,CategoryProducts,Checkout,Cart,OrderConfirmation,NotFound,TerminosCondiciones,PoliticaPrivacidad}.tsx, .claude/TODO.md
+- **Qué cambió:** nombre, dominio (mateajedrez.uy), metadatos/JSON-LD (Instagram, Threads, dirección Paysandú), copy y paleta de marca (Cuero #705931, Crema #F7F4E9, Algarrobo #A9875A, Yerba, Tinta) mapeada por rol semántico; tipografías Josefin Sans + Source Sans 3 vía Google Fonts (se quitaron los @font-face de Berlin/Cambria). Logos/íconos siguen siendo los viejos (pendiente, ver TODO).
+
 ## 2026-09-25 — Auditoría SEO: robots.txt, sitemap.xml, canonicals absolutos, 404 real, JSON-LD
 
 - **Archivos modificados:** `public/robots.txt` (nuevo), `scripts/generate-sitemap.ts` (nuevo), `src/lib/siteUrl.ts` (nuevo) + `siteUrl.test.ts` + `siteUrl.env.test.ts`, `src/lib/sitemapBuilder.ts` (nuevo) + `sitemapBuilder.test.ts`, `src/lib/jsonLd.ts` (nuevo) + `jsonLd.test.ts`, `src/pages/NotFound.tsx` (nuevo), `package.json`, `.gitignore`, `nginx.conf`, `Dockerfile`, `index.html`, `src/App.tsx`, `src/vite-env.d.ts`, `src/pages/ProductDetail.tsx`, `src/pages/CategoryProducts.tsx`, `src/pages/Products.tsx`, `src/components/layout/PublicStoreLayout.tsx`, `.claude/TODO.md`

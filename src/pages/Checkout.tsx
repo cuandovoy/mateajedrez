@@ -824,7 +824,7 @@ function CheckoutInner() {
                           )}
                           <p
                             className="text-sm font-semibold"
-                            style={{ color: 'var(--org-primary-color, #46362B)' }}
+                            style={{ color: 'var(--org-primary-color, #705931)' }}
                           >
                             {formatPrice(unitPrice * item.quantity, settings)}
                           </p>
@@ -1068,9 +1068,9 @@ function CheckoutInner() {
                             style={
                               paymentMethod === m.key
                                 ? {
-                                    borderColor: 'var(--org-primary-color, #46362B)',
-                                    backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #46362B) 15%, white)',
-                                    color: 'var(--org-primary-color, #46362B)',
+                                    borderColor: 'var(--org-primary-color, #705931)',
+                                    backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #705931) 15%, white)',
+                                    color: 'var(--org-primary-color, #705931)',
                                   }
                                 : undefined
                             }
@@ -1081,8 +1081,8 @@ function CheckoutInner() {
                               value={m.key}
                               checked={paymentMethod === m.key}
                               onChange={(e) => { setPaymentMethod(e.target.value); setPaymentMethodError(null) }}
-                              className="w-4 h-4 focus:ring-[var(--org-primary-color,#46362B)] shrink-0"
-                              style={{ accentColor: 'var(--org-primary-color, #46362B)' }}
+                              className="w-4 h-4 focus:ring-[var(--org-primary-color,#705931)] shrink-0"
+                              style={{ accentColor: 'var(--org-primary-color, #705931)' }}
                             />
                             <span className={`shrink-0 ${paymentMethod === m.key ? '' : 'text-gray-400'}`}>
                               {icon}

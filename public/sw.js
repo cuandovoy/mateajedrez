@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ruemia-v1';
+const CACHE_NAME = 'matesajedrez-v1';
 const STATIC_ASSETS = [
   '/icon-192.png',
   '/icon-512.png',

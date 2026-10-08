@@ -10,7 +10,7 @@ export function PublicStoreFooter() {
 
   // Marca hardcodeada: theming dinámico por organización fue removido
   // (single-tenant fork, org.branding/settings quedan permanentemente NULL).
-  const primaryColor = '#46362B'
+  const primaryColor = '#705931'
 
   const parentCategories = categoriesWithSubs
 
@@ -37,12 +37,12 @@ export function PublicStoreFooter() {
             <Link to="/" className="flex items-center gap-3 mb-4">
               <img
                 src={logoWordmark}
-                alt={organization.name}
+                alt="Mates Ajedrez"
                 className="h-10 w-10 rounded-lg object-contain"
               />
               <span
                 className="font-semibold text-base text-gray-900"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
               >
                 {organization.name}
               </span>
@@ -87,7 +87,7 @@ export function PublicStoreFooter() {
             <div>
               <h4
                 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
               >
                 Categorías
               </h4>
@@ -125,7 +125,7 @@ export function PublicStoreFooter() {
             <div>
               <h4
                 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4"
-                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
+                style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
               >
                 Seguinos
               </h4>

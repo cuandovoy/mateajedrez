@@ -8,7 +8,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 // llama `vi.resetModules()` y vuelve a importar `./siteUrl` dinámicamente
 // DESPUÉS de `vi.stubEnv`, para forzar una transformación nueva que sí vea
 // el valor stubbeado.
-const DEFAULT_SITE_URL = 'https://ruemia.uy'
+const DEFAULT_SITE_URL = 'https://mateajedrez.uy'
 
 async function loadSiteUrlModule() {
   vi.resetModules()
@@ -59,8 +59,8 @@ describe('absoluteUrl', () => {
   })
 
   it('respeta VITE_SITE_URL cuando está configurada', async () => {
-    vi.stubEnv('VITE_SITE_URL', 'https://staging.ruemia.uy')
+    vi.stubEnv('VITE_SITE_URL', 'https://staging.mateajedrez.uy')
     const { absoluteUrl } = await loadSiteUrlModule()
-    expect(absoluteUrl('/product/1')).toBe('https://staging.ruemia.uy/product/1')
+    expect(absoluteUrl('/product/1')).toBe('https://staging.mateajedrez.uy/product/1')
   })
 })

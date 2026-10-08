@@ -194,7 +194,7 @@ export function CategoryProducts() {
   const isLoadingMore = productsFetching && currentPage > 1
   const isFiltering = productsFetching && currentPage === 1
   const hasMore = pageData?.hasMore ?? false
-  const metaDescription = `Descubrí nuestra colección de ${displayCategory.name} — artículos artesanales de Ruemia.`
+  const metaDescription = `Descubrí nuestra colección de ${displayCategory.name} — artículos artesanales de Mates Ajedrez.`
   const canonicalUrl = absoluteUrl(`/categories/${categorySlug}`)
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
     { name: 'Inicio', url: absoluteUrl('/') },
@@ -204,9 +204,9 @@ export function CategoryProducts() {
   return (
     <div className="container-custom py-8">
       <Helmet>
-        <title>{`${displayCategory.name} | Ruemia`}</title>
+        <title>{`${displayCategory.name} | Mates Ajedrez`}</title>
         <meta name="description" content={metaDescription} />
-        <meta property="og:title" content={`${displayCategory.name} | Ruemia`} />
+        <meta property="og:title" content={`${displayCategory.name} | Mates Ajedrez`} />
         <meta property="og:description" content={metaDescription} />
         <meta property="og:url" content={canonicalUrl} />
         <link rel="canonical" href={canonicalUrl} />
@@ -229,7 +229,7 @@ export function CategoryProducts() {
       <div className="mb-8">
         <h1
           className="text-3xl font-bold text-gray-900 mb-1"
-          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
+          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
         >
           {displayCategory.name}
         </h1>
@@ -283,7 +283,7 @@ export function CategoryProducts() {
                   ? 'border-transparent shadow-sm'
                   : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
-              style={effectiveSelectedSubcategories.length === 0 ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
+              style={effectiveSelectedSubcategories.length === 0 ? { backgroundColor: 'var(--org-primary-color, #705931)', color: 'var(--org-primary-ink, white)' } : undefined}
             >
               Todas
             </button>
@@ -298,7 +298,7 @@ export function CategoryProducts() {
                       ? 'border-transparent shadow-sm'
                       : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
                   }`}
-                  style={isActive ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
+                  style={isActive ? { backgroundColor: 'var(--org-primary-color, #705931)', color: 'var(--org-primary-ink, white)' } : undefined}
                 >
                   {subcat.name}
                 </button>

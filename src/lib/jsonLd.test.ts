@@ -5,7 +5,7 @@ describe('buildProductJsonLd', () => {
   const base = {
     name: 'ELLEN',
     images: ['https://cdn.example.com/ellen.jpg'],
-    url: 'https://ruemia.uy/product/123',
+    url: 'https://mateajedrez.uy/product/123',
     price: 1500,
     priceCurrency: 'UYU',
     availability: 'InStock' as const,
@@ -71,9 +71,9 @@ describe('buildProductJsonLd', () => {
 describe('buildBreadcrumbJsonLd', () => {
   it('genera un ListItem por cada elemento, con posición secuencial desde 1', () => {
     const jsonLd = buildBreadcrumbJsonLd([
-      { name: 'Inicio', url: 'https://ruemia.uy/' },
-      { name: 'Materas', url: 'https://ruemia.uy/categories/materas' },
-      { name: 'Ellen', url: 'https://ruemia.uy/product/123' },
+      { name: 'Inicio', url: 'https://mateajedrez.uy/' },
+      { name: 'Materas', url: 'https://mateajedrez.uy/categories/materas' },
+      { name: 'Ellen', url: 'https://mateajedrez.uy/product/123' },
     ])
     expect(jsonLd['@context']).toBe('https://schema.org')
     expect(jsonLd['@type']).toBe('BreadcrumbList')
@@ -82,7 +82,7 @@ describe('buildBreadcrumbJsonLd', () => {
       '@type': 'ListItem',
       position: 1,
       name: 'Inicio',
-      item: 'https://ruemia.uy/',
+      item: 'https://mateajedrez.uy/',
     })
     expect(jsonLd.itemListElement[2].position).toBe(3)
   })
@@ -93,7 +93,7 @@ describe('buildBreadcrumbJsonLd', () => {
   })
 
   it('genera un solo ListItem para breadcrumbs de un nivel (home sin categoría)', () => {
-    const jsonLd = buildBreadcrumbJsonLd([{ name: 'Inicio', url: 'https://ruemia.uy/' }])
+    const jsonLd = buildBreadcrumbJsonLd([{ name: 'Inicio', url: 'https://mateajedrez.uy/' }])
     expect(jsonLd.itemListElement).toHaveLength(1)
     expect(jsonLd.itemListElement[0].position).toBe(1)
   })

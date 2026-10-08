@@ -34,11 +34,11 @@ export function CheckoutSteps({ currentStep }: CheckoutStepsProps) {
                 )}
                 style={
                   isActive
-                    ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' }
+                    ? { backgroundColor: 'var(--org-primary-color, #705931)', color: 'var(--org-primary-ink, white)' }
                     : isCompleted
                       ? {
-                          backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #46362B) 25%, white)',
-                          color: 'var(--org-primary-color, #46362B)',
+                          backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #705931) 25%, white)',
+                          color: 'var(--org-primary-color, #705931)',
                         }
                       : undefined
                 }
@@ -54,7 +54,7 @@ export function CheckoutSteps({ currentStep }: CheckoutStepsProps) {
             {index < STEPS.length - 1 && (
               <div
                 className="h-0.5 w-10 sm:w-20 mx-2 sm:mx-3 mb-5 rounded-full transition-colors"
-                style={{ backgroundColor: index < currentIndex ? 'var(--org-primary-color, #46362B)' : '#e5e7eb' }}
+                style={{ backgroundColor: index < currentIndex ? 'var(--org-primary-color, #705931)' : '#e5e7eb' }}
               />
             )}
           </div>

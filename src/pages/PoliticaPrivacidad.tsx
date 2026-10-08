@@ -23,16 +23,16 @@ export function PoliticaPrivacidad() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Responsable del tratamiento</h2>
             <p>
-              Ruemia (<a href="https://www.instagram.com/ruemia.uy/" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">@ruemia.uy</a>) es una
+              Mates Ajedrez (<a href="https://www.instagram.com/matesajedrez/" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">@matesajedrez</a>) es una
               tienda online operada por <strong>[NOMBRE COMPLETO DEL TITULAR]</strong>, con domicilio en{' '}
-              <strong>[DOMICILIO / LOCALIDAD]</strong>, responsable del tratamiento de los datos personales
+              <strong>Avenida España 1471, Paysandú, Uruguay</strong>, responsable del tratamiento de los datos personales
               recolectados a través de este sitio. Podés contactarnos por correo electrónico a{' '}
               <a href="mailto:[EMAIL DE CONTACTO]" className="text-primary-600 hover:underline">
                 [EMAIL DE CONTACTO]
               </a>{' '}
-              o por WhatsApp al{' '}
-              <a href="https://wa.me/59898839561" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-                +598 98 839 561
+              o por WhatsApp{' '}
+              <a href="https://wa.link/bdxmao" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                escribinos acá
               </a>
               .
             </p>

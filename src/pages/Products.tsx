@@ -14,7 +14,7 @@ import { Helmet } from 'react-helmet-async'
 import { useSearchParams } from 'react-router-dom'
 
 const META_DESCRIPTION =
-  'Explorá todo el catálogo de mates y accesorios artesanales de Ruemia — piezas en cuero hechas a mano en Uruguay.'
+  'Explorá todo el catálogo de mates y accesorios artesanales de Mates Ajedrez — mates en cuero crudo y algarrobo, hechos a mano en Paysandú, Uruguay.'
 
 export function Products() {
   const { organization } = useCurrentOrganization()
@@ -104,9 +104,9 @@ export function Products() {
 
   const seo = (
     <Helmet>
-      <title>Todos los productos | Ruemia</title>
+      <title>Todos los productos | Mates Ajedrez</title>
       <meta name="description" content={META_DESCRIPTION} />
-      <meta property="og:title" content="Todos los productos | Ruemia" />
+      <meta property="og:title" content="Todos los productos | Mates Ajedrez" />
       <meta property="og:description" content={META_DESCRIPTION} />
       <meta property="og:url" content={absoluteUrl('/products')} />
       <link rel="canonical" href={absoluteUrl('/products')} />
@@ -139,7 +139,7 @@ export function Products() {
       <div className="mb-8">
         <h1
           className="text-3xl font-bold text-gray-900 mb-1"
-          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
+          style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
         >
           Todos los productos
         </h1>
@@ -167,7 +167,7 @@ export function Products() {
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Buscar productos..."
             className="w-full h-10 pl-9 pr-8 border border-gray-200 rounded-full text-sm bg-white focus:outline-none focus:ring-2 transition-shadow"
-            style={{ '--tw-ring-color': 'var(--org-primary-color, #46362B)' } as React.CSSProperties}
+            style={{ '--tw-ring-color': 'var(--org-primary-color, #705931)' } as React.CSSProperties}
           />
           {searchTerm && (
             <button
@@ -189,7 +189,7 @@ export function Products() {
                   ? 'border-transparent shadow-sm'
                   : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
               }`}
-              style={!selectedCategory ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
+              style={!selectedCategory ? { backgroundColor: 'var(--org-primary-color, #705931)', color: 'var(--org-primary-ink, white)' } : undefined}
             >
               Todos
             </button>
@@ -202,7 +202,7 @@ export function Products() {
                     ? 'border-transparent shadow-sm'
                     : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
-                style={selectedCategory === cat.id ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
+                style={selectedCategory === cat.id ? { backgroundColor: 'var(--org-primary-color, #705931)', color: 'var(--org-primary-ink, white)' } : undefined}
               >
                 {cat.name}
               </button>
@@ -218,7 +218,7 @@ export function Products() {
                     ? 'border-transparent shadow-sm'
                     : 'bg-white border-gray-100 text-gray-500 hover:border-gray-300'
                 }`}
-                style={selectedCategory === subcat.id ? { backgroundColor: 'var(--org-primary-color, #46362B)', color: 'var(--org-primary-ink, white)' } : undefined}
+                style={selectedCategory === subcat.id ? { backgroundColor: 'var(--org-primary-color, #705931)', color: 'var(--org-primary-ink, white)' } : undefined}
               >
                 {subcat.name}
               </button>

@@ -5,4 +5,4 @@ Disallow: /cart
 Disallow: /checkout
 Disallow: /order-confirmation
 
-Sitemap: https://ruemia.uy/sitemap.xml
+Sitemap: https://mateajedrez.uy/sitemap.xml

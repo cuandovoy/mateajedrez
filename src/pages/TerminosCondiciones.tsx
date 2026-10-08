@@ -23,9 +23,9 @@ export function TerminosCondiciones() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-3">1. Aceptación de estos términos</h2>
             <p>
-              Al navegar y realizar una compra en Ruemia (
-              <a href="https://www.instagram.com/ruemia.uy/" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-                @ruemia.uy
+              Al navegar y realizar una compra en Mates Ajedrez (
+              <a href="https://www.instagram.com/matesajedrez/" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                @matesajedrez
               </a>
               ) aceptás los presentes Términos y Condiciones. Si no estás de acuerdo con alguno de sus
               puntos, te pedimos que no utilices este sitio para realizar compras.
@@ -36,13 +36,13 @@ export function TerminosCondiciones() {
             <h2 className="text-xl font-semibold text-gray-900 mb-3">2. Identificación del vendedor</h2>
             <p>
               Esta tienda es operada por <strong>[NOMBRE COMPLETO DEL TITULAR]</strong>, con domicilio en{' '}
-              <strong>[DOMICILIO / LOCALIDAD]</strong>. Podés contactarnos por correo electrónico a{' '}
+              <strong>Avenida España 1471, Paysandú, Uruguay</strong>. Podés contactarnos por correo electrónico a{' '}
               <a href="mailto:[EMAIL DE CONTACTO]" className="text-primary-600 hover:underline">
                 [EMAIL DE CONTACTO]
               </a>{' '}
-              o por WhatsApp al{' '}
-              <a href="https://wa.me/59898839561" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
-                +598 98 839 561
+              o por WhatsApp{' '}
+              <a href="https://wa.link/bdxmao" target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:underline">
+                escribinos acá
               </a>
               .
             </p>
@@ -108,7 +108,7 @@ export function TerminosCondiciones() {
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-3">8. Propiedad intelectual</h2>
             <p>
-              Las imágenes, textos, logo y demás contenido de este sitio son propiedad de Ruemia o de sus
+              Las imágenes, textos, logo y demás contenido de este sitio son propiedad de Mates Ajedrez o de sus
               proveedores y no pueden reproducirse ni utilizarse sin autorización previa.
             </p>
           </section>

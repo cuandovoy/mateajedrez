@@ -59,7 +59,7 @@ function CartQuantityInput({ quantity, min, max, onCommit }: CartQuantityInputPr
         if (e.key === 'Enter') e.currentTarget.blur()
       }}
       className="w-14 h-9 text-center font-semibold border border-gray-200 rounded-lg focus:outline-none focus:ring-2 transition-shadow"
-      style={{ '--tw-ring-color': 'var(--org-primary-color, #46362B)' } as React.CSSProperties}
+      style={{ '--tw-ring-color': 'var(--org-primary-color, #705931)' } as React.CSSProperties}
       aria-label="Cantidad"
     />
   )
@@ -287,7 +287,7 @@ function CartContent() {
       <div className="flex items-center justify-center min-h-screen">
         <div
           className="animate-spin rounded-full h-12 w-12 border-b-2"
-          style={{ borderColor: 'var(--org-primary-color, #46362B)' }}
+          style={{ borderColor: 'var(--org-primary-color, #705931)' }}
         ></div>
       </div>
     )
@@ -397,7 +397,7 @@ function CartContent() {
                                 {formatPrice(item.product.price, settings)}
                               </p>
                             )}
-                            <p className="text-sm" style={{ color: 'var(--org-primary-color, #46362B)' }}>
+                            <p className="text-sm" style={{ color: 'var(--org-primary-color, #705931)' }}>
                               {formatPrice(item.variant?.price ?? getEffectivePrice(item.product), settings)} c/u
                             </p>
                           </div>

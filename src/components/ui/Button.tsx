@@ -12,24 +12,24 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyles = 'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none'
 
     const variants = {
-      primary: 'focus-visible:ring-[var(--org-primary-color,#46362B)]',
-      secondary: 'focus-visible:ring-[var(--org-secondary-color,#A78B6C)]',
-      outline: 'border-2 focus-visible:ring-[var(--org-primary-color,#46362B)]',
+      primary: 'focus-visible:ring-[var(--org-primary-color,#705931)]',
+      secondary: 'focus-visible:ring-[var(--org-secondary-color,#A9875A)]',
+      outline: 'border-2 focus-visible:ring-[var(--org-primary-color,#705931)]',
       ghost: 'text-gray-700 hover:bg-gray-100 focus-visible:ring-gray-500',
       danger: 'bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500',
     }
 
     // Estilos inline para colores dinámicos de marca
     const dynamicStyles = variant === 'primary' ? {
-      backgroundColor: 'var(--org-primary-color, #46362B)',
+      backgroundColor: 'var(--org-primary-color, #705931)',
       color: 'var(--org-primary-ink, #ffffff)',
-      '--hover-bg': 'var(--org-primary-color, #46362B)',
+      '--hover-bg': 'var(--org-primary-color, #705931)',
     } : variant === 'secondary' ? {
-      backgroundColor: 'var(--org-secondary-color, #A78B6C)',
+      backgroundColor: 'var(--org-secondary-color, #A9875A)',
       color: 'var(--org-secondary-ink, #ffffff)',
     } : variant === 'outline' ? {
-      borderColor: 'var(--org-primary-color, #46362B)',
-      color: 'var(--org-primary-color, #46362B)',
+      borderColor: 'var(--org-primary-color, #705931)',
+      color: 'var(--org-primary-color, #705931)',
     } : {}
 
     const sizes = {

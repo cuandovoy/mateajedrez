@@ -69,7 +69,7 @@ export function CategoryCard({ category, fallbackImages = [] }: CategoryCardProp
         ) : (
           <div
             className="absolute inset-0"
-            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--org-primary-color, #46362B) 20%, white), color-mix(in srgb, var(--org-secondary-color, #A78B6C) 15%, white))' }}
+            style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--org-primary-color, #705931) 20%, white), color-mix(in srgb, var(--org-secondary-color, #A9875A) 15%, white))' }}
           />
         )}
 
@@ -83,7 +83,7 @@ export function CategoryCard({ category, fallbackImages = [] }: CategoryCardProp
         <div className="absolute bottom-0 left-0 right-0 p-5">
           <h3
             className="text-white text-xl font-semibold tracking-tight drop-shadow-sm"
-            style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, Cambria))', letterSpacing: '0.05em' }}
+            style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.12em' }}
           >
             {category.name}
           </h3>

@@ -1,5 +1,5 @@
 /** Dominio canónico del sitio — apex sin `www` (ver nginx.conf: redirect 301 www → apex). */
-export const DEFAULT_SITE_URL = 'https://ruemia.uy'
+export const DEFAULT_SITE_URL = 'https://mateajedrez.uy'
 
 /**
  * Construye una URL absoluta para `path` sobre `baseUrl`. Colapsa cualquier

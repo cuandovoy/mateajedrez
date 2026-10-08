@@ -14,7 +14,7 @@ interface PublicStoreLayoutProps {
   children: ReactNode
 }
 
-// Theming dinámico por organización fue removido: la marca (Ruemia) está
+// Theming dinámico por organización fue removido: la marca (Mates Ajedrez) está
 // hardcodeada como tokens estáticos en src/index.css (--org-*). Ver
 // tailwind.config.js / index.css para los valores reales.
 export function PublicStoreLayout({ organization, slug, children }: PublicStoreLayoutProps) {
@@ -24,21 +24,21 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
           (que siguen ahí como fallback para crawlers que no ejecutan JS).
           Cualquier <Helmet> de una página hija pisa estos tags puntuales. */}
       <Helmet>
-        <title>RUEMIA — Mates artesanales</title>
+        <title>Mates Ajedrez — MATE, luego existo</title>
         <meta
           name="description"
-          content="Mates artesanales de cuero y detalles bordados, hechos en Uruguay. Las piezas con historia merecen ser parte de nuevos momentos."
+          content="Mates artesanales en cuero crudo y algarrobo, grabados y personalizados en Paysandú, Uruguay. Tu mate, pero con tu esencia."
         />
-        <meta property="og:title" content="RUEMIA — Mates artesanales" />
+        <meta property="og:title" content="Mates Ajedrez — MATE, luego existo" />
         <meta
           property="og:description"
-          content="Mates artesanales de cuero y detalles bordados, hechos en Uruguay. Las piezas con historia merecen ser parte de nuevos momentos."
+          content="Mates artesanales en cuero crudo y algarrobo, grabados y personalizados en Paysandú, Uruguay. Tu mate, pero con tu esencia."
         />
         <meta property="og:image" content={absoluteUrl('/og-image.png')} />
         <meta property="og:url" content={absoluteUrl('/')} />
         <link rel="canonical" href={absoluteUrl('/')} />
       </Helmet>
-      <div className="min-h-screen flex flex-col bg-white" style={{ fontFamily: `var(--org-font-family, Cambria)` }}>
+      <div className="min-h-screen flex flex-col bg-white" style={{ fontFamily: `var(--org-font-family, 'Source Sans 3')` }}>
         <ShippingNoticeBanner />
         <PublicStoreHeader organization={organization} />
         <main className="flex-1">

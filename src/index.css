@@ -1,48 +1,30 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;1,400;1,500;1,600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@font-face {
-  font-family: 'Berlin';
-  src: url('/berlin.regular.ttf') format('truetype');
-  /* Rango completo: es la única variante que tenemos. Sin esto, el navegador
-     "fake-boldea" (font-bold/font-semibold de Tailwind) sintéticamente, lo que
-     engrosa y solapa los trazos del glifo — se ve como letras muy pegadas. */
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Cambria';
-  src: url('/Cambria.ttf') format('truetype');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
-
 @layer base {
   :root {
-    /* Marca Ruemia — tokens estáticos, hardcodeados a propósito (ver
+    /* Marca Mates Ajedrez — tokens estáticos, hardcodeados a propósito (ver
        CLAUDE.md: theming dinámico por organización fue removido, el fork
        es single-tenant). Los nombres --org-* se mantienen por compatibilidad
-       con el resto de la tienda, que sigue consumiendo var(--org-*, #fallback). */
-    --org-primary-color: #46362B;
-    --org-secondary-color: #A78B6C;
-    --org-accent-color: #B29E88;
-    --org-primary-ink: #EAE2D6;
-    --org-secondary-ink: #46362B;
-    --org-accent-ink: #46362B;
-    --org-font-family: 'Poppins', 'Cambria', Georgia, 'Times New Roman', serif;
-    --org-font-heading: 'Berlin', 'Cambria', Georgia, serif;
+       con el resto de la tienda, que sigue consumiendo var(--org-*, #fallback).
+       Cuero #705931 · Crema #F7F4E9 · Cuero oscuro #5A4626 · Algarrobo #A9875A ·
+       Yerba #5E7A3A · Tinta #2B2418. */
+    --org-primary-color: #705931;
+    --org-secondary-color: #A9875A;
+    --org-accent-color: #5E7A3A;
+    --org-primary-ink: #F7F4E9;
+    --org-secondary-ink: #2B2418;
+    --org-accent-ink: #F7F4E9;
+    --org-font-family: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --org-font-heading: 'Josefin Sans', 'Source Sans 3', system-ui, sans-serif;
     --org-font-technical: Arial, Helvetica, sans-serif;
   }
 
   body {
-    background-color: #EAE2D6;
-    color: #111827;
-    font-family: 'Poppins', 'Cambria', Georgia, 'Times New Roman', serif;
+    background-color: #F7F4E9;
+    color: #2B2418;
+    font-family: 'Source Sans 3', system-ui, -apple-system, 'Segoe UI', sans-serif;
   }
 }
 
