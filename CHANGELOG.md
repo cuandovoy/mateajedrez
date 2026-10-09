@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-08 — Duración mínima de 1 segundo para la animación de carga
+
+- **Archivos modificados:** `src/lib/splash.ts`, `src/lib/splash.test.ts`, `src/hooks/useSplashGate.ts`, `src/App.tsx`, `src/components/layout/PublicStoreWrapper.tsx`
+- **Qué cambió:** el `BrandLoader` inicial se mantiene visible al menos 1 segundo para que la animación se vea completa. El mínimo se cuenta desde el inicio de la navegación (`performance.now()`), así la carga de auth y la de la organización comparten el mismo segundo en vez de sumar dos.
+
 ## 2026-10-08 — Build de Docker estable y yarn como único gestor de paquetes
 
 - **Archivos modificados:** `Dockerfile`, `README.md`, `package-lock.json` (eliminado), `Dockerfile.alternative` (eliminado)

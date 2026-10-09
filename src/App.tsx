@@ -12,17 +12,19 @@ import { Visitanos } from '@/pages/Visitanos'
 import { PoliticaPrivacidad } from './pages/PoliticaPrivacidad'
 import { TerminosCondiciones } from './pages/TerminosCondiciones'
 import { useAuthStore } from '@/store/authStore'
+import { useSplashGate } from '@/hooks/useSplashGate'
 import { useEffect } from 'react'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 
 function App() {
   const { initialize, loading } = useAuthStore()
+  const showSplash = useSplashGate(loading)
 
   useEffect(() => {
     initialize()
   }, [initialize])
 
-  if (loading) {
+  if (showSplash) {
     return <BrandLoader />
   }
 

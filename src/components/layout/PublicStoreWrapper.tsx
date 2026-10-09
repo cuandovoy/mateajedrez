@@ -4,6 +4,7 @@ import { useOrganizationStore } from '@/store/organizationStore'
 import { PublicStoreLayout } from './PublicStoreLayout'
 import { usePageViewTracker } from '@/hooks/usePageViewTracker'
 import { BrandLoader } from '@/components/ui/BrandLoader'
+import { useSplashGate } from '@/hooks/useSplashGate'
 import type { Organization } from '@/types/database.types'
 
 // Fork de un único cliente: la organización ya no viene de la URL (:slug),
@@ -18,6 +19,8 @@ export function PublicStoreWrapper() {
   const [error, setError] = useState<string | null>(null)
   const [isNetworkError, setIsNetworkError] = useState(false)
   const [retryCount, setRetryCount] = useState(0)
+
+  const showSplash = useSplashGate(loading)
 
   usePageViewTracker(organization?.id, STORE_SLUG)
 
@@ -56,7 +59,7 @@ export function PublicStoreWrapper() {
     loadOrganization()
   }, [fetchOrgBySlug, setCurrentOrganization, retryCount])
 
-  if (loading) {
+  if (showSplash) {
     return <BrandLoader />
   }
 
