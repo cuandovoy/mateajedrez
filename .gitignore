@@ -37,3 +37,16 @@ exports/
 public/sitemap.xml
 # Local MCP config (contains tokens)
 .mcp.json
+
+
+
+node_modules
+dist
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+coverage
+.vite
+*.log
