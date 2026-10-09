@@ -29,7 +29,7 @@ Aplicación ecommerce completa construida con Vite, React, TypeScript, Tailwind 
 
 2. **Instalar dependencias**
    ```bash
-   npm install
+   yarn install
    ```
 
 3. **Configurar variables de entorno**
