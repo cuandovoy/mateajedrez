@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-08 — Build de Docker estable y yarn como único gestor de paquetes
+
+- **Archivos modificados:** `Dockerfile`, `README.md`, `package-lock.json` (eliminado), `Dockerfile.alternative` (eliminado)
+- **Qué cambió:** el `yarn install` del build agrega `--network-timeout 600000` y un cache mount de BuildKit, porque la descarga de `lucide-react` fallaba con `ESOCKETTIMEDOUT`. Se eliminan `package-lock.json` y `Dockerfile.alternative` (tenía un fallback a `npm install` sin lockfile) para que `yarn.lock` sea el único lockfile.
+
 ## 2026-10-08 — Revisión de alineación, textos y navegación del inicio
 
 - **Archivos modificados:** `src/components/features/HomeEditorial.tsx`, `src/pages/PublicStore.tsx`, `src/components/layout/PublicStoreHeader.tsx`, `src/components/layout/Footer.tsx`, `src/components/layout/ShippingNoticeBanner.tsx`.

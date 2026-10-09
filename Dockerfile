@@ -5,7 +5,9 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 COPY package.json yarn.lock ./
-RUN corepack enable && yarn install --frozen-lockfile
+# lucide-react's tarball is large; yarn's default 30s timeout fails on slow networks
+RUN --mount=type=cache,target=/usr/local/share/.cache/yarn \
+    corepack enable && yarn install --frozen-lockfile --network-timeout 600000
 
 COPY . .
 
