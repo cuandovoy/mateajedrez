@@ -4,6 +4,7 @@ import { PublicStoreHeader } from './PublicStoreHeader'
 import { PublicStoreFooter } from './Footer'
 import { ShippingNoticeBanner } from './ShippingNoticeBanner'
 import { ToastContainer } from './ToastContainer'
+import { WhatsappFloatingButton } from './WhatsappFloatingButton'
 import { PublicStoreProvider } from '@/contexts/PublicStoreContext'
 import { absoluteUrl } from '@/lib/siteUrl'
 import type { Organization } from '@/types/database.types'
@@ -45,6 +46,7 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
           {children}
         </main>
         <PublicStoreFooter />
+        <WhatsappFloatingButton />
         <ToastContainer />
       </div>
     </PublicStoreProvider>

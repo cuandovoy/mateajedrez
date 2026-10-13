@@ -9,7 +9,7 @@ import { useStoreProducts } from '@/hooks/usePublicProducts'
 import type { Product, Category, ProductImage } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { ArrowRight } from 'lucide-react'
-import { HomePhoto, HomePhotoHero, HomePersonalization } from '@/components/features/HomeEditorial'
+import { HomePhoto, HomePhotoHero, HomePersonalization, HomeLifestyle } from '@/components/features/HomeEditorial'
 
 const STORE_COVER_IMAGES_KEY = 'store_cover_image_urls'
 const HERO_SLIDE_INTERVAL_MS = 7000
@@ -306,6 +306,8 @@ export function PublicStore() {
         </section>
       )}
 
+      {!hasCoverImages && <HomeLifestyle />}
+
       {/* Featured Products Section */}
       {featuredProducts.length > 0 && (
         <section className="py-10 md:py-14">
@@ -347,26 +349,30 @@ export function PublicStore() {
         className="py-12 md:py-20 scroll-mt-20 bg-brand-cuero-oscuro"
       >
         <div className="container-custom grid md:grid-cols-2 gap-8 lg:gap-16 items-center">
-          <div>
-            <h2 className="font-heading font-light uppercase tracking-[0.14em] text-3xl md:text-4xl text-brand-crema mb-4">
-              Conocé Mates Ajedrez
+          <div className="min-w-0">
+            <h2 className="font-heading font-normal tracking-normal text-3xl leading-[1.2] md:text-4xl text-brand-crema mb-6 [text-wrap:balance]">
+              <span className="text-[0.7em]" aria-hidden="true">🧉</span>{' '}
+              ¡Un mundo de Matesitos para elegir!{' '}
+              <span className="inline-block text-[0.7em] align-middle" aria-hidden="true">🤎</span>
             </h2>
-            <p
-              className="leading-relaxed mb-6 text-brand-crema/85"
-            >
-              En Mates Ajedrez trabajamos cada mate a mano: cuero crudo, algarrobo y grabado
-              láser. Cada pieza se personaliza y se prepara antes de llegar a tu casa.
-            </p>
-            <p className="leading-relaxed mb-7 text-brand-crema/85">
-              Estamos en Paysandú. Acercate al local para ver los mates de cerca y elegir los detalles del tuyo.
-            </p>
-            <Link to="/visitanos" className="inline-flex items-center gap-3 min-h-12 px-6 border border-brand-crema text-brand-crema font-heading text-sm uppercase tracking-widest hover:bg-brand-crema hover:text-brand-cuero-oscuro transition-colors focus-ring">
+            <div className="space-y-4 text-base leading-7 text-brand-crema/90 md:leading-relaxed">
+              <p>
+                Tradicionales, pulidos o forrados en diferentes texturas; con boquillas simples, especiales o personalizadas.
+              </p>
+              <p>
+                De cerámica, poro o algarrobo… cada material tiene su encanto y cada mate, su propia esencia.
+              </p>
+              <p>
+                ✨ Diferentes estilos, texturas y detalles para encontrar ese Matesito que va con vos.
+              </p>
+            </div>
+            <Link to="/visitanos" className="mt-7 inline-flex w-full sm:w-auto justify-center items-center gap-3 min-h-12 px-4 sm:px-6 border border-brand-crema text-brand-crema font-heading text-sm uppercase tracking-wider hover:bg-brand-crema hover:text-brand-cuero-oscuro transition-colors focus-ring">
               Cómo llegar al local
-              <ArrowRight className="w-4 h-4" aria-hidden="true" />
+              <ArrowRight className="w-4 h-4 shrink-0" aria-hidden="true" />
             </Link>
           </div>
 
-          <div className="aspect-square overflow-hidden border border-brand-crema/20">
+          <div className="aspect-[4/3] md:aspect-square overflow-hidden border border-brand-crema/20">
             <HomePhoto
               name="mate-con-identidad"
               alt="Mate personalizado sobre una base de madera, entre plantas y materiales naturales"

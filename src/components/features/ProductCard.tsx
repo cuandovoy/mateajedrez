@@ -154,15 +154,15 @@ export function ProductCard({
           </h3>
         </Link>
 
-        <div className="mt-auto flex items-end justify-between gap-2">
-          <div className="min-w-0">
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-2">
+          <div className="max-w-full shrink-0">
             {hasActiveDiscount(product) && (
               <span className="text-xs text-brand-muted line-through block tabular-nums">
                 {formatPrice(product.price, settings)}
               </span>
             )}
             <span
-              className="font-heading text-lg font-semibold leading-none tabular-nums"
+              className="block font-heading text-lg font-semibold leading-tight tabular-nums"
               style={{ color: 'var(--org-primary-color, #705931)' }}
             >
               {formatPrice(getEffectivePrice(product), settings)}

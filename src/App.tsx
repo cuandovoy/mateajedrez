@@ -1,4 +1,5 @@
 import { PublicStoreWrapper } from '@/components/layout/PublicStoreWrapper'
+import { ScrollToTop } from '@/components/layout/ScrollToTop'
 import { BrandLoader } from '@/components/ui/BrandLoader'
 import { PublicStore } from '@/pages/PublicStore'
 import { Products } from '@/pages/Products'
@@ -30,6 +31,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         {/* Legal — páginas públicas sin autenticación, linkeadas desde el checkout y el footer */}
         <Route path="/legal/privacidad" element={<PoliticaPrivacidad />} />

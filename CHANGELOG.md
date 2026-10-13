@@ -4,6 +4,58 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-13 — Nueva composición editorial del hero
+
+- Título en dos líneas con mayúsculas y minúsculas y acento en color cuero. Texto y acción centrados en mobile, alineados a la izquierda en escritorio.
+- Foto principal completa en todos los tamaños. La foto pequeña integra el enlace a regalos personalizados, debajo de la foto en mobile y del texto en escritorio.
+- Verificado en Chromium a 320, 353, 390, 768 y 1280 px: sin desbordamientos, proporción original de la imagen y enlaces a productos y personalizados correctos. `yarn type-check` correcto.
+
+## 2026-10-13 — Hero mobile y precios legibles
+
+- Hero mobile con título de mayor peso y menor espaciado, texto oscuro arriba y foto principal completa en proporción 3:4 debajo. La foto pequeña acompaña a un lado sin superponerse; escritorio mantiene la composición original.
+- Precio y etiqueta de stock permiten salto de línea cuando no caben juntos, evitando que la etiqueta tape el importe.
+- Revisión en Chromium a 320, 353, 390 y 1280 px: sin superposición entre precios y stock ni desbordamientos en las filas; hero con texto arriba de la foto en mobile. `yarn type-check` correcto.
+
+## 2026-10-13 — Navegación y galerías en mobile
+
+- Categorías movidas inmediatamente debajo del hero, antes de “Para compartir”.
+- “Algunos trabajos que ya entregamos” usa una fila deslizable en mobile, con dos fotos visibles y parte de la siguiente, fotos cuadradas y sus leyendas. Mantiene la grilla desde 768 px. Verificado el desplazamiento por teclado y gesto táctil simulado en Chromium a 320 y 390 px.
+- Menú mobile dividido en enlaces principales (“Explorá Mates Ajedrez”) y lista de categorías (“Comprar por categoría”), con separador, filas de 48 px y scroll interno para pantallas bajas. Las subcategorías mantienen su desplegable con nombre accesible y estado expandido.
+- Verificados menú y navegación a Tienda a 320 y 390 px, sin desbordamiento horizontal y con cierre del menú al navegar. El catálogo disponible no tiene subcategorías para probar su expansión. `yarn type-check` correcto.
+
+## 2026-10-13 — Galería compacta de “Para compartir” en mobile
+
+- Las tres fotos se presentan en un mosaico de dos columnas: una vertical a la izquierda y dos apiladas a la derecha. Desde 768 px se mantienen las tres columnas originales.
+- Se ajustaron el encuadre de la foto cebando mate y `sizes` para los nuevos anchos. A 390 px, la galería ocupa 298 px de alto en lugar de aproximadamente 1375 px.
+- Verificado en Chromium a 320, 390, 768 y 1280 px: imágenes cargadas y sin desbordamientos. `yarn type-check` correcto.
+
+## 2026-10-13 — Nueva foto principal de portada
+
+- Se reemplazó la foto grande por `WhatsApp Image 2026-10-12 at 11.09.57 (5).jpeg`, manteniendo la foto pequeña de detalles personalizados y su posición.
+- Original guardado en `public/images/home/` junto a versiones WebP de 480 y 960 px (`mate-bryan-portada`) para la web.
+
+## 2026-10-13 — Texto de presentación y revisión SEO
+
+- Ajuste responsive de la sección: título sin mayúsculas forzadas ni tracking amplio, líneas equilibradas, texto con mayor interlineado en móvil, botón de ancho completo y foto 4:3 en pantallas pequeñas. Verificado con Chromium a 320, 390 y 1280 px, sin desbordamiento horizontal en la sección.
+- Se reemplazó “Conocé Mates Ajedrez” por el título “🧉 ¡Un mundo de Matesitos para elegir! 🤎” y los tres párrafos provistos, conservando la imagen y el enlace al local.
+- Diagnóstico SEO local y recomendaciones priorizadas en `docs/seo-review-2026-10-13.md`. No se aplicaron cambios de arquitectura ni de indexación.
+- Validación: `yarn type-check` completado correctamente.
+
+## 2026-10-12 — Botón flotante de WhatsApp en la tienda
+
+- **Archivos modificados:** `src/components/layout/WhatsappFloatingButton.tsx` (nuevo), `src/components/layout/PublicStoreLayout.tsx`, `src/vite-env.d.ts`
+- **Qué cambió:** botón circular cuero fijo abajo a la derecha en toda la tienda pública (oculto en `/checkout`), que abre WhatsApp con un mensaje inicial usando `VITE_WHATSAPP_SALES_NUMBER`. Si la variable está vacía, no se renderiza.
+
+## 2026-10-12 — Scroll al inicio al navegar entre páginas
+
+- **Archivos modificados:** `src/components/layout/ScrollToTop.tsx` (nuevo), `src/App.tsx`
+- **Qué cambió:** `BrowserRouter` no resetea el scroll, así que Home, Productos, Visitanos, legales y 404 heredaban la posición de la página anterior. `ScrollToTop` lleva al inicio en cada cambio de ruta (PUSH/REPLACE); respeta atrás/adelante (POP) y las URLs con hash como `/#nosotros`.
+
+## 2026-10-12 — Nuevas fotos en la portada: galería de trabajos, hero y sección "Para compartir"
+
+- **Archivos modificados:** `src/components/features/HomeEditorial.tsx`, `src/pages/PublicStore.tsx`, `public/images/home/*.webp` (8 fotos nuevas en 480w y 960w)
+- **Qué cambió:** la galería de trabajos pasa a 8 fotos (2 filas de 4), el hero usa `mates-apilados` en lugar de `ritual-matero` y se agrega `HomeLifestyle` ("Para compartir.") justo debajo del hero. La foto de San Cono se recortó para quitar un sticker de Instagram.
+
 ## 2026-10-08 — Duración mínima de 1 segundo para la animación de carga
 
 - **Archivos modificados:** `src/lib/splash.ts`, `src/lib/splash.test.ts`, `src/hooks/useSplashGate.ts`, `src/App.tsx`, `src/components/layout/PublicStoreWrapper.tsx`

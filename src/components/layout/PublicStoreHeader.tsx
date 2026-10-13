@@ -118,7 +118,7 @@ function MobileCategoryItem({ cat, onNavigate }: MobileCategoryItemProps) {
         <Link
           to={`/categories/${cat.value}`}
           onClick={onNavigate}
-          className="flex-1 px-4 py-2.5 font-heading text-xs font-semibold uppercase tracking-[0.2em] text-brand-cuero hover:bg-brand-crema transition-colors rounded-lg"
+          className="flex min-h-12 min-w-0 flex-1 items-center px-3 py-3 text-base text-brand-tinta hover:bg-brand-crema transition-colors focus-ring"
         >
           {cat.label}
         </Link>
@@ -126,8 +126,9 @@ function MobileCategoryItem({ cat, onNavigate }: MobileCategoryItemProps) {
           <button
             type="button"
             onClick={() => setIsExpanded((p) => !p)}
-            className="p-2.5 text-brand-cuero hover:text-brand-tinta transition-colors"
-            aria-label={isExpanded ? 'Contraer' : 'Expandir'}
+            className="flex h-12 w-12 shrink-0 items-center justify-center text-brand-cuero hover:text-brand-tinta transition-colors focus-ring"
+            aria-label={`${isExpanded ? 'Contraer' : 'Expandir'} ${cat.label}`}
+            aria-expanded={isExpanded}
           >
             <ChevronDown
               className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
@@ -142,7 +143,7 @@ function MobileCategoryItem({ cat, onNavigate }: MobileCategoryItemProps) {
               key={sub.value}
               to={`/categories/${sub.value}`}
               onClick={onNavigate}
-              className="block px-3 py-2 text-sm text-brand-cuero hover:text-brand-tinta hover:bg-brand-crema transition-colors rounded-lg"
+              className="flex min-h-11 items-center px-3 py-2 text-sm text-brand-cuero hover:text-brand-tinta hover:bg-brand-crema transition-colors focus-ring"
             >
               {sub.label}
             </Link>
@@ -556,46 +557,51 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
 
         {/* ─── Mobile menu panel ─── */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-brand-line">
-            <div className="py-2">
-              <Link
-                to="/"
-                onClick={handleInicioClick}
-                className="block px-4 py-2.5 font-heading text-xs font-semibold uppercase tracking-[0.2em] text-brand-cuero hover:bg-brand-crema transition-colors rounded-lg"
-              >
-                Inicio
-              </Link>
-              <Link
-                to="/products"
-                onClick={closeAll}
-                className="block px-4 py-3 font-heading text-xs font-semibold uppercase tracking-[0.2em] text-brand-cuero hover:bg-brand-crema transition-colors rounded-lg"
-              >
-                Tienda
-              </Link>
-              <Link
-                to="/#nosotros"
-                onClick={handleNosotrosClick}
-                className="block px-4 py-2.5 font-heading text-xs font-semibold uppercase tracking-[0.2em] text-brand-cuero hover:bg-brand-crema transition-colors rounded-lg"
-              >
-                Nosotros
-              </Link>
-              <Link
-                to="/visitanos"
-                onClick={closeAll}
-                className="block px-4 py-2.5 font-heading text-xs font-semibold uppercase tracking-[0.2em] text-brand-cuero hover:bg-brand-crema transition-colors rounded-lg"
-              >
-                Visitanos
-              </Link>
-            </div>
-            {categoriesWithSubs.length > 0 ? (
-              <div className="py-2">
-                <p className="px-4 pt-2 pb-1 text-xs font-semibold uppercase tracking-widest text-brand-cuero">
-                  Categorías
-                </p>
-                {categoriesWithSubs.map((cat) => (
-                  <MobileCategoryItem key={cat.value} cat={cat} onNavigate={closeAll} />
-                ))}
+          <div className="lg:hidden max-h-[70dvh] overflow-y-auto overscroll-contain border-t border-brand-line pb-4">
+            <nav aria-labelledby="mobile-pages-title" className="py-5 px-1">
+              <h2 id="mobile-pages-title" className="px-3 mb-3 font-heading text-lg font-semibold text-brand-tinta">Explorá Mates Ajedrez</h2>
+              <div className="grid grid-cols-2 gap-2">
+                <Link
+                  to="/"
+                  onClick={handleInicioClick}
+                  className="flex min-h-12 items-center px-3 py-3 text-base font-semibold text-brand-cuero bg-brand-crema hover:bg-brand-line transition-colors focus-ring"
+                >
+                  Inicio
+                </Link>
+                <Link
+                  to="/products"
+                  onClick={closeAll}
+                  className="flex min-h-12 items-center px-3 py-3 text-base font-semibold text-brand-cuero bg-brand-crema hover:bg-brand-line transition-colors focus-ring"
+                >
+                  Tienda
+                </Link>
+                <Link
+                  to="/#nosotros"
+                  onClick={handleNosotrosClick}
+                  className="flex min-h-12 items-center px-3 py-3 text-base font-semibold text-brand-cuero bg-brand-crema hover:bg-brand-line transition-colors focus-ring"
+                >
+                  Nosotros
+                </Link>
+                <Link
+                  to="/visitanos"
+                  onClick={closeAll}
+                  className="flex min-h-12 items-center px-3 py-3 text-base font-semibold text-brand-cuero bg-brand-crema hover:bg-brand-line transition-colors focus-ring"
+                >
+                  Visitanos
+                </Link>
               </div>
+            </nav>
+            {categoriesWithSubs.length > 0 ? (
+              <nav aria-labelledby="mobile-categories-title" className="border-t border-brand-line px-1 pt-5">
+                <h2 id="mobile-categories-title" className="px-3 mb-2 font-heading text-lg font-semibold text-brand-tinta">
+                  Comprar por categoría
+                </h2>
+                <div className="divide-y divide-brand-line">
+                  {categoriesWithSubs.map((cat) => (
+                    <MobileCategoryItem key={cat.value} cat={cat} onNavigate={closeAll} />
+                  ))}
+                </div>
+              </nav>
             ) : null}
           </div>
         )}
