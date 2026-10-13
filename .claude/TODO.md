@@ -8,6 +8,8 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 ## Portada con fotografías (2026-10-08)
 
 - 🟢 Resolver lint preexistente en `src/pages/PublicStore.tsx`: `no-constant-condition` en el recorrido de categorías y dependencias de hooks inestables. El nuevo `HomeEditorial.tsx` pasa lint.
+- 🟢 Quitar los `window.scrollTo({ top: 0 })` por página (ProductDetail, CategoryProducts, Cart, Checkout, OrderConfirmation): ahora los cubre `ScrollToTop` global. Revisar antes las dependencias de cada effect por si alguno scrollea en cambios que no son de ruta.
+- 🟡 `HomeLifestyle` solo se renderiza cuando no hay carrusel de portada configurado (ternario en `src/pages/PublicStore.tsx`). Decidir si debe mostrarse siempre.
 
 ## Visitanos (2026-10-08)
 

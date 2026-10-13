@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_SOCIAL_FACEBOOK?: string
   /** Número de WhatsApp (mismo formato que organization.settings.store_whatsapp_number). Si está vacío, el ícono no se muestra. */
   readonly VITE_SOCIAL_WHATSAPP?: string
+  /** Número de WhatsApp de ventas para el botón flotante de la tienda. Si está vacío, el botón no se muestra. */
+  readonly VITE_WHATSAPP_SALES_NUMBER?: string
 }
 
 interface ImportMeta {
