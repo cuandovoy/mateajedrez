@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-14 — Slideshow en el hero de la home
+
+- **Archivos modificados:** src/components/features/HomeEditorial.tsx, tailwind.config.js, src/index.css
+- **Qué cambió:** la foto fija del hero pasa a un crossfade de 4 fotos (portada, ritual matero, cebando mate, regalo personalizado) con zoom lento y una línea de progreso cuero en vez de dots. La animación CSS de la barra es el único reloj (su `animationend` avanza), se pausa con hover, pestaña oculta o hero fuera de pantalla, y las fotos extra se montan recién tras el `load` + idle para no competir con el LCP. Con `prefers-reduced-motion` queda la primera foto fija. Keyframes nuevos `brand-hero-zoom` y `brand-hero-progress`.
+
 ## 2026-10-13 — Header fundido con el hero y logo en el hero desktop
 
 - **Archivos modificados:** src/components/layout/PublicStoreHeader.tsx, src/components/features/HomeEditorial.tsx
