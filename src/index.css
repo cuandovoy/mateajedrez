@@ -95,6 +95,10 @@
     animation: none;
     background-image: none;
   }
+  .brand-hero-zoom,
+  .brand-hero-progress {
+    animation: none !important;
+  }
   .brand-loader-ring,
   .brand-loader-seal,
   .brand-loader-word {

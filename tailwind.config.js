@@ -61,12 +61,22 @@ export default {
           '0%': { backgroundPosition: '200% 0' },
           '100%': { backgroundPosition: '-200% 0' },
         },
+        'brand-hero-zoom': {
+          '0%': { transform: 'scale(1)' },
+          '100%': { transform: 'scale(1.06)' },
+        },
+        'brand-hero-progress': {
+          '0%': { transform: 'scaleX(0)' },
+          '100%': { transform: 'scaleX(1)' },
+        },
       },
       animation: {
         'brand-ring-draw': 'brand-ring-draw 2.4s cubic-bezier(0.25, 1, 0.5, 1) infinite',
         'brand-seal-breathe': 'brand-seal-breathe 3.2s ease-in-out infinite',
         'brand-fade-in': 'brand-fade-in 0.9s cubic-bezier(0.25, 1, 0.5, 1) 0.3s both',
         'brand-shimmer': 'brand-shimmer 1.8s linear infinite',
+        'brand-hero-zoom': 'brand-hero-zoom 7.5s ease-out forwards',
+        'brand-hero-progress': 'brand-hero-progress 6s linear forwards',
       },
     },
   },

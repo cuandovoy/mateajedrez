@@ -1,6 +1,8 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import { buildWhatsappUrl } from '@/lib/storeLocation'
+import { cn } from '@/lib/utils'
 
 interface HomePhotoProps {
   name: string
@@ -27,6 +29,112 @@ export function HomePhoto({ name, alt, className = '', sizes = '(min-width: 768p
   )
 }
 
+const heroSlides = [
+  { name: 'mate-bryan-portada', alt: 'Mate artesanal con virola cincelada y el nombre Bryan, sobre una tela junto a una piel clara' },
+  { name: 'ritual-matero', alt: 'Manos sosteniendo un mate con virola de plata sobre las piernas' },
+  { name: 'cebando-mate', alt: 'Una mujer vertiendo agua del termo en un mate' },
+  { name: 'regalo-personalizado', alt: 'Mate grabado para Eugenia Fernández en una caja de regalo, junto a otros mates personalizados' },
+]
+
+const HERO_SLIDE_SIZES = '(min-width: 1280px) 483px, (min-width: 768px) 38vw, (min-width: 416px) 384px, calc(100vw - 32px)'
+
+// The progress bar's CSS animation is the only clock: its animationend advances the
+// slide, so pausing (hover, hidden tab, hero off-screen) is just animation-play-state
+// and there is no JS timer to keep in sync. Extra slides mount only after the page
+// has loaded and the browser is idle, so they never compete with the LCP image.
+function HeroSlideshow() {
+  const [active, setActive] = useState(0)
+  const [previous, setPrevious] = useState<number | null>(null)
+  const [ready, setReady] = useState(false)
+  const [paused, setPaused] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+
+    let idleId: number | undefined
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const markReady = () => setReady(true)
+    const schedule = () => {
+      if ('requestIdleCallback' in window) idleId = window.requestIdleCallback(markReady, { timeout: 2000 })
+      else timeoutId = setTimeout(markReady, 1000)
+    }
+
+    if (document.readyState === 'complete') schedule()
+    else window.addEventListener('load', schedule, { once: true })
+
+    return () => {
+      window.removeEventListener('load', schedule)
+      if (idleId !== undefined) window.cancelIdleCallback(idleId)
+      clearTimeout(timeoutId)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!ready || !containerRef.current) return
+
+    let inView = true
+    const update = () => setPaused(document.hidden || !inView)
+    const observer = new IntersectionObserver(([entry]) => {
+      inView = entry.isIntersecting
+      update()
+    })
+
+    observer.observe(containerRef.current)
+    document.addEventListener('visibilitychange', update)
+    return () => {
+      observer.disconnect()
+      document.removeEventListener('visibilitychange', update)
+    }
+  }, [ready])
+
+  const advance = () => {
+    setPrevious(active)
+    setActive((active + 1) % heroSlides.length)
+  }
+
+  // Inline style beats the group-hover class, so only set it while force-paused.
+  const pausedStyle = paused ? { animationPlayState: 'paused' as const } : undefined
+  const slides = ready ? heroSlides : heroSlides.slice(0, 1)
+
+  return (
+    <div ref={containerRef} className="group">
+      <div className="relative aspect-[3/4] overflow-hidden bg-brand-line">
+        {slides.map((slide, index) => {
+          const isActive = index === active
+          // The outgoing slide keeps zooming while it fades so it doesn't snap back to scale 1.
+          const isZooming = ready && (isActive || index === previous)
+
+          return (
+            <div
+              key={slide.name}
+              aria-hidden={!isActive || undefined}
+              style={isZooming ? pausedStyle : undefined}
+              className={cn(
+                'absolute inset-0 transition-opacity duration-[1500ms] ease-in-out motion-reduce:transition-none',
+                isActive ? 'opacity-100' : 'opacity-0',
+                isZooming && 'brand-hero-zoom animate-brand-hero-zoom [@media(hover:hover)]:group-hover:[animation-play-state:paused]'
+              )}
+            >
+              <HomePhoto name={slide.name} alt={slide.alt} priority={index === 0} sizes={HERO_SLIDE_SIZES} />
+            </div>
+          )
+        })}
+      </div>
+      {ready && (
+        <div aria-hidden="true" className="mt-3 h-px overflow-hidden bg-brand-line motion-reduce:hidden">
+          <div
+            key={active}
+            onAnimationEnd={advance}
+            style={pausedStyle}
+            className="brand-hero-progress h-full origin-left bg-brand-cuero animate-brand-hero-progress [@media(hover:hover)]:group-hover:[animation-play-state:paused]"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function HomePhotoHero() {
   return (
     <section aria-labelledby="home-title" className="border-b border-brand-line bg-brand-crema">
@@ -44,7 +152,7 @@ export function HomePhotoHero() {
           </Link>
         </div>
         <div className="mx-auto w-full max-w-sm md:col-start-2 md:row-start-1 md:row-span-2 md:mr-0 md:max-w-[85%] md:self-center">
-          <HomePhoto name="mate-bryan-portada" alt="Mate artesanal con virola cincelada y el nombre Bryan, sobre una tela junto a una piel clara" className="!h-auto !object-contain" priority sizes="(min-width: 1280px) 483px, (min-width: 768px) 38vw, (min-width: 416px) 384px, calc(100vw - 32px)" />
+          <HeroSlideshow />
         </div>
         <a href="#personalizados" className="group mx-auto flex w-full max-w-sm items-center gap-5 border-t border-brand-line pt-5 text-brand-tinta focus-ring md:mx-0 md:col-start-1 md:row-start-2 md:mb-6 md:pt-6">
           <span className="block aspect-square w-20 shrink-0 overflow-hidden md:w-24">
