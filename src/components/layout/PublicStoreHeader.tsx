@@ -8,7 +8,6 @@ import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl
 import { ChevronDown, Menu, Minus, Plus, Search, ShoppingCart, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import logoSquare from '@/brand/mates-ajedrez-logo-square.jpeg'
 
 interface PublicStoreHeaderProps {
   organization: Organization
@@ -343,6 +342,8 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
   const desktopSearchRef = useRef<HTMLInputElement>(null)
   const mobileSearchRef = useRef<HTMLInputElement>(null)
   const headerRef = useRef<HTMLElement>(null)
+  const isHome = location.pathname === '/'
+  const [isPastHero, setIsPastHero] = useState(false)
 
   const { categoriesWithSubs } = usePublicCategoriesForMenu(organization.id)
 
@@ -403,10 +404,27 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
     return () => document.removeEventListener('mousedown', handleOutside)
   }, [isMobileMenuOpen, isSearchOpen])
 
+  // On the home page the header blends into the hero (same crema background, no
+  // border) and the desktop seal stays hidden because the hero shows the big
+  // logo; both come back once the user scrolls past it, so the logo is never
+  // shown twice at the same time.
+  useEffect(() => {
+    if (!isHome) return
+    const onScroll = () => setIsPastHero(window.scrollY > 160)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [isHome])
+
+  const blendWithHero = isHome && !isPastHero
+
   return (
     <header
       ref={headerRef}
-      className="sticky top-0 z-30 bg-brand-bg border-b border-brand-line"
+      className={cn(
+        'sticky top-0 z-30 bg-brand-crema border-b transition-colors duration-300 motion-reduce:transition-none',
+        blendWithHero ? 'border-transparent' : 'border-brand-line'
+      )}
     >
       <div className="container-custom">
 
@@ -414,8 +432,16 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
         <div className="hidden lg:grid grid-cols-[1fr_auto_1fr] items-center gap-4 h-20">
 
           {/* Logo seal — same square logo as mobile, larger for desktop hierarchy */}
-          <Link to="/" className="flex items-center gap-3 shrink-0 justify-self-start">
-            <img src={logoSquare} alt="Mates Ajedrez" width={56} height={56} className="h-14 w-14 rounded-full object-cover" />
+          <Link
+            to="/"
+            aria-hidden={blendWithHero || undefined}
+            tabIndex={blendWithHero ? -1 : undefined}
+            className={cn(
+              'flex items-center gap-3 shrink-0 justify-self-start transition-opacity duration-300 motion-reduce:transition-none',
+              blendWithHero && 'opacity-0 pointer-events-none'
+            )}
+          >
+            <img src="/images/logo-ajedrez-cuero-sm.png" alt="Mates Ajedrez" width={60} height={64} className="h-16 w-auto" />
           </Link>
 
           {/* Nav: Inicio / Categorías (trigger colapsable) / Nosotros */}
@@ -502,8 +528,8 @@ export function PublicStoreHeader({ organization }: PublicStoreHeaderProps) {
           </button>
 
           {/* Center logo seal (the square logo already includes the brand name) */}
-          <Link to="/" onClick={closeAll} className="flex justify-center items-center h-11 w-11">
-            <img src={logoSquare} alt="Mates Ajedrez" width={44} height={44} className="h-11 w-11 rounded-full object-cover" />
+          <Link to="/" onClick={closeAll} className="flex justify-center items-center h-12">
+            <img src="/images/logo-ajedrez-cuero-sm.png" alt="Mates Ajedrez" width={45} height={48} className="h-12 w-auto" />
           </Link>
 
           {/* Right */}

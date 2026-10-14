@@ -32,6 +32,7 @@ export function HomePhotoHero() {
     <section aria-labelledby="home-title" className="border-b border-brand-line bg-brand-crema">
       <div className="container-custom grid gap-7 py-8 md:grid-cols-2 md:grid-rows-[1fr_auto] md:gap-x-12 md:gap-y-8 md:py-12 lg:gap-x-20">
         <div className="text-center md:text-left md:self-end md:pt-6">
+          <img src="/images/logo-ajedrez-cuero.png" alt="Mates Ajedrez" width={188} height={200} className="hidden lg:block mb-8 h-40 w-auto xl:h-48" />
           <h1 id="home-title" className="font-heading font-normal text-brand-tinta text-[2.75rem] leading-[1.05] tracking-[-0.02em] sm:text-6xl lg:text-7xl">
             Tu mate,<br /><span className="text-brand-cuero">tu momento.</span>
           </h1>
@@ -42,8 +43,8 @@ export function HomePhotoHero() {
             Ver mates <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
-        <div className="mx-auto w-full max-w-sm md:col-start-2 md:row-start-1 md:row-span-2 md:max-w-none md:self-center">
-          <HomePhoto name="mate-bryan-portada" alt="Mate artesanal con virola cincelada y el nombre Bryan, sobre una tela junto a una piel clara" className="!h-auto !object-contain" priority sizes="(min-width: 1280px) 568px, (min-width: 768px) 45vw, (min-width: 416px) 384px, calc(100vw - 32px)" />
+        <div className="mx-auto w-full max-w-sm md:col-start-2 md:row-start-1 md:row-span-2 md:mr-0 md:max-w-[85%] md:self-center">
+          <HomePhoto name="mate-bryan-portada" alt="Mate artesanal con virola cincelada y el nombre Bryan, sobre una tela junto a una piel clara" className="!h-auto !object-contain" priority sizes="(min-width: 1280px) 483px, (min-width: 768px) 38vw, (min-width: 416px) 384px, calc(100vw - 32px)" />
         </div>
         <a href="#personalizados" className="group mx-auto flex w-full max-w-sm items-center gap-5 border-t border-brand-line pt-5 text-brand-tinta focus-ring md:mx-0 md:col-start-1 md:row-start-2 md:mb-6 md:pt-6">
           <span className="block aspect-square w-20 shrink-0 overflow-hidden md:w-24">

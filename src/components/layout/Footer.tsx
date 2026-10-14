@@ -3,7 +3,6 @@ import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
 import { ShoppingCart, LayoutGrid, Instagram, Facebook, MessageCircle, MapPin, Truck, RotateCcw, CreditCard } from 'lucide-react'
 import { buildWhatsappUrl } from '@/lib/storeLocation'
-import logoSquare from '@/brand/mates-ajedrez-logo-square.jpeg'
 
 export function PublicStoreFooter() {
   const { organization } = usePublicStore()
@@ -31,11 +30,11 @@ export function PublicStoreFooter() {
           <div>
             <Link to="/" className="flex items-center gap-4 mb-5">
               <img
-                src={logoSquare}
+                src="/images/logo-ajedrez-crema-sm.png"
                 alt="Mates Ajedrez"
-                width={48}
-                height={48}
-                className="h-12 w-12 rounded-full object-cover ring-1 ring-brand-crema/30"
+                width={53}
+                height={56}
+                className="h-14 w-auto"
               />
               <span className="font-heading font-light uppercase text-lg tracking-[0.2em] text-brand-crema">
                 Mates Ajedrez

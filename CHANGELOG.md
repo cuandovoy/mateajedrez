@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-13 — Header fundido con el hero y logo en el hero desktop
+
+- **Archivos modificados:** src/components/layout/PublicStoreHeader.tsx, src/components/features/HomeEditorial.tsx
+- **Qué cambió:** el header de la tienda pasa a `bg-brand-crema` (mismo color que el hero). En la home, arriba de todo, el header no tiene borde y el sello desktop se oculta porque el hero muestra el logo grande sobre el título; al scrollear (>160px) vuelven el borde y el sello del header, así el logo nunca aparece dos veces a la vez. El logo transparente (`public/images/logo-transparente.png`) reemplaza al sello cuadrado en hero, header, footer y `BrandLoader`, vía tres derivados en `public/images/`: `logo-ajedrez-cuero.png` (400px, recortado y sin manchas, para hero y loader), `logo-ajedrez-cuero-sm.png` (128px con trazo engrosado para que se lea a 48–64px en el header) y `logo-ajedrez-crema-sm.png` (misma versión en crema para el footer oscuro). Logo del hero `h-40 xl:h-48`; la foto del hero se achicó a `md:max-w-[85%]` alineada a la derecha. Archivos extra: src/components/layout/Footer.tsx, src/components/ui/BrandLoader.tsx.
+
 ## 2026-10-13 — Nueva composición editorial del hero
 
 - Título en dos líneas con mayúsculas y minúsculas y acento en color cuero. Texto y acción centrados en mobile, alineados a la izquierda en escritorio.
