@@ -1,5 +1,3 @@
-import logoSquare from '@/brand/mates-ajedrez-logo-square.jpeg'
-
 interface BrandLoaderProps {
   /** Accessible status text announced to screen readers. */
   label?: string
@@ -17,12 +15,12 @@ export function BrandLoader({ label = 'Cargando la tienda' }: BrandLoaderProps) 
       <div className="relative h-28 w-28">
         <div className="absolute inset-0 flex items-center justify-center">
           <img
-            src={logoSquare}
+            src="/images/logo-ajedrez-cuero.png"
             alt=""
-            width={80}
+            width={75}
             height={80}
             decoding="async"
-            className="brand-loader-seal animate-brand-seal-breathe h-20 w-20 rounded-full object-cover"
+            className="brand-loader-seal animate-brand-seal-breathe h-20 w-auto"
           />
         </div>
         <svg viewBox="0 0 112 112" className="absolute inset-0 h-full w-full" fill="none" aria-hidden="true">
