@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-18 — Nombre de categoría más legible en CategoryCard
+
+- **Archivos modificados:** src/components/features/CategoryCard.tsx, CLAUDE.md
+- **Qué cambió:** el nombre de la categoría pasa de Josefin Light (300) a Regular (400), `text-xl` y tracking 0.14em, mismo peso que el título del hero; en Light se veía demasiado fino sobre la foto.
+
 ## 2026-10-14 — Slideshow en el hero de la home
 
 - **Archivos modificados:** src/components/features/HomeEditorial.tsx, tailwind.config.js, src/index.css

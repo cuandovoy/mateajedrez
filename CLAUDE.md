@@ -712,7 +712,7 @@ useEffect(() => {
 
 ### CategoryCard
 - Diseño editorial con overlay: imagen a `aspect-[4/3]`, `rounded-md border border-brand-line`, gradiente `bg-gradient-to-t from-brand-tinta/80 via-brand-tinta/20 to-transparent` sobre la imagen (tinta, no negro)
-- Nombre en `font-heading` Light, mayúscula espaciada
+- Nombre en `font-heading` Regular (400, mismo peso que el título del hero), `text-xl`, mayúscula con `letterSpacing: 0.14em` — Light se perdía sobre la foto
 - Texto (nombre + descripción) sobre el gradiente en la parte inferior — **nunca** en caja blanca debajo de la imagen
 - Hover: `group-hover:scale-105` solo en la imagen, no en la card entera
 
