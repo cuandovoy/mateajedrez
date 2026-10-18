@@ -8,6 +8,8 @@ import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useToastStore } from '@/store/toastStore'
 import { isCouponDiscountMetadata } from '@/lib/coupons'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
+import { getDeliveryMethod, type ShippingAddress } from '@/lib/schemas'
+import { STORE_ADDRESS } from '@/lib/storeLocation'
 import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone, Download, AlertCircle, Clock, RefreshCw, MessageCircle, Mail } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
 
@@ -176,7 +178,8 @@ export function OrderConfirmation() {
   const handleDownloadReceipt = () => {
     if (!order) return
 
-    const addr = order.shipping_address as Record<string, string> | null
+    const addr = order.shipping_address as ShippingAddress | null
+    const isPickup = getDeliveryMethod(addr) === 'pickup'
     const orderRef = order.order_number ? `#${order.order_number}` : `#${order.id.slice(0, 8).toUpperCase()}`
     const createdAt = order.created_at
       ? new Date(order.created_at).toLocaleDateString('es-UY', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -215,7 +218,9 @@ export function OrderConfirmation() {
 
     const addressHtml = addr
       ? `<p style="margin:2px 0;">${addr.fullName ?? ''}</p>
-         <p style="margin:2px 0;">${addr.address ?? ''}, ${addr.city ?? ''}${addr.department ? `, ${addr.department}` : ''}</p>
+         ${isPickup
+           ? `<p style="margin:2px 0;">Retiro en local: ${STORE_ADDRESS}</p>`
+           : `<p style="margin:2px 0;">${addr.address ?? ''}, ${addr.city ?? ''}${addr.department ? `, ${addr.department}` : ''}</p>`}
          ${addr.email ? `<p style="margin:2px 0;">${addr.email}</p>` : ''}
          ${addr.phone ? `<p style="margin:2px 0;">Tel: ${addr.phone}</p>` : ''}`
       : ''
@@ -444,22 +449,27 @@ export function OrderConfirmation() {
             </div>
 
             {order.shipping_address && (() => {
-              const shipping = order.shipping_address as {
-                fullName?: string
-                email?: string
-                phone?: string
-                address?: string
-                city?: string
-                department?: string
-              }
+              const shipping = order.shipping_address as ShippingAddress
+              const isPickup = getDeliveryMethod(shipping) === 'pickup'
               return (
                 <div className="border-t pt-4">
-                  <p className="text-sm font-medium text-brand-muted mb-2">Dirección de Envío</p>
+                  <p className="text-sm font-medium text-brand-muted mb-2">
+                    {isPickup ? 'Retiro en local' : 'Dirección de Envío'}
+                  </p>
                   <div className="text-sm text-brand-muted">
                     <p>{shipping.fullName}</p>
                     {shipping.email && <p>Email: {shipping.email}</p>}
-                    <p>{shipping.address}</p>
-                    <p>{shipping.city}{shipping.department ? `, ${shipping.department}` : ''}</p>
+                    {isPickup ? (
+                      <>
+                        <p>{STORE_ADDRESS}</p>
+                        <p>Te avisamos cuando esté listo para retirar.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p>{shipping.address}</p>
+                        <p>{shipping.city}{shipping.department ? `, ${shipping.department}` : ''}</p>
+                      </>
+                    )}
                     <p className="mt-2">Tel: {shipping.phone}</p>
                   </div>
                 </div>

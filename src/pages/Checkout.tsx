@@ -9,7 +9,8 @@ import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
-import { checkoutSchema, URUGUAY_DEPARTMENTS, type CheckoutFormData } from '@/lib/schemas'
+import { checkoutSchema, URUGUAY_DEPARTMENTS, type CheckoutFormData, type CheckoutFormInput, type DeliveryMethod, type ShippingAddress } from '@/lib/schemas'
+import { STORE_ADDRESS } from '@/lib/storeLocation'
 import { supabase } from '@/lib/supabase'
 import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl, hasActiveDiscount } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -20,9 +21,9 @@ import type { CartItemWithProduct, Order, ProductImage } from '@/types'
 import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { BranchInventory, Customer } from '@/types/database.types'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, MapPin, Truck } from 'lucide-react'
+import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, Store, Truck } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver } from 'react-hook-form'
 import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3'
 import { Link, useNavigate } from 'react-router-dom'
 import type { StoreCoupon } from '@/types'
@@ -75,10 +76,13 @@ function CheckoutInner() {
     setValue,
     getValues,
     watch,
+    clearErrors,
     formState: { errors },
-  } = useForm<CheckoutFormData>({
-    resolver: zodResolver(checkoutSchema),
+  } = useForm<CheckoutFormInput>({
+    // El schema es una unión discriminada; RHF trabaja con la forma plana.
+    resolver: zodResolver(checkoutSchema) as unknown as Resolver<CheckoutFormInput>,
     defaultValues: {
+      deliveryMethod: 'shipping',
       fullName: '',
       email: '',
       phone: '',
@@ -86,6 +90,14 @@ function CheckoutInner() {
       city: '',
     },
   })
+
+  const deliveryMethod = watch('deliveryMethod')
+  const isPickup = deliveryMethod === 'pickup'
+
+  const selectDeliveryMethod = (method: DeliveryMethod) => {
+    setValue('deliveryMethod', method)
+    clearErrors(['address', 'city', 'department'])
+  }
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -470,14 +482,20 @@ function CheckoutInner() {
         : 0
       const pricingTotal = Math.max(0, pricingSubtotal - pricingDiscountTotal)
       const orderPaymentMethod = paymentMethod || null
-      const contactInfo = {
+      const contactInfo: ShippingAddress = {
         fullName: formValues.fullName,
         email: formValues.email,
         phone: formValues.phone,
-        address: formValues.address,
-        city: formValues.city,
-        department: formValues.department,
+        delivery_method: formValues.deliveryMethod,
+        ...(formValues.deliveryMethod === 'shipping'
+          ? { address: formValues.address, city: formValues.city, department: formValues.department }
+          : {}),
       }
+      // El cliente guarda solo su última dirección real: un retiro no la pisa
+      // y delivery_method es propio de cada orden.
+      const customerAddress: ShippingAddress = { ...contactInfo }
+      delete customerAddress.delivery_method
+      const customerAddressUpdate = formValues.deliveryMethod === 'shipping' ? { address: customerAddress } : {}
 
       if (!organizationId) {
         show('No se pudo determinar la organización. Por favor, inicia sesión o recarga la página.', 'error')
@@ -534,7 +552,7 @@ function CheckoutInner() {
               ...(user?.id && !existingCustomer.user_id ? { user_id: user.id } : {}),
               full_name: formValues.fullName,
               phone: formValues.phone,
-              address: contactInfo,
+              ...customerAddressUpdate,
             } as never)
             .eq('id', existingCustomer.id)
             .select()
@@ -550,7 +568,7 @@ function CheckoutInner() {
             email: formValues.email,
             full_name: formValues.fullName,
             phone: formValues.phone,
-            address: contactInfo,
+            address: formValues.deliveryMethod === 'shipping' ? customerAddress : null,
             is_active: true,
           } as never)
           .select()
@@ -775,10 +793,13 @@ function CheckoutInner() {
 
       <h1 className="brand-title text-2xl md:text-3xl mb-4">Finalizar Compra</h1>
 
-      <div className="mb-8 flex items-start gap-3 rounded-lg border border-brand-algarrobo/40 bg-brand-crema px-4 py-3 text-sm text-brand-tinta">
-        <Truck className="h-5 w-5 shrink-0 mt-0.5" />
-        <p>Los productos tienen una demora de entrega de 3 a 5 días hábiles.</p>
-      </div>
+      {!isPickup && (
+        <div className="mb-8 flex items-start gap-3 rounded-lg border border-brand-algarrobo/40 bg-brand-crema px-4 py-3 text-sm text-brand-tinta">
+          <Truck className="h-5 w-5 shrink-0 mt-0.5" />
+          <p>Los productos tienen una demora de entrega de 3 a 5 días hábiles.</p>
+        </div>
+      )}
+      {isPickup && <div className="mb-8" />}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Order Summary */}
@@ -918,7 +939,7 @@ function CheckoutInner() {
               <CardTitle>Datos de Contacto</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleFormSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={handleFormSubmit((values) => onSubmit(values as CheckoutFormData))} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-brand-muted mb-1">
@@ -968,67 +989,119 @@ function CheckoutInner() {
                   )}
                 </div>
 
-                {/* Shipping address */}
+                {/* Delivery method */}
                 <div className="pt-4">
                   <label className="block text-sm font-medium text-brand-muted mb-3">
-                    Dirección de Envío <span className="text-red-500">*</span>
+                    Cómo querés recibir tu pedido <span className="text-red-500">*</span>
                   </label>
-                  <div className="space-y-4">
-                    <div>
-                      <Input
-                        type="text"
-                        placeholder="Calle y número, apto/casa"
-                        {...register('address')}
-                        className={errors.address ? 'border-red-500' : ''}
-                      />
-                      {errors.address && (
-                        <p className="text-xs text-red-500 mt-1">{errors.address.message}</p>
-                      )}
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup">
+                    {([
+                      { value: 'shipping', title: 'Envío a domicilio', hint: 'Para todo el país, excepto Paysandú', icon: <Truck className="h-5 w-5" /> },
+                      { value: 'pickup', title: 'Retiro en local', hint: 'Paysandú, sin costo', icon: <Store className="h-5 w-5" /> },
+                    ] as const).map((opt) => {
+                      const selected = deliveryMethod === opt.value
+                      return (
+                        <label
+                          key={opt.value}
+                          className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                            selected ? '' : 'border-brand-line hover:bg-brand-crema'
+                          }`}
+                          style={
+                            selected
+                              ? {
+                                  borderColor: 'var(--org-primary-color, #705931)',
+                                  backgroundColor: 'color-mix(in srgb, var(--org-primary-color, #705931) 15%, white)',
+                                  color: 'var(--org-primary-color, #705931)',
+                                }
+                              : undefined
+                          }
+                        >
+                          <input
+                            type="radio"
+                            name="deliveryMethod"
+                            value={opt.value}
+                            checked={selected}
+                            onChange={() => selectDeliveryMethod(opt.value)}
+                            className="w-4 h-4 focus:ring-[var(--org-primary-color,#705931)] shrink-0"
+                            style={{ accentColor: 'var(--org-primary-color, #705931)' }}
+                          />
+                          <span className={`shrink-0 ${selected ? '' : 'text-brand-muted'}`}>{opt.icon}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-brand-tinta">{opt.title}</p>
+                            <p className="text-sm text-brand-muted">{opt.hint}</p>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {isPickup ? (
+                    <div className="mt-4 flex items-start gap-3 rounded-lg border border-brand-algarrobo/40 bg-brand-crema px-4 py-3 text-sm text-brand-tinta">
+                      <Store className="h-5 w-5 shrink-0 mt-0.5" />
+                      <p>
+                        El retiro se realiza en el local <strong>Mate Ajedrez</strong>: {STORE_ADDRESS}.
+                        Te notificaremos cuando el pedido esté listo para retirar.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-4">
                       <div>
                         <Input
                           type="text"
-                          placeholder="Ciudad"
-                          {...register('city')}
-                          className={errors.city ? 'border-red-500' : ''}
+                          placeholder="Calle y número, apto/casa"
+                          {...register('address')}
+                          className={errors.address ? 'border-red-500' : ''}
                         />
-                        {errors.city && (
-                          <p className="text-xs text-red-500 mt-1">{errors.city.message}</p>
+                        {errors.address && (
+                          <p className="text-xs text-red-500 mt-1">{errors.address.message}</p>
                         )}
                       </div>
 
-                      <div>
-                        <select
-                          defaultValue=""
-                          {...register('department')}
-                          className={cn(
-                            'w-full min-h-[44px] px-4 py-2 border rounded-lg bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:border-transparent transition-colors',
-                            errors.department ? 'border-red-500 focus-visible:ring-red-500' : 'border-brand-line'
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Input
+                            type="text"
+                            placeholder="Ciudad"
+                            {...register('city')}
+                            className={errors.city ? 'border-red-500' : ''}
+                          />
+                          {errors.city && (
+                            <p className="text-xs text-red-500 mt-1">{errors.city.message}</p>
                           )}
-                        >
-                          <option value="" disabled>Departamento</option>
-                          {URUGUAY_DEPARTMENTS.map((dept) => (
-                            <option key={dept} value={dept}>{dept}</option>
-                          ))}
-                        </select>
-                        {errors.department && (
-                          <p className="text-xs text-red-500 mt-1">{errors.department.message}</p>
-                        )}
-                      </div>
-                    </div>
+                        </div>
 
-                    {watch('department') === 'Paysandú' && (
-                      <div className="flex items-start gap-3 rounded-lg border border-brand-algarrobo/40 bg-brand-crema px-4 py-3 text-sm text-brand-tinta">
-                        <MapPin className="h-5 w-5 shrink-0 mt-0.5" />
-                        <p>
-                          Para Paysandú, el retiro se realiza en el local <strong>Mate Ajedrez</strong>.
-                          Te notificaremos cuando el pedido esté listo para retirar.
-                        </p>
+                        <div>
+                          <select
+                            defaultValue=""
+                            {...register('department')}
+                            className={cn(
+                              'w-full min-h-[44px] px-4 py-2 border rounded-lg bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:border-transparent transition-colors',
+                              errors.department ? 'border-red-500 focus-visible:ring-red-500' : 'border-brand-line'
+                            )}
+                          >
+                            <option value="" disabled>Departamento</option>
+                            {URUGUAY_DEPARTMENTS.filter((dept) => dept !== 'Paysandú').map((dept) => (
+                              <option key={dept} value={dept}>{dept}</option>
+                            ))}
+                          </select>
+                          {errors.department && (
+                            <p className="text-xs text-red-500 mt-1">{errors.department.message}</p>
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
+
+                      <p className="text-sm text-brand-muted">
+                        ¿Estás en Paysandú?{' '}
+                        <button
+                          type="button"
+                          onClick={() => selectDeliveryMethod('pickup')}
+                          className="font-medium text-brand-cuero underline underline-offset-2 hover:text-brand-cuero-oscuro"
+                        >
+                          Elegí Retiro en local
+                        </button>
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Payment Method Selection */}

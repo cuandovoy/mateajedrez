@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-18 — Retiro en local o envío a domicilio en el checkout
+
+- **Archivos modificados:** src/lib/schemas.ts, src/lib/schemas.test.ts, src/pages/Checkout.tsx, src/pages/OrderConfirmation.tsx, CHANGELOG.md
+- **Qué cambió:** el checkout ofrece "Retiro en local" (para todos) y "Envío a domicilio" (excluye Paysandú, validado en el schema). El modo se guarda en `orders.shipping_address.delivery_method`; las órdenes sin la clave se tratan como envío (`getDeliveryMethod`). Sin migración SQL. El retiro no pisa la dirección guardada del cliente. La confirmación y el comprobante muestran la dirección del local en retiros.
+
 ## 2026-10-18 — Nombre de categoría más legible en CategoryCard
 
 - **Archivos modificados:** src/components/features/CategoryCard.tsx, CLAUDE.md
