@@ -4,6 +4,16 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-21 — Correcciones de accesibilidad y responsive en checkout y fichas
+
+- **Archivos modificados:** src/store/cartStore.ts, src/pages/Checkout.tsx, src/components/features/CheckoutSteps.tsx, src/pages/ProductDetail.tsx, src/components/features/ProductCard.tsx, CHANGELOG.md, .claude/TODO.md
+- **Qué cambió:** el checkout ya no redirige a /cart al recargar con items (nuevo flag `hasFetched` en cartStore + skeleton mientras carga). Se corrigió el overflow mobile de los pasos del checkout y de la fila de cantidad en la ficha, el botón de agregar de ProductCard es visible con foco de teclado, y los campos del checkout tienen `id`/`label`/`autoComplete` (email y teléfono con `aria-label` explícito, porque `Input` usa el placeholder como fallback). Un `orderPlacedRef` evita que el `clearCart()` post-orden dispare la redirección a /cart.
+
+## 2026-10-21 — Nuevo texto "Regalá algo personal" y nombres de categoría en mobile
+
+- **Archivos modificados:** src/components/features/HomeEditorial.tsx, src/components/features/CategoryCard.tsx
+- **Qué cambió:** se reemplazó el párrafo bajo "Regalá algo personal" por el texto nuevo. En `CategoryCard`, el nombre pasa a `font-semibold` con text-shadow suave y gradiente más denso para que resalte; en mobile (2 columnas) usa `13px` / tracking 0.02em y `p-2.5` para que "PERSONALIZADOS" entre en una línea hasta 360px (antes se cortaba por el `overflow-hidden`), con `hyphens-auto` como respaldo en pantallas más angostas.
+
 ## 2026-10-18 — Retiro en local o envío a domicilio en el checkout
 
 - **Archivos modificados:** src/lib/schemas.ts, src/lib/schemas.test.ts, src/pages/Checkout.tsx, src/pages/OrderConfirmation.tsx, CHANGELOG.md

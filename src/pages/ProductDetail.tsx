@@ -649,7 +649,7 @@ export function ProductDetail() {
 
           <div className="mb-6 pt-6 border-t border-brand-line">
             {!isOutOfStock && (
-              <div className="flex items-center gap-6 mb-4">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
                 <span className="brand-eyebrow !text-brand-muted">Cantidad</span>
                 <div className="flex items-center gap-2">
                   <button
