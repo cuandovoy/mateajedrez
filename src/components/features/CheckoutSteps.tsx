@@ -46,14 +46,14 @@ export function CheckoutSteps({ currentStep }: CheckoutStepsProps) {
               >
                 {isCompleted ? <Check className="h-4 w-4" /> : index + 1}
               </div>
-              <span className={cn('font-heading text-[11px] font-semibold uppercase tracking-[0.14em] whitespace-nowrap', isActive ? 'text-brand-tinta' : 'text-brand-muted')}>
+              <span className={cn('font-heading text-[11px] font-semibold uppercase tracking-[0.14em] whitespace-normal text-center max-w-[76px] sm:whitespace-nowrap sm:max-w-none', isActive ? 'text-brand-tinta' : 'text-brand-muted')}>
                 {step.label}
               </span>
             </div>
 
             {index < STEPS.length - 1 && (
               <div
-                className="h-px w-10 sm:w-20 mx-2 sm:mx-3 mb-5 transition-colors"
+                className="h-px w-4 sm:w-20 mx-1 sm:mx-3 mb-5 transition-colors"
                 style={{ backgroundColor: index < currentIndex ? 'var(--org-primary-color, #705931)' : '#E4DCC8' }}
               />
             )}

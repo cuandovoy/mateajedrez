@@ -257,6 +257,22 @@ Implementación del plan de acción de `seo-audit-ruemia.md` (Tier 1 y Tier 2, v
 - 🟢 Alt text de `ProductCard.tsx` sigue siendo `{categoría} {índice}` en vez de describir el producto puntual (Issue #13 del audit) — no tocado, fuera del alcance explícito de esta tarea.
 - 🟢 Meta descriptions de producto/categoría por debajo del largo ideal (Issue #12 del audit) — depende de contenido cargado en Supabase, no de código.
 
+## Auditoría UI — pendientes tras fixes de checkout/PDP (2026-10-21)
+
+### 🟡 Media
+- 🟡 Botón flotante de WhatsApp se superpone con el botón de agregar al carrito de las cards en mobile — src/components/layout
+- 🟡 Lightbox de ProductDetail sin accesibilidad de diálogo (role="dialog", aria-modal, foco atrapado, Escape) — src/pages/ProductDetail.tsx
+- 🟡 Tap targets chicos en Cart, dropdown del header y botones de cantidad de la PDP, y aria-labels faltantes — src/pages/Cart.tsx, src/components/layout/PublicStoreHeader.tsx, src/pages/ProductDetail.tsx
+- 🟡 CategoryCard sin focus-ring y rotación de fallback que ignora prefers-reduced-motion — src/components/features/CategoryCard.tsx
+
+### 🟢 Baja
+- 🟢 El menú mobile no se cierra con Escape — src/components/layout/PublicStoreHeader.tsx
+- 🟢 Chips de filtro sin aria-pressed — src/components/filters
+- 🟢 Altura de tap de links de footer y breadcrumb — src/components/layout
+- 🟢 El badge de reCAPTCHA persiste después del checkout (sin verificar)
+
+---
+
 ## Completado ✅
 
 - ✅ 2026-10-08 — Logo y assets de Mates Ajedrez integrados (header, footer, BrandLoader, favicon, apple-touch-icon, icon-192/512, og-image 1200x630, JSON-LD logo, sw cache v2). Reemplaza los pendientes de assets Ruemia.

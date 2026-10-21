@@ -74,16 +74,22 @@ export function CategoryCard({ category, fallbackImages = [] }: CategoryCardProp
         )}
 
         {/* Gradient overlay — always present */}
-        <div className="absolute inset-0 bg-gradient-to-t from-brand-tinta/80 via-brand-tinta/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-tinta/90 via-brand-tinta/30 to-transparent" />
 
         {/* Hover brightening */}
         <div className="absolute inset-0 bg-brand-crema/0 group-hover:bg-brand-crema/5 transition-all duration-300" />
 
         {/* Text */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 md:p-5">
+        <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-4 md:p-5">
+          {/* 13px/0.02em is the largest size where "PERSONALIZADOS" fits one line in a
+              2-column card down to 360px; hyphenation only kicks in on narrower phones. */}
           <h3
-            className="text-brand-crema text-xl font-normal uppercase"
-            style={{ fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))', letterSpacing: '0.14em' }}
+            lang="es"
+            className="text-brand-crema text-[13px] sm:text-lg md:text-xl font-semibold uppercase leading-snug tracking-[0.02em] sm:tracking-[0.14em] hyphens-auto break-words"
+            style={{
+              fontFamily: 'var(--org-font-heading, var(--org-font-family, sans-serif))',
+              textShadow: '0 1px 8px rgb(43 36 24 / 0.6)',
+            }}
           >
             {category.name}
           </h3>

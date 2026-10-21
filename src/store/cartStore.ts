@@ -25,6 +25,7 @@ class CartToastedError extends Error {}
 interface CartState {
   items: CartItemWithProduct[]
   loading: boolean
+  hasFetched: boolean
   fetchCart: (organizationId?: string) => Promise<void>
   addToCart: (productId: string, quantity?: number, variantId?: string) => Promise<void>
   updateQuantity: (itemId: string, quantity: number) => Promise<void>
@@ -39,6 +40,7 @@ interface CartState {
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   loading: false,
+  hasFetched: false,
 
   fetchCart: async (orgIdParam?: string) => {
     const { user } = useAuthStore.getState()
@@ -81,7 +83,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     } catch (error) {
       console.error('Error fetching cart:', error)
     } finally {
-      set({ loading: false })
+      set({ loading: false, hasFetched: true })
     }
   },
 

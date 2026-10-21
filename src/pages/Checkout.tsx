@@ -22,7 +22,7 @@ import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { BranchInventory, Customer } from '@/types/database.types'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, Store, Truck } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3'
 import { Link, useNavigate } from 'react-router-dom'
@@ -45,7 +45,7 @@ interface FulfillmentBranchCandidate {
 function CheckoutInner() {
   const navigate = useNavigate()
   const settings = useOrgSettings()
-  const { items, loading: cartLoading, getTotal, clearCart } = useCartStore()
+  const { items, loading: cartLoading, hasFetched: cartFetched, getTotal, clearCart } = useCartStore()
   const { user } = useAuthStore()
   const { executeRecaptcha } = useGoogleReCaptcha()
   const { organization } = usePublicStore()
@@ -105,13 +105,17 @@ function CheckoutInner() {
 
   // Si se llega a /checkout con el carrito vacío (refresh, back, sesión de
   // invitado expirada), redirige a /cart en vez de mostrar el formulario
-  // completo con un resumen en $0. `cartLoading` evita el falso positivo
-  // mientras PublicStoreHeader todavía está trayendo el carrito.
+  // completo con un resumen en $0. `cartFetched` evita el falso positivo
+  // mientras PublicStoreHeader todavía no trajo el carrito (el store arranca
+  // con items vacío y loading en false antes del primer fetch).
+  // `orderPlacedRef` evita que el clearCart() post-orden dispare esta
+  // redirección y compita con la navegación a la confirmación.
+  const orderPlacedRef = useRef(false)
   useEffect(() => {
-    if (!cartLoading && items.length === 0) {
+    if (cartFetched && !cartLoading && items.length === 0 && !orderPlacedRef.current) {
       navigate('/cart')
     }
-  }, [cartLoading, items.length, navigate])
+  }, [cartFetched, cartLoading, items.length, navigate])
 
   // Cargar configuración de Biller si la org la tiene activa
   useEffect(() => {
@@ -660,6 +664,7 @@ function CheckoutInner() {
 
         const { init_point } = await mpRes.json() as { init_point: string }
 
+        orderPlacedRef.current = true
         await clearCart()
         // Redirect to MP checkout — MP will redirect back to order-confirmation
         window.location.href = init_point
@@ -765,6 +770,7 @@ function CheckoutInner() {
       }
 
       // Clear cart
+      orderPlacedRef.current = true
       await clearCart()
 
       show('¡Orden creada exitosamente!', 'success')
@@ -777,6 +783,18 @@ function CheckoutInner() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (!cartFetched) {
+    return (
+      <div className="container-custom py-8">
+        <CheckoutSteps currentStep="checkout" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-96 w-full rounded-md lg:col-span-2" />
+          <Skeleton className="h-64 w-full rounded-md" />
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -942,11 +960,13 @@ function CheckoutInner() {
               <form onSubmit={handleFormSubmit((values) => onSubmit(values as CheckoutFormData))} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-brand-muted mb-1">
+                    <label htmlFor="checkout-fullName" className="block text-sm font-medium text-brand-muted mb-1">
                       Nombre Completo <span className="text-red-500">*</span>
                     </label>
                     <Input
+                      id="checkout-fullName"
                       type="text"
+                      autoComplete="name"
                       {...register('fullName')}
                       className={errors.fullName ? 'border-red-500' : ''}
                     />
@@ -956,11 +976,14 @@ function CheckoutInner() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-brand-muted mb-1">
+                    <label htmlFor="checkout-email" className="block text-sm font-medium text-brand-muted mb-1">
                       Email <span className="text-red-500">*</span>
                     </label>
                     <Input
+                      id="checkout-email"
                       type="email"
+                      autoComplete="email"
+                      aria-label="Email"
                       {...register('email')}
                       placeholder="tu@email.com"
                       className={errors.email ? 'border-red-500' : ''}
@@ -975,11 +998,14 @@ function CheckoutInner() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-brand-muted mb-1">
+                  <label htmlFor="checkout-phone" className="block text-sm font-medium text-brand-muted mb-1">
                     Teléfono <span className="text-red-500">*</span>
                   </label>
                   <Input
+                    id="checkout-phone"
                     type="tel"
+                    autoComplete="tel"
+                    aria-label="Teléfono"
                     {...register('phone')}
                     placeholder="099 123 456"
                     className={errors.phone ? 'border-red-500' : ''}
@@ -1047,7 +1073,10 @@ function CheckoutInner() {
                     <div className="mt-4 space-y-4">
                       <div>
                         <Input
+                          id="checkout-address"
                           type="text"
+                          autoComplete="street-address"
+                          aria-label="Dirección"
                           placeholder="Calle y número, apto/casa"
                           {...register('address')}
                           className={errors.address ? 'border-red-500' : ''}
@@ -1060,7 +1089,10 @@ function CheckoutInner() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <Input
+                            id="checkout-city"
                             type="text"
+                            autoComplete="address-level2"
+                            aria-label="Ciudad"
                             placeholder="Ciudad"
                             {...register('city')}
                             className={errors.city ? 'border-red-500' : ''}
@@ -1072,6 +1104,9 @@ function CheckoutInner() {
 
                         <div>
                           <select
+                            id="checkout-department"
+                            aria-label="Departamento"
+                            autoComplete="address-level1"
                             defaultValue=""
                             {...register('department')}
                             className={cn(
