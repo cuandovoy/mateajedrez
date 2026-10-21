@@ -218,7 +218,9 @@ export function HomePersonalization() {
           <div className="order-1 md:order-2 max-w-lg">
             <h2 id="personalizados-title" className="brand-title text-3xl lg:text-4xl !leading-tight">Regalá algo<br />personal.</h2>
             <p className="mt-6 text-brand-muted text-lg leading-relaxed">
-              Un nombre para alguien especial. El logo de tu empresa para tu equipo. Personalizamos cada mate con grabados y detalles que hacen la diferencia.
+              Nuestros mates personalizados llevan nombres, fechas o diseños que cuentan historias y hacen cada ronda más especial.
+              <br />
+              Personalizá el tuyo y convertí un simple mate en un recuerdo para toda la vida.
             </p>
             {whatsappUrl ? (
               <a href={`${whatsappUrl}?text=${encodeURIComponent('¡Hola! Me gustaría consultar por mates personalizados.')}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-3 min-h-12 mt-7 border-b border-brand-cuero font-heading text-sm uppercase tracking-widest text-brand-cuero hover:text-brand-tinta focus-ring">
