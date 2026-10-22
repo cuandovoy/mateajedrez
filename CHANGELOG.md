@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-10-22 — Nuevo texto de la sección "Para compartir"
+
+- **Archivos modificados:** src/components/features/HomeEditorial.tsx, CHANGELOG.md
+- **Qué cambió:** se reemplazó el párrafo bajo "Para compartir." por el nuevo copy en dos párrafos, con emojis 🤎 y 🧉 como en el texto original.
+
 ## 2026-10-21 — Correcciones de accesibilidad y responsive en checkout y fichas
 
 - **Archivos modificados:** src/store/cartStore.ts, src/pages/Checkout.tsx, src/components/features/CheckoutSteps.tsx, src/pages/ProductDetail.tsx, src/components/features/ProductCard.tsx, CHANGELOG.md, .claude/TODO.md

@@ -190,7 +190,10 @@ export function HomeLifestyle() {
         <div className="max-w-lg mb-8 md:mb-10">
           <h2 id="lifestyle-title" className="brand-title text-3xl lg:text-4xl !leading-tight">Para compartir.</h2>
           <p className="mt-5 text-brand-muted text-lg leading-relaxed">
-            El mate se disfruta mejor en compañía: en la plaza, en el jardín o en cualquier pausa del día.
+            Un mate, una charla y ese ratito que se disfruta sin apuro. 🤎
+          </p>
+          <p className="mt-4 text-brand-muted text-lg leading-relaxed">
+            Porque al final, los mejores momentos siempre encuentran la forma de compartirse alrededor de un mate. 🧉
           </p>
         </div>
         <div className="grid grid-cols-2 grid-rows-2 aspect-[6/5] md:aspect-auto md:grid-cols-3 md:grid-rows-1 gap-3 md:gap-6">
