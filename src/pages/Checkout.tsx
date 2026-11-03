@@ -7,6 +7,9 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { buildCouponDiscountMetadata, calculateCouponDiscountAmount, normalizeCouponCode } from '@/lib/coupons'
 import { useOrgPaymentMethods } from '@/hooks/useOrgPaymentMethods'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
+import { useStorefrontBranch } from '@/hooks/useStorefrontBranch'
+import { useCartGuard, checkCartItems } from '@/hooks/useCartGuard'
+import { blockedReasonMessage, mapOrderItemsInsertError } from '@/lib/cartGuard'
 import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
 import { checkoutSchema, URUGUAY_DEPARTMENTS, type CheckoutFormData, type CheckoutFormInput, type DeliveryMethod, type ShippingAddress } from '@/lib/schemas'
@@ -19,7 +22,7 @@ import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { useToastStore } from '@/store/toastStore'
 import type { CartItemWithProduct, Order, ProductImage } from '@/types'
 import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
-import { BranchInventory, Customer } from '@/types/database.types'
+import { BranchInventory, Customer } from '@/types/aliases'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, Store, Truck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -54,6 +57,8 @@ function CheckoutInner() {
   const { show } = useToastStore()
   const checkoutFulfillmentMode = settings.checkout_fulfillment_mode === 'main' ? 'main' : 'auto'
   const checkoutExcludeIsolatedWarehouses = settings.checkout_exclude_isolated_warehouses !== false
+  const { branchId: mainBranchId } = useStorefrontBranch(organizationId, checkoutExcludeIsolatedWarehouses)
+  const { blockedItems } = useCartGuard(organizationId, items)
   const checkoutStockAllocationMode = settings.checkout_stock_allocation_mode === 'manual' ? 'manual' : 'immediate'
   const [loading, setLoading] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState<string>('')
@@ -67,7 +72,6 @@ function CheckoutInner() {
     emitirCFE: false,
     tipoComprobante: 'ticket',
   })
-  const [mainBranchId, setMainBranchId] = useState<string | null>(null)
   const [paymentMethodError, setPaymentMethodError] = useState<string | null>(null)
 
   const {
@@ -128,52 +132,6 @@ function CheckoutInner() {
       .maybeSingle()
       .then(({ data }: { data: BillerConfig | null }) => setBillerConfig(data))
   }, [organizationId])
-
-  // Fetch main branch on mount (filter by org when available)
-  useEffect(() => {
-    const fetchMainBranch = async () => {
-      if (!organizationId) return
-      try {
-        let mainQuery = supabase
-          .from('branches')
-          .select('id')
-          .eq('organization_id', organizationId)
-          .eq('code', 'MAIN')
-          .eq('is_active', true)
-        if (checkoutExcludeIsolatedWarehouses) {
-          mainQuery = mainQuery.eq('is_isolated_warehouse', false)
-        }
-
-        const { data: mainData } = await mainQuery.maybeSingle()
-
-        if (mainData) {
-          setMainBranchId(mainData.id)
-          return
-        }
-
-        // Fallback: first active branch of org
-        let fallbackQuery = supabase
-          .from('branches')
-          .select('id')
-          .eq('organization_id', organizationId)
-          .eq('is_active', true)
-          .limit(1)
-        if (checkoutExcludeIsolatedWarehouses) {
-          fallbackQuery = fallbackQuery.eq('is_isolated_warehouse', false)
-        }
-
-        const { data: fallbackData } = await fallbackQuery.maybeSingle()
-
-        if (fallbackData) {
-          setMainBranchId(fallbackData.id)
-        }
-      } catch (error) {
-        console.error('Error fetching main branch:', error)
-      }
-    }
-
-    fetchMainBranch()
-  }, [organizationId, checkoutExcludeIsolatedWarehouses])
 
   // Pre-fill email from user when logged in
   useEffect(() => {
@@ -454,6 +412,18 @@ function CheckoutInner() {
     setLoading(true)
 
     try {
+      // Re-validate against current product flags BEFORE creating the order: the SaaS
+      // triggers reject order_items of hidden / "consultar disponibilidad" products,
+      // and by then the orders row already exists (guests cannot delete it).
+      const blocked = await checkCartItems(organizationId, items)
+      if (blocked.length > 0) {
+        show(
+          `Algunos productos de tu carrito no se pueden comprar online: ${blocked.map((b) => capitalizeFirst(b.name)).join(', ')}. Volvé al carrito y quitalos para continuar.`,
+          'error'
+        )
+        return
+      }
+
       let fulfillmentBranchId: string | null = null
       let stockIssues: string[] = []
 
@@ -491,14 +461,16 @@ function CheckoutInner() {
         email: formValues.email,
         phone: formValues.phone,
         delivery_method: formValues.deliveryMethod,
+        // `state` mirrors `department`: the order notification emails (SaaS migration 147) read `state`.
         ...(formValues.deliveryMethod === 'shipping'
-          ? { address: formValues.address, city: formValues.city, department: formValues.department }
+          ? { address: formValues.address, city: formValues.city, department: formValues.department, state: formValues.department }
           : {}),
       }
       // El cliente guarda solo su última dirección real: un retiro no la pisa
       // y delivery_method es propio de cada orden.
       const customerAddress: ShippingAddress = { ...contactInfo }
       delete customerAddress.delivery_method
+      delete customerAddress.state
       const customerAddressUpdate = formValues.deliveryMethod === 'shipping' ? { address: customerAddress } : {}
 
       if (!organizationId) {
@@ -636,8 +608,22 @@ function CheckoutInner() {
           window.location.reload()
           return
         }
+        const friendlyMessage = mapOrderItemsInsertError(itemsError)
+        if (friendlyMessage) {
+          show(friendlyMessage, 'error')
+          return
+        }
         throw itemsError
       }
+
+      // Totals can be rewritten by DB triggers after the items insert (tax-applying orgs),
+      // so the payment amount must come from the stored order, not from the client sum.
+      const { data: storedOrder } = await supabase
+        .from('orders')
+        .select('total')
+        .eq('id', (order as { id: string }).id)
+        .maybeSingle()
+      const storedTotal = typeof storedOrder?.total === 'number' ? storedOrder.total : pricingTotal
 
       // -----------------------------------------------------------------------
       // Mercado Pago: create preference and redirect — skip remaining steps
@@ -695,7 +681,7 @@ function CheckoutInner() {
           .insert({
             order_id: (order as { id: string }).id,
             payment_method: orderPaymentMethod,
-            amount: pricingTotal,
+            amount: storedTotal,
             cash_session_id: cashSessionId,
           } as any)
 
@@ -818,6 +804,20 @@ function CheckoutInner() {
         </div>
       )}
       {isPickup && <div className="mb-8" />}
+
+      {blockedItems.length > 0 && (
+        <div role="alert" className="mb-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <p className="font-medium">Hay productos que no se pueden comprar online:</p>
+          <ul className="mt-1 list-disc pl-5">
+            {blockedItems.map((b) => (
+              <li key={b.itemId}>
+                {capitalizeFirst(b.name)}: {blockedReasonMessage(b.reason)}
+              </li>
+            ))}
+          </ul>
+          <Link to="/cart" className="mt-2 inline-block font-medium underline">Volver al carrito</Link>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Order Summary */}

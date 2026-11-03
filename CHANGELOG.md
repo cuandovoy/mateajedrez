@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-11-03 — Alinear la tienda con el esquema compartido del SaaS (checkout roto)
+
+- **Archivos modificados:** src/types/database.types.ts, src/types/aliases.ts (nuevo), src/types/index.ts, src/lib/cartGuard.ts (+test, nuevos), src/lib/stock.ts (+test), src/lib/queryKeys.ts, src/lib/schemas.ts, src/hooks/useCartGuard.ts y useStorefrontBranch.ts (nuevos), src/hooks/usePublicProducts.ts, src/store/cartStore.ts, src/components/features/ProductCard.tsx, src/pages/ProductDetail.tsx, src/pages/Cart.tsx, src/pages/Checkout.tsx, y los imports de tipos en layout/hooks/lib
+- **Qué cambió:** el checkout fallaba (23514) porque la DB compartida con el SaaS agregó `requires_availability_check`, `visible_in_store` y `storefront_branch_id`. Se regeneraron los tipos (alias de dominio en `aliases.ts`, uniones de `kind`/`status` preservadas), los productos "a consultar" muestran "Consultar por producto" en vez de comprar, se filtra `visible_in_store` en todas las consultas, el carrito/checkout validan los productos contra sus flags antes de crear la orden (y mapean el error 23514 a un toast), la sucursal se resuelve con el RPC `resolve_storefront_branch_id`, `shipping_address` incluye `state` (lo lee el email 147) y el monto de `order_payments` sale del total guardado en la DB.
+
 ## 2026-10-22 — Nuevo texto de la sección "Para compartir"
 
 - **Archivos modificados:** src/components/features/HomeEditorial.tsx, CHANGELOG.md

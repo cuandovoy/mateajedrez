@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
-import type { Organization } from '@/types/database.types'
+import type { Organization } from '@/types/aliases'
 
 /**
  * Store simplificado: la tienda pública es single-tenant por deploy (la

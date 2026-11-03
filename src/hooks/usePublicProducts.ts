@@ -46,6 +46,7 @@ async function fetchStoreProducts(organizationId: string): Promise<StoreProducts
     `)
     .eq('organization_id', organizationId)
     .eq('is_active', true)
+    .eq('visible_in_store', true)
     .order('created_at', { ascending: false })
 
   if (error) throw error
@@ -108,6 +109,7 @@ async function fetchFilteredProducts(
     `)
     .eq('organization_id', organizationId)
     .eq('is_active', true)
+    .eq('visible_in_store', true)
     .order('created_at', { ascending: false })
     .range(from, to)
 
@@ -192,6 +194,7 @@ async function fetchStoreProduct(organizationId: string, productId: string): Pro
     .eq('id', productId)
     .eq('organization_id', organizationId)
     .eq('is_active', true)
+    .eq('visible_in_store', true)
     .single()
 
   if (error) throw error
@@ -215,6 +218,7 @@ async function fetchStoreProduct(organizationId: string, productId: string): Pro
       .eq('category_id', product.category_id)
       .eq('organization_id', organizationId)
       .eq('is_active', true)
+      .eq('visible_in_store', true)
       .neq('id', productId)
       .limit(4)
 
@@ -287,6 +291,7 @@ async function fetchCategoryProducts(
     `)
     .eq('organization_id', organizationId)
     .eq('is_active', true)
+    .eq('visible_in_store', true)
     .order('created_at', { ascending: false })
     .range(from, to)
 

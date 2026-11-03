@@ -82,6 +82,8 @@ export interface ShippingAddress {
   address?: string
   city?: string
   department?: string
+  /** Duplicate of `department`; the order notification emails (SaaS migration 147) read this key. */
+  state?: string
   delivery_method?: DeliveryMethod
 }
 
