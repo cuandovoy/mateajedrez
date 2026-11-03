@@ -52,8 +52,17 @@ Deno.serve(async (req) => {
       'error-codes'?: string[]
     }
 
+    if (!data.success) {
+      console.error('reCAPTCHA siteverify rejected token:', data['error-codes'], 'hostname:', (data as { hostname?: string }).hostname)
+    }
+
     return new Response(
-      JSON.stringify({ success: data.success, score: data.score ?? null }),
+      JSON.stringify({
+        success: data.success,
+        score: data.score ?? null,
+        action: data.action ?? null,
+        errors: data['error-codes'] ?? [],
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (err) {

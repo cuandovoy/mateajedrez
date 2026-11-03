@@ -1,5 +1,5 @@
 import { useCartStore } from '@/store/cartStore'
-import type { Organization } from '@/types/database.types'
+import type { Organization } from '@/types/aliases'
 import type { Product, ProductImage } from '@/types'
 import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
 import type { CategoryWithSubcategories } from '@/hooks/usePublicCategories'

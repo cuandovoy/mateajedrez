@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import type { Product, ProductImage } from '@/types'
-import type { OrganizationSettings } from '@/types/database.types'
+import type { OrganizationSettings } from '@/types/aliases'
 
 /** Returns true if the product has an active (non-expired) discount. */
 export function hasActiveDiscount(product: Pick<Product, 'discount_percentage' | 'discount_expires_at'>): boolean {

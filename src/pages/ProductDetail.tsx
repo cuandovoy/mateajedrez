@@ -257,6 +257,7 @@ export function ProductDetail() {
   const isOutOfStock = hasActiveVariants && !selectedVariantId
     ? allVariantsUnavailable
     : currentStock !== null && currentStock <= 0
+  const requiresInquiry = !!product.requires_availability_check
   const whatsappHref = settings.store_whatsapp_number
     ? `https://wa.me/${settings.store_whatsapp_number.replace(/\D/g, '')}?text=${encodeURIComponent(
         `Hola! Quiero consultar sobre la disponibilidad de "${product.name}" (${window.location.href})`
@@ -289,7 +290,7 @@ export function ProductDetail() {
     // satisfacer el tipo `OrganizationSettings.currency` (string | null),
     // más laxo que la garantía real del hook.
     priceCurrency: settings.currency ?? 'ARS',
-    availability: isOutOfStock ? 'OutOfStock' : 'InStock',
+    availability: isOutOfStock || requiresInquiry ? 'OutOfStock' : 'InStock',
   })
 
   const breadcrumbJsonLd = buildBreadcrumbJsonLd([
@@ -648,7 +649,12 @@ export function ProductDetail() {
           </div>
 
           <div className="mb-6 pt-6 border-t border-brand-line">
-            {!isOutOfStock && (
+            {requiresInquiry && (
+              <p className="text-sm leading-6 text-brand-muted mb-4">
+                Producto a encargar. Consultá su disponibilidad y plazo de entrega antes de comprar.
+              </p>
+            )}
+            {!requiresInquiry && !isOutOfStock && (
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4">
                 <span className="brand-eyebrow !text-brand-muted">Cantidad</span>
                 <div className="flex items-center gap-2">
@@ -685,10 +691,10 @@ export function ProductDetail() {
                 </span>
               </div>
             )}
-            {isOutOfStock && (
+            {!requiresInquiry && isOutOfStock && (
               <p className="text-sm text-brand-muted mb-4">Este producto no tiene stock disponible.</p>
             )}
-            {isOutOfStock && whatsappHref ? (
+            {(requiresInquiry || isOutOfStock) && whatsappHref ? (
               <a
                 href={whatsappHref}
                 target="_blank"
@@ -696,8 +702,12 @@ export function ProductDetail() {
                 className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-md bg-brand-cuero font-heading text-sm font-semibold uppercase tracking-[0.14em] text-brand-crema transition-colors hover:bg-brand-cuero-oscuro focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:ring-offset-2"
               >
                 <MessageCircle className="h-5 w-5" />
-                Consultar disponibilidad
+                {requiresInquiry ? 'Consultar por producto' : 'Consultar disponibilidad'}
               </a>
+            ) : requiresInquiry ? (
+              <p role="status" className="rounded-md border border-brand-line bg-brand-crema p-4 text-sm leading-6 text-brand-tinta">
+                Las consultas online no están disponibles por el momento. Contactá directamente a la tienda para coordinar tu pedido.
+              </p>
             ) : (
               <Button
                 className="w-full h-12"

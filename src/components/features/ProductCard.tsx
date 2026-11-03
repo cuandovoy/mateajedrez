@@ -84,7 +84,8 @@ export function ProductCard({
 
   const hasStock = stock !== null ? stock > 0 : false
   const productUrl = `/product/${product.id}`
-  const showAddButton = !noAddToCart && !hasVariants && stock !== null && hasStock
+  const requiresInquiry = !!product.requires_availability_check
+  const showAddButton = !requiresInquiry && !noAddToCart && !hasVariants && stock !== null && hasStock
 
   return (
     <div className="group bg-white rounded-md border border-brand-line overflow-hidden transition-colors duration-300 hover:border-brand-algarrobo flex flex-col h-full">
@@ -169,7 +170,7 @@ export function ProductCard({
             </span>
           </div>
 
-          {stock !== null && (
+          {!requiresInquiry && stock !== null && (
             <span
               className={cn(
                 'flex-shrink-0 font-heading text-[10px] px-2 py-1 rounded-full font-semibold uppercase tracking-[0.1em]',
@@ -181,7 +182,15 @@ export function ProductCard({
           )}
         </div>
 
-        {!noAddToCart && hasVariants && (
+        {requiresInquiry && (
+          <Link
+            to={productUrl}
+            className="mt-3 inline-flex min-h-10 items-center justify-center rounded-md border border-brand-line px-3 py-2 font-heading text-xs font-semibold uppercase tracking-[0.14em] text-brand-tinta transition-colors hover:border-brand-cuero focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          >
+            Consultar por producto
+          </Link>
+        )}
+        {!requiresInquiry && !noAddToCart && hasVariants && (
           <Link to={productUrl} className="mt-3">
             <Button variant="outline" size="sm" className="w-full" disabled={!hasStock}>
               {hasStock ? 'Ver opciones' : 'Sin stock'}

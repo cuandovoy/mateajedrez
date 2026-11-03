@@ -5,7 +5,7 @@ import { PublicStoreLayout } from './PublicStoreLayout'
 import { usePageViewTracker } from '@/hooks/usePageViewTracker'
 import { BrandLoader } from '@/components/ui/BrandLoader'
 import { useSplashGate } from '@/hooks/useSplashGate'
-import type { Organization } from '@/types/database.types'
+import type { Organization } from '@/types/aliases'
 
 // Fork de un único cliente: la organización ya no viene de la URL (:slug),
 // se resuelve una sola vez desde esta env var de build.

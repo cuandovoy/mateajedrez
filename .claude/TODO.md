@@ -273,6 +273,18 @@ Implementación del plan de acción de `seo-audit-ruemia.md` (Tier 1 y Tier 2, v
 
 ---
 
+## Deriva con el esquema compartido del SaaS (2026-11-03)
+
+### 🔴 Crítico
+- 🔴 La creación de orden no es atómica: `orders` se inserta y luego `order_items`; si falla, queda una orden huérfana sin items y un invitado no puede borrarla (no hay policy DELETE/UPDATE para anon). Proponer RPC `create_store_order` en el repo SaaS (orders + items + validación de flags en una transacción) — src/pages/Checkout.tsx
+### 🟠 Alta
+- 🟠 Este fork no tiene registro de migraciones del esquema del SaaS (la DB es compartida y la define `ecommerce-supabase saas`); cada cambio de esquema allá puede romper la tienda sin aviso. Agregar un check periódico (`supabase gen types` + diff en CI) o un contrato de RPCs/columnas que usa la tienda
+- 🟠 `can_create_organization` ya no existe en la DB; el fork no lo usa (0 referencias en src/)
+### 🟡 Media
+- 🟡 `database.types.ts` se regenera pisando el archivo: los alias de dominio viven en src/types/aliases.ts; documentar el comando de regeneración y no editar el generado
+- 🟡 Quedan casts `as any` en RPCs/tablas que ya tienen tipos generados (stock.ts, Checkout.tsx, cartStore.ts) — limpiar en otra pasada
+- 🟡 Checkout valida stock por consultas sueltas a `branch_inventory` con N+1; evaluar RPC de validación de carrito
+
 ## Completado ✅
 
 - ✅ 2026-10-08 — Logo y assets de Mates Ajedrez integrados (header, footer, BrandLoader, favicon, apple-touch-icon, icon-192/512, og-image 1200x630, JSON-LD logo, sw cache v2). Reemplaza los pendientes de assets Ruemia.

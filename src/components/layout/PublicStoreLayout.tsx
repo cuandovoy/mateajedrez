@@ -7,7 +7,7 @@ import { ToastContainer } from './ToastContainer'
 import { WhatsappFloatingButton } from './WhatsappFloatingButton'
 import { PublicStoreProvider } from '@/contexts/PublicStoreContext'
 import { absoluteUrl } from '@/lib/siteUrl'
-import type { Organization } from '@/types/database.types'
+import type { Organization } from '@/types/aliases'
 
 interface PublicStoreLayoutProps {
   organization: Organization

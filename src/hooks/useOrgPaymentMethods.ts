@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { queryKeys } from '@/lib/queryKeys'
-import type { OrganizationPaymentMethod } from '@/types/database.types'
+import type { OrganizationPaymentMethod } from '@/types/aliases'
 
 type UseOrgPaymentMethodsOptions = {
   includeInactive?: boolean
