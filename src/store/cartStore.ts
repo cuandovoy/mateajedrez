@@ -1,6 +1,7 @@
 import { capitalizeFirst, getEffectivePrice } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { getProductStock } from '@/lib/stock'
+import { isProductPurchasableInStore } from '@/lib/cartGuard'
 import type { CartItem, CartItemWithProduct, Product, ProductVariant } from '@/types'
 import { PostgrestError } from '@supabase/supabase-js'
 import { create } from 'zustand'
@@ -117,6 +118,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         `)
         .in('id', productIds)
         .eq('is_active', true)
+        .eq('visible_in_store', true)
 
       // Filter by org to prevent cross-org contamination
       if (organizationId) {
@@ -246,7 +248,7 @@ export const useCartStore = create<CartState>((set, get) => ({
       if (variantId) {
         const { data: variant, error: variantError } = await (supabase
           .from('product_variants') as any)
-          .select('id, name, is_active, product:products(id, name, is_active, organization_id)')
+          .select('id, name, is_active, product:products(id, name, is_active, visible_in_store, organization_id, requires_availability_check)')
           .eq('id', variantId)
           .single()
 
@@ -258,9 +260,13 @@ export const useCartStore = create<CartState>((set, get) => ({
         }
 
         const product = (variant as any).product as Product
-        if (!product?.is_active || !variant.is_active) {
+        if (product?.requires_availability_check) {
+          useToastStore.getState().show('Consultá la disponibilidad de este producto con la tienda.', 'error')
+          throw new CartToastedError('Product requires availability inquiry')
+        }
+        if (!isProductPurchasableInStore(product) || !variant.is_active) {
           useToastStore.getState().show('Este producto no está disponible', 'error')
-          throw new CartToastedError('Product or variant is not active')
+          throw new CartToastedError('Product or variant is not purchasable')
         }
 
         productOrganizationId = product.organization_id || null
@@ -269,15 +275,19 @@ export const useCartStore = create<CartState>((set, get) => ({
       } else {
         const { data: product, error: productError }: { data: Product | null, error: PostgrestError | null } = await supabase
           .from('products')
-          .select('id, name, is_active, organization_id')
+          .select('id, name, is_active, visible_in_store, organization_id, requires_availability_check')
           .eq('id', productId)
           .single()
 
         if (productError) throw productError
 
-        if (!product?.is_active) {
+        if (product?.requires_availability_check) {
+          useToastStore.getState().show('Consultá la disponibilidad de este producto con la tienda.', 'error')
+          throw new CartToastedError('Product requires availability inquiry')
+        }
+        if (!product || !isProductPurchasableInStore(product)) {
           useToastStore.getState().show('Este producto no está disponible', 'error')
-          throw new CartToastedError('Product is not active')
+          throw new CartToastedError('Product is not purchasable')
         }
 
         const { count: variantsCount } = await supabase
@@ -391,6 +401,7 @@ export const useCartStore = create<CartState>((set, get) => ({
           `)
           .eq('id', productId)
           .eq('is_active', true)
+          .eq('visible_in_store', true)
           .single()
 
         if (error) throw error

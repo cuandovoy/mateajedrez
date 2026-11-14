@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { capitalizeFirst, formatPrice, formatDateShort, normalizeLineBreaks, translateAttributeLabel } from './utils'
-import type { OrganizationSettings } from '@/types/database.types'
+import type { OrganizationSettings } from '@/types/aliases'
 
 // ─── capitalizeFirst ─────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import { useContext, useMemo } from 'react'
 import { useOrganizationStore } from '@/store/organizationStore'
 import { PublicStoreContext } from '@/contexts/PublicStoreContext'
-import type { OrganizationSettings } from '@/types/database.types'
+import type { OrganizationSettings } from '@/types/aliases'
 import { resolveBranchesEnabled, resolveTransfersEnabled } from '@/lib/orgModules'
 
 const DEFAULT_SETTINGS: Required<Pick<OrganizationSettings, 'currency' | 'locale' | 'timezone' | 'decimal_places'>> = {

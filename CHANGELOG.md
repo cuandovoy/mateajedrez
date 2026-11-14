@@ -4,6 +4,23 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-11-14 — UX audit: variantes, ProductCard y filtros mobile
+
+- **Archivos modificados:** src/lib/productGallery.ts, src/lib/productGallery.test.ts, src/components/features/VariantSelector.tsx, src/components/features/ProductCard.tsx, src/pages/ProductDetail.tsx, src/pages/Products.tsx, src/pages/CategoryProducts.tsx, src/index.css, CLAUDE.md
+- **Qué cambió:** las variantes ya no duplican la foto (solo cambia la imagen principal); ProductCard con precio protagonista, card completa clickeable, botón de carrito de 44px y badge de stock solo para sin stock / últimas unidades; chips de categoría en una fila con scroll horizontal en mobile; VariantSelector con tokens brand y skeleton. Reglas actualizadas en CLAUDE.md.
+
+---
+
+## 2026-11-11 — Horarios del local, comprobante por WhatsApp y checkout mobile
+
+- **Archivos modificados:** src/lib/storeHours.ts, src/lib/storeHours.test.ts, src/components/features/StoreHours.tsx, src/pages/Visitanos.tsx, src/pages/Checkout.tsx, src/pages/OrderConfirmation.tsx
+- **Qué cambió:** Horarios reales (L-V 9:30–12:30 y 15:30–19:30, sáb 9:30–13:00) en una fuente única (`src/lib/storeHours.ts`) mostrados en Visitanos y en el retiro en local del checkout. El comprobante de transferencia se pide solo por WhatsApp (botón wa.me con la orden), sin email. Checkout mobile: resumen colapsable arriba con el total, secciones separadas con títulos, radios con mejor tap target y textos de ayuda/error de 14px.
+
+## 2026-11-03 — Alinear la tienda con el esquema compartido del SaaS (checkout roto)
+
+- **Archivos modificados:** src/types/database.types.ts, src/types/aliases.ts (nuevo), src/types/index.ts, src/lib/cartGuard.ts (+test, nuevos), src/lib/stock.ts (+test), src/lib/queryKeys.ts, src/lib/schemas.ts, src/hooks/useCartGuard.ts y useStorefrontBranch.ts (nuevos), src/hooks/usePublicProducts.ts, src/store/cartStore.ts, src/components/features/ProductCard.tsx, src/pages/ProductDetail.tsx, src/pages/Cart.tsx, src/pages/Checkout.tsx, y los imports de tipos en layout/hooks/lib
+- **Qué cambió:** el checkout fallaba (23514) porque la DB compartida con el SaaS agregó `requires_availability_check`, `visible_in_store` y `storefront_branch_id`. Se regeneraron los tipos (alias de dominio en `aliases.ts`, uniones de `kind`/`status` preservadas), los productos "a consultar" muestran "Consultar por producto" en vez de comprar, se filtra `visible_in_store` en todas las consultas, el carrito/checkout validan los productos contra sus flags antes de crear la orden (y mapean el error 23514 a un toast), la sucursal se resuelve con el RPC `resolve_storefront_branch_id`, `shipping_address` incluye `state` (lo lee el email 147) y el monto de `order_payments` sale del total guardado en la DB.
+
 ## 2026-10-22 — Nuevo texto de la sección "Para compartir"
 
 - **Archivos modificados:** src/components/features/HomeEditorial.tsx, CHANGELOG.md

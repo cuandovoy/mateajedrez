@@ -5,13 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { supabase } from '@/lib/supabase'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useStoreProducts } from '@/hooks/usePublicProducts'
+import { useStorefrontBranch } from '@/hooks/useStorefrontBranch'
+import { useCartGuard } from '@/hooks/useCartGuard'
+import { blockedReasonMessage } from '@/lib/cartGuard'
+import { useToastStore } from '@/store/toastStore'
 import { capitalizeFirst, cn, formatPrice, getProductImageUrl, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { Product, ProductImage } from '@/types'
-import { BranchInventory, ProductVariant } from '@/types/database.types'
+import { BranchInventory, ProductVariant } from '@/types/aliases'
 import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -73,7 +77,9 @@ function CartContent() {
   const { user } = useAuthStore()
   const organizationId = organization.id
   const [stockWarnings, setStockWarnings] = useState<Record<string, { available: number; requested: number }>>({})
-  const [mainBranchId, setMainBranchId] = useState<string | null>(null)
+  const { branchId: mainBranchId } = useStorefrontBranch(organizationId, true)
+  const { blockedItems } = useCartGuard(organizationId, items)
+  const blockedByItemId = useMemo(() => new Map(blockedItems.map((b) => [b.itemId, b])), [blockedItems])
   const [itemStocks, setItemStocks] = useState<Record<string, number>>({}) // item.id -> stock
 
   const { data: storeProductsData } = useStoreProducts(organizationId)
@@ -111,50 +117,6 @@ function CartContent() {
   useEffect(() => {
     fetchCart(organizationId)
   }, [user, fetchCart, organizationId])
-
-  // Fetch operational branch for this cart organization (excluding isolated warehouses)
-  useEffect(() => {
-    const fetchMainBranch = async () => {
-      if (!organizationId) {
-        setMainBranchId(null)
-        return
-      }
-
-      try {
-        const { data: mainData } = await supabase
-          .from('branches')
-          .select('id')
-          .eq('organization_id', organizationId)
-          .eq('code', 'MAIN')
-          .eq('is_active', true)
-          .eq('is_isolated_warehouse', false)
-          .maybeSingle()
-
-        if (mainData) {
-          setMainBranchId(mainData.id)
-          return
-        }
-
-        // Fallback: first active non-isolated branch
-        const { data: fallbackData } = await supabase
-          .from('branches')
-          .select('id')
-          .eq('organization_id', organizationId)
-          .eq('is_active', true)
-          .eq('is_isolated_warehouse', false)
-          .limit(1)
-          .maybeSingle()
-
-        if (fallbackData) {
-          setMainBranchId(fallbackData.id)
-        }
-      } catch (error) {
-        console.error('Error fetching main branch:', error)
-      }
-    }
-
-    fetchMainBranch()
-  }, [organizationId])
 
   useEffect(() => {
     // Validate stock when items change and branch is loaded
@@ -260,6 +222,10 @@ function CartContent() {
   }
 
   const handleCheckout = () => {
+    if (blockedItems.length > 0) {
+      useToastStore.getState().show('Quitá del carrito los productos no disponibles para continuar.', 'error')
+      return
+    }
     navigate('/checkout')
   }
 
@@ -319,10 +285,17 @@ function CartContent() {
           {items.map((item) => {
             const stockWarning = stockWarnings[item.id]
             const hasStockIssue = stockWarning && stockWarning.available < stockWarning.requested
+            const blocked = blockedByItemId.get(item.id)
             
             return (
-              <Card key={item.id} className={cn(hasStockIssue && 'border-yellow-300 border-2')}>
+              <Card key={item.id} className={cn((hasStockIssue || blocked) && 'border-yellow-300 border-2')}>
                 <CardContent className="p-6">
+                  {blocked && (
+                    <div role="alert" className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-2">
+                      <AlertTriangle className="h-5 w-5 text-red-700 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-700">{blockedReasonMessage(blocked.reason)}</p>
+                    </div>
+                  )}
                   {hasStockIssue && (
                     <div className="mb-4 p-3 bg-brand-crema border border-brand-algarrobo/40 rounded-lg flex items-start space-x-2">
                       <AlertTriangle className="h-5 w-5 text-brand-tinta flex-shrink-0 mt-0.5" />
@@ -476,6 +449,13 @@ function CartContent() {
                   <span>{formatPrice(getTotal(), settings)}</span>
                 </div>
               </div>
+              {blockedItems.length > 0 && (
+                <div role="alert" className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">
+                    Hay productos en tu carrito que no se pueden comprar online. Quitalos para continuar.
+                  </p>
+                </div>
+              )}
               {Object.keys(stockWarnings).length > 0 && (
                 <div className="p-3 bg-brand-crema border border-brand-algarrobo/40 rounded-lg">
                   <p className="text-sm text-brand-tinta">
@@ -486,7 +466,7 @@ function CartContent() {
               <Button
                 className="w-full"
                 onClick={handleCheckout}
-                disabled={Object.keys(stockWarnings).length > 0}
+                disabled={Object.keys(stockWarnings).length > 0 || blockedItems.length > 0}
               >
                 Proceder al Pago
               </Button>

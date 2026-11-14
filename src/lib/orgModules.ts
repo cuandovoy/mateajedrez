@@ -1,4 +1,4 @@
-import type { OrganizationSettings } from '@/types/database.types'
+import type { OrganizationSettings } from '@/types/aliases'
 
 type RawSettings = OrganizationSettings | Record<string, unknown> | null | undefined
 

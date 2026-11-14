@@ -15,7 +15,6 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 
 - 🟡 Pedir al cliente el logo en mayor resolución o vectorial (SVG/PDF): el original es 531x601 JPEG, el og-image (1200x630) y los íconos salen con el logo a tamaño nativo — más nitidez para og-image y futura impresión
 - 🟢 Borrar assets Ruemia sin uso (cero referencias en código): src/brand/isotipo-cropped.png, isotipo-fondo1.png, logo-principal-fondo1.png, ruemia-logo-horizontal.png, branboard.pdf; public/berlin.regular.ttf, public/Cambria.ttf
-- 🟡 Agregar horarios de atención a la página Visitanos (dato aún no confirmado) — src/pages/Visitanos.tsx
 - 🟡 Agregar fotos del local a la página Visitanos — src/pages/Visitanos.tsx
 - 🟢 Usar el link de la ficha de Google Maps del local para un embed más rico (reseñas, fotos) — src/lib/storeLocation.ts
 - 🟢 Agregar JSON-LD LocalBusiness una vez confirmados los horarios — src/pages/Visitanos.tsx
@@ -273,8 +272,26 @@ Implementación del plan de acción de `seo-audit-ruemia.md` (Tier 1 y Tier 2, v
 
 ---
 
+## Deriva con el esquema compartido del SaaS (2026-11-03)
+
+### 🔴 Crítico
+- 🔴 La creación de orden no es atómica: `orders` se inserta y luego `order_items`; si falla, queda una orden huérfana sin items y un invitado no puede borrarla (no hay policy DELETE/UPDATE para anon). Proponer RPC `create_store_order` en el repo SaaS (orders + items + validación de flags en una transacción) — src/pages/Checkout.tsx
+### 🟠 Alta
+- 🟠 Este fork no tiene registro de migraciones del esquema del SaaS (la DB es compartida y la define `ecommerce-supabase saas`); cada cambio de esquema allá puede romper la tienda sin aviso. Agregar un check periódico (`supabase gen types` + diff en CI) o un contrato de RPCs/columnas que usa la tienda
+- 🟠 `can_create_organization` ya no existe en la DB; el fork no lo usa (0 referencias en src/)
+### 🟡 Media
+- 🟡 `database.types.ts` se regenera pisando el archivo: los alias de dominio viven en src/types/aliases.ts; documentar el comando de regeneración y no editar el generado
+- 🟡 Quedan casts `as any` en RPCs/tablas que ya tienen tipos generados (stock.ts, Checkout.tsx, cartStore.ts) — limpiar en otra pasada
+- 🟡 Checkout valida stock por consultas sueltas a `branch_inventory` con N+1; evaluar RPC de validación de carrito
+
+## Horarios del local (2026-11-11)
+
+- 🟡 Mover los horarios a org settings (DB) para editarlos desde el admin; hoy son una constante — src/lib/storeHours.ts
+- 🟡 Reemplazar `store_whatsapp_number` / `VITE_SOCIAL_WHATSAPP` / `VITE_WHATSAPP_SALES_NUMBER` por una única fuente del número de WhatsApp — OrderConfirmation.tsx, Visitanos.tsx, WhatsappFloatingButton.tsx
+
 ## Completado ✅
 
+- ✅ 2026-11-14 — Horarios reales del local (L-V 9:30–12:30 y 15:30–19:30, sáb 9:30–13:00) en `src/lib/storeHours.ts`, mostrados en Visitanos y en el retiro del checkout.
 - ✅ 2026-10-08 — Logo y assets de Mates Ajedrez integrados (header, footer, BrandLoader, favicon, apple-touch-icon, icon-192/512, og-image 1200x630, JSON-LD logo, sw cache v2). Reemplaza los pendientes de assets Ruemia.
 - ✅ 2026-09-25 — **Auditoría SEO (Tier 1 + Tier 2 de `seo-audit-ruemia.md`)**:
   1. `public/robots.txt` (nuevo) — `Allow: /`, `Disallow` de `/admin` (no existe en este fork, agregado igual por consistencia con otros forks), `/cart`, `/checkout`, `/order-confirmation`, y `Sitemap: https://ruemia.uy/sitemap.xml`.

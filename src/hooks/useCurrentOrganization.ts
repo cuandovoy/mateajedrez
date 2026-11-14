@@ -1,5 +1,5 @@
 import { usePublicStore } from '@/contexts/PublicStoreContext'
-import type { Organization } from '@/types/database.types'
+import type { Organization } from '@/types/aliases'
 
 /**
  * Organización actual de la tienda pública (single-tenant por deploy).

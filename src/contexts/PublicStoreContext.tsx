@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode } from 'react'
-import type { Organization } from '@/types/database.types'
+import type { Organization } from '@/types/aliases'
 
 interface PublicStoreContextValue {
   organization: Organization

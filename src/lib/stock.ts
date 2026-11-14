@@ -130,63 +130,72 @@ export function sortByStockFirst<T extends { id: string }>(
     .map(({ product }) => product)
 }
 
-const cachedMainBranchByOrg = new Map<string, string | null>()
+const cachedBranchByKey = new Map<string, string>()
 
-export async function getMainBranchId(organizationId?: string | null): Promise<string | null> {
-  const cacheKey = organizationId || '__global__'
-  if (cachedMainBranchByOrg.has(cacheKey)) {
-    return cachedMainBranchByOrg.get(cacheKey) ?? null
+interface StorefrontBranchOptions {
+  /** Applies only to the legacy resolution steps inside the RPC (see SaaS migration 171). */
+  excludeIsolatedWarehouses?: boolean
+}
+
+async function resolveBranchLegacy(organizationId: string, excludeIsolated: boolean): Promise<string | null> {
+  const base = () => {
+    let q = supabase
+      .from('branches')
+      .select('id')
+      .eq('organization_id', organizationId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
+    if (excludeIsolated) q = q.eq('is_isolated_warehouse', false)
+    return q
+  }
+
+  const { data: main, error } = await base().eq('code', 'MAIN')
+  if (error) throw error
+  if (Array.isArray(main) && main[0]) return (main[0] as { id: string }).id
+
+  const { data: first } = await base()
+  return Array.isArray(first) && first[0] ? (first[0] as { id: string }).id : null
+}
+
+/**
+ * Single entry point for "which branch serves the online store".
+ * Delegates to the SaaS-owned RPC resolve_storefront_branch_id (explicit
+ * organizations.storefront_branch_id, then code=MAIN, then first active branch).
+ * The legacy client-side query is only a fallback when the RPC itself fails.
+ */
+export async function getStorefrontBranchId(
+  organizationId?: string | null,
+  options: StorefrontBranchOptions = {}
+): Promise<string | null> {
+  if (!organizationId) return null
+  const exclude = options.excludeIsolatedWarehouses ?? true
+  const cacheKey = `${organizationId}:${exclude}`
+  const cached = cachedBranchByKey.get(cacheKey)
+  if (cached) return cached
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.rpc as any)('resolve_storefront_branch_id', {
+      p_organization_id: organizationId,
+      p_exclude_isolated_warehouses: exclude,
+    })
+    if (error) throw error
+    if (typeof data === 'string' && data) {
+      cachedBranchByKey.set(cacheKey, data)
+      return data
+    }
+    return null
+  } catch (rpcError) {
+    console.error('Error resolving storefront branch via RPC, using legacy fallback:', rpcError)
   }
 
   try {
-    let mainQuery = supabase
-      .from('branches')
-      .select('id')
-      .eq('code', 'MAIN')
-      .eq('is_active', true)
-      .eq('is_isolated_warehouse', false)
-      .order('created_at', { ascending: true })
-      .limit(1)
-
-    if (organizationId) {
-      mainQuery = mainQuery.eq('organization_id', organizationId)
-    }
-
-    const { data, error } = await mainQuery
-
-    if (error) throw error
-    const mainRow = Array.isArray(data) ? data[0] : null
-    if (mainRow) {
-      const branchId = (mainRow as { id: string }).id
-      cachedMainBranchByOrg.set(cacheKey, branchId)
-      return branchId
-    }
-
-    let fallbackQuery = supabase
-      .from('branches')
-      .select('id')
-      .eq('is_active', true)
-      .eq('is_isolated_warehouse', false)
-      .order('created_at', { ascending: true })
-      .limit(1)
-
-    if (organizationId) {
-      fallbackQuery = fallbackQuery.eq('organization_id', organizationId)
-    }
-
-    const { data: fallbackData } = await fallbackQuery
-
-    const fallbackRow = Array.isArray(fallbackData) ? fallbackData[0] : null
-    if (fallbackRow) {
-      const branchId = (fallbackRow as { id: string }).id
-      cachedMainBranchByOrg.set(cacheKey, branchId)
-      return branchId
-    }
-
-    cachedMainBranchByOrg.set(cacheKey, null)
-    return null
+    const legacy = await resolveBranchLegacy(organizationId, exclude)
+    if (legacy) cachedBranchByKey.set(cacheKey, legacy)
+    return legacy
   } catch (error) {
-    console.error('Error fetching main branch:', error)
+    console.error('Error fetching storefront branch:', error)
     return null
   }
 }

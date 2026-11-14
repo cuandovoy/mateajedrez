@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { getProductStock, getProductsStock, getMainBranchId } from './stock'
+import { getProductStock, getProductsStock, getStorefrontBranchId } from './stock'
 import { supabase } from './supabase'
 
 vi.mock('./supabase', () => ({
@@ -153,9 +153,9 @@ describe('getProductsStock', () => {
   })
 })
 
-// ─── getMainBranchId ──────────────────────────────────────────────────────────
+// ─── getStorefrontBranchId ────────────────────────────────────────────────────
 
-describe('getMainBranchId', () => {
+describe('getStorefrontBranchId', () => {
   const mockFrom = vi.mocked(supabase.from)
 
   // IDs únicos por test para evitar colisiones con la cache de módulo
@@ -166,47 +166,78 @@ describe('getMainBranchId', () => {
     vi.clearAllMocks()
   })
 
-  it('retorna el id de la sucursal MAIN', async () => {
+  it('resuelve la sucursal con el RPC resolve_storefront_branch_id', async () => {
+    mockRpc.mockResolvedValueOnce({ data: 'branch-rpc', error: null })
+    const orgId = nextOrgId()
+    expect(await getStorefrontBranchId(orgId)).toBe('branch-rpc')
+    expect(mockRpc).toHaveBeenCalledWith('resolve_storefront_branch_id', {
+      p_organization_id: orgId,
+      p_exclude_isolated_warehouses: true,
+    })
+  })
+
+  it('propaga excludeIsolatedWarehouses=false al RPC', async () => {
+    mockRpc.mockResolvedValueOnce({ data: 'branch-x', error: null })
+    const orgId = nextOrgId()
+    await getStorefrontBranchId(orgId, { excludeIsolatedWarehouses: false })
+    expect(mockRpc).toHaveBeenCalledWith('resolve_storefront_branch_id', {
+      p_organization_id: orgId,
+      p_exclude_isolated_warehouses: false,
+    })
+  })
+
+  it('usa la cache y no vuelve a llamar al RPC en la segunda llamada', async () => {
+    const orgId = nextOrgId()
+    mockRpc.mockResolvedValueOnce({ data: 'branch-cached', error: null })
+    expect(await getStorefrontBranchId(orgId)).toBe('branch-cached')
+    vi.clearAllMocks()
+    expect(await getStorefrontBranchId(orgId)).toBe('branch-cached')
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+
+  it('cachea por separado según el flag: distinto excludeIsolatedWarehouses vuelve a consultar', async () => {
+    const orgId = nextOrgId()
+    mockRpc.mockResolvedValue({ data: 'branch-a', error: null })
+    await getStorefrontBranchId(orgId)
+    await getStorefrontBranchId(orgId, { excludeIsolatedWarehouses: false })
+    expect(mockRpc).toHaveBeenCalledTimes(2)
+  })
+
+  it('retorna null y no cachea cuando el RPC devuelve null (sin sucursal resolvible)', async () => {
+    const orgId = nextOrgId()
+    mockRpc.mockResolvedValue({ data: null, error: null })
+    expect(await getStorefrontBranchId(orgId)).toBeNull()
+    await getStorefrontBranchId(orgId)
+    expect(mockRpc).toHaveBeenCalledTimes(2)
+  })
+
+  it('retorna null sin consultar si no hay organizationId', async () => {
+    expect(await getStorefrontBranchId(null)).toBeNull()
+    expect(await getStorefrontBranchId(undefined)).toBeNull()
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
+
+  it('hace fallback a la consulta legacy (MAIN) si el RPC falla', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'function does not exist' } })
     mockFrom.mockReturnValueOnce(
       createQueryMock({ data: [{ id: 'branch-main' }], error: null }) as any
     )
-    expect(await getMainBranchId(nextOrgId())).toBe('branch-main')
+    expect(await getStorefrontBranchId(nextOrgId())).toBe('branch-main')
   })
 
-  it('usa la cache y no consulta la DB en la segunda llamada', async () => {
-    const orgId = nextOrgId()
-    mockFrom.mockReturnValueOnce(
-      createQueryMock({ data: [{ id: 'branch-cached' }], error: null }) as any
-    )
-
-    expect(await getMainBranchId(orgId)).toBe('branch-cached')
-    vi.clearAllMocks()
-    expect(await getMainBranchId(orgId)).toBe('branch-cached') // hit de cache
-    expect(mockFrom).not.toHaveBeenCalled()
-  })
-
-  it('hace fallback a cualquier sucursal activa si no existe MAIN', async () => {
-    mockFrom
-      .mockReturnValueOnce(
-        createQueryMock({ data: [], error: null }) as any // MAIN no encontrada
-      )
-      .mockReturnValueOnce(
-        createQueryMock({ data: [{ id: 'branch-fallback' }], error: null }) as any
-      )
-    expect(await getMainBranchId(nextOrgId())).toBe('branch-fallback')
-  })
-
-  it('retorna null si no hay ninguna sucursal activa', async () => {
+  it('en fallback legacy usa cualquier sucursal activa si no existe MAIN', async () => {
+    mockRpc.mockRejectedValueOnce(new Error('network'))
     mockFrom
       .mockReturnValueOnce(createQueryMock({ data: [], error: null }) as any)
-      .mockReturnValueOnce(createQueryMock({ data: [], error: null }) as any)
-    expect(await getMainBranchId(nextOrgId())).toBeNull()
+      .mockReturnValueOnce(createQueryMock({ data: [{ id: 'branch-fallback' }], error: null }) as any)
+    expect(await getStorefrontBranchId(nextOrgId())).toBe('branch-fallback')
   })
 
-  it('retorna null en error de query', async () => {
+  it('retorna null si el RPC y el fallback legacy fallan', async () => {
+    mockRpc.mockResolvedValueOnce({ data: null, error: { message: 'boom' } })
     mockFrom.mockReturnValueOnce(
       createQueryMock({ data: null, error: { message: 'connection error' } }) as any
     )
-    expect(await getMainBranchId(nextOrgId())).toBeNull()
+    expect(await getStorefrontBranchId(nextOrgId())).toBeNull()
   })
 })

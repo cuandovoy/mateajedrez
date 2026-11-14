@@ -1,8 +1,9 @@
-import { CartItem, Category, Product, ProductVariant } from './database.types'
+import type { CartItem, Category, Product, ProductVariant } from './aliases'
 
+export type { Database } from './database.types'
 export type {
   CartItem, Category, CategoryInsert,
-  CategoryUpdate, Database, Order,
+  CategoryUpdate, Order,
   OrderItem, Product, ProductInsert,
   ProductUpdate, ProductVariant, ProductVariantInsert,
   ProductVariantUpdate, ProductImage, ProductImageInsert,
@@ -16,7 +17,7 @@ export type {
   InventoryMovement, InventoryMovementInsert, InventoryMovementUpdate,
   InventoryTransfer, InventoryTransferInsert, InventoryTransferUpdate,
   OrganizationMember, StoreCoupon, StoreCouponInsert, StoreCouponUpdate,
-} from './database.types'
+} from './aliases'
 
 /**
  * Extended organization member with org-role fields that migration 089 added.

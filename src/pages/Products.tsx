@@ -148,7 +148,7 @@ export function Products() {
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-3 mb-8">
         {/* Search */}
-        <div className="relative flex-1 min-w-[200px]">
+        <div className="relative w-full md:w-auto md:flex-1 md:min-w-[200px]">
           {isFiltering ? (
             <svg
               className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-brand-muted"
@@ -180,10 +180,10 @@ export function Products() {
 
         {/* Category chips */}
         {categories.length > 0 && (
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex flex-nowrap md:flex-wrap gap-2 w-full md:w-auto overflow-x-auto md:overflow-visible scrollbar-none snap-x scroll-px-4 sm:scroll-px-6 md:scroll-px-0 -mx-4 px-4 sm:-mx-6 sm:px-6 md:mx-0 md:px-0">
             <button
               onClick={() => selectCategory('')}
-              className={`h-10 px-4 rounded-full font-heading text-xs font-semibold uppercase tracking-[0.14em] transition-colors border ${
+              className={`h-10 shrink-0 snap-start px-4 rounded-full font-heading text-xs font-semibold uppercase tracking-[0.14em] transition-colors border ${
                 !selectedCategory
                   ? 'bg-brand-cuero border-brand-cuero text-brand-crema'
                   : 'bg-transparent border-brand-line text-brand-tinta hover:border-brand-cuero'
@@ -195,7 +195,7 @@ export function Products() {
               <button
                 key={cat.id}
                 onClick={() => selectCategory(cat.id)}
-                className={`h-10 px-4 rounded-full font-heading text-xs font-semibold uppercase tracking-[0.14em] transition-colors border ${
+                className={`h-10 shrink-0 snap-start px-4 rounded-full font-heading text-xs font-semibold uppercase tracking-[0.14em] transition-colors border ${
                   selectedCategory === cat.id
                     ? 'bg-brand-cuero border-brand-cuero text-brand-crema'
                     : 'bg-transparent border-brand-line text-brand-tinta hover:border-brand-cuero'
@@ -210,7 +210,7 @@ export function Products() {
               <button
                 key={subcat.id}
                 onClick={() => selectCategory(subcat.id)}
-                className={`h-10 px-4 rounded-full font-heading text-xs font-semibold uppercase tracking-[0.14em] transition-colors border ${
+                className={`h-10 shrink-0 snap-start px-4 rounded-full font-heading text-xs font-semibold uppercase tracking-[0.14em] transition-colors border ${
                   selectedCategory === subcat.id
                     ? 'bg-brand-cuero border-brand-cuero text-brand-crema'
                     : 'bg-transparent border-brand-line text-brand-tinta hover:border-brand-cuero'
@@ -223,13 +223,13 @@ export function Products() {
         )}
 
         {/* Price range */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex items-center gap-2 w-full md:w-auto md:ml-auto">
           <input
             type="number"
             placeholder="Precio mín."
             value={priceRange.min}
             onChange={(e) => setPriceRange({ ...priceRange, min: e.target.value })}
-            className="w-28 h-10 px-3 border border-brand-line rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-cuero focus:border-brand-cuero bg-white"
+            className="flex-1 min-w-0 md:flex-none md:w-28 h-10 px-3 border border-brand-line rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-cuero focus:border-brand-cuero bg-white"
           />
           <span className="text-brand-muted text-sm">—</span>
           <input
@@ -237,12 +237,12 @@ export function Products() {
             placeholder="Precio máx."
             value={priceRange.max}
             onChange={(e) => setPriceRange({ ...priceRange, max: e.target.value })}
-            className="w-28 h-10 px-3 border border-brand-line rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-cuero focus:border-brand-cuero bg-white"
+            className="flex-1 min-w-0 md:flex-none md:w-28 h-10 px-3 border border-brand-line rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-brand-cuero focus:border-brand-cuero bg-white"
           />
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
-              className="h-10 px-3 text-sm text-red-500 border border-red-200 rounded-full hover:bg-red-50 transition-colors"
+              className="h-10 shrink-0 px-3 text-sm text-red-500 border border-red-200 rounded-full hover:bg-red-50 transition-colors"
             >
               Limpiar
             </button>
