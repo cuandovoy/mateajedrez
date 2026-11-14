@@ -7,6 +7,7 @@ import { useProductVariants } from '@/hooks/useProductVariants'
 import { useStoreProduct } from '@/hooks/usePublicProducts'
 import { capitalizeFirst, formatPrice, hasActiveDiscount, getEffectivePrice, normalizeLineBreaks } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
+import { buildImageUrls, resolveVariantImage } from '@/lib/productGallery'
 import { absoluteUrl } from '@/lib/siteUrl'
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from '@/lib/jsonLd'
 import { useCartStore } from '@/store/cartStore'
@@ -87,6 +88,8 @@ export function ProductDetail() {
   const { data: variants = [] } = useProductVariants(organization?.id, id)
   const hasActiveVariants = variants.length > 0
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
+  // Variant image that is not part of the gallery: replaces only the main image (no extra thumbnail)
+  const [variantOverrideUrl, setVariantOverrideUrl] = useState<string | null>(null)
   const [imageLoading, setImageLoading] = useState(true)
   const [fadeIn, setFadeIn] = useState(false)
 
@@ -117,6 +120,7 @@ export function ProductDetail() {
   // Resetea el estado de la galería cuando cambia el producto cargado
   useEffect(() => {
     setCurrentImageIndex(0)
+    setVariantOverrideUrl(null)
     setImageLoading(true)
     setFadeIn(false)
     setAllImagesFailed(false)
@@ -194,9 +198,6 @@ export function ProductDetail() {
     if (!product) return
 
     setSelectedVariantId(variantId || null)
-    setCurrentImageIndex(0)
-    setImageLoading(true)
-    setFadeIn(false)
     setAllImagesFailed(false)
 
     if (variantId) {
@@ -204,11 +205,30 @@ export function ProductDetail() {
       if (variant) {
         setSelectedVariant(variant)
         setQuantity(1)
+        const withImages = product as Product & { product_images?: ProductImage[] }
+        const resolution = resolveVariantImage(
+          buildImageUrls(withImages.product_images, product.image_url),
+          variant.image_url
+        )
+        if (resolution.kind === 'index') {
+          setVariantOverrideUrl(null)
+          setCurrentImageIndex(resolution.index)
+          setImageLoading(true)
+          setFadeIn(false)
+        } else if (resolution.kind === 'override') {
+          setVariantOverrideUrl(resolution.url)
+          setImageLoading(true)
+          setFadeIn(false)
+        } else {
+          // A previous variant's override must not linger on a variant without its own image.
+          setVariantOverrideUrl(null)
+        }
       }
       return
     }
 
     setSelectedVariant(null)
+    setVariantOverrideUrl(null)
     setQuantity(1)
   }, [product, variants])
 
@@ -346,45 +366,16 @@ export function ProductDetail() {
           {(() => {
             const productWithImages = product as Product & { product_images?: ProductImage[] }
             
-            // Get all available image URLs in priority order
-            const imageUrls: string[] = []
-            
-            // 1. Variant image (if exists)
-            if (selectedVariant?.image_url && isValidImageUrl(selectedVariant.image_url)) {
-              imageUrls.push(selectedVariant.image_url)
-            }
-            
-            // 2. Product images (sorted by is_primary and display_order)
-            if (productWithImages.product_images && productWithImages.product_images.length > 0) {
-              const sorted = [...productWithImages.product_images]
-                .filter((img) => isValidImageUrl(img.image_url))
-                .sort((a, b) => {
-                  // Primary images first
-                  if (a.is_primary && !b.is_primary) return -1
-                  if (!a.is_primary && b.is_primary) return 1
-                  // Then by display_order
-                  return a.display_order - b.display_order
-                })
-              
-              sorted.forEach((img) => {
-                if (img.image_url && !imageUrls.includes(img.image_url)) {
-                  imageUrls.push(img.image_url)
-                }
-              })
-            }
-            
-            // 3. Legacy image_url (if exists and valid)
-            if (product.image_url && isValidImageUrl(product.image_url) && !imageUrls.includes(product.image_url)) {
-              imageUrls.push(product.image_url)
-            }
-            
+            const imageUrls = buildImageUrls(productWithImages.product_images, product.image_url)
+
             // Get current image URL to try
-            const currentImageUrl = imageUrls[currentImageIndex]
+            const currentImageUrl = variantOverrideUrl ?? imageUrls[Math.min(currentImageIndex, imageUrls.length - 1)]
             const hasMultipleImages = imageUrls.length > 1
             
             const handlePreviousImage = () => {
               setFadeIn(false)
               setTimeout(() => {
+                setVariantOverrideUrl(null)
                 setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : imageUrls.length - 1))
                 setImageLoading(true)
               }, 150)
@@ -393,6 +384,7 @@ export function ProductDetail() {
             const handleNextImage = () => {
               setFadeIn(false)
               setTimeout(() => {
+                setVariantOverrideUrl(null)
                 setCurrentImageIndex((prev) => (prev < imageUrls.length - 1 ? prev + 1 : 0))
                 setImageLoading(true)
               }, 150)
@@ -435,7 +427,7 @@ export function ProductDetail() {
                 >
                   <div className="relative w-full" style={{ aspectRatio: '1 / 1', minHeight: '400px' }}>
                     <img
-                      key={`${selectedVariantId ?? 'base'}-${currentImageIndex}`}
+                      key={`${variantOverrideUrl ?? 'gallery'}-${currentImageIndex}`}
                       ref={handleImgRef}
                       src={currentImageUrl}
                       alt={capitalizeFirst(product.name)}
@@ -448,7 +440,9 @@ export function ProductDetail() {
                         console.error('Error loading image:', currentImageUrl)
                         setImageLoading(false)
                         // Try next image if available
-                        if (currentImageIndex < imageUrls.length - 1) {
+                        if (variantOverrideUrl) {
+                          setVariantOverrideUrl(null)
+                        } else if (currentImageIndex < imageUrls.length - 1) {
                           setCurrentImageIndex(currentImageIndex + 1)
                         } else {
                           // All images failed, show placeholder
@@ -488,7 +482,7 @@ export function ProductDetail() {
                       
                       {/* Image counter */}
                       <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-brand-tinta/60 text-white px-3 py-1 rounded-full text-sm">
-                        {currentImageIndex + 1} / {imageUrls.length}
+                        {variantOverrideUrl ? 'Variante' : `${currentImageIndex + 1} / ${imageUrls.length}`}
                       </div>
                     </>
                   )}
@@ -501,16 +495,17 @@ export function ProductDetail() {
                       <button
                         key={index}
                         onClick={() => {
-                          if (index !== currentImageIndex) {
+                          if (index !== currentImageIndex || variantOverrideUrl) {
                             setFadeIn(false)
                             setTimeout(() => {
+                              setVariantOverrideUrl(null)
                               setCurrentImageIndex(index)
                               setImageLoading(true)
                             }, 150)
                           }
                         }}
                         className={`flex-shrink-0 w-20 h-20 rounded-md overflow-hidden border transition-colors duration-200 ${
-                          index === currentImageIndex ? 'border-brand-cuero ring-1 ring-brand-cuero' : 'border-brand-line hover:border-brand-algarrobo'
+                          index === currentImageIndex && !variantOverrideUrl ? 'border-brand-cuero ring-1 ring-brand-cuero' : 'border-brand-line hover:border-brand-algarrobo'
                         }`}
                         aria-label={`Ver imagen ${index + 1}`}
                       >
@@ -568,7 +563,7 @@ export function ProductDetail() {
                             <ChevronRight className="h-6 w-6 text-white" />
                           </button>
                           <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 text-white/80 text-sm">
-                            {currentImageIndex + 1} / {imageUrls.length}
+                            {variantOverrideUrl ? 'Variante' : `${currentImageIndex + 1} / ${imageUrls.length}`}
                           </div>
                         </>
                       )}

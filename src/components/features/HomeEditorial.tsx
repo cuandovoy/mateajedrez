@@ -172,7 +172,7 @@ const workPhotos = [
   { name: 'mates-bwo', alt: 'Mates de calabaza con grabado del logo de BWO', caption: 'BWO · Regalos de empresa' },
   { name: 'mates-genolet', alt: 'Canasta de mates grabados para Genolet Transporte', caption: 'Genolet · Mates personalizados' },
   { name: 'mates-congreso-salto', alt: 'Mate de cuero grabado del Congreso 2025 Ser-con-cáncer, Salto, levantado frente a muchos otros mates', caption: 'Congreso Ser-con-cáncer · Salto 2025' },
-  { name: 'mate-iniciales', alt: 'Mate de madera con las iniciales L∞A aplicadas en plata, sostenido en la mano', caption: 'Iniciales L∞A · Aplique en plata' },
+  { name: 'mate-iniciales', alt: 'Mate de madera con las iniciales L∞A aplicadas en alpaca, sostenido en la mano', caption: 'Iniciales L∞A · Aplique en alpaca' },
   { name: 'virola-cincelada', alt: 'Vista superior de una virola de plata cincelada con hojas y el nombre Bryan', caption: 'Bryan · Virola cincelada' },
   { name: 'mates-residencia-san-cono', alt: 'Mates de calabaza y portamates de cuero apilados, grabados con el logo de Residencia San Cono', caption: 'Residencia San Cono · Mate y portamate grabados' },
 ]

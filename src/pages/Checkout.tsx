@@ -1,6 +1,7 @@
 import { BillerCheckoutPanel } from '@/components/features/BillerCheckoutPanel'
 import { CheckoutSteps } from '@/components/features/CheckoutSteps'
 import { Button } from '@/components/ui/Button'
+import { StoreHours } from '@/components/features/StoreHours'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { Skeleton } from '@/components/ui/Skeleton'
@@ -24,7 +25,7 @@ import type { CartItemWithProduct, Order, ProductImage } from '@/types'
 import type { BillerConfig, CheckoutBillerState } from '@/types/biller'
 import { BranchInventory, Customer } from '@/types/aliases'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowLeft, Banknote, CheckCircle2, CreditCard, Landmark, Store, Truck } from 'lucide-react'
+import { ArrowLeft, Banknote, CheckCircle2, ChevronDown, CreditCard, Landmark, Store, Truck } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { GoogleReCaptchaProvider, useGoogleReCaptcha } from 'react-google-recaptcha-v3'
@@ -771,62 +772,8 @@ function CheckoutInner() {
     }
   }
 
-  if (!cartFetched) {
-    return (
-      <div className="container-custom py-8">
-        <CheckoutSteps currentStep="checkout" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Skeleton className="h-96 w-full rounded-md lg:col-span-2" />
-          <Skeleton className="h-64 w-full rounded-md" />
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="container-custom py-8">
-      <CheckoutSteps currentStep="checkout" />
-      <Button
-        variant="ghost"
-        onClick={() => navigate('/cart')}
-        className="mb-6"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Volver al carrito
-      </Button>
-
-      <h1 className="brand-title text-2xl md:text-3xl mb-4">Finalizar Compra</h1>
-
-      {!isPickup && (
-        <div className="mb-8 flex items-start gap-3 rounded-lg border border-brand-algarrobo/40 bg-brand-crema px-4 py-3 text-sm text-brand-tinta">
-          <Truck className="h-5 w-5 shrink-0 mt-0.5" />
-          <p>Los productos tienen una demora de entrega de 3 a 5 días hábiles.</p>
-        </div>
-      )}
-      {isPickup && <div className="mb-8" />}
-
-      {blockedItems.length > 0 && (
-        <div role="alert" className="mb-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <p className="font-medium">Hay productos que no se pueden comprar online:</p>
-          <ul className="mt-1 list-disc pl-5">
-            {blockedItems.map((b) => (
-              <li key={b.itemId}>
-                {capitalizeFirst(b.name)}: {blockedReasonMessage(b.reason)}
-              </li>
-            ))}
-          </ul>
-          <Link to="/cart" className="mt-2 inline-block font-medium underline">Volver al carrito</Link>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Order Summary */}
-        <div className="lg:col-span-1">
-          <Card className="sticky top-24">
-            <CardHeader>
-              <CardTitle>Resumen de la Orden</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+  const summaryContent = (
+    <>
               <div className="space-y-3">
                 {items.map((item) => {
                   const unitPrice = item.variant?.price ?? getEffectivePrice(item.product)
@@ -907,7 +854,7 @@ function CheckoutInner() {
                   className="space-y-2 rounded-lg border border-brand-line bg-brand-crema p-3"
                 >
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-brand-muted mb-1">
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-brand-tinta mb-1.5">
                       Cupón de descuento
                     </label>
                     <div className="flex gap-2">
@@ -934,10 +881,10 @@ function CheckoutInner() {
                     </div>
                   </div>
                   {couponError && (
-                    <p className="text-xs text-red-500">{couponError}</p>
+                    <p className="text-sm text-red-600">{couponError}</p>
                   )}
                   {couponSuccess && (
-                    <p className="text-xs text-emerald-700">{couponSuccess}</p>
+                    <p className="text-sm text-emerald-700">{couponSuccess}</p>
                   )}
                   {finalTotal === 0 && discountTotal > 0 && (
                     <p className="text-xs text-emerald-700">
@@ -946,6 +893,85 @@ function CheckoutInner() {
                   )}
                 </form>
               </div>
+    </>
+  )
+
+  if (!cartFetched) {
+    return (
+      <div className="container-custom py-8">
+        <CheckoutSteps currentStep="checkout" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Skeleton className="h-96 w-full rounded-md lg:col-span-2" />
+          <Skeleton className="h-64 w-full rounded-md" />
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="container-custom py-8">
+      <CheckoutSteps currentStep="checkout" />
+      <Button
+        variant="ghost"
+        onClick={() => navigate('/cart')}
+        className="mb-6"
+      >
+        <ArrowLeft className="h-4 w-4 mr-2" />
+        Volver al carrito
+      </Button>
+
+      <h1 className="brand-title text-2xl md:text-3xl mb-4">Finalizar Compra</h1>
+
+      {!isPickup && (
+        <div className="mb-6 flex items-start gap-3 rounded-lg border border-brand-algarrobo/40 bg-brand-crema px-4 py-3 text-sm text-brand-tinta">
+          <Truck className="h-5 w-5 shrink-0 mt-0.5" />
+          <p>Los productos tienen una demora de entrega de 3 a 5 días hábiles.</p>
+        </div>
+      )}
+      {isPickup && <div className="mb-8" />}
+
+      {blockedItems.length > 0 && (
+        <div role="alert" className="mb-8 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <p className="font-medium">Hay productos que no se pueden comprar online:</p>
+          <ul className="mt-1 list-disc pl-5">
+            {blockedItems.map((b) => (
+              <li key={b.itemId}>
+                {capitalizeFirst(b.name)}: {blockedReasonMessage(b.reason)}
+              </li>
+            ))}
+          </ul>
+          <Link to="/cart" className="mt-2 inline-block font-medium underline">Volver al carrito</Link>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+        {/* Order Summary — collapsible on mobile, sticky card on desktop */}
+        <div className="lg:col-span-1">
+          <details className="group rounded-md border border-brand-line bg-white lg:hidden">
+            <summary className="flex min-h-[56px] cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+              <span className="flex flex-col">
+                <span className="font-heading text-xs font-semibold uppercase tracking-[0.14em] text-brand-tinta">
+                  Resumen de la orden
+                </span>
+                <span className="text-sm text-brand-muted">
+                  {items.length} {items.length === 1 ? 'producto' : 'productos'} · tocá para ver el detalle
+                </span>
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="font-heading text-base font-semibold text-brand-tinta">
+                  {formatPrice(finalTotal, settings)}
+                </span>
+                <ChevronDown className="h-5 w-5 text-brand-muted transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
+              </span>
+            </summary>
+            <div className="space-y-5 border-t border-brand-line px-4 py-4">{summaryContent}</div>
+          </details>
+          <Card className="sticky top-24 hidden lg:block">
+            <CardHeader>
+              <CardTitle>Resumen de la Orden</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {summaryContent}
             </CardContent>
           </Card>
         </div>
@@ -957,10 +983,10 @@ function CheckoutInner() {
               <CardTitle>Datos de Contacto</CardTitle>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleFormSubmit((values) => onSubmit(values as CheckoutFormData))} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <form onSubmit={handleFormSubmit((values) => onSubmit(values as CheckoutFormData))} className="space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
-                    <label htmlFor="checkout-fullName" className="block text-sm font-medium text-brand-muted mb-1">
+                    <label htmlFor="checkout-fullName" className="block text-sm font-medium text-brand-tinta mb-1.5">
                       Nombre Completo <span className="text-red-500">*</span>
                     </label>
                     <Input
@@ -971,12 +997,12 @@ function CheckoutInner() {
                       className={errors.fullName ? 'border-red-500' : ''}
                     />
                     {errors.fullName && (
-                      <p className="text-xs text-red-500 mt-1">{errors.fullName.message}</p>
+                      <p className="text-sm text-red-600 mt-1.5">{errors.fullName.message}</p>
                     )}
                   </div>
 
                   <div>
-                    <label htmlFor="checkout-email" className="block text-sm font-medium text-brand-muted mb-1">
+                    <label htmlFor="checkout-email" className="block text-sm font-medium text-brand-tinta mb-1.5">
                       Email <span className="text-red-500">*</span>
                     </label>
                     <Input
@@ -989,16 +1015,16 @@ function CheckoutInner() {
                       className={errors.email ? 'border-red-500' : ''}
                     />
                     {errors.email && (
-                      <p className="text-xs text-red-500 mt-1">{errors.email.message}</p>
+                      <p className="text-sm text-red-600 mt-1.5">{errors.email.message}</p>
                     )}
-                    <p className="text-xs text-brand-muted mt-1">
+                    <p className="text-sm text-brand-muted mt-1.5">
                       Te identifica como cliente y te avisamos el estado de tu orden
                     </p>
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="checkout-phone" className="block text-sm font-medium text-brand-muted mb-1">
+                  <label htmlFor="checkout-phone" className="block text-sm font-medium text-brand-tinta mb-1.5">
                     Teléfono <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -1011,13 +1037,13 @@ function CheckoutInner() {
                     className={errors.phone ? 'border-red-500' : ''}
                   />
                   {errors.phone && (
-                    <p className="text-xs text-red-500 mt-1">{errors.phone.message}</p>
+                    <p className="text-sm text-red-600 mt-1.5">{errors.phone.message}</p>
                   )}
                 </div>
 
                 {/* Delivery method */}
-                <div className="pt-4">
-                  <label className="block text-sm font-medium text-brand-muted mb-3">
+                <div className="mt-2 border-t border-brand-line pt-6">
+                  <label className="block font-heading text-sm font-semibold uppercase tracking-[0.14em] text-brand-tinta mb-3">
                     Cómo querés recibir tu pedido <span className="text-red-500">*</span>
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup">
@@ -1029,7 +1055,7 @@ function CheckoutInner() {
                       return (
                         <label
                           key={opt.value}
-                          className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                          className={`flex min-h-[64px] items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors sm:items-center sm:gap-4 ${
                             selected ? '' : 'border-brand-line hover:bg-brand-crema'
                           }`}
                           style={
@@ -1048,10 +1074,10 @@ function CheckoutInner() {
                             value={opt.value}
                             checked={selected}
                             onChange={() => selectDeliveryMethod(opt.value)}
-                            className="w-4 h-4 focus:ring-[var(--org-primary-color,#705931)] shrink-0"
+                            className="mt-1 w-5 h-5 focus:ring-[var(--org-primary-color,#705931)] shrink-0 sm:mt-0"
                             style={{ accentColor: 'var(--org-primary-color, #705931)' }}
                           />
-                          <span className={`shrink-0 ${selected ? '' : 'text-brand-muted'}`}>{opt.icon}</span>
+                          <span className={`shrink-0 mt-0.5 sm:mt-0 ${selected ? '' : 'text-brand-muted'}`}>{opt.icon}</span>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-brand-tinta">{opt.title}</p>
                             <p className="text-sm text-brand-muted">{opt.hint}</p>
@@ -1064,10 +1090,13 @@ function CheckoutInner() {
                   {isPickup ? (
                     <div className="mt-4 flex items-start gap-3 rounded-lg border border-brand-algarrobo/40 bg-brand-crema px-4 py-3 text-sm text-brand-tinta">
                       <Store className="h-5 w-5 shrink-0 mt-0.5" />
-                      <p>
-                        El retiro se realiza en el local <strong>Mate Ajedrez</strong>: {STORE_ADDRESS}.
-                        Te notificaremos cuando el pedido esté listo para retirar.
-                      </p>
+                      <div className="min-w-0 space-y-4">
+                        <p>
+                          El retiro se realiza en el local <strong>Mate Ajedrez</strong>: {STORE_ADDRESS}.
+                          Te notificaremos cuando el pedido esté listo para retirar.
+                        </p>
+                        <StoreHours />
+                      </div>
                     </div>
                   ) : (
                     <div className="mt-4 space-y-4">
@@ -1082,7 +1111,7 @@ function CheckoutInner() {
                           className={errors.address ? 'border-red-500' : ''}
                         />
                         {errors.address && (
-                          <p className="text-xs text-red-500 mt-1">{errors.address.message}</p>
+                          <p className="text-sm text-red-600 mt-1.5">{errors.address.message}</p>
                         )}
                       </div>
 
@@ -1098,7 +1127,7 @@ function CheckoutInner() {
                             className={errors.city ? 'border-red-500' : ''}
                           />
                           {errors.city && (
-                            <p className="text-xs text-red-500 mt-1">{errors.city.message}</p>
+                            <p className="text-sm text-red-600 mt-1.5">{errors.city.message}</p>
                           )}
                         </div>
 
@@ -1120,7 +1149,7 @@ function CheckoutInner() {
                             ))}
                           </select>
                           {errors.department && (
-                            <p className="text-xs text-red-500 mt-1">{errors.department.message}</p>
+                            <p className="text-sm text-red-600 mt-1.5">{errors.department.message}</p>
                           )}
                         </div>
                       </div>
@@ -1140,8 +1169,8 @@ function CheckoutInner() {
                 </div>
 
                 {/* Payment Method Selection */}
-                <div className="pt-4">
-                  <label className="block text-sm font-medium text-brand-muted mb-3">
+                <div className="mt-2 border-t border-brand-line pt-6">
+                  <label className="block font-heading text-sm font-semibold uppercase tracking-[0.14em] text-brand-tinta mb-3">
                     Método de Pago {paymentMethodRequired && <span className="text-red-500">*</span>}
                   </label>
                   {!paymentMethodRequired && discountTotal > 0 && (
@@ -1170,7 +1199,7 @@ function CheckoutInner() {
                         return (
                           <label
                             key={m.id}
-                            className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-colors ${
+                            className={`flex min-h-[64px] items-start gap-3 p-4 border-2 rounded-lg cursor-pointer transition-colors sm:items-center sm:gap-4 ${
                               paymentMethod === m.key ? '' : 'border-brand-line hover:bg-brand-crema'
                             }`}
                             style={
@@ -1189,10 +1218,10 @@ function CheckoutInner() {
                               value={m.key}
                               checked={paymentMethod === m.key}
                               onChange={(e) => { setPaymentMethod(e.target.value); setPaymentMethodError(null) }}
-                              className="w-4 h-4 focus:ring-[var(--org-primary-color,#705931)] shrink-0"
+                              className="mt-1 w-5 h-5 focus:ring-[var(--org-primary-color,#705931)] shrink-0 sm:mt-0"
                               style={{ accentColor: 'var(--org-primary-color, #705931)' }}
                             />
-                            <span className={`shrink-0 ${paymentMethod === m.key ? '' : 'text-brand-muted'}`}>
+                            <span className={`shrink-0 mt-0.5 sm:mt-0 ${paymentMethod === m.key ? '' : 'text-brand-muted'}`}>
                               {icon}
                             </span>
                             <div className="flex-1 min-w-0">
@@ -1208,12 +1237,12 @@ function CheckoutInner() {
                       })}
                   </div>
                   {paymentMethodError && (
-                    <p className="text-xs text-red-500 mt-2">{paymentMethodError}</p>
+                    <p className="text-sm text-red-600 mt-2">{paymentMethodError}</p>
                   )}
                 </div>
 
-                <div className="flex items-center space-x-2 pt-4">
-                  <CheckCircle2 className="h-5 w-5 text-[#46602B]" />
+                <div className="flex items-start gap-2 pt-2">
+                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[#46602B]" />
                   <p className="text-sm text-brand-muted">
                     Tus datos serán guardados para futuras compras
                   </p>
@@ -1229,13 +1258,13 @@ function CheckoutInner() {
 
                 <Button
                   type="submit"
-                  className="w-full mt-6"
+                  className="w-full mt-6 min-h-[48px]"
                   disabled={loading}
                   isLoading={loading}
                 >
                   {loading ? 'Procesando...' : 'Confirmar Orden'}
                 </Button>
-                <p className="text-xs text-brand-muted text-center">
+                <p className="text-sm text-brand-muted text-center leading-relaxed">
                   Al realizar tu pedido aceptás nuestros{' '}
                   <Link to="/legal/terminos" target="_blank" className="underline hover:text-brand-muted">
                     Términos y Condiciones
