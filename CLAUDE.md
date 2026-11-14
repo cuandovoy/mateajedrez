@@ -264,7 +264,7 @@ Principios:
 - Los controles son siempre visibles — no colapsados, no detrás de un botón "Filtros"
 - Contenedor: `flex flex-wrap items-center gap-3`
 - Search: input `rounded-full h-10 pl-9 border border-brand-line bg-white focus:ring-2 focus:ring-brand-cuero` con ícono `Search` y botón `×` inline
-- Categorías: chips en tipografía de títulos, mayúscula espaciada (ver ejemplo abajo)
+- Categorías: chips en tipografía de títulos, mayúscula espaciada (ver ejemplo abajo). En mobile son **una sola fila con scroll horizontal** (`flex-nowrap overflow-x-auto scrollbar-none`, chips `shrink-0`, padding de borde para no recortar) — siguen siempre visibles, no colapsados; desde `md:` hacen wrap. Search en su propia fila y precio mín/máx en una fila compacta
 - Precio: dos inputs `rounded-full h-10 w-28 border border-brand-line` inline con `—` entre ellos
 - Botón "Limpiar": `text-red-500 border border-red-200 rounded-full hover:bg-red-50`, solo cuando `hasActiveFilters`
 - No usar `<Card>`, `<select>` nativo ni sidebar lateral para filtros de tienda
@@ -294,7 +294,7 @@ Concepto: "ficha técnica artesanal" — basado en el manual de marca (círculo 
 - Encabezados de sección: `.brand-eyebrow` (etiqueta chica en mayúscula espaciada, color cuero) + `.brand-title` (Josefin Light). Usar el eyebrow con moderación, no en cada bloque
 - El nombre de marca como wordmark se escribe espaciado: `A J E D R E Z`
 - Sello circular (`rounded-full bg-brand-cuero text-brand-crema`) es el recurso gráfico de la marca para badges
-- Badge "En stock": `bg-[#EEF3E6] text-[#46602B]` (tono yerba). "Sin stock": rojo atenuado, sin overlay
+- Badge de stock en cards: solo "Sin stock" (rojo atenuado, sin overlay) o "Últimas N" (stock ≤ 3, `getStockBadge` en `@/lib/productGallery`). No se muestra "En stock" con stock normal
 - Footer: fondo `brand-tinta`, texto crema, separadores `border-brand-crema/20`
 
 ### Loading y animaciones
@@ -706,8 +706,12 @@ useEffect(() => {
 - Imagen: siempre `aspect-square` (1:1) — nunca `16/9` ni altura fija
 - Bordes: `bg-white rounded-md border border-brand-line hover:border-brand-algarrobo transition-colors` — sin sombras ni hover-lift
 - Zoom de imagen en hover: `group-hover:scale-105 transition-transform duration-500`
-- Botón "Agregar al carrito": floating `rounded-full` absolutamente posicionado en la esquina inferior derecha de la imagen. En desktop: `md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300`. En mobile: siempre visible. **No** usar un botón `w-full` debajo de la imagen para productos sin variantes.
-- Sin stock: **sin overlay sobre la imagen** — el producto se ve normal. El único indicador es el badge junto al precio (`bg-red-50 text-red-600`, "Sin stock", mismo lugar que el badge verde "En stock"). El overlay `bg-white/70` con pill centrada que se usaba antes se sacó a pedido del usuario (2026-07-23): "nublaba" la foto del producto. Misma regla aplica a la imagen principal de `ProductDetail.tsx` — ahí el indicador es el texto "Este producto no tiene stock disponible." debajo del precio, sin overlay en la imagen.
+- Botón "Agregar al carrito": floating `rounded-full` absolutamente posicionado en la esquina inferior derecha de la imagen. En desktop: `md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 transition-all duration-300`. En mobile: siempre visible. **No** usar un botón `w-full` debajo de la imagen para productos sin variantes. Tap target mínimo 44px (`h-11 w-11`).
+- Precio: `font-heading text-xl font-semibold text-brand-tinta` es el elemento más fuerte de la card; el color cuero (org primary) se reserva para el precio con descuento. Precio original tachado `text-sm` en la misma línea.
+- Card completa clickeable: link del título con `after:absolute after:inset-0` (stretched link) y card `relative`; botones de acción (carrito, "Consultar por producto", "Ver opciones") con `relative z-10`. Sin elementos interactivos anidados.
+- Badge de stock solo para sin stock / pocas unidades (nunca "En stock"). Sin stock: nombre y precio en `text-brand-muted`, sin overlay.
+- Sin stock: **sin overlay sobre la imagen** — el producto se ve normal. El único indicador es el badge "Sin stock" junto al precio (`bg-red-50 text-red-600`) y el nombre/precio atenuados. El overlay `bg-white/70` con pill centrada que se usaba antes se sacó a pedido del usuario (2026-07-23): "nublaba" la foto del producto. Misma regla aplica a la imagen principal de `ProductDetail.tsx` — ahí el indicador es el texto "Este producto no tiene stock disponible." debajo del precio, sin overlay en la imagen.
+- ProductDetail y variantes: elegir una variante cambia solo la imagen principal (salta a ella si ya está en la galería, o la reemplaza como override sin agregar miniatura). Nunca renderizar una segunda imagen de la variante (ni en `VariantSelector`). Lógica en `@/lib/productGallery`.
 - Badge de descuento: sello circular `absolute top-3 left-3 h-11 w-11 rounded-full bg-brand-cuero text-brand-crema font-heading` — no dentro del body de la card
 
 ### CategoryCard

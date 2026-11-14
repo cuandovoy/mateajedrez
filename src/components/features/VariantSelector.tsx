@@ -1,20 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useProductVariants } from '@/hooks/useProductVariants'
-import { capitalizeFirst, cn, formatPrice, getEffectivePrice, translateAttributeLabel } from '@/lib/utils'
+import { cn, formatPrice, getEffectivePrice, translateAttributeLabel } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
+import { Skeleton } from '@/components/ui/Skeleton'
 import type { ProductVariant, Product } from '@/types'
-
-function isValidImageUrl(url: unknown): url is string {
-  if (!url || typeof url !== 'string') return false
-  if (!url.trim()) return false
-  try {
-    const parsed = new URL(url)
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
 
 interface VariantSelectorProps {
   product: Product
@@ -31,7 +21,6 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({})
   const [variantStocks, setVariantStocks] = useState<Record<string, number>>({})
   const [productStock, setProductStock] = useState<number | null>(null)
-  const [imageLoadFailed, setImageLoadFailed] = useState(false)
 
   // Reset selector state when product changes
   useEffect(() => {
@@ -95,10 +84,6 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
       .catch(() => setProductStock(0))
   }, [variants, product.id, product.organization_id, onAvailabilityChange, onVariantStocksChange])
 
-  useEffect(() => {
-    setImageLoadFailed(false)
-  }, [selectedVariantId, product.id])
-
   const handleAttributeChange = (attributeKey: string, value: string) => {
     if (selectedAttributes[attributeKey] === value) {
       const newSelected = { ...selectedAttributes }
@@ -127,16 +112,13 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
   const selectedVariant = variants.find((v) => v.id === selectedVariantId)
   const displayPrice = selectedVariant?.price ?? getEffectivePrice(product)
   const displayStock = selectedVariantId ? (variantStocks[selectedVariantId] ?? null) : (productStock ?? null)
-  const variantImage = isValidImageUrl(selectedVariant?.image_url) ? selectedVariant.image_url : null
-  const showImage = Boolean(variantImage && !imageLoadFailed)
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-4">
-        <div
-          className="animate-spin rounded-full h-6 w-6 border-b-2"
-          style={{ borderColor: 'var(--org-primary-color, #705931)' }}
-        ></div>
+      <div className="flex flex-wrap gap-2" aria-hidden="true">
+        <Skeleton className="h-10 w-16 rounded-lg" />
+        <Skeleton className="h-10 w-20 rounded-lg" />
+        <Skeleton className="h-10 w-14 rounded-lg" />
       </div>
     )
   }
@@ -197,7 +179,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
                         'relative overflow-hidden px-4 py-2 rounded-lg border-2 transition-colors',
                         isSelected
                           ? 'font-medium'
-                          : 'border-brand-line bg-white text-brand-muted hover:border-gray-400',
+                          : 'border-brand-line bg-white text-brand-muted hover:border-brand-algarrobo',
                         !isAvailable && 'opacity-50 cursor-not-allowed'
                       )}
                       style={
@@ -213,7 +195,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
                       {value}
                       {!isAvailable && (
                         <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                          <span className="w-[140%] h-px bg-gray-400 rotate-[-20deg]" />
+                          <span className="w-[140%] h-px bg-brand-muted rotate-[-20deg]" />
                         </span>
                       )}
                     </button>
@@ -241,7 +223,7 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
                   disabled={!isAvailable}
                   className={cn(
                     'w-full rounded-lg border px-3 py-2 text-left transition-colors',
-                    isSelected ? '' : 'border-brand-line bg-white hover:border-gray-400',
+                    isSelected ? '' : 'border-brand-line bg-white hover:border-brand-algarrobo',
                     !isAvailable && 'opacity-50 cursor-not-allowed'
                   )}
                   style={
@@ -289,19 +271,6 @@ export function VariantSelector({ product, selectedVariantId, onVariantChange, o
             <div className="text-sm text-brand-muted">
               Variante: {selectedVariant.name}
             </div>
-          )}
-        </div>
-      )}
-
-      {selectedVariant && (
-        <div className="mt-4">
-          {showImage && (
-            <img
-              src={variantImage as string}
-              alt={capitalizeFirst(selectedVariant?.name || product.name)}
-              className="w-full h-64 object-cover rounded-lg"
-              onError={() => setImageLoadFailed(true)}
-            />
           )}
         </div>
       )}

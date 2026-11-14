@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 import { ShoppingCart, Package } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
-import { Button } from '@/components/ui/Button'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, cn, formatPrice, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
+import { getStockBadge } from '@/lib/productGallery'
 import type { Product, ProductImage } from '@/types'
 import { useState, useEffect } from 'react'
 
@@ -83,15 +83,18 @@ export function ProductCard({
   }, [product.id, product.organization_id, stockProp])
 
   const hasStock = stock !== null ? stock > 0 : false
+  const isOutOfStock = stock !== null && !hasStock
+  const stockBadge = getStockBadge(stock)
+  const discounted = hasActiveDiscount(product)
   const productUrl = `/product/${product.id}`
   const requiresInquiry = !!product.requires_availability_check
   const showAddButton = !requiresInquiry && !noAddToCart && !hasVariants && stock !== null && hasStock
 
   return (
-    <div className="group bg-white rounded-md border border-brand-line overflow-hidden transition-colors duration-300 hover:border-brand-algarrobo flex flex-col h-full">
+    <div className="group relative bg-white rounded-md border border-brand-line overflow-hidden transition-colors duration-300 hover:border-brand-algarrobo flex flex-col h-full">
       {/* Image area */}
       <div className="relative overflow-hidden">
-        <Link to={productUrl}>
+        <Link to={productUrl} tabIndex={-1} aria-hidden="true">
           <div className="aspect-square bg-brand-crema border-b border-brand-line">
             {currentImageUrl ? (
               <img
@@ -117,8 +120,8 @@ export function ProductCard({
         </Link>
 
         {/* Discount badge */}
-        {hasActiveDiscount(product) && (
-          <span className="absolute top-3 left-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-brand-cuero text-brand-crema font-heading text-[11px] font-semibold ring-1 ring-brand-crema/60">
+        {discounted && (
+          <span className="pointer-events-none absolute top-3 left-3 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-brand-cuero text-brand-crema font-heading text-[11px] font-semibold ring-1 ring-brand-crema/60">
             -{product.discount_percentage}%
           </span>
         )}
@@ -128,7 +131,7 @@ export function ProductCard({
           <button
             onClick={handleAddToCart}
             disabled={isAdding}
-            className="absolute bottom-3 right-3 rounded-full p-2.5 md:p-3 border border-brand-crema/40 z-10 md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 md:focus-visible:opacity-100 md:focus-visible:translate-y-0 transition-all duration-300 disabled:opacity-50"
+            className="absolute bottom-3 right-3 flex h-11 w-11 items-center justify-center rounded-full border border-brand-crema/40 z-10 md:opacity-0 md:group-hover:opacity-100 md:translate-y-2 md:group-hover:translate-y-0 md:focus-visible:opacity-100 md:focus-visible:translate-y-0 transition-all duration-300 disabled:opacity-50"
             style={{
               backgroundColor: 'var(--org-primary-color, #705931)',
               color: 'var(--org-primary-ink, white)',
@@ -149,35 +152,45 @@ export function ProductCard({
 
       {/* Info */}
       <div className="p-4 flex flex-col flex-grow">
-        <Link to={productUrl}>
-          <h3 className="text-[15px] font-semibold text-brand-tinta line-clamp-2 leading-snug mb-3 hover:text-brand-cuero transition-colors">
+        <h3 className="mb-3">
+          {/* Stretched link: the ::after covers the whole card so the entire card is clickable */}
+          <Link
+            to={productUrl}
+            className={cn(
+              'block text-[15px] font-semibold line-clamp-2 leading-snug transition-colors after:absolute after:inset-0 after:content-[\'\'] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
+              isOutOfStock ? 'text-brand-muted' : 'text-brand-tinta group-hover:text-brand-cuero'
+            )}
+          >
             {capitalizeFirst(product.name)}
-          </h3>
-        </Link>
+          </Link>
+        </h3>
 
         <div className="mt-auto flex flex-wrap items-end justify-between gap-x-2 gap-y-2">
-          <div className="max-w-full shrink-0">
-            {hasActiveDiscount(product) && (
-              <span className="text-xs text-brand-muted line-through block tabular-nums">
-                {formatPrice(product.price, settings)}
-              </span>
-            )}
+          <div className="flex max-w-full shrink-0 flex-wrap items-baseline gap-x-2">
             <span
-              className="block font-heading text-lg font-semibold leading-tight tabular-nums"
-              style={{ color: 'var(--org-primary-color, #705931)' }}
+              className={cn(
+                'font-heading text-xl font-semibold leading-tight tabular-nums',
+                isOutOfStock ? 'text-brand-muted' : 'text-brand-tinta'
+              )}
+              style={discounted && !isOutOfStock ? { color: 'var(--org-primary-color, #705931)' } : undefined}
             >
               {formatPrice(getEffectivePrice(product), settings)}
             </span>
+            {discounted && (
+              <span className="text-sm text-brand-muted line-through tabular-nums">
+                {formatPrice(product.price, settings)}
+              </span>
+            )}
           </div>
 
-          {!requiresInquiry && stock !== null && (
+          {!requiresInquiry && stockBadge && (
             <span
               className={cn(
                 'flex-shrink-0 font-heading text-[10px] px-2 py-1 rounded-full font-semibold uppercase tracking-[0.1em]',
-                hasStock ? 'bg-[#EEF3E6] text-[#46602B]' : 'bg-red-50 text-red-700'
+                stockBadge.kind === 'out' ? 'bg-red-50 text-red-700' : 'bg-brand-crema text-brand-cuero-oscuro border border-brand-line'
               )}
             >
-              {hasStock ? 'En stock' : 'Sin stock'}
+              {stockBadge.label}
             </span>
           )}
         </div>
@@ -185,17 +198,25 @@ export function ProductCard({
         {requiresInquiry && (
           <Link
             to={productUrl}
-            className="mt-3 inline-flex min-h-10 items-center justify-center rounded-md border border-brand-line px-3 py-2 font-heading text-xs font-semibold uppercase tracking-[0.14em] text-brand-tinta transition-colors hover:border-brand-cuero focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            aria-label={`Consultar por ${product.name}`}
+            className="relative z-10 mt-3 inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-md border border-brand-line px-3 py-2 font-heading text-xs font-semibold uppercase tracking-[0.14em] text-brand-tinta transition-colors hover:border-brand-cuero focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
           >
-            Consultar por producto
+            Consultar
           </Link>
         )}
         {!requiresInquiry && !noAddToCart && hasVariants && (
-          <Link to={productUrl} className="mt-3">
-            <Button variant="outline" size="sm" className="w-full" disabled={!hasStock}>
-              {hasStock ? 'Ver opciones' : 'Sin stock'}
-            </Button>
-          </Link>
+          hasStock ? (
+            <Link
+              to={productUrl}
+              className="relative z-10 mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-md border border-brand-line px-3 py-2 font-heading text-xs font-semibold uppercase tracking-[0.14em] text-brand-tinta transition-colors hover:border-brand-cuero focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+            >
+              Ver opciones
+            </Link>
+          ) : (
+            <span className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-md border border-brand-line px-3 py-2 font-heading text-xs font-semibold uppercase tracking-[0.14em] text-brand-muted opacity-60">
+              Sin stock
+            </span>
+          )
         )}
       </div>
     </div>
