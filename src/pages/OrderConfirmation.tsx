@@ -10,7 +10,7 @@ import { isCouponDiscountMetadata } from '@/lib/coupons'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { getDeliveryMethod, type ShippingAddress } from '@/lib/schemas'
 import { STORE_ADDRESS } from '@/lib/storeLocation'
-import { CheckCircle2, ArrowLeft, Package, CreditCard, Phone, Download, AlertCircle, Clock, RefreshCw, MessageCircle, Mail } from 'lucide-react'
+import { CheckCircle2, ArrowLeft, Package, CreditCard, Download, AlertCircle, Clock, RefreshCw, MessageCircle } from 'lucide-react'
 import type { Order, OrderItem } from '@/types'
 
 const getStatusLabel = (status: string | null): string => {
@@ -45,9 +45,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash:         'Efectivo',
   credit_card:  'Tarjeta de Crédito',
 }
-
-// PENDING: replace with the real Mates Ajedrez contact email (not in the brand manual).
-const TRANSFER_CONTACT_EMAIL = '[EMAIL DE CONTACTO]'
 
 export function OrderConfirmation() {
   const { orderId } = useParams<{ orderId: string }>()
@@ -160,6 +157,11 @@ export function OrderConfirmation() {
   const contactWhatsappHref = settings.store_whatsapp_number
     ? `https://wa.me/${settings.store_whatsapp_number.replace(/\D/g, '')}?text=${encodeURIComponent(
         `Hola! Quiero coordinar mi orden ${orderRef}`
+      )}`
+    : null
+  const receiptWhatsappHref = settings.store_whatsapp_number
+    ? `https://wa.me/${settings.store_whatsapp_number.replace(/\D/g, '')}?text=${encodeURIComponent(
+        `Hola! Te envío el comprobante de transferencia de mi orden ${orderRef}`
       )}`
     : null
   const couponDiscountMetadata = order && isCouponDiscountMetadata(order.discount_metadata)
@@ -596,25 +598,23 @@ export function OrderConfirmation() {
                 )}
               </div>
               <div className="bg-brand-crema border border-brand-algarrobo/40 p-4 rounded-lg">
-                <div className="flex items-start space-x-3">
-                  <Phone className="h-5 w-5 text-brand-tinta mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-brand-tinta mb-1">
-                      Envía el comprobante de transferencia
-                    </p>
-                    <p className="text-sm text-brand-tinta">
-                      Por favor, envía una foto del comprobante de pago a este correo o WhatsApp:
-                    </p>
-                    <div className="mt-2 space-y-1">
-                      <p className="flex items-center gap-2 text-sm font-semibold" style={{ color: primaryColor }}>
-                        <Mail className="h-4 w-4 shrink-0" />
-                        <a href={`mailto:${TRANSFER_CONTACT_EMAIL}`} className="hover:underline">
-                          {TRANSFER_CONTACT_EMAIL}
-                        </a>
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <p className="text-sm font-medium text-brand-tinta mb-1">
+                  Enviá la foto del comprobante por WhatsApp
+                </p>
+                <p className="text-sm text-brand-muted">
+                  Así podemos confirmar tu pago y preparar tu pedido.
+                </p>
+                {receiptWhatsappHref && (
+                  <a
+                    href={receiptWhatsappHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md bg-brand-cuero px-5 py-2.5 font-heading text-sm font-semibold uppercase tracking-[0.14em] text-brand-crema transition-colors hover:bg-brand-cuero-oscuro focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:ring-offset-2 sm:w-auto"
+                  >
+                    <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                    Enviar comprobante por WhatsApp
+                  </a>
+                )}
               </div>
               <p className="text-xs text-brand-muted mt-2">
                 Una vez recibido el comprobante, procesaremos tu orden y te notificaremos.
