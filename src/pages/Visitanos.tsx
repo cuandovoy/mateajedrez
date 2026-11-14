@@ -7,6 +7,7 @@ import {
   buildMapEmbedUrl,
   buildWhatsappUrl,
 } from '@/lib/storeLocation'
+import { StoreHours } from '@/components/features/StoreHours'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 
 const META_TITLE = 'Visitanos | Mates Ajedrez'
@@ -50,6 +51,8 @@ export function Visitanos() {
               {STORE_ADDRESS}
             </address>
           </div>
+
+          <StoreHours />
 
           <div className="flex flex-col gap-3 sm:flex-row lg:flex-col">
             <a
