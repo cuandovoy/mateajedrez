@@ -35,6 +35,10 @@ describe('calculateCouponDiscountAmount', () => {
   it('devuelve cero si el subtotal es cero', () => {
     expect(calculateCouponDiscountAmount('percentage', 25, 0)).toBe(0)
   })
+
+  it('redondea medio centavo hacia arriba como Postgres (14.5 x 15% = 2.175 -> 2.18)', () => {
+    expect(calculateCouponDiscountAmount('percentage', 15, 14.5)).toBe(2.18)
+  })
 })
 
 describe('buildCouponDiscountMetadata', () => {

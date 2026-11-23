@@ -85,6 +85,19 @@ export interface ShippingAddress {
   /** Duplicate of `department`; the order notification emails (SaaS migration 147) read this key. */
   state?: string
   delivery_method?: DeliveryMethod
+  /** Recargo de Mercado Pago ya incluido en los precios de los order_items (el backend compartido no tiene campo propio). */
+  payment_surcharge?: PaymentSurcharge
+}
+
+export interface PaymentSurcharge {
+  method: 'mercadopago'
+  percent: number
+  /** Monto que suma el recargo respecto de (subtotal - cupón). */
+  amount: number
+  /** Subtotal sin recargo; la DB guarda el recargado. */
+  base_subtotal?: number
+  /** Cupón real aplicado; en cupones fijos la DB guarda el valor escalado. */
+  coupon_amount?: number
 }
 
 /** Orders created before pickup existed carry no key and are shipments. */
