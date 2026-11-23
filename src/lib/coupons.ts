@@ -14,7 +14,8 @@ export interface CouponDiscountMetadata {
   applied_at: string
 }
 
-const roundMoney = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100
+// toPrecision strips float noise (2.175 is stored as 2.17499…) so half cents round up like Postgres.
+export const roundMoney = (value: number): number => Math.round(Number((value * 100).toPrecision(12))) / 100
 
 export function normalizeCouponCode(value: string): string {
   return value.trim().toUpperCase().replace(/\s+/g, '')
