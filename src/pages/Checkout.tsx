@@ -13,6 +13,7 @@ import { useCartGuard, checkCartItems } from '@/hooks/useCartGuard'
 import { blockedReasonMessage, mapOrderItemsInsertError } from '@/lib/cartGuard'
 import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
+import { calculateSurchargedPricing, getSurchargePercent } from '@/lib/paymentSurcharge'
 import { checkoutSchema, URUGUAY_DEPARTMENTS, type CheckoutFormData, type CheckoutFormInput, type DeliveryMethod, type ShippingAddress } from '@/lib/schemas'
 import { STORE_ADDRESS } from '@/lib/storeLocation'
 import { supabase } from '@/lib/supabase'
@@ -158,6 +159,19 @@ function CheckoutInner() {
     : 0
   const finalTotal = Math.max(0, subtotal - discountTotal)
   const paymentMethodRequired = finalTotal > 0
+
+  // Un cupón que cubre todo no se paga, así que no hay recargo que cobrar.
+  const surchargePercent = finalTotal > 0 ? getSurchargePercent(paymentMethod) : 0
+  const surchargedPricing = calculateSurchargedPricing({
+    lines: items.map((item) => ({
+      unitPrice: item.variant?.price ?? getEffectivePrice(item.product),
+      quantity: item.quantity,
+    })),
+    percent: surchargePercent,
+    coupon: appliedCoupon ? { kind: appliedCoupon.kind, value: appliedCoupon.amount } : null,
+  })
+  const surchargeAmount = surchargePercent > 0 ? surchargedPricing.surchargeAmount : 0
+  const displayTotal = surchargePercent > 0 ? surchargedPricing.total : finalTotal
 
   const fetchValidatedCoupon = async (normalizedCode: string): Promise<StoreCoupon | null> => {
     const rpcAttempts = [
@@ -457,6 +471,15 @@ function CheckoutInner() {
         : 0
       const pricingTotal = Math.max(0, pricingSubtotal - pricingDiscountTotal)
       const orderPaymentMethod = paymentMethod || null
+      const appliedSurchargePercent = pricingTotal > 0 ? getSurchargePercent(paymentMethod) : 0
+      const orderPricing = calculateSurchargedPricing({
+        lines: items.map((item) => ({
+          unitPrice: item.variant?.price ?? getEffectivePrice(item.product),
+          quantity: item.quantity,
+        })),
+        percent: appliedSurchargePercent,
+        coupon: appliedCoupon ? { kind: appliedCoupon.kind, value: appliedCoupon.amount } : null,
+      })
       const contactInfo: ShippingAddress = {
         fullName: formValues.fullName,
         email: formValues.email,
@@ -466,12 +489,16 @@ function CheckoutInner() {
         ...(formValues.deliveryMethod === 'shipping'
           ? { address: formValues.address, city: formValues.city, department: formValues.department, state: formValues.department }
           : {}),
+        ...(appliedSurchargePercent > 0
+          ? { payment_surcharge: { method: 'mercadopago', percent: appliedSurchargePercent, amount: orderPricing.surchargeAmount, base_subtotal: pricingSubtotal, coupon_amount: pricingDiscountTotal } }
+          : {}),
       }
       // El cliente guarda solo su última dirección real: un retiro no la pisa
       // y delivery_method es propio de cada orden.
       const customerAddress: ShippingAddress = { ...contactInfo }
       delete customerAddress.delivery_method
       delete customerAddress.state
+      delete customerAddress.payment_surcharge
       const customerAddressUpdate = formValues.deliveryMethod === 'shipping' ? { address: customerAddress } : {}
 
       if (!organizationId) {
@@ -489,7 +516,11 @@ function CheckoutInner() {
         subtotal_before_discount: pricingSubtotal,
         discount_total: pricingDiscountTotal,
         discount_metadata: appliedCoupon
-          ? buildCouponDiscountMetadata(appliedCoupon, pricingDiscountTotal)
+          ? buildCouponDiscountMetadata(
+              // La DB resta el cupón del subtotal recargado: un cupón fijo se escala para que el total sea (S - cupón) x 1.10.
+              orderPricing.couponValue !== null ? { ...appliedCoupon, amount: orderPricing.couponValue } : appliedCoupon,
+              orderPricing.dbDiscountTotal,
+            )
           : null,
         total: pricingTotal,
         status: (checkoutStockAllocationMode === 'manual' ? 'pending_allocation' : 'pending') as Order['status'],
@@ -582,15 +613,20 @@ function CheckoutInner() {
       if (orderError || !order) throw orderError || new Error('Failed to create order')
 
       // Create order items (include variant_id if available)
-      const orderItems = items.map((item) => {
+      const orderItems = items.map((item, index) => {
         const cartItem = item as CartItemWithProduct & { product_id: string; quantity: number; variant_id?: string | null }
         const price = item.variant?.price ?? getEffectivePrice(item.product)
+        // La DB recalcula el total desde base_unit_price: el recargo de Mercado Pago solo puede viajar ahí.
+        const surcharged = appliedSurchargePercent > 0
+          ? { base_unit_price: orderPricing.unitPrices[index] }
+          : {}
         return {
           order_id: (order as { id: string }).id,
           product_id: cartItem.product_id,
           variant_id: cartItem.variant_id || null,
           quantity: cartItem.quantity,
-          price,
+          price: appliedSurchargePercent > 0 ? orderPricing.unitPrices[index] : price,
+          ...surcharged,
         }
       })
 
@@ -841,9 +877,15 @@ function CheckoutInner() {
                       <span>-{formatPrice(discountTotal, settings)}</span>
                     </div>
                   )}
+                  {surchargeAmount > 0 && (
+                    <div className="flex justify-between text-brand-muted">
+                      <span>Recargo Mercado Pago ({surchargePercent}%)</span>
+                      <span>+{formatPrice(surchargeAmount, settings)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-heading text-lg font-semibold pt-2 border-t border-dashed border-brand-line">
                     <span>Total</span>
-                    <span>{formatPrice(finalTotal, settings)}</span>
+                    <span>{formatPrice(displayTotal, settings)}</span>
                   </div>
                 </div>
                 <form
@@ -959,7 +1001,7 @@ function CheckoutInner() {
               </span>
               <span className="flex items-center gap-2">
                 <span className="font-heading text-base font-semibold text-brand-tinta">
-                  {formatPrice(finalTotal, settings)}
+                  {formatPrice(displayTotal, settings)}
                 </span>
                 <ChevronDown className="h-5 w-5 text-brand-muted transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
               </span>
@@ -1231,6 +1273,11 @@ function CheckoutInner() {
                                   ? 'Disponible solo en tienda física'
                                   : 'Realizá el pago según las instrucciones'}
                               </p>
+                              {m.key === 'mercadopago' && finalTotal > 0 && (
+                                <p className="mt-0.5 text-xs font-medium text-brand-muted">
+                                  Pagar con Mercado Pago tiene un recargo del {getSurchargePercent('mercadopago')}%.
+                                </p>
+                              )}
                             </div>
                           </label>
                         )

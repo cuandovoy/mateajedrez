@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { useToastStore } from '@/store/toastStore'
 import { isCouponDiscountMetadata } from '@/lib/coupons'
+import { removeSurcharge } from '@/lib/paymentSurcharge'
 import { capitalizeFirst, formatPrice } from '@/lib/utils'
 import { getDeliveryMethod, type ShippingAddress } from '@/lib/schemas'
 import { STORE_ADDRESS } from '@/lib/storeLocation'
@@ -168,6 +169,11 @@ export function OrderConfirmation() {
     ? order.discount_metadata
     : null
   const hasCouponDiscount = !!order && order.discount_total > 0
+  const surcharge = (order?.shipping_address as ShippingAddress | null)?.payment_surcharge ?? null
+  // Los order_items guardan el precio recargado; se muestran sin recargo para que cierren con el subtotal.
+  const displayUnitPrice = (price: number) => (surcharge ? removeSurcharge(price, surcharge.percent) : price)
+  const displaySubtotal = surcharge?.base_subtotal ?? ((order?.subtotal_before_discount ?? order?.total ?? 0) - (surcharge?.amount ?? 0))
+  const displayCouponAmount = surcharge?.coupon_amount ?? order?.discount_total ?? 0
   const couponLabel = couponDiscountMetadata?.code ?? 'Cupón'
   const paymentMethodLabel = order
     ? (order.total === 0
@@ -196,8 +202,8 @@ export function OrderConfirmation() {
           <tr>
             <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">${capitalizeFirst(item.product.name)}${variantLabel}</td>
             <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:center;">${item.quantity}</td>
-            <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;">${formatPrice(item.price, settings)}</td>
-            <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;">${formatPrice(item.price * item.quantity, settings)}</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;">${formatPrice(displayUnitPrice(item.price), settings)}</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-weight:600;">${formatPrice(displayUnitPrice(item.price) * item.quantity, settings)}</td>
           </tr>`
       })
       .join('')
@@ -205,12 +211,18 @@ export function OrderConfirmation() {
     const summaryRowsHtml = `
         <tr>
           <td colspan="3" style="padding-top:12px;">Subtotal</td>
-          <td style="padding-top:12px;text-align:right;">${formatPrice(order.subtotal_before_discount ?? order.total, settings)}</td>
+          <td style="padding-top:12px;text-align:right;">${formatPrice(surcharge ? displaySubtotal : (order.subtotal_before_discount ?? order.total), settings)}</td>
         </tr>
         ${hasCouponDiscount ? `
         <tr>
           <td colspan="3" style="padding-top:8px;color:#166534;">${couponLabel}</td>
-          <td style="padding-top:8px;text-align:right;color:#166534;">-${formatPrice(order.discount_total, settings)}</td>
+          <td style="padding-top:8px;text-align:right;color:#166534;">-${formatPrice(displayCouponAmount, settings)}</td>
+        </tr>
+        ` : ''}
+        ${surcharge && surcharge.amount > 0 ? `
+        <tr>
+          <td colspan="3" style="padding-top:8px;">Recargo Mercado Pago (${surcharge.percent}%)</td>
+          <td style="padding-top:8px;text-align:right;">+${formatPrice(surcharge.amount, settings)}</td>
         </tr>
         ` : ''}
         <tr class="total-row">
@@ -418,7 +430,7 @@ export function OrderConfirmation() {
               </div>
               <div>
                 <p className="text-sm text-brand-muted">Subtotal</p>
-                <p className="font-semibold">{formatPrice(order.subtotal_before_discount ?? order.total, settings)}</p>
+                <p className="font-semibold">{formatPrice(displaySubtotal, settings)}</p>
               </div>
             </div>
 
@@ -426,13 +438,20 @@ export function OrderConfirmation() {
               <div className="border-t pt-4 space-y-2">
                 <div className="flex items-center justify-between gap-4 text-sm">
                   <p className="font-medium text-brand-muted">{couponLabel}</p>
-                  <p className="font-semibold text-emerald-700">-{formatPrice(order.discount_total, settings)}</p>
+                  <p className="font-semibold text-emerald-700">-{formatPrice(displayCouponAmount, settings)}</p>
                 </div>
                 {couponDiscountMetadata?.applied_at && (
                   <p className="text-xs text-brand-muted">
                     Aplicado el {new Date(couponDiscountMetadata.applied_at).toLocaleString('es-UY')}
                   </p>
                 )}
+              </div>
+            )}
+
+            {surcharge && surcharge.amount > 0 && (
+              <div className="flex items-center justify-between gap-4 border-t pt-4 text-sm">
+                <p className="font-medium text-brand-muted">Recargo Mercado Pago ({surcharge.percent}%)</p>
+                <p className="font-semibold">+{formatPrice(surcharge.amount, settings)}</p>
               </div>
             )}
 
@@ -554,11 +573,11 @@ export function OrderConfirmation() {
                         </div>
                       )}
                       <p className="text-sm text-brand-muted">
-                        Cantidad: {item.quantity} × {formatPrice(item.price, settings)}
+                        Cantidad: {item.quantity} × {formatPrice(displayUnitPrice(item.price), settings)}
                       </p>
                     </div>
                     <p className="font-semibold">
-                      {formatPrice(item.price * item.quantity, settings)}
+                      {formatPrice(displayUnitPrice(item.price) * item.quantity, settings)}
                     </p>
                   </div>
                 )
