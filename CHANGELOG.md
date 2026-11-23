@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-11-23 — Recargo del 10% por pagar con Mercado Pago
+
+- **Archivos modificados:** src/lib/paymentSurcharge.ts, src/lib/paymentSurcharge.test.ts, src/lib/schemas.ts, src/pages/Checkout.tsx, src/pages/OrderConfirmation.tsx, .claude/TODO.md
+- **Qué cambió:** al elegir Mercado Pago los `order_items` se insertan con `base_unit_price` recargado 10% (la DB compartida recalcula `orders.total` desde ahí y MP cobra ese total). El checkout muestra el recargo en el resumen y bajo la opción; se guarda `payment_surcharge` en `shipping_address` y la confirmación lo muestra. El recargo se calcula después del cupón, (subtotal - cupón) x 1.10: en cupones fijos se guarda el valor escalado en `discount_metadata` y el real en `payment_surcharge`. Sin migraciones.
+
 ## 2026-11-14 — UX audit: variantes, ProductCard y filtros mobile
 
 - **Archivos modificados:** src/lib/productGallery.ts, src/lib/productGallery.test.ts, src/components/features/VariantSelector.tsx, src/components/features/ProductCard.tsx, src/pages/ProductDetail.tsx, src/pages/Products.tsx, src/pages/CategoryProducts.tsx, src/index.css, CLAUDE.md

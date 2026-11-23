@@ -5,6 +5,10 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 
 ---
 
+## Recargo Mercado Pago (2026-11-23)
+
+- 🟡 El recargo del 10% de Mercado Pago está horneado en los precios de `order_items` porque el backend compartido no tiene columna de recargo: reportes y márgenes de esta org incluyen ese 10%. Si MP falla y el cliente paga por transferencia, el admin debe ajustar la orden a mano. En órdenes MP con cupón fijo el admin ve el valor del cupón inflado 10% en `discount_metadata` (la DB resta el cupón del subtotal ya recargado, así el total queda (subtotal - cupón) x 1.10). Solución ideal: columna de recargo en el repo del SaaS — src/lib/paymentSurcharge.ts
+
 ## Portada con fotografías (2026-10-08)
 
 - 🟢 Resolver lint preexistente en `src/pages/PublicStore.tsx`: `no-constant-condition` en el recorrido de categorías y dependencias de hooks inestables. El nuevo `HomeEditorial.tsx` pasa lint.
