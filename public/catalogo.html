@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Shareable entry point for public catalogs hosted on Axiostock.
+      nginx serves this file for /catalogo/* on mateajedrez.uy. Link-preview crawlers
+      (WhatsApp, Facebook, etc.) do not run JS, so they only read the Mates Ajedrez tags
+      below; real browsers are sent to the same path on axiostock.com.
+      Do NOT turn this into an HTTP 301/302: crawlers follow HTTP redirects and the
+      preview would show Axiostock's metadata. No og:url and no meta refresh for the same reason.
+    -->
+    <title>Catálogo — Mates Ajedrez</title>
+    <meta name="description" content="Mirá el catálogo de Mates Ajedrez: mates artesanales en cuero crudo y algarrobo, grabados y personalizados en Paysandú, Uruguay." />
+    <meta name="robots" content="noindex, follow" />
+    <link rel="icon" type="image/png" href="/favicon-32.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Mates Ajedrez" />
+    <meta property="og:locale" content="es_UY" />
+    <meta property="og:title" content="Catálogo — Mates Ajedrez" />
+    <meta property="og:description" content="Mates artesanales en cuero crudo y algarrobo, grabados y personalizados en Paysandú, Uruguay." />
+    <meta property="og:image" content="https://mateajedrez.uy/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Mates Ajedrez — mates artesanales en cuero crudo y algarrobo" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Catálogo — Mates Ajedrez" />
+    <meta name="twitter:description" content="Mates artesanales en cuero crudo y algarrobo, grabados y personalizados en Paysandú, Uruguay." />
+    <meta name="twitter:image" content="https://mateajedrez.uy/og-image.png" />
+
+    <meta name="theme-color" content="#705931" />
+    <script>
+      location.replace('https://axiostock.com' + location.pathname + location.search + location.hash)
+    </script>
+    <style>
+      body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        background: #FBF9F3; color: #2B2418; font-family: system-ui, sans-serif; text-align: center; padding: 16px; }
+      a { color: #705931; }
+    </style>
+  </head>
+  <body>
+    <p>Abriendo el catálogo de Mates Ajedrez…<br />
+      <a id="catalog-link" href="https://axiostock.com/catalogo/">Si no se abre solo, tocá acá.</a>
+    </p>
+    <script>
+      document.getElementById('catalog-link').href = 'https://axiostock.com' + location.pathname + location.search + location.hash
+    </script>
+  </body>
+</html>
