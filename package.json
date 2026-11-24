@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "prebuild": "node scripts/generate-sitemap.ts",
+    "prebuild": "node scripts/generate-sitemap.ts || echo \"[sitemap] generator failed to start, keeping existing sitemap\"",
     "build": "tsc && vite build",
     "dev:laboutique": "vite --mode laboutique",
     "build:laboutique": "tsc && vite build --mode laboutique",

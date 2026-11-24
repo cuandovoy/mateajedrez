@@ -8,10 +8,13 @@
  * `import.meta.env`, y solo importa la lógica PURA de `src/lib/` (sin nada
  * que dependa de Vite/React).
  *
- * Fail-soft por diseño: si faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY /
- * VITE_STORE_SLUG, o si la consulta a Supabase falla (red, RLS, org inactiva,
- * etc.), igual se escribe un sitemap válido con las rutas estáticas — nunca
- * debe romper `yarn build`.
+ * Fail-safe por diseño: si faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY /
+ * VITE_STORE_SLUG, o si cualquier consulta a Supabase falla (red, RLS, org
+ * inactiva, etc.), se loguea un warning y se deja `public/sitemap.xml` tal cual
+ * está (nunca se pisa con una versión degradada) — y nunca se rompe `yarn build`.
+ * Se escribe en `public/` (no en `dist/`) porque Vite vacía `dist/` y luego copia
+ * `public/` al build: el prebuild corre antes, así que `public/` es el único
+ * destino que termina en la imagen.
  *
  * Tradeoff conocido (ver CHANGELOG.md 2026-09-25): el sitemap se genera en
  * build-time, no en request-time. Un producto nuevo cargado en Supabase
@@ -22,7 +25,7 @@ import { writeFileSync, readFileSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
-import { buildSitemapXml } from '../src/lib/sitemapBuilder.ts'
+import { buildSitemapXml, toSitemapDate } from '../src/lib/sitemapBuilder.ts'
 import type { SitemapEntry } from '../src/lib/sitemapBuilder.ts'
 import { buildAbsoluteUrl, DEFAULT_SITE_URL } from '../src/lib/siteUrl.ts'
 
@@ -72,7 +75,8 @@ interface CategoryRow {
   updated_at: string | null
 }
 
-async function fetchDynamicEntries(siteUrl: string): Promise<SitemapEntry[]> {
+// Retorna null cuando no se pudo obtener el catálogo completo: el caller NO debe escribir nada.
+async function fetchDynamicEntries(siteUrl: string): Promise<SitemapEntry[] | null> {
   const supabaseUrl = process.env.VITE_SUPABASE_URL
   const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY
   const storeSlug = process.env.VITE_STORE_SLUG
@@ -80,9 +84,9 @@ async function fetchDynamicEntries(siteUrl: string): Promise<SitemapEntry[]> {
   if (!supabaseUrl || !supabaseAnonKey || !storeSlug) {
     console.warn(
       '[generate-sitemap] Faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY / VITE_STORE_SLUG en el entorno de build — ' +
-        'se genera el sitemap solo con rutas estáticas.'
+        'public/sitemap.xml queda sin cambios.'
     )
-    return []
+    return null
   }
 
   try {
@@ -93,30 +97,34 @@ async function fetchDynamicEntries(siteUrl: string): Promise<SitemapEntry[]> {
 
     if (orgError || !org?.id) {
       console.warn(
-        '[generate-sitemap] No se pudo resolver la organización desde VITE_STORE_SLUG — se continúa solo con rutas estáticas.',
+        '[generate-sitemap] No se pudo resolver la organización desde VITE_STORE_SLUG — public/sitemap.xml queda sin cambios.',
         orgError?.message ?? 'sin datos'
       )
-      return []
+      return null
     }
     const organizationId = org.id
 
     // Mismo filtro que usePublicProducts.ts / usePublicCategories.ts: productos
-    // activos de la organización; categorías no tienen flag de visibilidad propio,
-    // todas las de la organización son públicas.
+    // activos y visibles en la tienda; categorías no tienen flag de visibilidad
+    // propio, todas las de la organización son públicas.
     const [productsResult, categoriesResult] = await Promise.all([
       supabase
         .from('products')
         .select('id, updated_at')
         .eq('organization_id', organizationId)
-        .eq('is_active', true),
+        .eq('is_active', true)
+        .eq('visible_in_store', true),
       supabase.from('categories').select('slug, updated_at').eq('organization_id', organizationId),
     ])
 
-    if (productsResult.error) {
-      console.warn('[generate-sitemap] Error consultando productos, se omiten del sitemap:', productsResult.error.message)
-    }
-    if (categoriesResult.error) {
-      console.warn('[generate-sitemap] Error consultando categorías, se omiten del sitemap:', categoriesResult.error.message)
+    // Un sitemap sin productos o sin categorías por un error transitorio sería peor que
+    // el anterior: ante cualquier error se aborta y se conserva el archivo existente.
+    if (productsResult.error || categoriesResult.error) {
+      console.warn(
+        '[generate-sitemap] Error consultando productos/categorías — public/sitemap.xml queda sin cambios:',
+        productsResult.error?.message ?? categoriesResult.error?.message
+      )
+      return null
     }
 
     const products = (productsResult.data ?? []) as ProductRow[]
@@ -126,7 +134,7 @@ async function fetchDynamicEntries(siteUrl: string): Promise<SitemapEntry[]> {
       .filter((c) => !!c.slug)
       .map((c) => ({
         loc: buildAbsoluteUrl(`/categories/${c.slug}`, siteUrl),
-        lastmod: c.updated_at ? c.updated_at.slice(0, 10) : undefined,
+        lastmod: toSitemapDate(c.updated_at),
         changefreq: 'weekly',
         priority: 0.7,
       }))
@@ -135,15 +143,15 @@ async function fetchDynamicEntries(siteUrl: string): Promise<SitemapEntry[]> {
       .filter((p) => !!p.id)
       .map((p) => ({
         loc: buildAbsoluteUrl(`/product/${p.id}`, siteUrl),
-        lastmod: p.updated_at ? p.updated_at.slice(0, 10) : undefined,
+        lastmod: toSitemapDate(p.updated_at),
         changefreq: 'weekly',
         priority: 0.6,
       }))
 
     return [...categoryEntries, ...productEntries]
   } catch (err) {
-    console.warn('[generate-sitemap] Error inesperado consultando Supabase — se continúa solo con rutas estáticas:', err)
-    return []
+    console.warn('[generate-sitemap] Error inesperado consultando Supabase — public/sitemap.xml queda sin cambios:', err)
+    return null
   }
 }
 
@@ -158,6 +166,7 @@ async function main(): Promise<void> {
   }))
 
   const dynamicEntries = await fetchDynamicEntries(siteUrl)
+  if (dynamicEntries === null) return
   const xml = buildSitemapXml([...staticEntries, ...dynamicEntries])
 
   const outPath = join(rootDir, 'public', 'sitemap.xml')
@@ -170,7 +179,7 @@ async function main(): Promise<void> {
 main().catch((err) => {
   // Fail-soft: ni siquiera un error no previsto en main() debe tumbar `yarn build`.
   console.error(
-    '[generate-sitemap] Error inesperado generando el sitemap — se continúa el build sin sitemap.xml actualizado:',
+    '[generate-sitemap] Error inesperado generando el sitemap — public/sitemap.xml queda sin cambios:',
     err
   )
 })

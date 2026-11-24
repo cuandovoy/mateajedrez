@@ -16,6 +16,9 @@ const queryClient = new QueryClient({
   },
 })
 
+// Fallback SEO estático para crawlers sin JS (ver index.html): Helmet pasa a ser la única fuente.
+document.querySelectorAll('[data-static-seo]').forEach((el) => el.remove())
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <HelmetProvider>

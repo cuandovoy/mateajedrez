@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildSitemapXml } from './sitemapBuilder'
+import { buildSitemapXml, toSitemapDate } from './sitemapBuilder'
 
 describe('buildSitemapXml', () => {
   it('genera el XML con header y urlset para una entrada completa', () => {
@@ -56,5 +56,44 @@ describe('buildSitemapXml', () => {
   it('formatea priority con un decimal', () => {
     const xml = buildSitemapXml([{ loc: 'https://mateajedrez.uy/', priority: 0.7 }])
     expect(xml).toContain('<priority>0.7</priority>')
+  })
+})
+
+describe('buildSitemapXml — deduplicación', () => {
+  it('descarta entradas con el mismo loc y conserva la primera', () => {
+    const xml = buildSitemapXml([
+      { loc: 'https://x.uy/a', priority: 1 },
+      { loc: 'https://x.uy/a', priority: 0.1 },
+      { loc: 'https://x.uy/b' },
+    ])
+    expect(xml.match(/<url>/g)).toHaveLength(2)
+    expect(xml).toContain('<priority>1.0</priority>')
+    expect(xml).not.toContain('<priority>0.1</priority>')
+  })
+
+  it('considera iguales los loc que solo difieren en espacios alrededor', () => {
+    const xml = buildSitemapXml([{ loc: 'https://x.uy/a' }, { loc: '  https://x.uy/a  ' }])
+    expect(xml.match(/<url>/g)).toHaveLength(1)
+  })
+})
+
+describe('toSitemapDate', () => {
+  it('recorta un timestamp ISO a YYYY-MM-DD', () => {
+    expect(toSitemapDate('2026-10-12T14:30:00.123+00:00')).toBe('2026-10-12')
+  })
+
+  it('acepta una fecha ya en formato YYYY-MM-DD', () => {
+    expect(toSitemapDate('2026-10-12')).toBe('2026-10-12')
+  })
+
+  it('retorna undefined para null, undefined y vacío', () => {
+    expect(toSitemapDate(null)).toBeUndefined()
+    expect(toSitemapDate(undefined)).toBeUndefined()
+    expect(toSitemapDate('')).toBeUndefined()
+  })
+
+  it('retorna undefined para una fecha inválida (no debe romper el sitemap)', () => {
+    expect(toSitemapDate('no es fecha')).toBeUndefined()
+    expect(toSitemapDate('2026-13-45')).toBeUndefined()
   })
 })

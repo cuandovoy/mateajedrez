@@ -16,6 +16,7 @@ import type { Product, ProductImage } from '@/types'
 import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle, Share2, X, ZoomIn } from 'lucide-react'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Helmet } from 'react-helmet-async'
+import { useDialogFocus } from '@/hooks/useDialogFocus'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 const DEFAULT_PRODUCT_PLACEHOLDER =
@@ -111,6 +112,8 @@ export function ProductDetail() {
   const [allVariantsUnavailable, setAllVariantsUnavailable] = useState(false)
   const productRef = useRef<HTMLDivElement>(null)
   const touchStartXRef = useRef<number | null>(null)
+  const lightboxRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(isLightboxOpen, lightboxRef)
 
 
   useEffect(() => {
@@ -431,6 +434,9 @@ export function ProductDetail() {
                       ref={handleImgRef}
                       src={currentImageUrl}
                       alt={capitalizeFirst(product.name)}
+                      loading="eager"
+                      // React 18 solo conoce el atributo en minúscula; el spread evita el tipado de @types/react.
+                      {...{ fetchpriority: 'high' }}
                       onClick={() => setIsLightboxOpen(true)}
                       className={`w-full h-full object-cover cursor-zoom-in transition-opacity duration-300 ${
                         fadeIn ? 'opacity-100' : 'opacity-0'
@@ -522,11 +528,17 @@ export function ProductDetail() {
                 {/* Lightbox — reusa handlePreviousImage/handleNextImage de la galería */}
                 {isLightboxOpen && (
                   <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-brand-tinta/60 p-4"
+                    ref={lightboxRef}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={`Imagen ampliada de ${capitalizeFirst(product.name)}`}
+                    tabIndex={-1}
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-brand-tinta/60 p-4 focus:outline-none"
                     onClick={() => setIsLightboxOpen(false)}
                   >
                     <button
                       type="button"
+                      data-autofocus
                       onClick={() => setIsLightboxOpen(false)}
                       className="absolute top-4 right-4 text-white/80 hover:text-white transition-colors"
                       aria-label="Cerrar"

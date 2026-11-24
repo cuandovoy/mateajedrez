@@ -1,11 +1,23 @@
 import { useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { Helmet } from 'react-helmet-async'
+import { absoluteUrl } from '@/lib/siteUrl'
 
 export function PoliticaPrivacidad() {
   const navigate = useNavigate()
 
+  const canonicalUrl = absoluteUrl('/legal/privacidad')
+
   return (
     <div className="min-h-screen bg-brand-bg py-12 px-4 sm:px-6">
+      <Helmet>
+        <title>Política de privacidad | Mates Ajedrez</title>
+        <meta name="description" content="Cómo Mates Ajedrez recopila, usa y protege tus datos personales." />
+        <meta property="og:title" content="Política de privacidad | Mates Ajedrez" />
+        <meta property="og:description" content="Cómo Mates Ajedrez recopila, usa y protege tus datos personales." />
+        <meta property="og:url" content={canonicalUrl} />
+        <link rel="canonical" href={canonicalUrl} />
+      </Helmet>
       <div className="max-w-3xl mx-auto">
         <button
           onClick={() => navigate(-1)}

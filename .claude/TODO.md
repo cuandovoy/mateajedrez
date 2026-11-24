@@ -5,6 +5,16 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 
 ---
 
+## Web quality batch 1 (2026-11-24)
+
+- 🟠 CSP: agregar `Content-Security-Policy-Report-Only` en `nginx.conf` (orígenes: Google Fonts, Supabase, reCAPTCHA, axiostock.com), revisar violaciones unos días y recién ahí pasar a enforce — nginx.conf
+- 🟡 Imágenes de producto: evaluar Supabase image transformations (`/render/image/`) para servir tamaños responsive y WebP; requiere revisar plan/costo porque el proyecto Supabase es compartido — src/lib/utils.ts
+- 🟡 Self-hostear Josefin Sans y Source Sans 3 (hoy Google Fonts bloquea render y suma 2 orígenes) — index.html, src/index.css
+- 🟡 El splash tiene un mínimo de 1s (`SPLASH_MIN_MS`) que atrasa LCP/FCP aunque todo esté listo; evaluar bajarlo o quitarlo — src/lib/splash.ts
+- 🟡 Contraste de `text-brand-algarrobo` sobre fondo claro es 3.17:1 (WCAG AA pide 4.5:1 en texto chico) — src/components/features/StoreHours.tsx:11, src/pages/Visitanos.tsx:48
+- 🟢 Fotos sin optimizar en public/ (no se borraron porque sus URLs pueden estar guardadas en la DB). Verificar en la DB y migrar/comprimir: `public/*_n.jpg` (8 archivos: 86k, 357k, 200k, 182k, 47k, 128k, 280k, 352k) y `public/images/home/WhatsApp Image 2026-10-12 *.jpeg` (13 archivos, 79k a 483k, ~3.7 MB en total). También `public/images/logo-transparente.png` (469k, original del que salen los logos derivados) y `public/logo.jpeg`
+- 🟢 Brotli: nginx:stable-alpine no trae el módulo; evaluar comprimir en el proxy/CDN de adelante o una imagen con `ngx_brotli` — Dockerfile, nginx.conf
+
 ## Recargo Mercado Pago (2026-11-23)
 
 - 🟡 El recargo del 10% de Mercado Pago está horneado en los precios de `order_items` porque el backend compartido no tiene columna de recargo: reportes y márgenes de esta org incluyen ese 10%. Si MP falla y el cliente paga por transferencia, el admin debe ajustar la orden a mano. En órdenes MP con cupón fijo el admin ve el valor del cupón inflado 10% en `discount_metadata` (la DB resta el cupón del subtotal ya recargado, así el total queda (subtotal - cupón) x 1.10). Solución ideal: columna de recargo en el repo del SaaS — src/lib/paymentSurcharge.ts
@@ -18,7 +28,7 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 ## Visitanos (2026-10-08)
 
 - 🟡 Pedir al cliente el logo en mayor resolución o vectorial (SVG/PDF): el original es 531x601 JPEG, el og-image (1200x630) y los íconos salen con el logo a tamaño nativo — más nitidez para og-image y futura impresión
-- 🟢 Borrar assets Ruemia sin uso (cero referencias en código): src/brand/isotipo-cropped.png, isotipo-fondo1.png, logo-principal-fondo1.png, ruemia-logo-horizontal.png, branboard.pdf; public/berlin.regular.ttf, public/Cambria.ttf
+- 🟢 Borrar assets Ruemia sin uso (cero referencias en código): src/brand/isotipo-cropped.png, isotipo-fondo1.png, logo-principal-fondo1.png, ruemia-logo-horizontal.png, branboard.pdf
 - 🟡 Agregar fotos del local a la página Visitanos — src/pages/Visitanos.tsx
 - 🟢 Usar el link de la ficha de Google Maps del local para un embed más rico (reseñas, fotos) — src/lib/storeLocation.ts
 - 🟢 Agregar JSON-LD LocalBusiness una vez confirmados los horarios — src/pages/Visitanos.tsx
@@ -33,7 +43,7 @@ Prioridades: 🔴 crítico · 🟠 alta · 🟡 media · 🟢 baja
 - 🟠 Regenerar public/sitemap.xml en el próximo build con el dominio nuevo (si se commitea) y revisar el banner de envío (ShippingNoticeBanner.tsx, plazo 3 a 5 días) con el cliente
 
 ### 🟡 Media
-- 🟡 Archivos de fuentes obsoletos removibles: public/berlin.regular.ttf y public/Cambria.ttf (ya no se referencian)
+- ✅ (2026-11-24) Archivos de fuentes obsoletos public/berlin.regular.ttf y public/Cambria.ttf borrados
 - 🟡 Footer solo soporta Instagram/Facebook/WhatsApp; el manual incluye Threads (https://www.threads.net/@matesajedrez) — agregar si el cliente lo pide (requiere cambio de código, fuera del alcance del rebrand)
 
 ## Facelift Mates Ajedrez (2026-10-08)
