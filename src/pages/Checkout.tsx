@@ -896,11 +896,13 @@ function CheckoutInner() {
                   className="space-y-2 rounded-lg border border-brand-line bg-brand-crema p-3"
                 >
                   <div>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-brand-tinta mb-1.5">
+                    <label htmlFor="checkout-coupon" className="block text-xs font-semibold uppercase tracking-wide text-brand-tinta mb-1.5">
                       Cupón de descuento
                     </label>
                     <div className="flex gap-2">
                       <Input
+                        id="checkout-coupon"
+                        aria-label="Cupón de descuento"
                         value={couponCode}
                         onChange={(event) => {
                           setCouponCode(event.target.value)
@@ -1035,11 +1037,13 @@ function CheckoutInner() {
                       id="checkout-fullName"
                       type="text"
                       autoComplete="name"
+                      aria-invalid={errors.fullName ? true : undefined}
+                      aria-describedby={errors.fullName ? 'checkout-fullName-error' : undefined}
                       {...register('fullName')}
                       className={errors.fullName ? 'border-red-500' : ''}
                     />
                     {errors.fullName && (
-                      <p className="text-sm text-red-600 mt-1.5">{errors.fullName.message}</p>
+                      <p id="checkout-fullName-error" className="text-sm text-red-600 mt-1.5">{errors.fullName.message}</p>
                     )}
                   </div>
 
@@ -1052,12 +1056,14 @@ function CheckoutInner() {
                       type="email"
                       autoComplete="email"
                       aria-label="Email"
+                      aria-invalid={errors.email ? true : undefined}
+                      aria-describedby={errors.email ? 'checkout-email-error' : undefined}
                       {...register('email')}
                       placeholder="tu@email.com"
                       className={errors.email ? 'border-red-500' : ''}
                     />
                     {errors.email && (
-                      <p className="text-sm text-red-600 mt-1.5">{errors.email.message}</p>
+                      <p id="checkout-email-error" className="text-sm text-red-600 mt-1.5">{errors.email.message}</p>
                     )}
                     <p className="text-sm text-brand-muted mt-1.5">
                       Te identifica como cliente y te avisamos el estado de tu orden
@@ -1074,21 +1080,23 @@ function CheckoutInner() {
                     type="tel"
                     autoComplete="tel"
                     aria-label="Teléfono"
+                    aria-invalid={errors.phone ? true : undefined}
+                    aria-describedby={errors.phone ? 'checkout-phone-error' : undefined}
                     {...register('phone')}
                     placeholder="099 123 456"
                     className={errors.phone ? 'border-red-500' : ''}
                   />
                   {errors.phone && (
-                    <p className="text-sm text-red-600 mt-1.5">{errors.phone.message}</p>
+                    <p id="checkout-phone-error" className="text-sm text-red-600 mt-1.5">{errors.phone.message}</p>
                   )}
                 </div>
 
                 {/* Delivery method */}
                 <div className="mt-2 border-t border-brand-line pt-6">
-                  <label className="block font-heading text-sm font-semibold uppercase tracking-[0.14em] text-brand-tinta mb-3">
+                  <label id="checkout-delivery-label" className="block font-heading text-sm font-semibold uppercase tracking-[0.14em] text-brand-tinta mb-3">
                     Cómo querés recibir tu pedido <span className="text-red-500">*</span>
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-labelledby="checkout-delivery-label">
                     {([
                       { value: 'shipping', title: 'Envío a domicilio', hint: 'Para todo el país, excepto Paysandú', icon: <Truck className="h-5 w-5" /> },
                       { value: 'pickup', title: 'Retiro en local', hint: 'Paysandú, sin costo', icon: <Store className="h-5 w-5" /> },
@@ -1149,11 +1157,13 @@ function CheckoutInner() {
                           autoComplete="street-address"
                           aria-label="Dirección"
                           placeholder="Calle y número, apto/casa"
+                          aria-invalid={errors.address ? true : undefined}
+                          aria-describedby={errors.address ? 'checkout-address-error' : undefined}
                           {...register('address')}
                           className={errors.address ? 'border-red-500' : ''}
                         />
                         {errors.address && (
-                          <p className="text-sm text-red-600 mt-1.5">{errors.address.message}</p>
+                          <p id="checkout-address-error" className="text-sm text-red-600 mt-1.5">{errors.address.message}</p>
                         )}
                       </div>
 
@@ -1165,11 +1175,13 @@ function CheckoutInner() {
                             autoComplete="address-level2"
                             aria-label="Ciudad"
                             placeholder="Ciudad"
+                            aria-invalid={errors.city ? true : undefined}
+                            aria-describedby={errors.city ? 'checkout-city-error' : undefined}
                             {...register('city')}
                             className={errors.city ? 'border-red-500' : ''}
                           />
                           {errors.city && (
-                            <p className="text-sm text-red-600 mt-1.5">{errors.city.message}</p>
+                            <p id="checkout-city-error" className="text-sm text-red-600 mt-1.5">{errors.city.message}</p>
                           )}
                         </div>
 
@@ -1179,6 +1191,8 @@ function CheckoutInner() {
                             aria-label="Departamento"
                             autoComplete="address-level1"
                             defaultValue=""
+                            aria-invalid={errors.department ? true : undefined}
+                            aria-describedby={errors.department ? 'checkout-department-error' : undefined}
                             {...register('department')}
                             className={cn(
                               'w-full min-h-[44px] px-4 py-2 border rounded-lg bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:border-transparent transition-colors',
@@ -1191,7 +1205,7 @@ function CheckoutInner() {
                             ))}
                           </select>
                           {errors.department && (
-                            <p className="text-sm text-red-600 mt-1.5">{errors.department.message}</p>
+                            <p id="checkout-department-error" className="text-sm text-red-600 mt-1.5">{errors.department.message}</p>
                           )}
                         </div>
                       </div>

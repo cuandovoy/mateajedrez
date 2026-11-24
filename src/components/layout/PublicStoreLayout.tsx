@@ -40,9 +40,15 @@ export function PublicStoreLayout({ organization, slug, children }: PublicStoreL
         <link rel="canonical" href={absoluteUrl('/')} />
       </Helmet>
       <div className="min-h-screen flex flex-col bg-brand-bg text-brand-tinta" style={{ fontFamily: `var(--org-font-family, 'Source Sans 3')` }}>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-brand-cuero focus:px-4 focus:py-2 focus:font-heading focus:text-xs focus:font-semibold focus:uppercase focus:tracking-[0.14em] focus:text-brand-crema"
+        >
+          Saltar al contenido
+        </a>
         <ShippingNoticeBanner />
         <PublicStoreHeader organization={organization} />
-        <main className="flex-1 animate-fade-in-up">
+        <main id="main-content" tabIndex={-1} className="flex-1 animate-fade-in-up focus:outline-none">
           {children}
         </main>
         <PublicStoreFooter />
