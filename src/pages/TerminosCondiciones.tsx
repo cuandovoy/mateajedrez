@@ -1,11 +1,23 @@
 import { useNavigate, Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
+import { Helmet } from 'react-helmet-async'
+import { absoluteUrl } from '@/lib/siteUrl'
 
 export function TerminosCondiciones() {
   const navigate = useNavigate()
 
+  const canonicalUrl = absoluteUrl('/legal/terminos')
+
   return (
     <div className="min-h-screen bg-brand-bg py-12 px-4 sm:px-6">
+      <Helmet>
+        <title>Términos y condiciones | Mates Ajedrez</title>
+        <meta name="description" content="Condiciones de compra, envíos y uso de la tienda online de Mates Ajedrez." />
+        <meta property="og:title" content="Términos y condiciones | Mates Ajedrez" />
+        <meta property="og:description" content="Condiciones de compra, envíos y uso de la tienda online de Mates Ajedrez." />
+        <meta property="og:url" content={canonicalUrl} />
+        <link rel="canonical" href={canonicalUrl} />
+      </Helmet>
       <div className="max-w-3xl mx-auto">
         <button
           onClick={() => navigate(-1)}

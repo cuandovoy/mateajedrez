@@ -178,6 +178,9 @@ export function CategoryProducts() {
   if (notFound || !categoryResolution) {
     return (
       <div className="container-custom py-8 text-center">
+        <Helmet>
+          <meta name="robots" content="noindex" />
+        </Helmet>
         <p className="text-brand-muted text-lg mb-4">Categoría no encontrada</p>
         <Link to="/products">
           <Button variant="outline" className="rounded-full">

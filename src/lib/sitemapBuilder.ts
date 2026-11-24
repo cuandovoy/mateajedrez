@@ -29,10 +29,16 @@ function escapeXml(value: string): string {
  * debe tumbar la generación del sitemap ni el build.
  */
 export function buildSitemapXml(entries: SitemapEntry[]): string {
-  const validEntries = entries.filter((entry) => !!entry.loc && entry.loc.trim() !== '')
+  const seen = new Set<string>()
+  const validEntries = entries.filter((entry) => {
+    const loc = entry.loc?.trim()
+    if (!loc || seen.has(loc)) return false
+    seen.add(loc)
+    return true
+  })
 
   const urlNodes = validEntries.map((entry) => {
-    const fields = [`    <loc>${escapeXml(entry.loc)}</loc>`]
+    const fields = [`    <loc>${escapeXml(entry.loc.trim())}</loc>`]
     if (entry.lastmod) fields.push(`    <lastmod>${escapeXml(entry.lastmod)}</lastmod>`)
     if (entry.changefreq) fields.push(`    <changefreq>${entry.changefreq}</changefreq>`)
     if (typeof entry.priority === 'number') fields.push(`    <priority>${entry.priority.toFixed(1)}</priority>`)
@@ -40,4 +46,17 @@ export function buildSitemapXml(entries: SitemapEntry[]): string {
   })
 
   return [XML_HEADER, URLSET_OPEN, ...urlNodes, URLSET_CLOSE, ''].join('\n')
+}
+
+/**
+ * Normaliza un timestamp (ej. `updated_at` de Supabase) al formato `YYYY-MM-DD`
+ * que acepta `<lastmod>`. Retorna undefined si el valor falta o no es una fecha válida.
+ */
+export function toSitemapDate(value: string | null | undefined): string | undefined {
+  if (!value) return undefined
+  const day = value.slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return undefined
+  const parsed = new Date(`${day}T00:00:00Z`)
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day) return undefined
+  return day
 }

@@ -5,17 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
 
     <!-- Primary Meta Tags -->
-    <!-- description, og:title, og:description y canonical se manejan en runtime vía
-         react-helmet-async (default en PublicStoreLayout.tsx, override por página) — se
-         sacaron de este HTML estático para no duplicar el tag una vez que Helmet corre.
-         <title> se deja estático: Helmet lo pisa con document.title (sin duplicar), así
-         que sirve de fallback real para el instante antes de que cargue el JS.
-         Nota: crawlers que no ejecutan JS (previews de WhatsApp/Twitter/Facebook) solo ven
-         este HTML estático — description/og:*/canonical NO varían por producto/categoría
-         para esos casos hasta que el proyecto tenga SSR o prerender. Ver .claude/TODO.md. -->
+    <!-- Los tags marcados con data-static-seo (description, og:*) son el
+         fallback para crawlers que NO ejecutan JS (previews de WhatsApp/Facebook): ven
+         solo este HTML. src/main.tsx los elimina antes de renderizar para que
+         react-helmet-async (default en PublicStoreLayout.tsx, override por página) sea
+         la única fuente en runtime y no queden tags duplicados.
+         <title> se deja estático: Helmet lo pisa con document.title (sin duplicar).
+         Nota: los valores estáticos NO varían por producto/categoría hasta que el
+         proyecto tenga SSR o prerender. Ver .claude/TODO.md.
+         Sin canonical ni og:url estáticos: sin JS harían que cada URL declare la home
+         como canónica. -->
     <title>Mates Ajedrez — MATE, luego existo</title>
     <meta name="title" content="Mates Ajedrez — MATE, luego existo" />
     <meta name="keywords" content="mates artesanales, mates de cuero crudo, mates de algarrobo, mates personalizados, grabado láser, regalos empresariales, mates Paysandú, Uruguay" />
+    <meta name="description" content="Mates artesanales en cuero crudo y algarrobo, grabados y personalizados en Paysandú, Uruguay. Tu mate, pero con tu esencia." data-static-seo />
     <meta name="author" content="Mates Ajedrez" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="language" content="Spanish" />
@@ -35,20 +38,40 @@
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
+    <meta property="og:title" content="Mates Ajedrez — MATE, luego existo" data-static-seo />
+    <meta property="og:description" content="Mates artesanales en cuero crudo y algarrobo, grabados y personalizados en Paysandú, Uruguay. Tu mate, pero con tu esencia." data-static-seo />
+    <meta property="og:image" content="https://mateajedrez.uy/og-image.png" data-static-seo />
+    <meta property="og:image:width" content="1200" data-static-seo />
+    <meta property="og:image:height" content="630" data-static-seo />
     <meta property="og:image:alt" content="Mates Ajedrez — mates artesanales en cuero crudo y algarrobo" />
     <meta property="og:locale" content="es" />
     <meta property="og:site_name" content="Mates Ajedrez" />
 
     <!-- Twitter -->
-    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Mates Ajedrez — MATE, luego existo" />
     <meta name="twitter:description" content="Mates artesanales en cuero crudo y algarrobo, grabados y personalizados en Paysandú, Uruguay. Tu mate, pero con tu esencia." />
-    <meta name="twitter:image" content="/og-image.png" />
+    <meta name="twitter:image" content="https://mateajedrez.uy/og-image.png" />
     <meta name="twitter:image:alt" content="Mates Ajedrez — mates artesanales en cuero crudo y algarrobo" />
 
     <!-- Theme Color -->
     <meta name="theme-color" content="#705931" />
     <meta name="msapplication-TileColor" content="#705931" />
+
+    <!-- LCP de la home: precarga la primera imagen del hero SOLO en "/" para que las
+         demás rutas no la descarguen. Debe coincidir con HomePhoto/HeroSlideshow en
+         src/components/features/HomeEditorial.tsx (name, srcset y sizes). -->
+    <script>
+      if (location.pathname === '/') {
+        var l = document.createElement('link');
+        l.rel = 'preload';
+        l.as = 'image';
+        l.setAttribute('imagesrcset', '/images/home/mate-bryan-portada-480.webp 480w, /images/home/mate-bryan-portada-960.webp 960w');
+        l.setAttribute('imagesizes', '(min-width: 1280px) 483px, (min-width: 768px) 38vw, (min-width: 416px) 384px, calc(100vw - 32px)');
+        l.setAttribute('fetchpriority', 'high');
+        document.head.appendChild(l);
+      }
+    </script>
 
     <!-- Preconnect for Performance -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -93,11 +116,8 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker
             .register('/sw.js')
-            .then((reg) => {
-              console.log('Service Worker registrado:', reg);
-            })
             .catch((err) => {
-              console.log('Service Worker registration error:', err);
+              console.error('Service Worker registration error:', err);
             });
         });
       }
