@@ -4,6 +4,11 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-11-24 — Links de catálogo con preview de Mates Ajedrez
+
+- **Archivos modificados:** `nginx.conf`, `public/catalogo.html`
+- **Qué cambió:** `mateajedrez.uy/catalogo/*` sirve un HTML con los meta tags de Mates Ajedrez y redirige por JS a la misma ruta en `axiostock.com`. No es un 301 a propósito: los crawlers de WhatsApp/Facebook siguen redirects HTTP y mostrarían los datos de Axiostock.
+
 ## 2026-11-23 — Recargo del 10% por pagar con Mercado Pago
 
 - **Archivos modificados:** src/lib/paymentSurcharge.ts, src/lib/paymentSurcharge.test.ts, src/lib/schemas.ts, src/pages/Checkout.tsx, src/pages/OrderConfirmation.tsx, .claude/TODO.md
