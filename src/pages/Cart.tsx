@@ -14,11 +14,12 @@ import { getProductStock } from '@/lib/stock'
 import { useAuthStore } from '@/store/authStore'
 import { useCartStore } from '@/store/cartStore'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
+import { PICKUP_HINT } from '@/lib/storeLocation'
 import { Product, ProductImage } from '@/types'
 import { BranchInventory, ProductVariant } from '@/types/aliases'
 import { AlertTriangle, Minus, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 const SUGGESTED_PRODUCTS_COUNT = 5
 
@@ -443,6 +444,13 @@ function CartContent() {
                 <span className="text-brand-muted">Subtotal</span>
                 <span className="font-semibold">{formatPrice(getTotal(), settings)}</span>
               </div>
+              <div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-brand-muted">Envío</span>
+                  <span className="text-right text-sm text-brand-muted">Se calcula en el siguiente paso</span>
+                </div>
+                <p className="mt-1 text-xs text-brand-muted">Retiro en local: {PICKUP_HINT}.</p>
+              </div>
               <div className="border-t pt-4">
                 <div className="flex justify-between font-heading text-lg font-semibold">
                   <span>Total</span>
@@ -470,6 +478,12 @@ function CartContent() {
               >
                 Proceder al Pago
               </Button>
+              <Link
+                to="/products"
+                className="block text-center text-sm font-medium text-brand-cuero underline underline-offset-4 hover:text-brand-cuero-oscuro focus-ring rounded"
+              >
+                Seguir comprando
+              </Link>
             </CardContent>
           </Card>
         </div>
