@@ -14,6 +14,8 @@ export interface CheckoutDraft {
 }
 
 export interface DraftStorage {
+  length?: number
+  key?(index: number): string | null
   getItem(key: string): string | null
   setItem(key: string, value: string): void
   removeItem(key: string): void
@@ -22,8 +24,10 @@ export interface DraftStorage {
 const MAX_FIELD_LENGTH = 500
 const TEXT_FIELDS = ['fullName', 'email', 'phone', 'address', 'city', 'department', 'paymentMethod'] as const
 
+const DRAFT_KEY_PREFIX = 'checkout_draft_'
+
 export function checkoutDraftKey(organizationId: string): string {
-  return `checkout_draft_${organizationId}`
+  return `${DRAFT_KEY_PREFIX}${organizationId}`
 }
 
 export function serializeCheckoutDraft(draft: CheckoutDraft): string {
@@ -99,6 +103,22 @@ export function clearCheckoutDraft(organizationId: string, storage?: DraftStorag
   if (!target) return
   try {
     target.removeItem(checkoutDraftKey(organizationId))
+  } catch {
+    // Ver saveCheckoutDraft.
+  }
+}
+
+// Al cerrar sesión no deben quedar datos personales de otra persona en el borrador.
+export function clearAllCheckoutDrafts(storage?: DraftStorage | null): void {
+  const target = resolveStorage(storage)
+  if (!target || typeof target.length !== 'number' || !target.key) return
+  try {
+    const keys: string[] = []
+    for (let i = 0; i < target.length; i++) {
+      const k = target.key(i)
+      if (k && k.startsWith(DRAFT_KEY_PREFIX)) keys.push(k)
+    }
+    keys.forEach((k) => target.removeItem(k))
   } catch {
     // Ver saveCheckoutDraft.
   }

@@ -396,11 +396,11 @@ export function ProductDetail() {
         className={isMain ? 'w-full h-12' : 'flex-1 h-12'}
         onClick={handleAddToCart}
         disabled={
-          !needsVariantChoice && (
+          (needsVariantChoice ? allVariantsUnavailable : (
             (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)) === 0 ||
             isAdding ||
             (selectedVariantId ? variantStock === null : productStock === null)
-          )
+          ))
         }
         isLoading={isAdding}
       >

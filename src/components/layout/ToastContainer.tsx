@@ -10,7 +10,8 @@ export function ToastContainer() {
   // segundo toast se dispara mientras el primero sigue visible, hereda el
   // timer en curso (useEffect de Toast no re-arranca) y puede desaparecer
   // mucho antes de los 3s normales.
-  return <Toast
+  return (
+    <Toast
       key={id}
       message={message}
       type={type}
@@ -18,4 +19,5 @@ export function ToastContainer() {
       action={action ?? undefined}
       duration={duration ?? undefined}
     />
+  )
 }

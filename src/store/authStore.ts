@@ -1,3 +1,4 @@
+import { clearAllCheckoutDrafts } from '@/lib/checkoutDraft'
 import { create } from 'zustand'
 import { supabase } from '@/lib/supabase'
 import type { UserProfile } from '@/types'
@@ -177,6 +178,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { error } = await supabase.auth.signOut()
       if (error) throw error
 
+      clearAllCheckoutDrafts()
       set({ user: null, profile: null })
     } catch (error) {
       console.error('Error signing out:', error)

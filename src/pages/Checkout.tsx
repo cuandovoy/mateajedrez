@@ -98,6 +98,8 @@ function CheckoutInner() {
     },
   })
 
+  const restoredPaymentRef = useRef<string | null>(null)
+
   // Restaura el borrador (sessionStorage, por organización) solo si el formulario
   // sigue vacío. Declarado antes del efecto de guardado para que corra primero.
   useEffect(() => {
@@ -111,7 +113,10 @@ function CheckoutInner() {
     if (draft.department) setValue('department', draft.department)
     if (draft.email && !getValues('email')) setValue('email', draft.email)
     // Si el método ya no está habilitado, el efecto de sincronización lo reemplaza.
-    if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod)
+    if (draft.paymentMethod) {
+      restoredPaymentRef.current = draft.paymentMethod
+      setPaymentMethod(draft.paymentMethod)
+    }
   }, [organizationId, getValues, setValue])
 
   // Guardado con debounce de los campos no sensibles (nunca cupón ni recaptcha).
@@ -185,7 +190,10 @@ function CheckoutInner() {
       .map((m) => m.key)
     const firstEnabled = paymentMethods.find((m) => !m.requires_cash_session)?.key ?? paymentMethods.find((m) => m.requires_cash_session && mainBranchId)?.key ?? paymentMethods[0]?.key ?? ''
     if (availableKeys.length > 0 && (!paymentMethod || !availableKeys.includes(paymentMethod))) {
-      setPaymentMethod(firstEnabled)
+      // Un método restaurado del borrador tiene prioridad si sigue habilitado.
+      const restored = restoredPaymentRef.current
+      restoredPaymentRef.current = null
+      setPaymentMethod(restored && availableKeys.includes(restored) ? restored : firstEnabled)
     }
   }, [paymentMethods, mainBranchId, paymentMethod])
 

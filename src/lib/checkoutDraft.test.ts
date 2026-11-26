@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   checkoutDraftKey,
+  clearAllCheckoutDrafts,
   clearCheckoutDraft,
   isCheckoutFormPristine,
   loadCheckoutDraft,
@@ -16,6 +17,8 @@ function createStorage(initial: Record<string, string> = {}) {
     getItem: (k: string) => (k in data ? data[k] : null),
     setItem: (k: string, v: string) => { data[k] = v },
     removeItem: (k: string) => { delete data[k] },
+    get length() { return Object.keys(data).length },
+    key: (i: number) => Object.keys(data)[i] ?? null,
   }
 }
 
@@ -145,5 +148,23 @@ describe('persistencia en storage', () => {
   it('descarta un valor corrupto guardado en storage', () => {
     const storage = createStorage({ [checkoutDraftKey('org-1')]: '{corrupto' })
     expect(loadCheckoutDraft('org-1', storage)).toBeNull()
+  })
+})
+
+describe('clearAllCheckoutDrafts', () => {
+  it('borra los borradores de todas las organizaciones y respeta otras claves', () => {
+    const storage = createStorage({ otra: '1' })
+    saveCheckoutDraft('org-1', fullDraft, storage)
+    saveCheckoutDraft('org-2', fullDraft, storage)
+    clearAllCheckoutDrafts(storage)
+    expect(loadCheckoutDraft('org-1', storage)).toBeNull()
+    expect(loadCheckoutDraft('org-2', storage)).toBeNull()
+    expect(storage.data.otra).toBe('1')
+  })
+
+  it('no explota sin storage o con storage que lanza', () => {
+    expect(() => clearAllCheckoutDrafts(null)).not.toThrow()
+    const broken = { length: 1, key: () => { throw new Error('x') }, getItem: () => null, setItem: () => {}, removeItem: () => {} }
+    expect(() => clearAllCheckoutDrafts(broken)).not.toThrow()
   })
 })

@@ -271,6 +271,11 @@ function CartMenu({ triggerClassName, badgeClassName, ariaLabel, enableHover = f
       onMouseEnter={() => { pausedRef.current = true; clearAutoClose() }}
       onMouseLeave={() => { pausedRef.current = false; if (isOpen && announcement) scheduleAutoClose() }}
       onFocus={() => { pausedRef.current = true; clearAutoClose() }}
+      onBlur={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+        pausedRef.current = false
+        if (isOpen && announcement) scheduleAutoClose()
+      }}
     >
       <button
         type="button"

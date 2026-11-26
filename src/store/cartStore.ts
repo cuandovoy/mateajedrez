@@ -345,7 +345,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         const organizationId = productOrganizationId
         if (!organizationId) {
           useToastStore.getState().show('No se pudo identificar la tienda', 'error')
-          return
+          throw new CartToastedError('Missing organization id')
         }
         const { data, error } = await (supabase
           .from('cart_items') as any)

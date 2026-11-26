@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { X, CheckCircle2, AlertCircle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useLayoutStore } from '@/store/layoutStore'
 
 export type ToastType = 'success' | 'error' | 'info'
 
@@ -13,13 +14,18 @@ interface ToastProps {
 }
 
 export function Toast({ message, type = 'success', onClose, duration = 3000, action }: ToastProps) {
+  const [paused, setPaused] = useState(false)
+  const stickyCtaVisible = useLayoutStore((s) => s.stickyCtaVisible)
+
+  // Pausado mientras hay hover o foco dentro (p. ej. para llegar a "Deshacer").
   useEffect(() => {
+    if (paused) return
     const timer = setTimeout(() => {
       onClose()
     }, duration)
 
     return () => clearTimeout(timer)
-  }, [onClose, duration])
+  }, [onClose, duration, paused])
 
   const icons = {
     success: CheckCircle2,
@@ -38,7 +44,15 @@ export function Toast({ message, type = 'success', onClose, duration = 3000, act
   return (
     <div
       role="alert"
-      className="animate-fade-in-up fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-sm z-50 flex items-center gap-3 px-4 py-3 rounded-md border border-brand-line bg-white text-brand-tinta shadow-[0_8px_24px_-12px_rgba(43,36,24,0.35)]"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      className={cn(
+        'animate-fade-in-up fixed right-4 left-4 sm:left-auto sm:max-w-sm z-50 flex items-center gap-3 px-4 py-3 rounded-md border border-brand-line bg-white text-brand-tinta shadow-[0_8px_24px_-12px_rgba(43,36,24,0.35)]',
+        // Sobre la barra de compra fija (solo < md).
+        stickyCtaVisible ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-4' : 'bottom-4'
+      )}
     >
       <span className={cn('flex items-center justify-center h-8 w-8 rounded-full flex-shrink-0', iconStyles[type])}>
         <Icon className="h-4 w-4" />
