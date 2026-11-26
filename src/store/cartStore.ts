@@ -1,4 +1,4 @@
-import { capitalizeFirst, getEffectivePrice } from '@/lib/utils'
+import { getEffectivePrice } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { getProductStock } from '@/lib/stock'
 import { isProductPurchasableInStore } from '@/lib/cartGuard'
@@ -7,6 +7,7 @@ import { PostgrestError } from '@supabase/supabase-js'
 import { create } from 'zustand'
 import { useAuthStore } from './authStore'
 import { useToastStore } from './toastStore'
+import { useCartPeekStore } from './cartPeekStore'
 
 interface LocalCartItem {
   product_id: string
@@ -331,10 +332,7 @@ export const useCartStore = create<CartState>((set, get) => ({
 
       if (existingItem) {
         await get().updateQuantity(existingItem.id, existingItem.quantity + quantity)
-        useToastStore.getState().show(
-          `Cantidad actualizada en el carrito`,
-          'success'
-        )
+        useCartPeekStore.getState().open({ productId, variantId: variantId || null }, 'Cantidad actualizada en el carrito')
         return
       }
 
@@ -383,10 +381,7 @@ export const useCartStore = create<CartState>((set, get) => ({
           ],
         })
 
-        useToastStore.getState().show(
-          `${capitalizeFirst(newItem.product.name)} agregado al carrito`,
-          'success'
-        )
+        useCartPeekStore.getState().open({ productId, variantId: variantId || null })
       } else {
         const { data: product, error } = await supabase
           .from('products')
@@ -454,10 +449,7 @@ export const useCartStore = create<CartState>((set, get) => ({
           ],
         })
 
-        useToastStore.getState().show(
-          `${(product as Product).name} agregado al carrito`,
-          'success'
-        )
+        useCartPeekStore.getState().open({ productId, variantId: variantId || null })
       }
     } catch (error) {
       console.error('Error adding to cart:', error)
