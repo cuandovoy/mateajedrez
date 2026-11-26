@@ -4,6 +4,14 @@ Registro de cambios realizados por Claude Code. Entradas en orden descendente.
 
 ---
 
+## 2026-11-25 — Mejoras de UX de compra en la tienda
+
+- **Archivos modificados:** `src/store/cartPeekStore.ts`, `src/store/layoutStore.ts`, `src/store/cartStore.ts`, `src/store/toastStore.ts`, `src/components/ui/Toast.tsx`, `src/components/layout/{PublicStoreHeader,ToastContainer,WhatsappFloatingButton}.tsx`, `src/components/features/{ProductCard,PurchaseReassurance}.tsx`, `src/hooks/useTransientFlag.ts`, `src/pages/{ProductDetail,Cart,Checkout,OrderConfirmation}.tsx`, `src/lib/{checkoutDraft,checkoutDraft.test,storeLocation}.ts`, `src/index.css`
+- **Qué cambió:** el mini-carrito del header se abre solo (4s, pausa con hover/foco, resalta la línea agregada, anuncio aria-live) tras agregar un producto, reemplazando el toast de éxito; badge con bump; estado "Agregado" en botones; barra de compra fija en mobile en la ficha (WhatsApp flotante se corre); línea de envío/medios de pago junto al CTA; "Deshacer" al quitar del carrito (Toast acepta `action`/`duration` opcionales); CTA sin variante enfoca el selector con mensaje inline; resumen del carrito con "Envío" honesto y "Seguir comprando"; borrador del checkout en sessionStorage por organización (sin cupón ni recaptcha); en pago MP rechazado se ofrece "Coordinar el pago" por WhatsApp. Sin cambios de backend. Corrige además el carrito local de invitados, que quitaba/actualizaba por producto ignorando la variante.
+- **Reintentar pago MP: no implementado** (ver `.claude/TODO.md`): reutilizar `create-mp-preference` sobre una orden rechazada no es seguro sin cambios de backend.
+
+---
+
 ## 2026-11-24 — Web quality batch 1 (performance, SEO, seguridad y accesibilidad sin cambios visuales)
 
 - **Archivos modificados:** `nginx.conf`, `index.html`, `vite.config.ts`, `src/App.tsx`, `src/main.tsx`, `src/lib/lazyWithRetry.ts` (+ test), `src/lib/sitemapBuilder.ts` (+ test), `scripts/generate-sitemap.ts`, `src/hooks/useDialogFocus.ts`, `src/components/layout/PublicStoreLayout.tsx`, `src/pages/ProductDetail.tsx`, `src/pages/Checkout.tsx`, `.claude/TODO.md`, `src/lib/chunkReload.ts`, `src/components/ui/ChunkLoadErrorFallback.tsx`, `src/pages/CategoryProducts.tsx`, `src/pages/PoliticaPrivacidad.tsx`, `src/pages/TerminosCondiciones.tsx`; borrados `public/icon-192 192.png`, `public/icon-512 512.png`, `public/Cambria.ttf`, `public/berlin.regular.ttf`

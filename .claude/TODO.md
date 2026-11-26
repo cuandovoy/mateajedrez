@@ -303,6 +303,13 @@ Implementación del plan de acción de `seo-audit-ruemia.md` (Tier 1 y Tier 2, v
 - 🟡 Mover los horarios a org settings (DB) para editarlos desde el admin; hoy son una constante — src/lib/storeHours.ts
 - 🟡 Reemplazar `store_whatsapp_number` / `VITE_SOCIAL_WHATSAPP` / `VITE_WHATSAPP_SALES_NUMBER` por una única fuente del número de WhatsApp — OrderConfirmation.tsx, Visitanos.tsx, WhatsappFloatingButton.tsx
 
+## UX de compra — pendientes (2026-11-25)
+
+- 🟠 Reintento de pago Mercado Pago bloqueado por el backend compartido: `mp-webhook` pasa la orden a `cancelled` al rechazar y `create-mp-preference` no valida estado de la orden (cada llamada crea otra preferencia y otra fila placeholder en `order_payments`); reintentar sobre una orden cancelada podría "resucitarla" sin re-reservar stock. Requiere cambio de backend (aceptar reintento solo si la orden sigue `pending`, o crear orden nueva) — fuera de alcance de este fork
+- 🟠 `create-mp-preference` arma `back_urls` con prefijo `/${orgSlug}/order-confirmation/...`, pero este fork monta `/order-confirmation/:orderId` en la raíz; verificar que el retorno de MP (success/failure) llegue a una ruta válida — `supabase/functions/create-mp-preference/index.ts`
+- 🟡 `ProductDetail.handleAddToCart` muestra siempre el toast "No se pudo agregar..." aunque el store ya haya mostrado uno específico (doble toast) — `src/pages/ProductDetail.tsx`
+- 🟢 Cart: el "Total" del resumen excluye el envío (se calcula en el checkout); evaluar rotularlo "Total sin envío" — `src/pages/Cart.tsx`
+
 ## Completado ✅
 
 - ✅ 2026-11-14 — Horarios reales del local (L-V 9:30–12:30 y 15:30–19:30, sáb 9:30–13:00) en `src/lib/storeHours.ts`, mostrados en Visitanos y en el retiro del checkout.
