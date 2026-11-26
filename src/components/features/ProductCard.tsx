@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
-import { ShoppingCart, Package } from 'lucide-react'
+import { Check, ShoppingCart, Package } from 'lucide-react'
 import { useCartStore } from '@/store/cartStore'
+import { useToastStore } from '@/store/toastStore'
+import { useTransientFlag } from '@/hooks/useTransientFlag'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
 import { capitalizeFirst, cn, formatPrice, hasActiveDiscount, getEffectivePrice } from '@/lib/utils'
 import { getProductStock } from '@/lib/stock'
@@ -35,6 +37,8 @@ export function ProductCard({
   const settings = useOrgSettings()
   const { addToCart } = useCartStore()
   const [isAdding, setIsAdding] = useState(false)
+  const [justAdded, flashAdded] = useTransientFlag(1500)
+  const showToast = useToastStore((s) => s.show)
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [stock, setStock] = useState<number | null>(null)
 
@@ -42,8 +46,14 @@ export function ProductCard({
     setIsAdding(true)
     try {
       await addToCart(product.id, 1)
+      flashAdded()
     } catch (error) {
       console.error('Error adding to cart:', error)
+      // El store ya avisa los errores conocidos (stock, producto inactivo);
+      // sin este flag el usuario vería dos toasts seguidos.
+      if (!(error instanceof Error && error.name === 'CartToastedError')) {
+        showToast('No se pudo agregar el producto al carrito', 'error')
+      }
     } finally {
       setIsAdding(false)
     }
@@ -136,9 +146,11 @@ export function ProductCard({
               backgroundColor: 'var(--org-primary-color, #705931)',
               color: 'var(--org-primary-ink, white)',
             }}
-            aria-label="Agregar al carrito"
+            aria-label={justAdded ? 'Agregado al carrito' : 'Agregar al carrito'}
           >
-            {isAdding ? (
+            {justAdded ? (
+              <Check className="h-4 w-4" />
+            ) : isAdding ? (
               <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />

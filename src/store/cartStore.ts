@@ -22,7 +22,9 @@ function localCartKey(organizationId?: string | null) {
 // Marca errores que ya mostraron su propio toast específico (stock insuficiente,
 // producto inactivo, etc.) para que el catch de addToCart no los tape con el
 // mensaje genérico "Error al agregar producto al carrito".
-class CartToastedError extends Error {}
+class CartToastedError extends Error {
+  name = 'CartToastedError'
+}
 
 interface CartState {
   items: CartItemWithProduct[]

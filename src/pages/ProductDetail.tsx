@@ -13,10 +13,11 @@ import { buildProductJsonLd, buildBreadcrumbJsonLd } from '@/lib/jsonLd'
 import { useCartStore } from '@/store/cartStore'
 import { useToastStore } from '@/store/toastStore'
 import type { Product, ProductImage } from '@/types'
-import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle, Share2, X, ZoomIn } from 'lucide-react'
+import { ArrowLeft, Check, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle, Share2, X, ZoomIn } from 'lucide-react'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
+import { useTransientFlag } from '@/hooks/useTransientFlag'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 const DEFAULT_PRODUCT_PLACEHOLDER =
@@ -81,6 +82,7 @@ export function ProductDetail() {
   const product = productData?.product ?? null
   const relatedProducts = productData?.relatedProducts ?? []
   const [isAdding, setIsAdding] = useState(false)
+  const [justAdded, flashAdded] = useTransientFlag(1500)
   const [quantity, setQuantity] = useState(1)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedVariant, setSelectedVariant] = useState<{ image_url?: string | null; price?: number | null; stock?: number; unit?: string | null } | null>(null)
@@ -168,6 +170,7 @@ export function ProductDetail() {
     setIsAdding(true)
     try {
       await addToCart(product.id, quantity, selectedVariantId || undefined)
+      flashAdded()
     } catch (error) {
       console.error('Error adding to cart:', error)
       show('No se pudo agregar el producto al carrito', 'error')
@@ -727,8 +730,8 @@ export function ProductDetail() {
                 }
                 isLoading={isAdding}
               >
-                <ShoppingCart className="h-5 w-5 mr-2" />
-                {hasActiveVariants && !selectedVariantId ? 'Seleccioná una variante' : 'Agregar al carrito'}
+                {justAdded ? <Check className="h-5 w-5 mr-2" /> : <ShoppingCart className="h-5 w-5 mr-2" />}
+                {hasActiveVariants && !selectedVariantId ? 'Seleccioná una variante' : justAdded ? 'Agregado' : 'Agregar al carrito'}
               </Button>
             )}
           </div>
