@@ -15,6 +15,7 @@ import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
 import { calculateSurchargedPricing, getSurchargePercent } from '@/lib/paymentSurcharge'
 import { checkoutSchema, URUGUAY_DEPARTMENTS, type CheckoutFormData, type CheckoutFormInput, type DeliveryMethod, type ShippingAddress } from '@/lib/schemas'
+import { clearCheckoutDraft, isCheckoutFormPristine, loadCheckoutDraft, saveCheckoutDraft } from '@/lib/checkoutDraft'
 import { PICKUP_HINT, SHIPPING_HINT, STORE_ADDRESS } from '@/lib/storeLocation'
 import { supabase } from '@/lib/supabase'
 import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl, hasActiveDiscount } from '@/lib/utils'
@@ -96,6 +97,41 @@ function CheckoutInner() {
       city: '',
     },
   })
+
+  // Restaura el borrador (sessionStorage, por organización) solo si el formulario
+  // sigue vacío. Declarado antes del efecto de guardado para que corra primero.
+  useEffect(() => {
+    const draft = loadCheckoutDraft(organizationId)
+    if (!draft || !isCheckoutFormPristine(getValues())) return
+    if (draft.deliveryMethod) setValue('deliveryMethod', draft.deliveryMethod)
+    if (draft.fullName) setValue('fullName', draft.fullName)
+    if (draft.phone) setValue('phone', draft.phone)
+    if (draft.address) setValue('address', draft.address)
+    if (draft.city) setValue('city', draft.city)
+    if (draft.department) setValue('department', draft.department)
+    if (draft.email && !getValues('email')) setValue('email', draft.email)
+    // Si el método ya no está habilitado, el efecto de sincronización lo reemplaza.
+    if (draft.paymentMethod) setPaymentMethod(draft.paymentMethod)
+  }, [organizationId, getValues, setValue])
+
+  // Guardado con debounce de los campos no sensibles (nunca cupón ni recaptcha).
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const persist = () => {
+      if (orderPlacedRef.current) return
+      saveCheckoutDraft(organizationId, { ...getValues(), paymentMethod })
+    }
+    const schedule = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(persist, 400)
+    }
+    const subscription = watch(schedule)
+    schedule()
+    return () => {
+      subscription.unsubscribe()
+      if (timer) clearTimeout(timer)
+    }
+  }, [organizationId, paymentMethod, watch, getValues])
 
   const deliveryMethod = watch('deliveryMethod')
   const isPickup = deliveryMethod === 'pickup'
@@ -688,6 +724,7 @@ function CheckoutInner() {
         const { init_point } = await mpRes.json() as { init_point: string }
 
         orderPlacedRef.current = true
+        clearCheckoutDraft(organizationId)
         await clearCart()
         // Redirect to MP checkout — MP will redirect back to order-confirmation
         window.location.href = init_point
@@ -794,6 +831,7 @@ function CheckoutInner() {
 
       // Clear cart
       orderPlacedRef.current = true
+      clearCheckoutDraft(organizationId)
       await clearCart()
 
       show('¡Orden creada exitosamente!', 'success')
