@@ -1,6 +1,10 @@
 /** Physical store address — single source of truth for the text, map and directions. */
 export const STORE_ADDRESS = 'Avenida España 1471, Paysandú, Uruguay'
 
+// Hechos de entrega compartidos entre Checkout, Carrito y ficha de producto.
+export const SHIPPING_HINT = 'Para todo el país, excepto Paysandú'
+export const PICKUP_HINT = 'Paysandú, sin costo'
+
 /** Keyless Google Maps embed URL for an address. Empty string when the address is blank. */
 export function buildMapEmbedUrl(address: string): string {
   const trimmed = address.trim()

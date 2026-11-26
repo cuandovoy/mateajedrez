@@ -15,7 +15,7 @@ import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
 import { calculateSurchargedPricing, getSurchargePercent } from '@/lib/paymentSurcharge'
 import { checkoutSchema, URUGUAY_DEPARTMENTS, type CheckoutFormData, type CheckoutFormInput, type DeliveryMethod, type ShippingAddress } from '@/lib/schemas'
-import { STORE_ADDRESS } from '@/lib/storeLocation'
+import { PICKUP_HINT, SHIPPING_HINT, STORE_ADDRESS } from '@/lib/storeLocation'
 import { supabase } from '@/lib/supabase'
 import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl, hasActiveDiscount } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -1098,8 +1098,8 @@ function CheckoutInner() {
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-labelledby="checkout-delivery-label">
                     {([
-                      { value: 'shipping', title: 'Envío a domicilio', hint: 'Para todo el país, excepto Paysandú', icon: <Truck className="h-5 w-5" /> },
-                      { value: 'pickup', title: 'Retiro en local', hint: 'Paysandú, sin costo', icon: <Store className="h-5 w-5" /> },
+                      { value: 'shipping', title: 'Envío a domicilio', hint: SHIPPING_HINT, icon: <Truck className="h-5 w-5" /> },
+                      { value: 'pickup', title: 'Retiro en local', hint: PICKUP_HINT, icon: <Store className="h-5 w-5" /> },
                     ] as const).map((opt) => {
                       const selected = deliveryMethod === opt.value
                       return (
