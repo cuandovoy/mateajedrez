@@ -1,4 +1,5 @@
 import { useCartStore } from '@/store/cartStore'
+import { useCartPeekStore } from '@/store/cartPeekStore'
 import type { Organization } from '@/types/aliases'
 import type { Product, ProductImage } from '@/types'
 import { usePublicCategoriesForMenu } from '@/hooks/usePublicCategories'
@@ -153,6 +154,8 @@ function MobileCategoryItem({ cat, onNavigate }: MobileCategoryItemProps) {
   )
 }
 
+const CART_PEEK_DURATION_MS = 4000
+
 interface CartMenuProps {
   triggerClassName: string
   badgeClassName: string
@@ -171,7 +174,64 @@ function CartMenu({ triggerClassName, badgeClassName, ariaLabel, enableHover = f
   const navigate = useNavigate()
   const location = useLocation()
   const settings = useOrgSettings()
-  const { items, updateQuantity, removeFromCart, getTotal, getItemCount } = useCartStore()
+  const { items, updateQuantity, removeWithUndo, getTotal, getItemCount } = useCartStore()
+  const peekToken = useCartPeekStore((s) => s.token)
+  const peekHighlight = useCartPeekStore((s) => s.highlight)
+  const peekAnnouncement = useCartPeekStore((s) => s.announcement)
+  const [announcement, setAnnouncement] = useState('')
+  const [bumpKey, setBumpKey] = useState(0)
+  const autoCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pausedRef = useRef(false)
+  const lastToken = useRef(peekToken)
+  const prevCount = useRef(getItemCount())
+  const highlightRef = useRef<HTMLDivElement>(null)
+
+  const clearAutoClose = () => {
+    if (autoCloseTimer.current) {
+      clearTimeout(autoCloseTimer.current)
+      autoCloseTimer.current = null
+    }
+  }
+
+  const scheduleAutoClose = () => {
+    clearAutoClose()
+    autoCloseTimer.current = setTimeout(() => {
+      if (!pausedRef.current) setIsOpen(false)
+    }, CART_PEEK_DURATION_MS)
+  }
+
+  // Apertura programática tras agregar un producto. Solo la instancia visible
+  // (desktop o mobile) reacciona: la otra vive dentro de un `display: none`.
+  useEffect(() => {
+    if (peekToken === lastToken.current) return
+    lastToken.current = peekToken
+    const el = containerRef.current
+    if (!el || el.offsetParent === null) return
+    pausedRef.current = false
+    setIsOpen(true)
+    setAnnouncement(peekAnnouncement)
+    scheduleAutoClose()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peekToken])
+
+  useEffect(() => () => clearAutoClose(), [])
+
+  useEffect(() => {
+    if (!isOpen) {
+      clearAutoClose()
+      setAnnouncement('')
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (isOpen) highlightRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [isOpen, peekToken])
+
+  const currentCount = getItemCount()
+  useEffect(() => {
+    if (currentCount > prevCount.current) setBumpKey((k) => k + 1)
+    prevCount.current = currentCount
+  }, [currentCount])
 
   useEffect(() => {
     if (!isOpen) return
@@ -205,19 +265,36 @@ function CartMenu({ triggerClassName, badgeClassName, ariaLabel, enableHover = f
   }
 
   return (
-    <div ref={containerRef} className={cn('relative', enableHover && 'group')}>
+    <div
+      ref={containerRef}
+      className={cn('relative', enableHover && 'group')}
+      onMouseEnter={() => { pausedRef.current = true; clearAutoClose() }}
+      onMouseLeave={() => { pausedRef.current = false; if (isOpen && announcement) scheduleAutoClose() }}
+      onFocus={() => { pausedRef.current = true; clearAutoClose() }}
+      onBlur={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return
+        pausedRef.current = false
+        if (isOpen && announcement) scheduleAutoClose()
+      }}
+    >
       <button
         type="button"
-        onClick={() => setIsOpen((p) => !p)}
+        onClick={() => {
+          clearAutoClose()
+          setIsOpen((p) => !p)
+        }}
         aria-label={ariaLabel}
         aria-expanded={isOpen}
         className={triggerClassName}
       >
         <ShoppingCart className="h-5 w-5" />
         {itemCount > 0 && (
-          <span className={badgeClassName}>{itemCount > 99 ? '99+' : itemCount}</span>
+          <span key={bumpKey} className={cn(badgeClassName, bumpKey > 0 && 'cart-badge-bump')}>
+            {itemCount > 99 ? '99+' : itemCount}
+          </span>
         )}
       </button>
+      <span role="status" aria-live="polite" className="sr-only">{announcement}</span>
 
       <div
         className={cn(
@@ -240,8 +317,18 @@ function CartMenu({ triggerClassName, badgeClassName, ariaLabel, enableHover = f
                   const imageUrl = getProductImageUrl(productWithImages, item.variant?.image_url || null)
                   const unitPrice = item.variant?.price ?? getEffectivePrice(item.product)
 
+                  const isHighlighted =
+                    !!peekHighlight &&
+                    announcement !== '' &&
+                    item.product_id === peekHighlight.productId &&
+                    (item.variant_id ?? null) === peekHighlight.variantId
+
                   return (
-                    <div key={item.id} className="flex gap-3 p-3">
+                    <div
+                      key={item.id}
+                      ref={isHighlighted ? highlightRef : undefined}
+                      className={cn('flex gap-3 p-3 transition-colors', isHighlighted && 'bg-brand-crema')}
+                    >
                       <div className="flex-shrink-0 w-14 h-14 bg-brand-crema rounded-lg overflow-hidden border border-brand-line">
                         {imageUrl ? (
                           <img src={imageUrl} alt={capitalizeFirst(item.product.name)} className="w-full h-full object-cover" />
@@ -290,7 +377,7 @@ function CartMenu({ triggerClassName, badgeClassName, ariaLabel, enableHover = f
 
                       <button
                         type="button"
-                        onClick={() => removeFromCart(item.id).catch(() => {})}
+                        onClick={() => removeWithUndo(item.id).catch(() => {})}
                         aria-label="Eliminar producto del carrito"
                         className="self-start text-brand-algarrobo hover:text-red-500 transition-colors p-1 -mr-1"
                       >

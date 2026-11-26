@@ -15,7 +15,8 @@ import { BillerApiError, descargarPDFBlob } from '@/lib/biller'
 import { emitirCFEDesdeOrden } from '@/lib/billerSaleService'
 import { calculateSurchargedPricing, getSurchargePercent } from '@/lib/paymentSurcharge'
 import { checkoutSchema, URUGUAY_DEPARTMENTS, type CheckoutFormData, type CheckoutFormInput, type DeliveryMethod, type ShippingAddress } from '@/lib/schemas'
-import { STORE_ADDRESS } from '@/lib/storeLocation'
+import { clearCheckoutDraft, isCheckoutFormPristine, loadCheckoutDraft, saveCheckoutDraft } from '@/lib/checkoutDraft'
+import { PICKUP_HINT, SHIPPING_HINT, STORE_ADDRESS } from '@/lib/storeLocation'
 import { supabase } from '@/lib/supabase'
 import { capitalizeFirst, cn, formatPrice, getEffectivePrice, getProductImageUrl, hasActiveDiscount } from '@/lib/utils'
 import { useAuthStore } from '@/store/authStore'
@@ -97,6 +98,46 @@ function CheckoutInner() {
     },
   })
 
+  const restoredPaymentRef = useRef<string | null>(null)
+
+  // Restaura el borrador (sessionStorage, por organización) solo si el formulario
+  // sigue vacío. Declarado antes del efecto de guardado para que corra primero.
+  useEffect(() => {
+    const draft = loadCheckoutDraft(organizationId)
+    if (!draft || !isCheckoutFormPristine(getValues())) return
+    if (draft.deliveryMethod) setValue('deliveryMethod', draft.deliveryMethod)
+    if (draft.fullName) setValue('fullName', draft.fullName)
+    if (draft.phone) setValue('phone', draft.phone)
+    if (draft.address) setValue('address', draft.address)
+    if (draft.city) setValue('city', draft.city)
+    if (draft.department) setValue('department', draft.department)
+    if (draft.email && !getValues('email')) setValue('email', draft.email)
+    // Si el método ya no está habilitado, el efecto de sincronización lo reemplaza.
+    if (draft.paymentMethod) {
+      restoredPaymentRef.current = draft.paymentMethod
+      setPaymentMethod(draft.paymentMethod)
+    }
+  }, [organizationId, getValues, setValue])
+
+  // Guardado con debounce de los campos no sensibles (nunca cupón ni recaptcha).
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const persist = () => {
+      if (orderPlacedRef.current) return
+      saveCheckoutDraft(organizationId, { ...getValues(), paymentMethod })
+    }
+    const schedule = () => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(persist, 400)
+    }
+    const subscription = watch(schedule)
+    schedule()
+    return () => {
+      subscription.unsubscribe()
+      if (timer) clearTimeout(timer)
+    }
+  }, [organizationId, paymentMethod, watch, getValues])
+
   const deliveryMethod = watch('deliveryMethod')
   const isPickup = deliveryMethod === 'pickup'
 
@@ -149,7 +190,10 @@ function CheckoutInner() {
       .map((m) => m.key)
     const firstEnabled = paymentMethods.find((m) => !m.requires_cash_session)?.key ?? paymentMethods.find((m) => m.requires_cash_session && mainBranchId)?.key ?? paymentMethods[0]?.key ?? ''
     if (availableKeys.length > 0 && (!paymentMethod || !availableKeys.includes(paymentMethod))) {
-      setPaymentMethod(firstEnabled)
+      // Un método restaurado del borrador tiene prioridad si sigue habilitado.
+      const restored = restoredPaymentRef.current
+      restoredPaymentRef.current = null
+      setPaymentMethod(restored && availableKeys.includes(restored) ? restored : firstEnabled)
     }
   }, [paymentMethods, mainBranchId, paymentMethod])
 
@@ -688,6 +732,7 @@ function CheckoutInner() {
         const { init_point } = await mpRes.json() as { init_point: string }
 
         orderPlacedRef.current = true
+        clearCheckoutDraft(organizationId)
         await clearCart()
         // Redirect to MP checkout — MP will redirect back to order-confirmation
         window.location.href = init_point
@@ -794,6 +839,7 @@ function CheckoutInner() {
 
       // Clear cart
       orderPlacedRef.current = true
+      clearCheckoutDraft(organizationId)
       await clearCart()
 
       show('¡Orden creada exitosamente!', 'success')
@@ -1098,8 +1144,8 @@ function CheckoutInner() {
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" role="radiogroup" aria-labelledby="checkout-delivery-label">
                     {([
-                      { value: 'shipping', title: 'Envío a domicilio', hint: 'Para todo el país, excepto Paysandú', icon: <Truck className="h-5 w-5" /> },
-                      { value: 'pickup', title: 'Retiro en local', hint: 'Paysandú, sin costo', icon: <Store className="h-5 w-5" /> },
+                      { value: 'shipping', title: 'Envío a domicilio', hint: SHIPPING_HINT, icon: <Truck className="h-5 w-5" /> },
+                      { value: 'pickup', title: 'Retiro en local', hint: PICKUP_HINT, icon: <Store className="h-5 w-5" /> },
                     ] as const).map((opt) => {
                       const selected = deliveryMethod === opt.value
                       return (

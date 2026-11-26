@@ -1,5 +1,6 @@
 import { ProductCard } from '@/components/features/ProductCard'
 import { VariantSelector } from '@/components/features/VariantSelector'
+import { PurchaseReassurance } from '@/components/features/PurchaseReassurance'
 import { Button } from '@/components/ui/Button'
 import { usePublicStore } from '@/contexts/PublicStoreContext'
 import { useOrgSettings } from '@/hooks/useOrgSettings'
@@ -12,11 +13,13 @@ import { absoluteUrl } from '@/lib/siteUrl'
 import { buildProductJsonLd, buildBreadcrumbJsonLd } from '@/lib/jsonLd'
 import { useCartStore } from '@/store/cartStore'
 import { useToastStore } from '@/store/toastStore'
+import { useLayoutStore } from '@/store/layoutStore'
 import type { Product, ProductImage } from '@/types'
-import { ArrowLeft, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle, Share2, X, ZoomIn } from 'lucide-react'
+import { ArrowLeft, Check, ShoppingCart, ChevronLeft, ChevronRight, MessageCircle, Share2, X, ZoomIn } from 'lucide-react'
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Helmet } from 'react-helmet-async'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
+import { useTransientFlag } from '@/hooks/useTransientFlag'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 const DEFAULT_PRODUCT_PLACEHOLDER =
@@ -81,6 +84,7 @@ export function ProductDetail() {
   const product = productData?.product ?? null
   const relatedProducts = productData?.relatedProducts ?? []
   const [isAdding, setIsAdding] = useState(false)
+  const [justAdded, flashAdded] = useTransientFlag(1500)
   const [quantity, setQuantity] = useState(1)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedVariant, setSelectedVariant] = useState<{ image_url?: string | null; price?: number | null; stock?: number; unit?: string | null } | null>(null)
@@ -111,6 +115,12 @@ export function ProductDetail() {
   const [variantStockMap, setVariantStockMap] = useState<Record<string, number>>({})
   const [allVariantsUnavailable, setAllVariantsUnavailable] = useState(false)
   const productRef = useRef<HTMLDivElement>(null)
+  const variantSectionRef = useRef<HTMLDivElement>(null)
+  const [showVariantHint, setShowVariantHint] = useState(false)
+  // Nodo del CTA principal (callback ref → state) para observar cuándo sale de pantalla.
+  const [ctaNode, setCtaNode] = useState<HTMLDivElement | null>(null)
+  const [ctaInView, setCtaInView] = useState(true)
+  const setStickyCtaVisible = useLayoutStore((s) => s.setStickyCtaVisible)
   const touchStartXRef = useRef<number | null>(null)
   const lightboxRef = useRef<HTMLDivElement>(null)
   useDialogFocus(isLightboxOpen, lightboxRef)
@@ -142,6 +152,18 @@ export function ProductDetail() {
     return () => document.removeEventListener('keydown', handleEscape)
   }, [isLightboxOpen])
 
+  useEffect(() => {
+    if (!ctaNode || typeof IntersectionObserver === 'undefined') return
+    const observer = new IntersectionObserver(([entry]) => setCtaInView(entry.isIntersecting))
+    observer.observe(ctaNode)
+    return () => observer.disconnect()
+  }, [ctaNode])
+
+  // El hint de "elegí una opción" se apaga solo al elegir variante.
+  useEffect(() => {
+    if (selectedVariantId) setShowVariantHint(false)
+  }, [selectedVariantId])
+
   const handleVariantAvailabilityChange = useCallback((hasAvailableVariant: boolean) => {
     setAllVariantsUnavailable(!hasAvailableVariant)
   }, [])
@@ -162,12 +184,34 @@ export function ProductDetail() {
     return () => { cancelled = true }
   }, [product?.id, product?.organization_id])
 
+  const needsVariantChoice = hasActiveVariants && !selectedVariantId
+  const hasNoPurchaseChannel = !!product?.requires_availability_check && !settings.store_whatsapp_number
+
+  useEffect(() => {
+    setStickyCtaVisible(!!ctaNode && !ctaInView && !hasNoPurchaseChannel)
+    return () => setStickyCtaVisible(false)
+  }, [ctaNode, ctaInView, hasNoPurchaseChannel, setStickyCtaVisible])
+
+  const promptVariantChoice = () => {
+    setShowVariantHint(true)
+    const section = variantSectionRef.current
+    if (!section) return
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    section.scrollIntoView({ block: 'center', behavior: reduceMotion ? 'auto' : 'smooth' })
+    section.querySelector<HTMLElement>('button:not(:disabled)')?.focus({ preventScroll: true })
+  }
+
   const handleAddToCart = async () => {
     if (!product) return
+    if (needsVariantChoice) {
+      promptVariantChoice()
+      return
+    }
 
     setIsAdding(true)
     try {
       await addToCart(product.id, quantity, selectedVariantId || undefined)
+      flashAdded()
     } catch (error) {
       console.error('Error adding to cart:', error)
       show('No se pudo agregar el producto al carrito', 'error')
@@ -324,8 +368,53 @@ export function ProductDetail() {
     { name: capitalizeFirst(product.name), url: productUrl },
   ])
 
+  // El mismo CTA vive en el bloque principal y en la barra fija mobile: así
+  // ambos respetan exactamente los mismos estados (variante / stock / consulta).
+  const renderPrimaryCta = (isMain: boolean) => {
+    if ((requiresInquiry || isOutOfStock) && whatsappHref) {
+      return (
+        <a
+          href={whatsappHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${isMain ? 'w-full' : 'flex-1'} h-12 inline-flex items-center justify-center gap-2 rounded-md bg-brand-cuero font-heading text-sm font-semibold uppercase tracking-[0.14em] text-brand-crema transition-colors hover:bg-brand-cuero-oscuro focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:ring-offset-2`}
+        >
+          <MessageCircle className="h-5 w-5" />
+          {requiresInquiry ? 'Consultar por producto' : 'Consultar disponibilidad'}
+        </a>
+      )
+    }
+    if (requiresInquiry) {
+      return isMain ? (
+        <p role="status" className="rounded-md border border-brand-line bg-brand-crema p-4 text-sm leading-6 text-brand-tinta">
+          Las consultas online no están disponibles por el momento. Contactá directamente a la tienda para coordinar tu pedido.
+        </p>
+      ) : null
+    }
+    return (
+      <Button
+        className={isMain ? 'w-full h-12' : 'flex-1 h-12'}
+        onClick={handleAddToCart}
+        disabled={
+          (needsVariantChoice ? allVariantsUnavailable : (
+            (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)) === 0 ||
+            isAdding ||
+            (selectedVariantId ? variantStock === null : productStock === null)
+          ))
+        }
+        isLoading={isAdding}
+      >
+        {justAdded ? <Check className="h-5 w-5 mr-2" /> : <ShoppingCart className="h-5 w-5 mr-2" />}
+        {justAdded ? 'Agregado' : 'Agregar al carrito'}
+      </Button>
+    )
+  }
+
+  const stickyCta = renderPrimaryCta(false)
+  const showStickyBar = !ctaInView && !!stickyCta
+
   return (
-    <div className="container-custom py-8">
+    <div className="container-custom py-8 pb-28 md:pb-8">
       <Helmet>
         <title>{metaTitle}</title>
         <meta name="description" content={metaDescription} />
@@ -645,7 +734,7 @@ export function ProductDetail() {
           </div>
 
           {/* Variant Selector - Solo permite seleccionar una variante a la vez */}
-          <div className="mb-6">
+          <div ref={variantSectionRef} className="mb-6 scroll-mt-24">
             <VariantSelector
               product={product}
               selectedVariantId={selectedVariantId}
@@ -653,6 +742,9 @@ export function ProductDetail() {
               onAvailabilityChange={handleVariantAvailabilityChange}
               onVariantStocksChange={handleVariantStocksChange}
             />
+            <p aria-live="polite" className="mt-2 text-sm font-medium text-red-700">
+              {showVariantHint && needsVariantChoice ? 'Elegí una opción para continuar' : ''}
+            </p>
           </div>
 
           <div className="mb-6 pt-6 border-t border-brand-line">
@@ -701,39 +793,22 @@ export function ProductDetail() {
             {!requiresInquiry && isOutOfStock && (
               <p className="text-sm text-brand-muted mb-4">Este producto no tiene stock disponible.</p>
             )}
-            {(requiresInquiry || isOutOfStock) && whatsappHref ? (
-              <a
-                href={whatsappHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-md bg-brand-cuero font-heading text-sm font-semibold uppercase tracking-[0.14em] text-brand-crema transition-colors hover:bg-brand-cuero-oscuro focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:ring-offset-2"
-              >
-                <MessageCircle className="h-5 w-5" />
-                {requiresInquiry ? 'Consultar por producto' : 'Consultar disponibilidad'}
-              </a>
-            ) : requiresInquiry ? (
-              <p role="status" className="rounded-md border border-brand-line bg-brand-crema p-4 text-sm leading-6 text-brand-tinta">
-                Las consultas online no están disponibles por el momento. Contactá directamente a la tienda para coordinar tu pedido.
-              </p>
-            ) : (
-              <Button
-                className="w-full h-12"
-                onClick={handleAddToCart}
-                disabled={
-                  (hasActiveVariants && !selectedVariantId) ||
-                  (selectedVariantId ? (variantStock ?? 0) : (productStock ?? 0)) === 0 ||
-                  isAdding ||
-                  (selectedVariantId ? variantStock === null : productStock === null)
-                }
-                isLoading={isAdding}
-              >
-                <ShoppingCart className="h-5 w-5 mr-2" />
-                {hasActiveVariants && !selectedVariantId ? 'Seleccioná una variante' : 'Agregar al carrito'}
-              </Button>
-            )}
+            <div ref={setCtaNode}>{renderPrimaryCta(true)}</div>
+            <PurchaseReassurance />
           </div>
         </div>
       </div>
+
+      {showStickyBar && (
+        <div className="fixed inset-x-0 bottom-0 z-40 md:hidden border-t border-brand-line bg-brand-bg px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          <div className="mx-auto flex max-w-xl items-center gap-4">
+            <p className="font-heading text-xl font-semibold tabular-nums text-brand-cuero">
+              {formatPrice(displayPrice, settings)}
+            </p>
+            {stickyCta}
+          </div>
+        </div>
+      )}
 
       {/* Productos relacionados */}
       {relatedProducts.length > 0 && (

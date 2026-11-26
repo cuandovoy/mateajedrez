@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { X, CheckCircle2, AlertCircle, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useLayoutStore } from '@/store/layoutStore'
 
 export type ToastType = 'success' | 'error' | 'info'
 
@@ -9,16 +10,22 @@ interface ToastProps {
   type?: ToastType
   onClose: () => void
   duration?: number
+  action?: { label: string; onClick: () => void }
 }
 
-export function Toast({ message, type = 'success', onClose, duration = 3000 }: ToastProps) {
+export function Toast({ message, type = 'success', onClose, duration = 3000, action }: ToastProps) {
+  const [paused, setPaused] = useState(false)
+  const stickyCtaVisible = useLayoutStore((s) => s.stickyCtaVisible)
+
+  // Pausado mientras hay hover o foco dentro (p. ej. para llegar a "Deshacer").
   useEffect(() => {
+    if (paused) return
     const timer = setTimeout(() => {
       onClose()
     }, duration)
 
     return () => clearTimeout(timer)
-  }, [onClose, duration])
+  }, [onClose, duration, paused])
 
   const icons = {
     success: CheckCircle2,
@@ -37,12 +44,32 @@ export function Toast({ message, type = 'success', onClose, duration = 3000 }: T
   return (
     <div
       role="alert"
-      className="animate-fade-in-up fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-sm z-50 flex items-center gap-3 px-4 py-3 rounded-md border border-brand-line bg-white text-brand-tinta shadow-[0_8px_24px_-12px_rgba(43,36,24,0.35)]"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      className={cn(
+        'animate-fade-in-up fixed right-4 left-4 sm:left-auto sm:max-w-sm z-50 flex items-center gap-3 px-4 py-3 rounded-md border border-brand-line bg-white text-brand-tinta shadow-[0_8px_24px_-12px_rgba(43,36,24,0.35)]',
+        // Sobre la barra de compra fija (solo < md).
+        stickyCtaVisible ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] md:bottom-4' : 'bottom-4'
+      )}
     >
       <span className={cn('flex items-center justify-center h-8 w-8 rounded-full flex-shrink-0', iconStyles[type])}>
         <Icon className="h-4 w-4" />
       </span>
       <p className="text-sm font-medium flex-1 min-w-0">{message}</p>
+      {action && (
+        <button
+          type="button"
+          onClick={() => {
+            action.onClick()
+            onClose()
+          }}
+          className="min-h-[44px] px-2 font-heading text-xs font-semibold uppercase tracking-[0.14em] text-brand-cuero hover:text-brand-cuero-oscuro underline underline-offset-4 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero rounded"
+        >
+          {action.label}
+        </button>
+      )}
       <button
         type="button"
         onClick={onClose}
