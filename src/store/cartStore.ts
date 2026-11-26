@@ -31,9 +31,10 @@ interface CartState {
   loading: boolean
   hasFetched: boolean
   fetchCart: (organizationId?: string) => Promise<void>
-  addToCart: (productId: string, quantity?: number, variantId?: string) => Promise<void>
+  addToCart: (productId: string, quantity?: number, variantId?: string, options?: { silent?: boolean }) => Promise<void>
   updateQuantity: (itemId: string, quantity: number) => Promise<void>
   removeFromCart: (itemId: string) => Promise<void>
+  removeWithUndo: (itemId: string) => Promise<void>
   clearCart: () => Promise<void>
   getTotal: () => number
   getItemCount: () => number
@@ -240,7 +241,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
   },
 
-  addToCart: async (productId: string, quantity = 1, variantId?: string) => {
+  addToCart: async (productId: string, quantity = 1, variantId?: string, options?: { silent?: boolean }) => {
     const { user } = useAuthStore.getState()
 
     try {
@@ -334,7 +335,9 @@ export const useCartStore = create<CartState>((set, get) => ({
 
       if (existingItem) {
         await get().updateQuantity(existingItem.id, existingItem.quantity + quantity)
-        useCartPeekStore.getState().open({ productId, variantId: variantId || null }, 'Cantidad actualizada en el carrito')
+        if (!options?.silent) {
+          useCartPeekStore.getState().open({ productId, variantId: variantId || null }, 'Cantidad actualizada en el carrito')
+        }
         return
       }
 
@@ -383,7 +386,7 @@ export const useCartStore = create<CartState>((set, get) => ({
           ],
         })
 
-        useCartPeekStore.getState().open({ productId, variantId: variantId || null })
+        if (!options?.silent) useCartPeekStore.getState().open({ productId, variantId: variantId || null })
       } else {
         const { data: product, error } = await supabase
           .from('products')
@@ -451,7 +454,7 @@ export const useCartStore = create<CartState>((set, get) => ({
           ],
         })
 
-        useCartPeekStore.getState().open({ productId, variantId: variantId || null })
+        if (!options?.silent) useCartPeekStore.getState().open({ productId, variantId: variantId || null })
       }
     } catch (error) {
       console.error('Error adding to cart:', error)
@@ -489,7 +492,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         const localCart = localStorage.getItem(cartKey)
         const localItems: LocalCartItem[] = localCart ? JSON.parse(localCart) : []
 
-        const localItem = localItems.find(li => li.product_id === item.product_id)
+        const localItem = localItems.find(li => li.product_id === item.product_id && (li.variant_id ?? null) === (item.variant_id ?? null))
         if (localItem) {
           localItem.quantity = quantity
           localStorage.setItem(cartKey, JSON.stringify(localItems))
@@ -525,7 +528,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         const localCart = localStorage.getItem(cartKey)
         const localItems: LocalCartItem[] = localCart ? JSON.parse(localCart) : []
 
-        const filteredItems = localItems.filter(li => li.product_id !== item.product_id)
+        const filteredItems = localItems.filter(li => !(li.product_id === item.product_id && (li.variant_id ?? null) === (item.variant_id ?? null)))
         localStorage.setItem(cartKey, JSON.stringify(filteredItems))
       }
 
@@ -537,6 +540,23 @@ export const useCartStore = create<CartState>((set, get) => ({
       useToastStore.getState().show('No se pudo eliminar el producto del carrito', 'error')
       throw error
     }
+  },
+
+  removeWithUndo: async (itemId: string) => {
+    const item = get().items.find((i) => i.id === itemId)
+    if (!item) return
+    const { product_id: productId, quantity } = item
+    const variantId = item.variant_id ?? undefined
+    await get().removeFromCart(itemId)
+    useToastStore.getState().show('Producto quitado', 'info', {
+      duration: 5000,
+      action: {
+        label: 'Deshacer',
+        onClick: () => {
+          get().addToCart(productId, quantity, variantId, { silent: true }).catch(() => {})
+        },
+      },
+    })
   },
 
   clearCart: async () => {

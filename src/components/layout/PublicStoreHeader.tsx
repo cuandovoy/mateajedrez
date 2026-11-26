@@ -174,7 +174,7 @@ function CartMenu({ triggerClassName, badgeClassName, ariaLabel, enableHover = f
   const navigate = useNavigate()
   const location = useLocation()
   const settings = useOrgSettings()
-  const { items, updateQuantity, removeFromCart, getTotal, getItemCount } = useCartStore()
+  const { items, updateQuantity, removeWithUndo, getTotal, getItemCount } = useCartStore()
   const peekToken = useCartPeekStore((s) => s.token)
   const peekHighlight = useCartPeekStore((s) => s.highlight)
   const peekAnnouncement = useCartPeekStore((s) => s.announcement)
@@ -372,7 +372,7 @@ function CartMenu({ triggerClassName, badgeClassName, ariaLabel, enableHover = f
 
                       <button
                         type="button"
-                        onClick={() => removeFromCart(item.id).catch(() => {})}
+                        onClick={() => removeWithUndo(item.id).catch(() => {})}
                         aria-label="Eliminar producto del carrito"
                         className="self-start text-brand-algarrobo hover:text-red-500 transition-colors p-1 -mr-1"
                       >

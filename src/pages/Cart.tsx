@@ -73,7 +73,7 @@ function CartContent() {
   const navigate = useNavigate()
   const { organization } = usePublicStore()
   const settings = useOrgSettings()
-  const { items, loading, fetchCart, updateQuantity, removeFromCart, getTotal } = useCartStore()
+  const { items, loading, fetchCart, updateQuantity, removeWithUndo, getTotal } = useCartStore()
   const { user } = useAuthStore()
   const organizationId = organization.id
   const [stockWarnings, setStockWarnings] = useState<Record<string, { available: number; requested: number }>>({})
@@ -418,7 +418,7 @@ function CartContent() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => removeFromCart(item.id).catch(() => {})}
+                          onClick={() => removeWithUndo(item.id).catch(() => {})}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                           aria-label="Eliminar producto del carrito"
                         >
