@@ -160,6 +160,11 @@ export function OrderConfirmation() {
         `Hola! Quiero coordinar mi orden ${orderRef}`
       )}`
     : null
+  const paymentWhatsappHref = settings.store_whatsapp_number
+    ? `https://wa.me/${settings.store_whatsapp_number.replace(/\D/g, '')}?text=${encodeURIComponent(
+        `Hola! Mi pago con Mercado Pago de la orden ${orderRef} fue rechazado. Quiero coordinar otra forma de pago.`
+      )}`
+    : null
   const receiptWhatsappHref = settings.store_whatsapp_number
     ? `https://wa.me/${settings.store_whatsapp_number.replace(/\D/g, '')}?text=${encodeURIComponent(
         `Hola! Te envío el comprobante de transferencia de mi orden ${orderRef}`
@@ -352,8 +357,19 @@ export function OrderConfirmation() {
             <div className="flex-1">
               <p className="font-semibold text-red-800">El pago fue rechazado</p>
               <p className="text-sm text-red-700 mt-0.5">
-                Tu orden fue creada pero el pago no se completó. Podés intentar de nuevo o elegir otro método de pago.
+                Tu orden fue creada pero el pago no se completó. Escribinos y coordinamos otra forma de pago para tu pedido.
               </p>
+              {paymentWhatsappHref && (
+                <a
+                  href={paymentWhatsappHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex h-10 items-center gap-2 rounded-md bg-brand-cuero px-4 font-heading text-xs font-semibold uppercase tracking-[0.14em] text-brand-crema transition-colors hover:bg-brand-cuero-oscuro focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-cuero focus-visible:ring-offset-2"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                  Coordinar el pago
+                </a>
+              )}
             </div>
           </div>
         )}
